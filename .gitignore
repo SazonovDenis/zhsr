@@ -1,0 +1,35 @@
+# Claude Code project instructions (local only)
+CLAUDE.md
+
+# Ignore IntelliJ IDEA project files
+.idea/
+
+# Ignore Gradle files
+.gradle/
+build/
+
+# Ignore other common files and directories
+*.log
+*.class
+*.war
+*.iml
+*.ipr
+*.iws
+out/
+tmp/
+logs/
+notuse/
+_*/
+gradle/wrapper/*.jar
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+*.class
+?
+
+
+
+# кэш диаграмм doc-db
+.plantuml-cache/

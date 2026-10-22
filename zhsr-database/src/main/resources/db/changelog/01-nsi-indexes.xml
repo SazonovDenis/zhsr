@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
+        objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
+
+    <!-- НСИ: уникальность кодов и номеров, внешние ключи -->
+
+    <changeSet id="01-nsi-indexes-uq_station_code" author="zhsr">
+        <addUniqueConstraint tableName="station" columnNames="code" constraintName="uq_station_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_depot_code" author="zhsr">
+        <addUniqueConstraint tableName="depot" columnNames="code" constraintName="uq_depot_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_depot_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="depot" baseColumnNames="station" constraintName="fk_depot_station"
+                                 referencedTableName="station" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_wagon_type_code" author="zhsr">
+        <addUniqueConstraint tableName="wagon_type" columnNames="code" constraintName="uq_wagon_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_wagon_model_code" author="zhsr">
+        <addUniqueConstraint tableName="wagon_model" columnNames="code" constraintName="uq_wagon_model_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_wagon_number" author="zhsr">
+        <addUniqueConstraint tableName="wagon" columnNames="number" constraintName="uq_wagon_number"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_wagon_depot" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon" baseColumnNames="depot" constraintName="fk_wagon_depot"
+                                 referencedTableName="depot" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_wagon_wagon_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon" baseColumnNames="wagon_type" constraintName="fk_wagon_wagon_type"
+                                 referencedTableName="wagon_type" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_wagon_wagon_model" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon" baseColumnNames="wagon_model" constraintName="fk_wagon_wagon_model"
+                                 referencedTableName="wagon_model" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_route_train_number" author="zhsr">
+        <addUniqueConstraint tableName="route" columnNames="train_number" constraintName="uq_route_train_number"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_route_stop_route_seq" author="zhsr">
+        <addUniqueConstraint tableName="route_stop" columnNames="route, seq" constraintName="uq_route_stop_route_seq"/>
+    </changeSet>
+
+    <!-- остановки маршрута удаляются вместе с маршрутом -->
+    <changeSet id="01-nsi-indexes-fk_route_stop_route" author="zhsr">
+        <addForeignKeyConstraint baseTableName="route_stop" baseColumnNames="route" constraintName="fk_route_stop_route"
+                                 referencedTableName="route" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_route_stop_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="route_stop" baseColumnNames="station" constraintName="fk_route_stop_station"
+                                 referencedTableName="station" referencedColumnNames="id"/>
+    </changeSet>
+
+</databaseChangeLog>

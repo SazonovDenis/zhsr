@@ -1,0 +1,122 @@
+title: "Документация по базе данных Zholserik"
+subtitle: "Проект zhsr"
+
+diagrams:
+
+  nsi:
+    title: "Вагоны"
+    tables: [ depot, wagon, wagon_type, wagon_model, station ]
+
+tables:
+
+  depot:
+    title: "Депо"
+    description: |
+      Депо приписки вагонов компании.
+    columns:
+      code:
+        title: "Код депо"
+        description: "Уникален в компании"
+      name:
+        title: "Название"
+      station:
+        title: "Расположение депо"
+        description: "Задаёт территориальную привязку"
+
+  wagon:
+    title: "Вагон"
+    description: Каталог вагонов в учете компании.
+    columns:
+      number:
+        title: "Номер вагона"
+        description: "Уникален в компании"
+      wagon_type:
+        title: "Тип вагона"
+      wagon_model:
+        title: "Модель"
+      build_year:
+        title: "Год постройки"
+      depot:
+        title: "Депо приписки"
+      wagon_status:
+        title: "Состояние вагона"
+        constants_from: doc/dict/wagon_status.tsv
+        description: "Меняется по данным других таблиц"
+      data:
+        title: "Прочие паспортные данные"
+        description: "JSON без схемы (например, seats, manufacturer)"
+
+  wagon_type:
+    title: "Тип вагона"
+    constants_from: doc/dict/wagon_type.tsv
+    description: |
+      Типы вагонов по назначению, например: купейный, плацкартный, ресторан.
+    columns:
+      code:
+        title: "Код типа"
+        description: "Уникален"
+      name:
+        title: "Название"
+      description:
+        title: "Пояснение"
+
+  wagon_model:
+    title: "Модель вагона"
+    constants_from: doc/dict/wagon_model.tsv
+    description: |
+      Модели вагонов парка, например: Тулпар-Тальго, Stadler спальный.
+    columns:
+      code:
+        title: "Код модели"
+        description: "Уникален"
+      name:
+        title: "Название"
+      description:
+        title: "Пояснение"
+
+  station:
+    title: "Станция"
+    columns:
+      code:
+        title: "Код станции"
+      name:
+        title: "Название"
+
+  route:
+    title: "Маршрут (поезд)"
+    description: |
+      Поезд компании, курсирующий по определённому маршруту, например: '655/656'
+    columns:
+      id:
+        title: "Идентификатор"
+      train_number:
+        title: "Номер поезда"
+        description: "Уникален в компании"
+      name:
+        title: "Название (сообщение)"
+        description: "Пример: 'Астана-Алматы'"
+      duration:
+        title: "Длительность рейса, часы"
+        description: "От явки до сдачи состава"
+      conductor_hours:
+        title: "Норма часов за рейс для проводника"
+      lnp_hours:
+        title: "Норма часов за рейс для начальника поезда"
+      pem_hours:
+        title: "Норма часов за рейс для ПЭМ"
+      active:
+        title: "Действует"
+
+  route_stop:
+    title: "Остановка маршрута"
+    description: |
+      Станции маршрута по порядку с нарастающим километражем. Основа натурного листа и расчёта пробега.
+    columns:
+      route:
+        title: "Маршрут"
+      seq:
+        title: "Порядковый номер остановки"
+      station:
+        title: "Станция"
+      km:
+        title: "Километраж от начала маршрута"

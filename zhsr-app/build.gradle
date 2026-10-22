@@ -1,0 +1,24 @@
+plugins {
+    id 'com.gorylenko.gradle-git-properties' version '2.5.7'
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    // миграции Liquibase применяются при старте приложения
+    implementation project(':zhsr-database')
+}
+
+// build-info.properties: имя, версия и время сборки - для BuildProperties
+springBoot {
+    buildInfo()
+}
+
+// git.properties: ветка и коммит - для GitProperties; формат даты - тот, что GitProperties разбирает в Instant
+gitProperties {
+    keys = [
+            'git.branch',
+            'git.commit.id.abbrev',
+            'git.commit.time'
+    ]
+    dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+}
