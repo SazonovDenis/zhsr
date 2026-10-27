@@ -19,13 +19,13 @@
         <mxCell id="start" value="Новый вагон" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fontSize=16;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
           <mxGeometry x="840" y="800" width="200" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="e_station_trip" value="Отправление (Ф-РЕЙ-03)&lt;br style=&quot;font-size: 16px;&quot;&gt;Прицепка (Ф-АКТ-01)&lt;br style=&quot;font-size: 16px;&quot;&gt;Отмена отцепки (Ф-АКТ-06)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.2;exitY=0;exitDx=0;exitDy=0;entryX=0.2;entryY=1;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="station" target="trip" edge="1">
+        <mxCell id="e_station_trip" value="Отправление рейса (Ф-РЕЙ-03)&lt;br style=&quot;font-size: 16px;&quot;&gt;Прицепка (Ф-АКТ-01)&lt;br style=&quot;font-size: 16px;&quot;&gt;Отмена отцепки (Ф-АКТ-06)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.2;exitY=0;exitDx=0;exitDy=0;entryX=0.2;entryY=1;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="station" target="trip" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_trip_station" value="Прибытие (Ф-РЕЙ-04)&lt;br style=&quot;font-size: 16px;&quot;&gt;Отцепка (Ф-АКТ-01)&lt;br style=&quot;font-size: 16px;&quot;&gt;Отмена прицепки (Ф-АКТ-06)&lt;br style=&quot;font-size: 16px;&quot;&gt;Смена расположения (Ф-ВАГ-03)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="trip" target="station" edge="1">
+        <mxCell id="e_trip_station" value="Прибытие рейса (Ф-РЕЙ-04)&lt;br style=&quot;font-size: 16px;&quot;&gt;Отцепка (Ф-АКТ-01)&lt;br style=&quot;font-size: 16px;&quot;&gt;Отмена прицепки (Ф-АКТ-06)&lt;br style=&quot;font-size: 16px;&quot;&gt;Смена расположения (Ф-ВАГ-03)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="trip" target="station" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_depot_trip" value="Отправление (Ф-РЕЙ-03)&lt;br style=&quot;font-size: 16px;&quot;&gt;Прицепка (Ф-АКТ-01)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.3;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="depot" target="trip" edge="1">
+        <mxCell id="e_depot_trip" value="Отправление рейса (Ф-РЕЙ-03)&lt;br style=&quot;font-size: 16px;&quot;&gt;Прицепка (Ф-АКТ-01)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.3;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="depot" target="trip" edge="1">
           <mxGeometry x="0.2273" relative="1" as="geometry">
             <mxPoint as="offset" />
           </mxGeometry>
@@ -35,7 +35,7 @@
             <mxPoint as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_yard_trip" value="Отправление (Ф-РЕЙ-03)&lt;br style=&quot;font-size: 16px;&quot;&gt;Прицепка (Ф-АКТ-01)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.7;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="yard" target="trip" edge="1">
+        <mxCell id="e_yard_trip" value="Отправление рейса (Ф-РЕЙ-03)&lt;br style=&quot;font-size: 16px;&quot;&gt;Прицепка (Ф-АКТ-01)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.7;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="yard" target="trip" edge="1">
           <mxGeometry x="0.0476" relative="1" as="geometry">
             <mxPoint as="offset" />
           </mxGeometry>
