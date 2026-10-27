@@ -8,6 +8,55 @@
 
     <!-- НСИ: уникальность кодов и номеров, внешние ключи -->
 
+    <changeSet id="01-nsi-indexes-uq_usr_login" author="zhsr">
+        <addUniqueConstraint tableName="usr" columnNames="login" constraintName="uq_usr_login"/>
+    </changeSet>
+
+    <!-- телефон в формате +7XXXXXXXXXX -->
+    <changeSet id="01-nsi-indexes-ck_usr_phone" author="zhsr">
+        <sql>alter table usr add constraint ck_usr_phone check (phone ~ '^\+7[0-9]{10}$')</sql>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_route_type_code" author="zhsr">
+        <addUniqueConstraint tableName="route_type" columnNames="code" constraintName="uq_route_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_transport_type_code" author="zhsr">
+        <addUniqueConstraint tableName="transport_type" columnNames="code" constraintName="uq_transport_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_location_type_code" author="zhsr">
+        <addUniqueConstraint tableName="location_type" columnNames="code" constraintName="uq_location_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_trip_status_type_code" author="zhsr">
+        <addUniqueConstraint tableName="trip_status_type" columnNames="code" constraintName="uq_trip_status_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_crew_duty_type_code" author="zhsr">
+        <addUniqueConstraint tableName="crew_duty_type" columnNames="code" constraintName="uq_crew_duty_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_coupling_type_code" author="zhsr">
+        <addUniqueConstraint tableName="coupling_type" columnNames="code" constraintName="uq_coupling_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_transfer_direction_type_code" author="zhsr">
+        <addUniqueConstraint tableName="transfer_direction_type" columnNames="code" constraintName="uq_transfer_direction_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_act_status_type_code" author="zhsr">
+        <addUniqueConstraint tableName="act_status_type" columnNames="code" constraintName="uq_act_status_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_work_type_code" author="zhsr">
+        <addUniqueConstraint tableName="work_type" columnNames="code" constraintName="uq_work_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_wagon_status_type_code" author="zhsr">
+        <addUniqueConstraint tableName="wagon_status_type" columnNames="code" constraintName="uq_wagon_status_type_code"/>
+    </changeSet>
+
     <changeSet id="01-nsi-indexes-uq_station_code" author="zhsr">
         <addUniqueConstraint tableName="station" columnNames="code" constraintName="uq_station_code"/>
     </changeSet>
@@ -21,12 +70,21 @@
                                  referencedTableName="station" referencedColumnNames="id"/>
     </changeSet>
 
+    <changeSet id="01-nsi-indexes-uq_yard_code" author="zhsr">
+        <addUniqueConstraint tableName="yard" columnNames="code" constraintName="uq_yard_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_yard_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="yard" baseColumnNames="station" constraintName="fk_yard_station"
+                                 referencedTableName="station" referencedColumnNames="id"/>
+    </changeSet>
+
     <changeSet id="01-nsi-indexes-uq_wagon_type_code" author="zhsr">
         <addUniqueConstraint tableName="wagon_type" columnNames="code" constraintName="uq_wagon_type_code"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-uq_wagon_model_code" author="zhsr">
-        <addUniqueConstraint tableName="wagon_model" columnNames="code" constraintName="uq_wagon_model_code"/>
+    <changeSet id="01-nsi-indexes-uq_model_type_code" author="zhsr">
+        <addUniqueConstraint tableName="model_type" columnNames="code" constraintName="uq_model_type_code"/>
     </changeSet>
 
     <changeSet id="01-nsi-indexes-uq_wagon_number" author="zhsr">
@@ -43,28 +101,86 @@
                                  referencedTableName="wagon_type" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-fk_wagon_wagon_model" author="zhsr">
-        <addForeignKeyConstraint baseTableName="wagon" baseColumnNames="wagon_model" constraintName="fk_wagon_wagon_model"
-                                 referencedTableName="wagon_model" referencedColumnNames="id"/>
+    <changeSet id="01-nsi-indexes-fk_wagon_model_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon" baseColumnNames="model_type" constraintName="fk_wagon_model_type"
+                                 referencedTableName="model_type" referencedColumnNames="id"/>
     </changeSet>
 
     <changeSet id="01-nsi-indexes-uq_route_train_number" author="zhsr">
         <addUniqueConstraint tableName="route" columnNames="train_number" constraintName="uq_route_train_number"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-uq_route_stop_route_seq" author="zhsr">
-        <addUniqueConstraint tableName="route_stop" columnNames="route, seq" constraintName="uq_route_stop_route_seq"/>
+    <changeSet id="01-nsi-indexes-fk_route_route_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="route" baseColumnNames="route_type" constraintName="fk_route_route_type"
+                                 referencedTableName="route_type" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_route_transport_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="route" baseColumnNames="transport_type" constraintName="fk_route_transport_type"
+                                 referencedTableName="transport_type" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_route_station_route_seq" author="zhsr">
+        <addUniqueConstraint tableName="route_station" columnNames="route, seq" constraintName="uq_route_station_route_seq"/>
     </changeSet>
 
     <!-- остановки маршрута удаляются вместе с маршрутом -->
-    <changeSet id="01-nsi-indexes-fk_route_stop_route" author="zhsr">
-        <addForeignKeyConstraint baseTableName="route_stop" baseColumnNames="route" constraintName="fk_route_stop_route"
+    <changeSet id="01-nsi-indexes-fk_route_station_route" author="zhsr">
+        <addForeignKeyConstraint baseTableName="route_station" baseColumnNames="route" constraintName="fk_route_station_route"
                                  referencedTableName="route" referencedColumnNames="id" onDelete="CASCADE"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-fk_route_stop_station" author="zhsr">
-        <addForeignKeyConstraint baseTableName="route_stop" baseColumnNames="station" constraintName="fk_route_stop_station"
+    <changeSet id="01-nsi-indexes-fk_route_station_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="route_station" baseColumnNames="station" constraintName="fk_route_station_station"
                                  referencedTableName="station" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_request_status_code" author="zhsr">
+        <addUniqueConstraint tableName="request_status" columnNames="code" constraintName="uq_request_status_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_severity_type_code" author="zhsr">
+        <addUniqueConstraint tableName="severity_type" columnNames="code" constraintName="uq_severity_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_service_type_code" author="zhsr">
+        <addUniqueConstraint tableName="service_type" columnNames="code" constraintName="uq_service_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_fault_category_type_code" author="zhsr">
+        <addUniqueConstraint tableName="fault_category_type" columnNames="code" constraintName="uq_fault_category_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_trip_phase_type_code" author="zhsr">
+        <addUniqueConstraint tableName="trip_phase_type" columnNames="code" constraintName="uq_trip_phase_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_fault_group_type_code" author="zhsr">
+        <addUniqueConstraint tableName="fault_group_type" columnNames="code" constraintName="uq_fault_group_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_fault_type_code" author="zhsr">
+        <addUniqueConstraint tableName="fault_type" columnNames="code" constraintName="uq_fault_type_code"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_fault_type_fault_group_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="fault_type" baseColumnNames="fault_group_type" constraintName="fk_fault_type_fault_group_type"
+                                 referencedTableName="fault_group_type" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_fault_type_fault_category_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="fault_type" baseColumnNames="fault_category_type" constraintName="fk_fault_type_fault_category_type"
+                                 referencedTableName="fault_category_type" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_fault_type_severity_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="fault_type" baseColumnNames="severity_type" constraintName="fk_fault_type_severity_type"
+                                 referencedTableName="severity_type" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_fault_type_service_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="fault_type" baseColumnNames="service_type" constraintName="fk_fault_type_service_type"
+                                 referencedTableName="service_type" referencedColumnNames="id"/>
     </changeSet>
 
 </databaseChangeLog>

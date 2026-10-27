@@ -1,0 +1,6 @@
+id	text	code	description
+1	В простое	IN_IDLE	по умолчанию
+2	В пути	IN_TRIP	
+3	В ремонте	IN_REPAIR	ставится при ТОР
+4	Резерв	RESERVE	подбирается в состав, если не хватает годных
+5	Отставлен	OUT_OF_SERVICE	

@@ -1,8 +1,8 @@
-код	значение	пояснение
-COMPARTMENT	Купейный	
-PLATZKART	Плацкартный	
-SLEEPER	СВ	
-LUX	Люкс	
-SEATING	Сидячий	
-RESTAURANT	Вагон-ресторан	
-STAFF	Штабной	вагон начальника поезда
+id	text	code	description
+1	Купейный	COMPARTMENT	
+2	Плацкартный	PLATZKART	
+3	СВ	SLEEPER	
+4	Люкс	LUX	
+5	Сидячий	SEATING	
+6	Вагон-ресторан	RESTAURANT	
+7	Штабной	STAFF	вагон начальника поезда

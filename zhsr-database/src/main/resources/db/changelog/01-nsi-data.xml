@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
+        objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
+
+    <!-- Данные справочников из doc/dict/<таблица>.tsv (копируются в db/dict при сборке).
+         Изменили tsv - changeSet выполнится заново: строки обновятся по id, новые добавятся; description не загружается. -->
+
+    <changeSet id="01-nsi-data-route_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="route_type" primaryKey="id" file="db/dict/route_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-transport_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="transport_type" primaryKey="id" file="db/dict/transport_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-location_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="location_type" primaryKey="id" file="db/dict/location_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-trip_status_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="trip_status_type" primaryKey="id" file="db/dict/trip_status_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-crew_duty_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="crew_duty_type" primaryKey="id" file="db/dict/crew_duty_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-coupling_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="coupling_type" primaryKey="id" file="db/dict/coupling_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-transfer_direction_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="transfer_direction_type" primaryKey="id" file="db/dict/transfer_direction_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-act_status_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="act_status_type" primaryKey="id" file="db/dict/act_status_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-work_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="work_type" primaryKey="id" file="db/dict/work_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-wagon_status_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="wagon_status_type" primaryKey="id" file="db/dict/wagon_status_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-wagon_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="wagon_type" primaryKey="id" file="db/dict/wagon_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-model_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="model_type" primaryKey="id" file="db/dict/model_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-request_status" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="request_status" primaryKey="id" file="db/dict/request_status.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-severity_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="severity_type" primaryKey="id" file="db/dict/severity_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-service_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="service_type" primaryKey="id" file="db/dict/service_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-fault_category_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="fault_category_type" primaryKey="id" file="db/dict/fault_category_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-trip_phase_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="trip_phase_type" primaryKey="id" file="db/dict/trip_phase_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+</databaseChangeLog>

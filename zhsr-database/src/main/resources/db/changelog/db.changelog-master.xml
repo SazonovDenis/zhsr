@@ -9,12 +9,30 @@
     <!--
         <группа>-tables.xml    - таблицы, типы колонок, NOT NULL
         <группа>-indexes.xml   - внешние ключи, уникальные ограничения, индексы
+        <группа>-data.xml      - данные справочников
 
         Внешние ключи накладываются после того, как созданы все таблицы.
+
+        Имена ограничений и индексов: <префикс>_<таблица>_<поля>, префиксы pk, fk, uq, ck, ex, ix, ux.
+        PostgreSQL обрезает имена длиннее 63 символов. Поля пишутся всегда полностью; если имя не помещается,
+        имя таблицы заменяется аббревиатурой из списка ниже - одной и той же во всех таких именах:
+            (пока нет)
+
+        repair-act.xml (repair_act, repair_close_act) в общую миграцию не входит.
     -->
 
     <include file="db/changelog/01-nsi-tables.xml"/>
 
     <include file="db/changelog/01-nsi-indexes.xml"/>
+
+    <include file="db/changelog/01-nsi-data.xml"/>
+
+    <include file="db/changelog/02-location-tables.xml"/>
+
+    <include file="db/changelog/02-location-indexes.xml"/>
+
+    <include file="db/changelog/03-repair-tables.xml"/>
+
+    <include file="db/changelog/03-repair-indexes.xml"/>
 
 </databaseChangeLog>

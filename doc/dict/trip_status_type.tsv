@@ -1,0 +1,5 @@
+id	text	code	description
+1	План	PLANNED	по умолчанию
+2	В рейсе	IN_TRIP	
+3	Выполнен	DONE	
+4	Отменён	CANCELLED	

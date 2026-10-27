@@ -1,0 +1,76 @@
+title: "Документация по базе данных Zholserik: ремонт вагона"
+subtitle: "Проект zhsr"
+
+diagrams:
+
+  repair_act:
+    title: "Ремонт вагона: ВУ-23"
+    tables: [ wagon, repair_act, wagon_status ]
+    hide_fields: [ "wagon", "wagon_status" ]
+
+  repair_close_act:
+    title: "Закрытие ремонта: ВУ-36"
+    tables: [ wagon, repair_act, repair_close_act, wagon_location, wagon_status ]
+    hide_fields: [ "wagon", "repair_act", "wagon_location", "wagon_status" ]
+
+tables:
+
+  repair_act:
+    title: "Акт ремонта (ВУ-23)"
+    description: |
+      Открывает ремонт: вагон - в ремонте. Открытый - без неотменённого ВУ-36 и не отменён; у вагона не больше одного
+      открытого - проверяет приложение, ограничением БД не выражается.
+    columns:
+      number:
+        title: "Номер ВУ-23"
+        description: "Уникален"
+      wagon:
+        title: "Вагон"
+      work_type:
+        title: "Вид работ"
+        constants_from: doc/dict/work_type.tsv
+      defect:
+        title: "Неисправность"
+      created_by:
+        title: "Кто оформил"
+      created_dt:
+        title: "Когда оформлен"
+      wagon_status:
+        title: "Запись состояния"
+        description: "wagon_status: в ремонте"
+      cancelled_by:
+        title: "Кто отменил"
+      cancelled_dt:
+        title: "Когда отменён"
+      cancel_reason:
+        title: "Причина отмены"
+
+  repair_close_act:
+    title: "Закрытие ремонта (ВУ-36)"
+    description: |
+      Оформляется отдельно по акту ремонта: вагон - в простое, из депо - на станцию депо. У акта ремонта не больше
+      одного неотменённого ВУ-36.
+    columns:
+      number:
+        title: "Номер ВУ-36"
+        description: "Уникален"
+      repair_act:
+        title: "Акт ремонта (ВУ-23)"
+      created_by:
+        title: "Кто оформил"
+      created_dt:
+        title: "Когда оформлен"
+      wagon_status:
+        title: "Запись состояния"
+        description: "wagon_status: в простое"
+      wagon_location:
+        title: "Запись расположения"
+        description: "wagon_location: из депо на станцию депо"
+      next_repair_date:
+        title: "Следующий плановый ремонт"
+      cancelled_by:
+        title: "Кто отменил"
+      cancelled_dt:
+        title: "Когда отменён"
+      cancel_reason:
+        title: "Причина отмены"

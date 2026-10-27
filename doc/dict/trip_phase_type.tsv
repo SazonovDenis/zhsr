@@ -1,0 +1,3 @@
+id	text	code	description
+1	До отправления	DEPOT	состав рейса не принят
+2	В пути	EN_ROUTE	состав принят и не сдан

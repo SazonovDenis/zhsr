@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
+        objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
+
+    <!-- Расположение вагонов: журналы, рейсы, состав, акты -->
+
+    <!-- Журналы: запись действует с dbeg по dend (не включая); dend пуст - текущая запись.
+         Документы ссылаются на записи журналов, которые они открыли. -->
+
+    <!-- журнал расположения: ровно одна из ссылок station, depot, yard, trip - та, что задана location_type -->
+    <changeSet id="02-location-tables-wagon_location" author="zhsr">
+        <createTable tableName="wagon_location">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="wagon" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dbeg" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dend" type="timestamp"/>
+            <column name="location_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="station" type="bigint"/>
+            <column name="depot" type="bigint"/>
+            <column name="yard" type="bigint"/>
+            <column name="trip" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+    <!-- журнал состояния -->
+    <changeSet id="02-location-tables-wagon_status" author="zhsr">
+        <createTable tableName="wagon_status">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="wagon" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dbeg" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dend" type="timestamp"/>
+            <column name="wagon_status_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- кэш текущего состояния вагона для быстрого доступа; поля вычисляемые - копия текущих записей
+         wagon_location и wagon_status, обновляется в той же транзакции, что и журналы -->
+    <changeSet id="02-location-tables-wagon_info" author="zhsr">
+        <createTable tableName="wagon_info">
+            <column name="wagon" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="dbeg_location" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="location_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="station" type="bigint"/>
+            <column name="depot" type="bigint"/>
+            <column name="yard" type="bigint"/>
+            <column name="trip" type="bigint"/>
+            <column name="dbeg_status" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="wagon_status_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="02-location-tables-trip" author="zhsr">
+        <createTable tableName="trip">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="route" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="planned_dt" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="trip_status_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="departed_dt" type="timestamp"/>
+            <column name="departed_by_usr" type="bigint"/>
+            <column name="arrived_dt" type="timestamp"/>
+            <column name="arrived_by_usr" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+    <!-- depart_wagon_location, arrive_wagon_location, depart_wagon_status, arrive_wagon_status - записи журналов расположения
+         и состояния, открытые отметками отправления и прибытия;
+         прицепка и отцепка в пути - в coupling_act_wagon -->
+    <changeSet id="02-location-tables-trip_wagon" author="zhsr">
+        <createTable tableName="trip_wagon">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="trip" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="wagon" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="seq" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="depart_wagon_location" type="bigint"/>
+            <column name="arrive_wagon_location" type="bigint"/>
+            <column name="depart_wagon_status" type="bigint"/>
+            <column name="arrive_wagon_status" type="bigint"/>
+            <column name="data" type="jsonb"/>
+        </createTable>
+    </changeSet>
+
+    <!-- бригада рейса: проводники по вагонам, начальник поезда, поездной электромеханик;
+         сотрудник - один раз на рейс, вагон указан у проводника; начальник поезда и ПЭМ - не больше одного на рейс -->
+    <changeSet id="02-location-tables-trip_crew" author="zhsr">
+        <createTable tableName="trip_crew">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="trip" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="crew_duty_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="wagon" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+    <!-- Акты - таблицы бумажных документов с суффиксом _act -->
+
+    <!-- акт отмены; на него ссылается отменённый акт -->
+    <changeSet id="02-location-tables-act_cancellation" author="zhsr">
+        <createTable tableName="act_cancellation">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="created_by_usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_dt" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reason" type="text">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- акт отцепки или прицепки в пути; act_status_type: проведён или отменён; отменённый - со ссылкой act_cancellation -->
+    <changeSet id="02-location-tables-coupling_act" author="zhsr">
+        <createTable tableName="coupling_act">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="number" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="coupling_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="trip" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="route_station" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="order_info" type="varchar(100)"/>
+            <column name="reason" type="text"/>
+            <column name="created_by_usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_dt" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="act_status_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="act_cancellation" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+    <!-- wagon_location - запись журнала расположения, открытая актом: прицепка - рейс, отцепка - станция;
+         wagon_status - запись журнала состояния, открытая актом: прицепка - в пути, отцепка - в простое;
+         пусты у отменённого акта: отмена удаляет записи -->
+    <changeSet id="02-location-tables-coupling_act_wagon" author="zhsr">
+        <createTable tableName="coupling_act_wagon">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="coupling_act" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="wagon" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="seq" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="wagon_location" type="bigint"/>
+            <column name="wagon_status" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+    <!-- акт приёма-передачи вагонов в депо или парк отстоя и из них: ровно одна из ссылок depot, yard;
+         station - станция, на которой происходит передача: станция депо или парка отстоя;
+         transferred_by_usr, transferred_dt - кто и когда сдал; received_by_usr, received_dt - кто и когда принял или отказал;
+         act_status_type: ожидает приёма - приём не отмечен, расположение не меняется; проведён - принят, расположение
+         меняется; отказ - reject_reason, расположение не меняется; отменён - со ссылкой act_cancellation, весь акт
+         целиком; акт можно оформить сразу принятым -->
+    <changeSet id="02-location-tables-transfer_act" author="zhsr">
+        <createTable tableName="transfer_act">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="number" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="transfer_direction_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="station" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="depot" type="bigint"/>
+            <column name="yard" type="bigint"/>
+            <column name="work_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="with_property" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="act_status_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="transferred_by_usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="transferred_dt" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="received_by_usr" type="bigint"/>
+            <column name="received_dt" type="timestamp"/>
+            <column name="reject_reason" type="text"/>
+            <column name="act_cancellation" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+    <!-- вагоны акта приёма-передачи; wagon_location - запись журнала расположения, открытая приёмом: депо или парк
+         отстоя либо их станция; пуста, пока акт не принят, и у отменённого акта: отмена удаляет запись -->
+    <changeSet id="02-location-tables-transfer_act_wagon" author="zhsr">
+        <createTable tableName="transfer_act_wagon">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="transfer_act" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="wagon" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="seq" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="note" type="text"/>
+            <column name="wagon_location" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

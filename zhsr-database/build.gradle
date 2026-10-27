@@ -3,3 +3,10 @@ dependencies {
     implementation 'org.postgresql:postgresql'
     implementation 'org.liquibase:liquibase-core'
 }
+
+// справочники doc/dict/*.tsv - в classpath db/dict для загрузки Liquibase
+processResources {
+    from("$rootDir/doc/dict") {
+        into 'db/dict'
+    }
+}

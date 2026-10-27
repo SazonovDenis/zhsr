@@ -3,11 +3,83 @@ subtitle: "Проект zhsr"
 
 diagrams:
 
-  nsi:
-    title: "Вагоны"
-    tables: [ depot, wagon, wagon_type, wagon_model, station ]
+  trip:
+    title: "Поездки"
+    tables: [ trip, trip_wagon, route, wagon_location, wagon_status, station, wagon_status_type, trip_status_type, usr ]
+    hide_fields: [ "station", "wagon_status_type", "trip_status_type", "usr" ]
+
+  trip_crew:
+    title: "Бригада рейса"
+    tables: [ trip, trip_crew, usr, crew_duty_type, wagon, route ]
+    hide_fields: [ "crew_duty_type", "wagon", "usr" ]
+    top: [ usr ]
+
+  wagon_location_status:
+    title: "Перемещение вагонов и смена их состояния"
+    description: "Главные журналы для любых изменений вагона. Другие таблицы могут хранить дополнительную информацию, но ссылаются сюда."
+    tables: [ wagon_location, wagon_status, wagon: { hide_references: [ "depot" ] }, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, station, trip, location_type ]
+    hide_fields: [ "depot", "yard", "station" , "wagon", "trip", "location_type" ]
+
+  coupling_act:
+    title: "Отцепка и прицепка"
+    tables: [ wagon, coupling_act, coupling_act_wagon, wagon_location, wagon_status, coupling_type, act_status_type, act_cancellation ]
+    hide_fields: [ "wagon", "wagon_location", "wagon_status", "coupling_type", "act_status_type" ]
+
+  transfer_act:
+    title: "Передача вагонов со станции и обратно"
+    description: "Акт приёма-передачи вагонов со станции в депо или парк отстоя. Приём вагонов обратно на станцию"
+    tables: [ wagon: { hide_references: [ "depot" ] }, transfer_act, transfer_act_wagon, transfer_direction_type, act_status_type, act_cancellation, station, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, wagon_location: { hide_references: [ "depot", "wagon", "yard" ] } ]
+    hide_fields: [ "wagon", "transfer_direction_type", "act_status_type", "station", "depot", "yard", "wagon_location" ]
+
+  repair_request:
+    title: "Заявки на ремонт"
+    tables: [ repair_request, repair_request_photo, repair_request_executor, repair_request_note, fault_type, request_status, trip_phase_type, wagon, trip: { hide_references: [ "arrived_by_usr", "departed_by_usr" ] }, usr ]
+    hide_fields: [ "request_status", "fault_type", "trip_phase_type", "wagon", "trip", "usr" ]
+    top: [ usr ]
+
+  info:
+    title: "Текущие состояния"
+    description: |
+      Для каждого объекта (вагон, заявка на ремонт) в таблицах ***_info хранится одна запись, в которую копируются последние данные со всех версионных таблиц объекта. 
+      Предназначены для быстрого построения списков.
+    tables: [ wagon_info, wagon, wagon_location, wagon_status, repair_request_info, repair_request: { hide_references: [ "wagon" ] }, repair_request_executor ]
+    hide_fields: [ "wagon", "wagon_location", "wagon_status", "repair_request", "repair_request_executor" ]
+
+  fault_type:
+    title: "Справочник: типы неисправностей"
+    tables: [ fault_type, fault_group_type, severity_type, service_type, fault_category_type ]
+
+  wagon:
+    title: "Справочник: вагоны"
+    tables: [ wagon, wagon_type, model_type, depot, station ]
+
+  route:
+    title: "Справочник: маршруты"
+    tables: [ route, route_station, depot, station, route_type, transport_type ]
+    hide_fields: [ "route_type", "transport_type" ]
 
 tables:
+
+  usr:
+    title: "Сотрудник"
+    description: |
+      Пользователь компании.
+    columns:
+      login:
+        title: "Логин"
+        description: "Уникален. Как привило ИИН"
+      full_name:
+        title: "ФИО"
+      password_hash:
+        title: "Хэш пароля"
+      phone:
+        title: "Телефон"
+        description: "В формате +7XXXXXXXXXX"
+      active:
+        title: "Учётная запись включена"
+        description: "Отключение не удаляет историю"
+      created_dt:
+        title: "Когда заведён"
 
   depot:
     title: "Депо"
@@ -23,6 +95,20 @@ tables:
         title: "Расположение депо"
         description: "Задаёт территориальную привязку"
 
+  yard:
+    title: "Парк отстоя"
+    description: |
+      Место расположения вагонов при станции, как депо.
+    columns:
+      code:
+        title: "Код парка отстоя"
+        description: "Уникален в компании"
+      name:
+        title: "Название"
+      station:
+        title: "Расположение парка отстоя"
+        description: "Задаёт территориальную привязку"
+
   wagon:
     title: "Вагон"
     description: Каталог вагонов в учете компании.
@@ -32,19 +118,122 @@ tables:
         description: "Уникален в компании"
       wagon_type:
         title: "Тип вагона"
-      wagon_model:
+        constants_from: doc/dict/wagon_type.tsv
+      model_type:
         title: "Модель"
+        constants_from: doc/dict/model_type.tsv
       build_year:
         title: "Год постройки"
       depot:
         title: "Депо приписки"
-      wagon_status:
-        title: "Состояние вагона"
-        constants_from: doc/dict/wagon_status.tsv
-        description: "Меняется по данным других таблиц"
       data:
         title: "Прочие паспортные данные"
         description: "JSON без схемы (например, seats, manufacturer)"
+
+  route_type:
+    title: "Регулярный или разовый маршрут"
+    constants_from: doc/dict/route_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  transport_type:
+    title: "Пассажирский или грузовой маршрут"
+    constants_from: doc/dict/transport_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  location_type:
+    title: "Вид расположения вагона"
+    constants_from: doc/dict/location_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  trip_status_type:
+    title: "Статус рейса"
+    constants_from: doc/dict/trip_status_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  crew_duty_type:
+    title: "Должность члена бригады"
+    constants_from: doc/dict/crew_duty_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  coupling_type:
+    title: "Отцепка или прицепка"
+    constants_from: doc/dict/coupling_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  transfer_direction_type:
+    title: "Направление акта приёма-передачи"
+    constants_from: doc/dict/transfer_direction_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  act_status_type:
+    title: "Статус акта"
+    description: |
+      Общий для актов отцепки, прицепки и приёма-передачи. Какие статусы допустимы, задаёт проверка в таблице акта:
+      у акта отцепки, прицепки - только "проведён" и "отменён".
+    constants_from: doc/dict/act_status_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  work_type:
+    title: "Вид работ"
+    constants_from: doc/dict/work_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  wagon_status_type:
+    title: "Состояние вагона"
+    constants_from: doc/dict/wagon_status_type.tsv
+    description: |
+      Состояния вагона, например: в простое, в пути, в ремонте. Состояние определяет парк (doc/dict/park_type.tsv).
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код состояния"
+        description: "Уникален"
 
   wagon_type:
     title: "Тип вагона"
@@ -52,27 +241,111 @@ tables:
     description: |
       Типы вагонов по назначению, например: купейный, плацкартный, ресторан.
     columns:
+      text:
+        title: "Значение"
       code:
         title: "Код типа"
         description: "Уникален"
-      name:
-        title: "Название"
-      description:
-        title: "Пояснение"
 
-  wagon_model:
+  model_type:
     title: "Модель вагона"
-    constants_from: doc/dict/wagon_model.tsv
+    constants_from: doc/dict/model_type.tsv
     description: |
       Модели вагонов парка, например: Тулпар-Тальго, Stadler спальный.
     columns:
+      text:
+        title: "Значение"
       code:
         title: "Код модели"
         description: "Уникален"
+
+  request_status:
+    title: "Статус заявки на ремонт"
+    constants_from: doc/dict/request_status.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  severity_type:
+    title: "Критичность неисправности"
+    constants_from: doc/dict/severity_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  service_type:
+    title: "Служба-исполнитель"
+    constants_from: doc/dict/service_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  fault_category_type:
+    title: "Категория неисправности"
+    constants_from: doc/dict/fault_category_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  trip_phase_type:
+    title: "Этап рейса"
+    constants_from: doc/dict/trip_phase_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  fault_group_type:
+    title: "Группа неисправностей"
+    description: |
+      Группа классификатора DIN, раздел экипировки или уборки.
+    columns:
+      code:
+        title: "Код группы (DIN)"
+        description: "Уникален"
       name:
         title: "Название"
-      description:
-        title: "Пояснение"
+      sort_order:
+        title: "Порядок показа"
+
+  fault_type:
+    title: "Тип неисправности"
+    description: |
+      Позиция справочника неисправностей. Группа и категория - независимые поля, не связанные между собой.
+      Отключается, а не удаляется.
+    columns:
+      code:
+        title: "Код"
+        description: "Уникален"
+      name:
+        title: "Название"
+      fault_group_type:
+        title: "Группа"
+      fault_category_type:
+        title: "Категория"
+        constants_from: doc/dict/fault_category_type.tsv
+      severity_type:
+        title: "Критичность по умолчанию"
+        constants_from: doc/dict/severity_type.tsv
+      service_type:
+        title: "Служба-исполнитель по умолчанию"
+        constants_from: doc/dict/service_type.tsv
+      active:
+        title: "Действует"
 
   station:
     title: "Станция"
@@ -87,8 +360,6 @@ tables:
     description: |
       Поезд компании, курсирующий по определённому маршруту, например: '655/656'
     columns:
-      id:
-        title: "Идентификатор"
       train_number:
         title: "Номер поезда"
         description: "Уникален в компании"
@@ -106,11 +377,17 @@ tables:
         title: "Норма часов за рейс для ПЭМ"
       active:
         title: "Действует"
+      route_type:
+        title: "Регулярный или разовый"
+        constants_from: doc/dict/route_type.tsv
+      transport_type:
+        title: "Пассажирский или грузовой"
+        constants_from: doc/dict/transport_type.tsv
 
-  route_stop:
-    title: "Остановка маршрута"
+  route_station:
+    title: "Остановка на маршруте"
     description: |
-      Станции маршрута по порядку с нарастающим километражем. Основа натурного листа и расчёта пробега.
+      Станции маршрута по порядку с нарастающим километражем. Основа натурного листа и расчёта пробега. В оба конца, например: Алматы-Астана-Алматы.
     columns:
       route:
         title: "Маршрут"
@@ -120,3 +397,375 @@ tables:
         title: "Станция"
       km:
         title: "Километраж от начала маршрута"
+
+  trip:
+    title: "Рейс"
+    description: |
+      Поездка поезда. Станция отправления - первая остановка маршрута, станция прибытия - последняя.
+      Начальник поезда и ПЭМ берутся из бригады рейса (trip_crew) - записи с должностями "начальник поезда" и
+      "поездной электромеханик".
+    columns:
+      route:
+        title: "Маршрут"
+      planned_dt:
+        title: "Плановое отправление"
+      trip_status_type:
+        title: "Статус"
+        constants_from: doc/dict/trip_status_type.tsv
+      departed_dt:
+        title: "Дата отправления"
+      arrived_dt:
+        title: "Дата прибытия"
+      departed_by_usr:
+        title: "Кто отметил отправление"
+      arrived_by_usr:
+        title: "Кто отметил прибытие"
+
+  trip_wagon:
+    title: "Состав рейса"
+    columns:
+      trip:
+        title: "Рейс"
+      wagon:
+        title: "Вагон"
+        description: "Уникален в рейсе"
+      seq:
+        title: "Позиция"
+      depart_wagon_location:
+        title: "Запись расположения при отправлении"
+        description: "wagon_location: вагон в рейсе"
+      arrive_wagon_location:
+        title: "Запись расположения при прибытии"
+        description: "wagon_location: вагон на станции прибытия"
+      depart_wagon_status:
+        title: "Запись состояния при отправлении"
+        description: "wagon_status: в пути"
+      arrive_wagon_status:
+        title: "Запись состояния при прибытии"
+        description: "wagon_status: в простое"
+      data:
+        title: "Данные перевозки"
+        description: "JSON: гружёный, груз, накладная, станция назначения"
+
+  trip_crew:
+    title: "Бригада рейса"
+    description: |
+      Член бригады с должностью на рейсе: проводник, начальник поезда, поездной электромеханик (ПЭМ). Начальник
+      поезда и ПЭМ - не больше одного на рейс.
+    columns:
+      trip:
+        title: "Рейс"
+      usr:
+        title: "Сотрудник"
+        description: "Один раз на рейс"
+      crew_duty_type:
+        title: "Должность на рейсе"
+        constants_from: doc/dict/crew_duty_type.tsv
+      wagon:
+        title: "Вагон, если должность на рейсе - проводник"
+
+  act_cancellation:
+    title: "Акт отмены"
+    description: |
+      На акт отмены ссылается отменённый акт отцепки, прицепки или приёма-передачи. Отменённый акт не удаляется,
+      но больше не действует.
+    columns:
+      created_by_usr:
+        title: "Кто отменил"
+      created_dt:
+        title: "Когда отменён"
+      reason:
+        title: "Причина отмены"
+
+  coupling_act:
+    title: "Акт отцепки, прицепки"
+    description: |
+      Отцепка или прицепка вагонов на остановке рейса.
+    columns:
+      number:
+        title: "Номер"
+        description: "Уникален"
+      coupling_type:
+        title: "Отцепка или прицепка"
+        constants_from: doc/dict/coupling_type.tsv
+      trip:
+        title: "Рейс"
+      route_station:
+        title: "На какой остановке произошла операция"
+      order_info:
+        title: "Приказ-основание"
+      reason:
+        title: "Причина"
+      created_by_usr:
+        title: "Кто составил"
+      created_dt:
+        title: "Когда"
+      act_status_type:
+        title: "Статус"
+        description: "Проведён или отменён"
+        constants_from: doc/dict/act_status_type.tsv
+      act_cancellation:
+        title: "Акт отмены"
+        description: "Заполнен только при статусе \"отменён\""
+
+  coupling_act_wagon:
+    title: "Вагон в акте отцепки, прицепки"
+    columns:
+      coupling_act:
+        title: "Акт"
+      wagon:
+        title: "Вагон"
+        description: "Уникален в акте"
+      seq:
+        title: "Порядок"
+      wagon_location:
+        title: "Запись расположения"
+        description: "wagon_location, открытая актом: прицепка - рейс, отцепка - станция"
+      wagon_status:
+        title: "Запись состояния"
+        description: "wagon_status, открытая актом: прицепка - в пути, отцепка - в простое"
+
+  transfer_act:
+    title: "Акт приёма-передачи вагонов со станции в депо или парк отстоя и обратно"
+    description: |
+      Передающая сторона: со станции в депо или парк отстоя - приёмщик, из депо или парка отстоя на станцию - мастер депо.
+      Принимающая сторона: со станции в депо или парк отстоя - мастер депо, из депо или парка отстоя на станцию - приёмщик.
+      Заполнено ровно одно из: депо, парк отстоя. Расположение вагонов меняется только при статусе "проведён" (принят).
+      Акт можно оформить сразу принятым. Отменяется весь акт целиком.
+    columns:
+      number:
+        title: "Номер"
+        description: "Уникален"
+      transfer_direction_type:
+        title: "Направление"
+        constants_from: doc/dict/transfer_direction_type.tsv
+      station:
+        title: "Станция, на которой происходит передача"
+        description: "Станция депо или парка отстоя"
+      depot:
+        title: "Депо"
+        description: "Пусто, если задан парк отстоя"
+      yard:
+        title: "Парк отстоя"
+        description: "Пусто, если задано депо"
+      work_type:
+        title: "Вид работ"
+        description: "При передаче для ремонта"
+        constants_from: doc/dict/work_type.tsv
+      with_property:
+        title: "С имуществом"
+      act_status_type:
+        title: "Статус"
+        constants_from: doc/dict/act_status_type.tsv
+      transferred_by_usr:
+        title: "Кто сдал"
+      transferred_dt:
+        title: "Когда сдан"
+      received_by_usr:
+        title: "Кто принял или отказал"
+        description: "Пусто, пока приём не подтверждён (когда находится в процессе передачи)"
+      received_dt:
+        title: "Когда принят или отказано"
+        description: "Пусто, пока приём не подтверждён (когда находится в процессе передачи)"
+      reject_reason:
+        title: "Причина отказа в приёме"
+        description: "Заполнена при статусе \"отказ\" и у отменённого акта, если до отмены был отказ"
+      act_cancellation:
+        title: "Акт отмены"
+        description: "Заполнен только при статусе \"отменён\""
+
+  transfer_act_wagon:
+    title: "Вагон в акте приёма-передачи"
+    columns:
+      transfer_act:
+        title: "Акт приёма-передачи"
+      wagon:
+        title: "Вагон"
+        description: "Уникален в акте"
+      seq:
+        title: "Порядок"
+      note:
+        title: "Комментарий"
+      wagon_location:
+        title: "Запись расположения"
+        description: "wagon_location, открытая приёмом: депо или парк отстоя акта либо их станция; пусто, пока акт не принят"
+
+  repair_request:
+    title: "Заявка на ремонт"
+    description: |
+      Неисправность вагона, поданная сотрудником.
+    columns:
+      number:
+        title: "Номер"
+        description: "Уникален"
+      wagon:
+        title: "Вагон"
+      trip:
+        title: "Рейс"
+      trip_phase_type:
+        title: "Этап рейса при подаче"
+        constants_from: doc/dict/trip_phase_type.tsv
+      service_type:
+        title: "Служба-исполнитель"
+        constants_from: doc/dict/service_type.tsv
+      usr:
+        title: "Автор"
+      created_dt:
+        title: "Время подачи"
+      fault_type:
+        title: "Неисправность"
+      severity_type:
+        title: "Критичность"
+        constants_from: doc/dict/severity_type.tsv
+      description:
+        title: "Описание от автора"
+
+  repair_request_photo:
+    title: "Фото к заявке"
+    description: |
+      Файл лежит в хранилище, здесь - ссылка.
+    columns:
+      repair_request:
+        title: "Заявка"
+      storage_key:
+        title: "Ключ файла в хранилище"
+      size_bytes:
+        title: "Размер, байт"
+      usr:
+        title: "Автор фото"
+      created_dt:
+        title: "Когда загружено"
+
+  repair_request_executor:
+    title: "Движение заявки по исполнителям"
+    description: |
+      Запись действует с dbeg по dend (не включая); dend пуст - текущая запись. Периоды заявки не пересекаются.
+    columns:
+      repair_request:
+        title: "Заявка"
+      dbeg:
+        title: "Начало периода"
+      dend:
+        title: "Конец периода"
+        description: "Пусто - текущая запись"
+      executor_usr:
+        title: "Исполнитель"
+      assigner_usr:
+        title: "Кем назначен исполнитель"
+      request_status:
+        title: "Статус"
+        constants_from: doc/dict/request_status.tsv
+
+  repair_request_info:
+    title: "Текущее состояние заявки"
+    description: |
+      Кэш состояния заявки для быстрого доступа. Все поля вычисляемые: копия текущей записи журнала
+      repair_request_executor, обновляется в одной транзакции с журналом. Одна запись на заявку. Пока у заявки нет
+      исполнителя (статус - новая), поля исполнителя пусты.
+    columns:
+      repair_request:
+        title: "Заявка"
+      dbeg:
+        title: "Начало текущей записи журнала"
+        description: "Вычисляемое: dbeg текущей записи repair_request_executor"
+      executor_usr:
+        title: "Исполнитель"
+        description: "Вычисляемое: из текущей записи repair_request_executor"
+      assigner_usr:
+        title: "Кем назначен исполнитель"
+        description: "Вычисляемое: из текущей записи repair_request_executor"
+      request_status:
+        title: "Текущий статус"
+        description: "Вычисляемое: из текущей записи repair_request_executor; без исполнителя - новая"
+        constants_from: doc/dict/request_status.tsv
+
+  repair_request_note:
+    title: "Пояснение к заявке"
+    columns:
+      repair_request:
+        title: "Заявка"
+      created_dt:
+        title: "Дата"
+      usr:
+        title: "Автор"
+      note:
+        title: "Пояснение"
+
+  wagon_location:
+    title: "Журнал расположения вагона"
+    description: |
+      Запись действует с dbeg по dend (не включая); dend пуст - текущее расположение. Периоды вагона не пересекаются.
+      Документы и другие таблицы ссылаются на записи, которые они открыли. Расположение ровно одно из: станция, депо, парк отстоя, рейс.
+    columns:
+      wagon:
+        title: "Вагон"
+      dbeg:
+        title: "Начало состояния"
+      dend:
+        title: "Конец состояния"
+        description: "Пусто - текущая запись"
+      location_type:
+        title: "Вид расположения"
+        description: "Задаёт, какая из ссылок заполнена: станция, депо, парк отстоя, рейс"
+        constants_from: doc/dict/location_type.tsv
+      station:
+        title: "Расположение: станция"
+      depot:
+        title: "Расположение: депо"
+      yard:
+        title: "Расположение: парк отстоя"
+      trip:
+        title: "Расположение: рейс"
+
+  wagon_status:
+    title: "Журнал состояния вагона"
+    description: |
+      Запись действует с dbeg по dend (не включая); dend пуст - текущее состояние. Периоды вагона не пересекаются.
+      Документы и другие таблицы ссылаются на записи, которые они открыли.
+    columns:
+      wagon:
+        title: "Вагон"
+      wagon_status_type:
+        title: "Состояние"
+        constants_from: doc/dict/wagon_status_type.tsv
+      dbeg:
+        title: "Начало состояния"
+      dend:
+        title: "Конец состояния"
+        description: "Пусто - текущая запись"
+
+  wagon_info:
+    title: "Текущее состояние вагона"
+    description: |
+      Кэш состояния вагона для быстрого доступа. Все поля вычисляемые: копия текущих записей журналов wagon_location и
+      wagon_status, обновляется в одной транзакции с журналами. Одна запись на вагон. Расположение ровно одно из:
+      станция, депо, парк отстоя, рейс.
+    columns:
+      wagon:
+        title: "Вагон"
+      dbeg_location:
+        title: "Начало текущего расположения"
+        description: "Вычисляемое: dbeg текущей записи wagon_location"
+      location_type:
+        title: "Вид расположения"
+        description: "Вычисляемое: из текущей записи wagon_location"
+        constants_from: doc/dict/location_type.tsv
+      station:
+        title: "Расположение: станция"
+        description: "Вычисляемое: из текущей записи wagon_location"
+      depot:
+        title: "Расположение: депо"
+        description: "Вычисляемое: из текущей записи wagon_location"
+      yard:
+        title: "Расположение: парк отстоя"
+        description: "Вычисляемое: из текущей записи wagon_location"
+      trip:
+        title: "Расположение: рейс"
+        description: "Вычисляемое: из текущей записи wagon_location"
+      dbeg_status:
+        title: "Начало текущего состояния"
+        description: "Вычисляемое: dbeg текущей записи wagon_status"
+      wagon_status_type:
+        title: "Состояние"
+        description: "Вычисляемое: из текущей записи wagon_status"
+        constants_from: doc/dict/wagon_status_type.tsv

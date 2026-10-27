@@ -1,0 +1,5 @@
+id	text	code	description
+1	Низкая	LOW	
+2	Средняя	MEDIUM	по умолчанию
+3	Высокая	HIGH	
+4	Критическая	CRITICAL	

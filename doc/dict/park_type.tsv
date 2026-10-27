@@ -1,0 +1,4 @@
+id	text	code	description
+1	Рабочий	WORKING	IN_IDLE, IN_TRIP, RESERVE
+2	Нерабочий	NON_WORKING	IN_REPAIR
+3	Исключён	EXCLUDED	OUT_OF_SERVICE

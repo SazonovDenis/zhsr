@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
+        objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
+
+    <!-- Заявки на ремонт: уникальность, внешние ключи, проверки, индексы -->
+
+    <!-- repair_request -->
+
+    <changeSet id="03-repair-indexes-uq_repair_request_number" author="zhsr">
+        <addUniqueConstraint tableName="repair_request" columnNames="number" constraintName="uq_repair_request_number"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_wagon" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request" baseColumnNames="wagon" constraintName="fk_repair_request_wagon"
+                                 referencedTableName="wagon" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_trip" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request" baseColumnNames="trip" constraintName="fk_repair_request_trip"
+                                 referencedTableName="trip" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_trip_phase_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request" baseColumnNames="trip_phase_type" constraintName="fk_repair_request_trip_phase_type"
+                                 referencedTableName="trip_phase_type" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_service_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request" baseColumnNames="service_type" constraintName="fk_repair_request_service_type"
+                                 referencedTableName="service_type" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request" baseColumnNames="usr" constraintName="fk_repair_request_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_fault_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request" baseColumnNames="fault_type" constraintName="fk_repair_request_fault_type"
+                                 referencedTableName="fault_type" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_severity_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request" baseColumnNames="severity_type" constraintName="fk_repair_request_severity_type"
+                                 referencedTableName="severity_type" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-ix_repair_request_wagon" author="zhsr">
+        <createIndex tableName="repair_request" indexName="ix_repair_request_wagon">
+            <column name="wagon"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-ix_repair_request_usr" author="zhsr">
+        <createIndex tableName="repair_request" indexName="ix_repair_request_usr">
+            <column name="usr"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- repair_request_photo: фото удаляются вместе с заявкой -->
+
+    <changeSet id="03-repair-indexes-fk_repair_request_photo_repair_request" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_photo" baseColumnNames="repair_request" constraintName="fk_repair_request_photo_repair_request"
+                                 referencedTableName="repair_request" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-ix_repair_request_photo_repair_request" author="zhsr">
+        <createIndex tableName="repair_request_photo" indexName="ix_repair_request_photo_repair_request">
+            <column name="repair_request"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- repair_request_executor: записи удаляются вместе с заявкой -->
+
+    <changeSet id="03-repair-indexes-fk_repair_request_executor_repair_request" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_executor" baseColumnNames="repair_request" constraintName="fk_repair_request_executor_repair_request"
+                                 referencedTableName="repair_request" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-ck_repair_request_executor_period" author="zhsr">
+        <sql>alter table repair_request_executor add constraint ck_repair_request_executor_period check (dend is null or dend &gt; dbeg)</sql>
+    </changeSet>
+
+    <!-- у заявки одна текущая запись -->
+    <changeSet id="03-repair-indexes-ux_repair_request_executor_current" author="zhsr">
+        <sql>create unique index ux_repair_request_executor_current on repair_request_executor (repair_request) where dend is null</sql>
+    </changeSet>
+
+    <!-- периоды заявки не пересекаются -->
+    <changeSet id="03-repair-indexes-ex_repair_request_executor_overlap" author="zhsr">
+        <sql>alter table repair_request_executor add constraint ex_repair_request_executor_overlap exclude using gist (repair_request with =, tsrange(dbeg, dend) with &amp;&amp;)</sql>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_executor_executor_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_executor" baseColumnNames="executor_usr" constraintName="fk_repair_request_executor_executor_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_executor_assigner_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_executor" baseColumnNames="assigner_usr" constraintName="fk_repair_request_executor_assigner_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_executor_request_status" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_executor" baseColumnNames="request_status" constraintName="fk_repair_request_executor_request_status"
+                                 referencedTableName="request_status" referencedColumnNames="id"/>
+    </changeSet>
+
+    <!-- текущие заявки исполнителя -->
+    <changeSet id="03-repair-indexes-ix_repair_request_executor_executor_usr_current" author="zhsr">
+        <sql>create index ix_repair_request_executor_executor_usr_current on repair_request_executor (executor_usr) where dend is null</sql>
+    </changeSet>
+
+    <!-- repair_request_info: кэш удаляется вместе с заявкой -->
+
+    <changeSet id="03-repair-indexes-fk_repair_request_info_repair_request" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_info" baseColumnNames="repair_request" constraintName="fk_repair_request_info_repair_request"
+                                 referencedTableName="repair_request" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_info_executor_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_info" baseColumnNames="executor_usr" constraintName="fk_repair_request_info_executor_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_info_assigner_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_info" baseColumnNames="assigner_usr" constraintName="fk_repair_request_info_assigner_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_info_request_status" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_info" baseColumnNames="request_status" constraintName="fk_repair_request_info_request_status"
+                                 referencedTableName="request_status" referencedColumnNames="id"/>
+    </changeSet>
+
+    <!-- поля исполнителя заполняются целиком или не заполняются -->
+    <changeSet id="03-repair-indexes-ck_repair_request_info_executor" author="zhsr">
+        <sql>alter table repair_request_info add constraint ck_repair_request_info_executor check (num_nulls(dbeg, executor_usr, assigner_usr) in (0, 3))</sql>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-ix_repair_request_info_executor_usr" author="zhsr">
+        <createIndex tableName="repair_request_info" indexName="ix_repair_request_info_executor_usr">
+            <column name="executor_usr"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-ix_repair_request_info_request_status" author="zhsr">
+        <createIndex tableName="repair_request_info" indexName="ix_repair_request_info_request_status">
+            <column name="request_status"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- repair_request_note: пояснения удаляются вместе с заявкой -->
+
+    <changeSet id="03-repair-indexes-fk_repair_request_note_repair_request" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_note" baseColumnNames="repair_request" constraintName="fk_repair_request_note_repair_request"
+                                 referencedTableName="repair_request" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_note_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_note" baseColumnNames="usr" constraintName="fk_repair_request_note_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-ix_repair_request_note_repair_request" author="zhsr">
+        <createIndex tableName="repair_request_note" indexName="ix_repair_request_note_repair_request">
+            <column name="repair_request"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

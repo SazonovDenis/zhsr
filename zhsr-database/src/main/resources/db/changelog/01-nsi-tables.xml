@@ -6,7 +6,32 @@
                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
         objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
 
-    <!-- НСИ: станции, депо, вагоны, маршруты -->
+    <!-- НСИ: справочники, станции, депо, парки отстоя, вагоны, маршруты -->
+
+    <!-- сотрудник; логин - ИИН -->
+    <changeSet id="01-nsi-tables-usr" author="zhsr">
+        <createTable tableName="usr">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="login" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="full_name" type="varchar(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="password_hash" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="phone" type="varchar(20)"/>
+            <column name="active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_dt" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
 
     <changeSet id="01-nsi-tables-station" author="zhsr">
         <createTable tableName="station">
@@ -37,9 +62,9 @@
         </createTable>
     </changeSet>
 
-    <!-- Тип вагона: купейный, плацкартный и т. п. -->
-    <changeSet id="01-nsi-tables-wagon_type" author="zhsr">
-        <createTable tableName="wagon_type">
+    <!-- парк отстоя: место расположения вагонов при станции, как депо -->
+    <changeSet id="01-nsi-tables-yard" author="zhsr">
+        <createTable tableName="yard">
             <column name="id" type="bigint" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
@@ -49,27 +74,192 @@
             <column name="name" type="varchar(255)">
                 <constraints nullable="false"/>
             </column>
-            <column name="description" type="varchar(1000)"/>
+            <column name="station" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+    <!-- Справочники: id, text, code - одноимённые колонки doc/dict/<таблица>.tsv; description из tsv - только в документации -->
+
+    <!-- маршрут: регулярный, разовый -->
+    <changeSet id="01-nsi-tables-route_type" author="zhsr">
+        <createTable tableName="route_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- пассажирский, грузовой -->
+    <changeSet id="01-nsi-tables-transport_type" author="zhsr">
+        <createTable tableName="transport_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- вид расположения вагона: станция, депо, рейс -->
+    <changeSet id="01-nsi-tables-location_type" author="zhsr">
+        <createTable tableName="location_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- статус рейса -->
+    <changeSet id="01-nsi-tables-trip_status_type" author="zhsr">
+        <createTable tableName="trip_status_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- должность члена бригады на рейсе -->
+    <changeSet id="01-nsi-tables-crew_duty_type" author="zhsr">
+        <createTable tableName="crew_duty_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- отцепка, прицепка -->
+    <changeSet id="01-nsi-tables-coupling_type" author="zhsr">
+        <createTable tableName="coupling_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- направление акта приёма-передачи -->
+    <changeSet id="01-nsi-tables-transfer_direction_type" author="zhsr">
+        <createTable tableName="transfer_direction_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- статус акта: отцепки, прицепки, приёма-передачи -->
+    <changeSet id="01-nsi-tables-act_status_type" author="zhsr">
+        <createTable tableName="act_status_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- вид работ -->
+    <changeSet id="01-nsi-tables-work_type" author="zhsr">
+        <createTable tableName="work_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- состояние вагона -->
+    <changeSet id="01-nsi-tables-wagon_status_type" author="zhsr">
+        <createTable tableName="wagon_status_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- Тип вагона: купейный, плацкартный и т. п. -->
+    <changeSet id="01-nsi-tables-wagon_type" author="zhsr">
+        <createTable tableName="wagon_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
     </changeSet>
 
     <!-- Модель вагона: Тулпар-Тальго, Stadler и т. п. -->
-    <changeSet id="01-nsi-tables-wagon_model" author="zhsr">
-        <createTable tableName="wagon_model">
-            <column name="id" type="bigint" autoIncrement="true">
+    <changeSet id="01-nsi-tables-model_type" author="zhsr">
+        <createTable tableName="model_type">
+            <column name="id" type="bigint">
                 <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
             </column>
             <column name="code" type="varchar(20)">
                 <constraints nullable="false"/>
             </column>
-            <column name="name" type="varchar(255)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="description" type="varchar(1000)"/>
         </createTable>
     </changeSet>
 
-    <!-- wagon_status - код из справочника doc/dict -->
     <changeSet id="01-nsi-tables-wagon" author="zhsr">
         <createTable tableName="wagon">
             <column name="id" type="bigint" autoIncrement="true">
@@ -81,12 +271,9 @@
             <column name="wagon_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="wagon_model" type="bigint"/>
+            <column name="model_type" type="bigint"/>
             <column name="build_year" type="integer"/>
             <column name="depot" type="bigint"/>
-            <column name="wagon_status" type="varchar(20)">
-                <constraints nullable="false"/>
-            </column>
             <column name="data" type="jsonb"/>
         </createTable>
     </changeSet>
@@ -111,11 +298,17 @@
             <column name="active" type="boolean" defaultValueBoolean="true">
                 <constraints nullable="false"/>
             </column>
+            <column name="route_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="transport_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
     </changeSet>
 
-    <changeSet id="01-nsi-tables-route_stop" author="zhsr">
-        <createTable tableName="route_stop">
+    <changeSet id="01-nsi-tables-route_station" author="zhsr">
+        <createTable tableName="route_station">
             <column name="id" type="bigint" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
@@ -129,6 +322,125 @@
                 <constraints nullable="false"/>
             </column>
             <column name="km" type="integer">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- статус заявки на ремонт -->
+    <changeSet id="01-nsi-tables-request_status" author="zhsr">
+        <createTable tableName="request_status">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- критичность неисправности -->
+    <changeSet id="01-nsi-tables-severity_type" author="zhsr">
+        <createTable tableName="severity_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- служба-исполнитель заявки -->
+    <changeSet id="01-nsi-tables-service_type" author="zhsr">
+        <createTable tableName="service_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- категория неисправности -->
+    <changeSet id="01-nsi-tables-fault_category_type" author="zhsr">
+        <createTable tableName="fault_category_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- этап рейса -->
+    <changeSet id="01-nsi-tables-trip_phase_type" author="zhsr">
+        <createTable tableName="trip_phase_type">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- группа неисправностей: группа DIN, раздел экипировки или уборки -->
+    <changeSet id="01-nsi-tables-fault_group_type" author="zhsr">
+        <createTable tableName="fault_group_type">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="code" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="varchar(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="sort_order" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- тип неисправности; группа и категория не связаны между собой -->
+    <changeSet id="01-nsi-tables-fault_type" author="zhsr">
+        <createTable tableName="fault_type">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="code" type="varchar(30)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="varchar(300)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="fault_group_type" type="bigint"/>
+            <column name="fault_category_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="severity_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="service_type" type="bigint"/>
+            <column name="active" type="boolean" defaultValueBoolean="true">
                 <constraints nullable="false"/>
             </column>
         </createTable>
