@@ -6,7 +6,7 @@
                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
         objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
 
-    <!-- НСИ: справочники, станции, депо, парки отстоя, вагоны, маршруты -->
+    <!-- НСИ: справочники, сотрудники, станции, депо, парки отстоя, вагоны, маршруты -->
 
     <!-- сотрудник; логин - ИИН -->
     <changeSet id="01-nsi-tables-usr" author="zhsr">
@@ -328,8 +328,8 @@
     </changeSet>
 
     <!-- статус заявки на ремонт -->
-    <changeSet id="01-nsi-tables-request_status" author="zhsr">
-        <createTable tableName="request_status">
+    <changeSet id="01-nsi-tables-request_status_type" author="zhsr">
+        <createTable tableName="request_status_type">
             <column name="id" type="bigint">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
@@ -358,8 +358,8 @@
     </changeSet>
 
     <!-- служба-исполнитель заявки -->
-    <changeSet id="01-nsi-tables-service_type" author="zhsr">
-        <createTable tableName="service_type">
+    <changeSet id="01-nsi-tables-service" author="zhsr">
+        <createTable tableName="service">
             <column name="id" type="bigint">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
@@ -439,10 +439,48 @@
             <column name="severity_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="service_type" type="bigint"/>
+            <column name="service" type="bigint"/>
             <column name="active" type="boolean" defaultValueBoolean="true">
                 <constraints nullable="false"/>
             </column>
+        </createTable>
+    </changeSet>
+
+    <!-- депо, в котором работает сотрудник; запись действует с dbeg по dend (не включая); dend пуст - текущая запись -->
+    <changeSet id="01-nsi-tables-usr_depot" author="zhsr">
+        <createTable tableName="usr_depot">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="depot" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dbeg" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dend" type="timestamp"/>
+        </createTable>
+    </changeSet>
+
+    <!-- служба, в которой работает сотрудник; запись действует с dbeg по dend (не включая); dend пуст - текущая запись -->
+    <changeSet id="01-nsi-tables-usr_service" author="zhsr">
+        <createTable tableName="usr_service">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="service" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dbeg" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dend" type="timestamp"/>
         </createTable>
     </changeSet>
 

@@ -117,8 +117,8 @@
         </loadUpdateData>
     </changeSet>
 
-    <changeSet id="01-nsi-data-request_status" author="zhsr" runOnChange="true">
-        <loadUpdateData tableName="request_status" primaryKey="id" file="db/dict/request_status.tsv" separator="\t" encoding="UTF-8">
+    <changeSet id="01-nsi-data-request_status_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="request_status_type" primaryKey="id" file="db/dict/request_status_type.tsv" separator="\t" encoding="UTF-8">
             <column header="id" name="id" type="NUMERIC"/>
             <column header="text" name="text" type="STRING"/>
             <column header="code" name="code" type="STRING"/>
@@ -135,8 +135,8 @@
         </loadUpdateData>
     </changeSet>
 
-    <changeSet id="01-nsi-data-service_type" author="zhsr" runOnChange="true">
-        <loadUpdateData tableName="service_type" primaryKey="id" file="db/dict/service_type.tsv" separator="\t" encoding="UTF-8">
+    <changeSet id="01-nsi-data-service" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="service" primaryKey="id" file="db/dict/service.tsv" separator="\t" encoding="UTF-8">
             <column header="id" name="id" type="NUMERIC"/>
             <column header="text" name="text" type="STRING"/>
             <column header="code" name="code" type="STRING"/>

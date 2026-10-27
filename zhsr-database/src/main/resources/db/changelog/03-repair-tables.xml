@@ -22,7 +22,7 @@
             </column>
             <column name="trip" type="bigint"/>
             <column name="trip_phase_type" type="bigint"/>
-            <column name="service_type" type="bigint">
+            <column name="service" type="bigint">
                 <constraints nullable="false"/>
             </column>
             <column name="usr" type="bigint">
@@ -65,7 +65,8 @@
         </createTable>
     </changeSet>
 
-    <!-- журнал движения заявки по исполнителям: запись действует с dbeg по dend (не включая); dend пуст - текущая запись -->
+    <!-- журнал движения заявки по исполнителям: запись действует с dbeg по dend (не включая); dend пуст - текущая запись;
+         created_by_usr - кто внёс запись: назначил исполнителя или сменил статус; пусто - Система -->
     <changeSet id="03-repair-tables-repair_request_executor" author="zhsr">
         <createTable tableName="repair_request_executor">
             <column name="id" type="bigint" autoIncrement="true">
@@ -81,10 +82,8 @@
             <column name="executor_usr" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="assigner_usr" type="bigint">
-                <constraints nullable="false"/>
-            </column>
-            <column name="request_status" type="bigint">
+            <column name="created_by_usr" type="bigint"/>
+            <column name="request_status_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
         </createTable>
@@ -92,7 +91,8 @@
 
     <!-- кэш текущего состояния заявки для быстрого доступа; поля вычисляемые - копия текущей записи
          repair_request_executor, обновляется в той же транзакции, что и журнал;
-         dbeg, executor_usr, assigner_usr пусты, пока у заявки нет исполнителя (статус NEW) -->
+         dbeg, executor_usr, created_by_usr пусты, пока у заявки нет исполнителя (статус NEW);
+         created_by_usr пуст и при исполнителе, если запись внесла Система -->
     <changeSet id="03-repair-tables-repair_request_info" author="zhsr">
         <createTable tableName="repair_request_info">
             <column name="repair_request" type="bigint">
@@ -100,8 +100,8 @@
             </column>
             <column name="dbeg" type="timestamp"/>
             <column name="executor_usr" type="bigint"/>
-            <column name="assigner_usr" type="bigint"/>
-            <column name="request_status" type="bigint">
+            <column name="created_by_usr" type="bigint"/>
+            <column name="request_status_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
         </createTable>

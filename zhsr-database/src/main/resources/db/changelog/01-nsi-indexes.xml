@@ -8,6 +8,11 @@
 
     <!-- НСИ: уникальность кодов и номеров, внешние ключи -->
 
+    <!-- для запрета пересечения периодов: usr_depot, usr_service, журналы -->
+    <changeSet id="01-nsi-indexes-btree_gist" author="zhsr">
+        <sql>create extension if not exists btree_gist</sql>
+    </changeSet>
+
     <changeSet id="01-nsi-indexes-uq_usr_login" author="zhsr">
         <addUniqueConstraint tableName="usr" columnNames="login" constraintName="uq_usr_login"/>
     </changeSet>
@@ -135,16 +140,16 @@
                                  referencedTableName="station" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-uq_request_status_code" author="zhsr">
-        <addUniqueConstraint tableName="request_status" columnNames="code" constraintName="uq_request_status_code"/>
+    <changeSet id="01-nsi-indexes-uq_request_status_type_code" author="zhsr">
+        <addUniqueConstraint tableName="request_status_type" columnNames="code" constraintName="uq_request_status_type_code"/>
     </changeSet>
 
     <changeSet id="01-nsi-indexes-uq_severity_type_code" author="zhsr">
         <addUniqueConstraint tableName="severity_type" columnNames="code" constraintName="uq_severity_type_code"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-uq_service_type_code" author="zhsr">
-        <addUniqueConstraint tableName="service_type" columnNames="code" constraintName="uq_service_type_code"/>
+    <changeSet id="01-nsi-indexes-uq_service_code" author="zhsr">
+        <addUniqueConstraint tableName="service" columnNames="code" constraintName="uq_service_code"/>
     </changeSet>
 
     <changeSet id="01-nsi-indexes-uq_fault_category_type_code" author="zhsr">
@@ -178,9 +183,63 @@
                                  referencedTableName="severity_type" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-fk_fault_type_service_type" author="zhsr">
-        <addForeignKeyConstraint baseTableName="fault_type" baseColumnNames="service_type" constraintName="fk_fault_type_service_type"
-                                 referencedTableName="service_type" referencedColumnNames="id"/>
+    <changeSet id="01-nsi-indexes-fk_fault_type_service" author="zhsr">
+        <addForeignKeyConstraint baseTableName="fault_type" baseColumnNames="service" constraintName="fk_fault_type_service"
+                                 referencedTableName="service" referencedColumnNames="id"/>
+    </changeSet>
+
+    <!-- usr_depot -->
+
+    <changeSet id="01-nsi-indexes-fk_usr_depot_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="usr_depot" baseColumnNames="usr" constraintName="fk_usr_depot_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_usr_depot_depot" author="zhsr">
+        <addForeignKeyConstraint baseTableName="usr_depot" baseColumnNames="depot" constraintName="fk_usr_depot_depot"
+                                 referencedTableName="depot" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-ix_usr_depot_depot" author="zhsr">
+        <createIndex tableName="usr_depot" indexName="ix_usr_depot_depot">
+            <column name="depot"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-ck_usr_depot_period" author="zhsr">
+        <sql>alter table usr_depot add constraint ck_usr_depot_period check (dend is null or dend &gt; dbeg)</sql>
+    </changeSet>
+
+    <!-- сотрудник в каждый момент работает не больше чем в одном депо -->
+    <changeSet id="01-nsi-indexes-ex_usr_depot_overlap" author="zhsr">
+        <sql>alter table usr_depot add constraint ex_usr_depot_overlap exclude using gist (usr with =, tsrange(dbeg, dend) with &amp;&amp;)</sql>
+    </changeSet>
+
+    <!-- usr_service -->
+
+    <changeSet id="01-nsi-indexes-fk_usr_service_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="usr_service" baseColumnNames="usr" constraintName="fk_usr_service_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_usr_service_service" author="zhsr">
+        <addForeignKeyConstraint baseTableName="usr_service" baseColumnNames="service" constraintName="fk_usr_service_service"
+                                 referencedTableName="service" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-ix_usr_service_service" author="zhsr">
+        <createIndex tableName="usr_service" indexName="ix_usr_service_service">
+            <column name="service"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-ck_usr_service_period" author="zhsr">
+        <sql>alter table usr_service add constraint ck_usr_service_period check (dend is null or dend &gt; dbeg)</sql>
+    </changeSet>
+
+    <!-- периоды сотрудника в одной службе не пересекаются -->
+    <changeSet id="01-nsi-indexes-ex_usr_service_overlap" author="zhsr">
+        <sql>alter table usr_service add constraint ex_usr_service_overlap exclude using gist (usr with =, service with =, tsrange(dbeg, dend) with &amp;&amp;)</sql>
     </changeSet>
 
 </databaseChangeLog>

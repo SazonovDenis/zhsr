@@ -9,11 +9,6 @@
     <!-- Расположение вагонов: уникальность, внешние ключи, проверки, индексы.
          Ссылка называется как таблица, на которую ссылается; ссылка с ролью - роль и имя таблицы в конце: created_by_usr -->
 
-    <!-- для запрета пересечения периодов в журналах -->
-    <changeSet id="02-location-indexes-btree_gist" author="zhsr">
-        <sql>create extension if not exists btree_gist</sql>
-    </changeSet>
-
     <!-- wagon_location -->
 
     <changeSet id="02-location-indexes-fk_wagon_location_wagon" author="zhsr">

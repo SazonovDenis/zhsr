@@ -90,7 +90,7 @@ tables:
       fault_group_type: {type: bigint, references: fault_group_type}
       fault_category_type: {type: bigint, required: true, references: fault_category_type}
       severity_type: {type: bigint, required: true, references: severity_type}
-      service_type: {type: bigint, references: service_type}
+      service: {type: bigint, references: service}
       active: {type: boolean, required: true}
 
   location_type:
@@ -115,7 +115,7 @@ tables:
       wagon: {type: bigint, required: true, references: wagon}
       trip: {type: bigint, references: trip}
       trip_phase_type: {type: bigint, references: trip_phase_type}
-      service_type: {type: bigint, required: true, references: service_type}
+      service: {type: bigint, required: true, references: service}
       usr: {type: bigint, required: true, references: usr}
       created_dt: {type: timestamp, required: true}
       fault_type: {type: bigint, required: true, references: fault_type}
@@ -130,8 +130,8 @@ tables:
       dbeg: {type: timestamp, required: true}
       dend: {type: timestamp}
       executor_usr: {type: bigint, required: true, references: usr}
-      assigner_usr: {type: bigint, required: true, references: usr}
-      request_status: {type: bigint, required: true, references: request_status}
+      created_by_usr: {type: bigint, references: usr}
+      request_status_type: {type: bigint, required: true, references: request_status_type}
 
   repair_request_info:
     primary_key: [repair_request]
@@ -139,8 +139,8 @@ tables:
       repair_request: {type: bigint, required: true, references: repair_request}
       dbeg: {type: timestamp}
       executor_usr: {type: bigint, references: usr}
-      assigner_usr: {type: bigint, references: usr}
-      request_status: {type: bigint, required: true, references: request_status}
+      created_by_usr: {type: bigint, references: usr}
+      request_status_type: {type: bigint, required: true, references: request_status_type}
 
   repair_request_note:
     primary_key: [id]
@@ -158,10 +158,10 @@ tables:
       repair_request: {type: bigint, required: true, references: repair_request}
       storage_key: {type: varchar(200), required: true}
       size_bytes: {type: integer, required: true}
-      usr: {type: bigint, required: true}
+      usr: {type: bigint, required: true, references: usr}
       created_dt: {type: timestamp, required: true}
 
-  request_status:
+  request_status_type:
     primary_key: [id]
     columns:
       id: {type: bigint, required: true}
@@ -198,7 +198,7 @@ tables:
       text: {type: varchar(255), required: true}
       code: {type: varchar(20), required: true}
 
-  service_type:
+  service:
     primary_key: [id]
     columns:
       id: {type: bigint, required: true}

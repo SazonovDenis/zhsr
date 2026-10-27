@@ -33,8 +33,8 @@ diagrams:
 
   repair_request:
     title: "Заявки на ремонт"
-    tables: [ repair_request, repair_request_photo, repair_request_executor, repair_request_note, fault_type, request_status, trip_phase_type, wagon, trip: { hide_references: [ "arrived_by_usr", "departed_by_usr" ] }, usr ]
-    hide_fields: [ "request_status", "fault_type", "trip_phase_type", "wagon", "trip", "usr" ]
+    tables: [ repair_request, repair_request_photo, repair_request_executor, repair_request_note, fault_type, request_status_type, trip_phase_type, wagon, trip: { hide_references: [ "arrived_by_usr", "departed_by_usr" ] }, usr ]
+    hide_fields: [ "request_status_type", "fault_type", "trip_phase_type", "wagon", "trip", "usr" ]
     top: [ usr ]
 
   info:
@@ -47,7 +47,7 @@ diagrams:
 
   fault_type:
     title: "Справочник: типы неисправностей"
-    tables: [ fault_type, fault_group_type, severity_type, service_type, fault_category_type ]
+    tables: [ fault_type, fault_group_type, severity_type, service, fault_category_type ]
 
   wagon:
     title: "Справочник: вагоны"
@@ -259,9 +259,9 @@ tables:
         title: "Код модели"
         description: "Уникален"
 
-  request_status:
+  request_status_type:
     title: "Статус заявки на ремонт"
-    constants_from: doc/dict/request_status.tsv
+    constants_from: doc/dict/request_status_type.tsv
     columns:
       text:
         title: "Значение"
@@ -279,9 +279,11 @@ tables:
         title: "Код"
         description: "Уникален"
 
-  service_type:
+  service:
     title: "Служба-исполнитель"
-    constants_from: doc/dict/service_type.tsv
+    description: |
+      Служба, которой адресуется заявка на ремонт.
+    constants_from: doc/dict/service.tsv
     columns:
       text:
         title: "Значение"
@@ -341,9 +343,9 @@ tables:
       severity_type:
         title: "Критичность по умолчанию"
         constants_from: doc/dict/severity_type.tsv
-      service_type:
+      service:
         title: "Служба-исполнитель по умолчанию"
-        constants_from: doc/dict/service_type.tsv
+        constants_from: doc/dict/service.tsv
       active:
         title: "Действует"
 
@@ -605,9 +607,9 @@ tables:
       trip_phase_type:
         title: "Этап рейса при подаче"
         constants_from: doc/dict/trip_phase_type.tsv
-      service_type:
+      service:
         title: "Служба-исполнитель"
-        constants_from: doc/dict/service_type.tsv
+        constants_from: doc/dict/service.tsv
       usr:
         title: "Автор"
       created_dt:
@@ -650,11 +652,12 @@ tables:
         description: "Пусто - текущая запись"
       executor_usr:
         title: "Исполнитель"
-      assigner_usr:
-        title: "Кем назначен исполнитель"
-      request_status:
+      created_by_usr:
+        title: "Кто внёс запись"
+        description: "Назначил исполнителя или сменил статус. Пусто - Система"
+      request_status_type:
         title: "Статус"
-        constants_from: doc/dict/request_status.tsv
+        constants_from: doc/dict/request_status_type.tsv
 
   repair_request_info:
     title: "Текущее состояние заявки"
@@ -671,13 +674,13 @@ tables:
       executor_usr:
         title: "Исполнитель"
         description: "Вычисляемое: из текущей записи repair_request_executor"
-      assigner_usr:
-        title: "Кем назначен исполнитель"
-        description: "Вычисляемое: из текущей записи repair_request_executor"
-      request_status:
+      created_by_usr:
+        title: "Кто внёс запись"
+        description: "Вычисляемое: из текущей записи repair_request_executor; пусто - Система или нет исполнителя"
+      request_status_type:
         title: "Текущий статус"
         description: "Вычисляемое: из текущей записи repair_request_executor; без исполнителя - новая"
-        constants_from: doc/dict/request_status.tsv
+        constants_from: doc/dict/request_status_type.tsv
 
   repair_request_note:
     title: "Пояснение к заявке"

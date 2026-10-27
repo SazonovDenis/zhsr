@@ -29,9 +29,9 @@
                                  referencedTableName="trip_phase_type" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="03-repair-indexes-fk_repair_request_service_type" author="zhsr">
-        <addForeignKeyConstraint baseTableName="repair_request" baseColumnNames="service_type" constraintName="fk_repair_request_service_type"
-                                 referencedTableName="service_type" referencedColumnNames="id"/>
+    <changeSet id="03-repair-indexes-fk_repair_request_service" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request" baseColumnNames="service" constraintName="fk_repair_request_service"
+                                 referencedTableName="service" referencedColumnNames="id"/>
     </changeSet>
 
     <changeSet id="03-repair-indexes-fk_repair_request_usr" author="zhsr">
@@ -68,6 +68,11 @@
                                  referencedTableName="repair_request" referencedColumnNames="id" onDelete="CASCADE"/>
     </changeSet>
 
+    <changeSet id="03-repair-indexes-fk_repair_request_photo_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_photo" baseColumnNames="usr" constraintName="fk_repair_request_photo_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
     <changeSet id="03-repair-indexes-ix_repair_request_photo_repair_request" author="zhsr">
         <createIndex tableName="repair_request_photo" indexName="ix_repair_request_photo_repair_request">
             <column name="repair_request"/>
@@ -100,14 +105,14 @@
                                  referencedTableName="usr" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="03-repair-indexes-fk_repair_request_executor_assigner_usr" author="zhsr">
-        <addForeignKeyConstraint baseTableName="repair_request_executor" baseColumnNames="assigner_usr" constraintName="fk_repair_request_executor_assigner_usr"
+    <changeSet id="03-repair-indexes-fk_repair_request_executor_created_by_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_executor" baseColumnNames="created_by_usr" constraintName="fk_repair_request_executor_created_by_usr"
                                  referencedTableName="usr" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="03-repair-indexes-fk_repair_request_executor_request_status" author="zhsr">
-        <addForeignKeyConstraint baseTableName="repair_request_executor" baseColumnNames="request_status" constraintName="fk_repair_request_executor_request_status"
-                                 referencedTableName="request_status" referencedColumnNames="id"/>
+    <changeSet id="03-repair-indexes-fk_repair_request_executor_request_status_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_executor" baseColumnNames="request_status_type" constraintName="fk_repair_request_executor_request_status_type"
+                                 referencedTableName="request_status_type" referencedColumnNames="id"/>
     </changeSet>
 
     <!-- текущие заявки исполнителя -->
@@ -127,19 +132,19 @@
                                  referencedTableName="usr" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="03-repair-indexes-fk_repair_request_info_assigner_usr" author="zhsr">
-        <addForeignKeyConstraint baseTableName="repair_request_info" baseColumnNames="assigner_usr" constraintName="fk_repair_request_info_assigner_usr"
+    <changeSet id="03-repair-indexes-fk_repair_request_info_created_by_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_info" baseColumnNames="created_by_usr" constraintName="fk_repair_request_info_created_by_usr"
                                  referencedTableName="usr" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="03-repair-indexes-fk_repair_request_info_request_status" author="zhsr">
-        <addForeignKeyConstraint baseTableName="repair_request_info" baseColumnNames="request_status" constraintName="fk_repair_request_info_request_status"
-                                 referencedTableName="request_status" referencedColumnNames="id"/>
+    <changeSet id="03-repair-indexes-fk_repair_request_info_request_status_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_info" baseColumnNames="request_status_type" constraintName="fk_repair_request_info_request_status_type"
+                                 referencedTableName="request_status_type" referencedColumnNames="id"/>
     </changeSet>
 
-    <!-- поля исполнителя заполняются целиком или не заполняются -->
+    <!-- dbeg и исполнитель заполняются вместе; без исполнителя пуст и тот, кто внёс запись -->
     <changeSet id="03-repair-indexes-ck_repair_request_info_executor" author="zhsr">
-        <sql>alter table repair_request_info add constraint ck_repair_request_info_executor check (num_nulls(dbeg, executor_usr, assigner_usr) in (0, 3))</sql>
+        <sql>alter table repair_request_info add constraint ck_repair_request_info_executor check (num_nulls(dbeg, executor_usr) in (0, 2) and (executor_usr is not null or created_by_usr is null))</sql>
     </changeSet>
 
     <changeSet id="03-repair-indexes-ix_repair_request_info_executor_usr" author="zhsr">
@@ -148,9 +153,9 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="03-repair-indexes-ix_repair_request_info_request_status" author="zhsr">
-        <createIndex tableName="repair_request_info" indexName="ix_repair_request_info_request_status">
-            <column name="request_status"/>
+    <changeSet id="03-repair-indexes-ix_repair_request_info_request_status_type" author="zhsr">
+        <createIndex tableName="repair_request_info" indexName="ix_repair_request_info_request_status_type">
+            <column name="request_status_type"/>
         </createIndex>
     </changeSet>
 
