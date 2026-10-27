@@ -422,7 +422,7 @@ tables:
         title: "Кто отметил прибытие"
 
   trip_wagon:
-    title: "Состав рейса"
+    title: "Состав вагонов рейса"
     columns:
       trip:
         title: "Рейс"
