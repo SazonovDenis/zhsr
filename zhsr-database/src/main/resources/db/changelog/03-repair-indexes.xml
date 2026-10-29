@@ -154,24 +154,6 @@
         </createIndex>
     </changeSet>
 
-    <!-- repair_request_change: история удаляется вместе с заявкой -->
-
-    <changeSet id="03-repair-indexes-fk_repair_request_change_repair_request" author="zhsr">
-        <addForeignKeyConstraint baseTableName="repair_request_change" baseColumnNames="repair_request" constraintName="fk_repair_request_change_repair_request"
-                                 referencedTableName="repair_request" referencedColumnNames="id" onDelete="CASCADE"/>
-    </changeSet>
-
-    <changeSet id="03-repair-indexes-fk_repair_request_change_created_by_usr" author="zhsr">
-        <addForeignKeyConstraint baseTableName="repair_request_change" baseColumnNames="created_by_usr" constraintName="fk_repair_request_change_created_by_usr"
-                                 referencedTableName="usr" referencedColumnNames="id"/>
-    </changeSet>
-
-    <changeSet id="03-repair-indexes-ix_repair_request_change_repair_request" author="zhsr">
-        <createIndex tableName="repair_request_change" indexName="ix_repair_request_change_repair_request">
-            <column name="repair_request"/>
-        </createIndex>
-    </changeSet>
-
     <!-- repair_request_note: пояснения удаляются вместе с заявкой -->
 
     <changeSet id="03-repair-indexes-fk_repair_request_note_repair_request" author="zhsr">

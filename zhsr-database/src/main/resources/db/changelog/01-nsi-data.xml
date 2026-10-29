@@ -169,6 +169,16 @@
             <column header="id" name="id" type="NUMERIC"/>
             <column header="text" name="text" type="STRING"/>
             <column header="code" name="code" type="STRING"/>
+            <column header="service" name="service" type="NUMERIC"/>
+            <column header="description" type="skip"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-category_type" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="category_type" primaryKey="id" file="db/dict/category_type.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="text" name="text" type="STRING"/>
+            <column header="code" name="code" type="STRING"/>
             <column header="description" type="skip"/>
         </loadUpdateData>
     </changeSet>

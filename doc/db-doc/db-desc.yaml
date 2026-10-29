@@ -9,9 +9,10 @@ diagrams:
     hide_fields: [ "trip_status_type", "usr", "wagon_location", "wagon_status" ]
 
   usr:
-    title: "Сотрудники: роли, депо и службы"
-    tables: [ usr, usr_role, role_type, usr_depot, usr_service, depot: { hide_references: [ "station" ] }, service ]
-    hide_fields: [ "role_type" ]
+    title: "Сотрудники: роли, депо, службы и категории"
+    tables: [ usr, usr_role, role_type, usr_depot, usr_category, depot: { hide_references: [ "station" ] }, service, category_type ]
+    hide_fields: [ role_type, depot, service, category_type ]
+    top: [ role_type, depot, service, category_type ]
 
   trip_crew:
     title: "Бригада рейса"
@@ -38,7 +39,7 @@ diagrams:
 
   repair_request:
     title: "Заявки на ремонт"
-    tables: [ repair_request, repair_request_photo, repair_request_executor, repair_request_change, repair_request_note, fault_type, request_status_type, wagon, trip: { hide_references: [ "arrived_by_usr", "departed_by_usr" ] }, usr ]
+    tables: [ repair_request, repair_request_photo, repair_request_executor, repair_request_note, fault_type, request_status_type, wagon, trip: { hide_references: [ "arrived_by_usr", "departed_by_usr" ] }, usr ]
     hide_fields: [ "request_status_type", "fault_type", "wagon", "trip", "usr" ]
     top: [ usr ]
 
@@ -52,8 +53,8 @@ diagrams:
 
   fault_type:
     title: "Справочник: типы неисправностей"
-    tables: [ fault_type, fault_group_type, severity_type, service, fault_category_type, usr_service ]
-    hide_fields: [ "usr_service" ]
+    tables: [ fault_type, fault_group_type, severity_type, service, fault_category_type, role_type ]
+    hide_fields: [ "role_type" ]
 
   wagon:
     title: "Справочник: вагоны"
@@ -75,6 +76,10 @@ tables:
       code:
         title: "Код"
         description: "Уникален"
+      service:
+        title: "Служба роли"
+        description: "Пусто - роль не относится к службе"
+        constants_from: doc/dict/service.tsv
 
   usr_role:
     title: "Роли сотрудника"
@@ -87,32 +92,43 @@ tables:
         title: "Роль"
         constants_from: doc/dict/role_type.tsv
 
-  usr_depot:
-    title: "Депо сотрудника"
+  category_type:
+    title: "Категория проводника"
+    constants_from: doc/dict/category_type.tsv
+    columns:
+      text:
+        title: "Значение"
+      code:
+        title: "Код"
+        description: "Уникален"
+
+  usr_category:
+    title: "Категория проводника у сотрудника"
     description: |
-      В каком депо работает сотрудник, например мастер депо. Запись действует с dbeg по dend (не включая); dend пуст -
-      текущая запись. Сотрудник в каждый момент работает не больше чем в одном депо.
+      Запись действует с dbeg по dend (не включая); dend пуст - текущая запись. У сотрудника в каждый момент не больше
+      одной категории.
     columns:
       usr:
         title: "Сотрудник"
-      depot:
-        title: "Депо"
+      category_type:
+        title: "Категория"
+        constants_from: doc/dict/category_type.tsv
       dbeg:
         title: "Начало периода"
       dend:
         title: "Конец периода"
         description: "Пусто - текущая запись"
 
-  usr_service:
-    title: "Служба сотрудника"
+  usr_depot:
+    title: "Депо сотрудника"
     description: |
-      В какой службе работает сотрудник. Запись действует с dbeg по dend (не включая); dend пуст - текущая запись.
-      Периоды сотрудника в одной службе не пересекаются; в разных службах сотрудник может работать одновременно.
+      В каком депо работает сотрудник; у каждого сотрудника есть текущее депо. Запись действует с dbeg по dend
+      (не включая); dend пуст - текущая запись. Сотрудник в каждый момент работает не больше чем в одном депо.
     columns:
       usr:
         title: "Сотрудник"
-      service:
-        title: "Служба"
+      depot:
+        title: "Депо"
       dbeg:
         title: "Начало периода"
       dend:
@@ -341,7 +357,8 @@ tables:
   service:
     title: "Служба-исполнитель"
     description: |
-      Служба, которой адресуется заявка на ремонт.
+      Служба, которой адресуется заявка на ремонт. Служба - свойство роли: у роли не больше одной службы, одну службу
+      могут иметь несколько ролей (role_type.service).
     constants_from: doc/dict/service.tsv
     columns:
       text:
@@ -650,7 +667,8 @@ tables:
   repair_request:
     title: "Заявка на ремонт"
     description: |
-      Неисправность вагона, поданная сотрудником. Корректировки - repair_request_change.
+      Неисправность вагона, поданная сотрудником. Автор корректирует заявку в течение ограниченного времени после подачи;
+      корректировка в журналы не попадает.
     columns:
       number:
         title: "Номер"
@@ -689,24 +707,6 @@ tables:
         title: "Автор фото"
       created_dt:
         title: "Когда загружено"
-
-  repair_request_change:
-    title: "История корректировок заявки"
-    description: |
-      Каждая корректировка заявки - одна запись: кто и когда изменил, значения изменённых полей до и после правки.
-    columns:
-      repair_request:
-        title: "Заявка"
-      created_by_usr:
-        title: "Кто изменил"
-      created_dt:
-        title: "Когда изменено"
-      old_data:
-        title: "Значения до правки"
-        description: "JSON: изменённые поля заявки и их прежние значения"
-      new_data:
-        title: "Значения после правки"
-        description: "JSON: изменённые поля заявки и их новые значения"
 
   repair_request_executor:
     title: "Движение заявки по исполнителям"

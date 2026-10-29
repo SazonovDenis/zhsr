@@ -19,6 +19,13 @@ tables:
       text: {type: varchar(255), required: true}
       code: {type: varchar(20), required: true}
 
+  category_type:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      text: {type: varchar(255), required: true}
+      code: {type: varchar(20), required: true}
+
   coupling_act:
     primary_key: [id]
     columns:
@@ -122,16 +129,6 @@ tables:
       severity_type: {type: bigint, required: true, references: severity_type}
       description: {type: text}
 
-  repair_request_change:
-    primary_key: [id]
-    columns:
-      id: {type: bigint, required: true}
-      repair_request: {type: bigint, required: true, references: repair_request}
-      created_by_usr: {type: bigint, required: true, references: usr}
-      created_dt: {type: timestamp, required: true}
-      old_data: {type: jsonb, required: true}
-      new_data: {type: jsonb, required: true}
-
   repair_request_executor:
     primary_key: [id]
     columns:
@@ -184,6 +181,7 @@ tables:
       id: {type: bigint, required: true}
       text: {type: varchar(255), required: true}
       code: {type: varchar(20), required: true}
+      service: {type: bigint, references: service}
 
   route:
     primary_key: [id]
@@ -331,6 +329,15 @@ tables:
       active: {type: boolean, required: true}
       created_dt: {type: timestamp, required: true}
 
+  usr_category:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      usr: {type: bigint, required: true, references: usr}
+      category_type: {type: bigint, required: true, references: category_type}
+      dbeg: {type: timestamp, required: true}
+      dend: {type: timestamp}
+
   usr_depot:
     primary_key: [id]
     columns:
@@ -346,15 +353,6 @@ tables:
       id: {type: bigint, required: true}
       usr: {type: bigint, required: true, references: usr}
       role_type: {type: bigint, required: true, references: role_type}
-
-  usr_service:
-    primary_key: [id]
-    columns:
-      id: {type: bigint, required: true}
-      usr: {type: bigint, required: true, references: usr}
-      service: {type: bigint, required: true, references: service}
-      dbeg: {type: timestamp, required: true}
-      dend: {type: timestamp}
 
   wagon:
     primary_key: [id]

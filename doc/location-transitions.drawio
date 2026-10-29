@@ -1,6 +1,6 @@
-<mxfile host="drawio-plugin" modified="2026-10-27T11:18:22.875Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36" etag="zDj9gonuUnOjMGo9JBNZ" version="22.1.22" type="embed">
+<mxfile host="drawio-plugin" modified="2026-10-29T19:17:43.498Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36" etag="jv9KEpifAhyzQrsgBRMc" version="22.1.22" type="embed">
   <diagram id="location-transitions" name="Расположение вагона">
-    <mxGraphModel dx="1242" dy="1078" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+    <mxGraphModel dx="1704" dy="1437" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -14,7 +14,7 @@
           <mxGeometry x="120" y="440" width="200" height="200" as="geometry" />
         </mxCell>
         <mxCell id="yard" value="Парк отстоя" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fontSize=15;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
-          <mxGeometry x="1520" y="440" width="200" height="200" as="geometry" />
+          <mxGeometry x="1600" y="440" width="200" height="200" as="geometry" />
         </mxCell>
         <mxCell id="start" value="Новый вагон" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fontSize=16;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
           <mxGeometry x="840" y="800" width="200" height="80" as="geometry" />
@@ -25,22 +25,12 @@
         <mxCell id="e_trip_station" value="Прибытие рейса (Ф-РЕЙ-04)&lt;br style=&quot;font-size: 16px;&quot;&gt;Отцепка (Ф-АКТ-01)&lt;br style=&quot;font-size: 16px;&quot;&gt;Отмена прицепки (Ф-АКТ-06)&lt;br style=&quot;font-size: 16px;&quot;&gt;Смена расположения (Ф-ВАГ-03)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="trip" target="station" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_depot_trip" value="Отправление рейса (Ф-РЕЙ-03)&lt;br style=&quot;font-size: 16px;&quot;&gt;Прицепка (Ф-АКТ-01)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.3;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="depot" target="trip" edge="1">
-          <mxGeometry x="0.2273" relative="1" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="e_trip_depot" value="Отмена прицепки (Ф-АКТ-06)&lt;br style=&quot;font-size: 16px;&quot;&gt;Смена расположения (Ф-ВАГ-03)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="trip" target="depot" edge="1">
+        <mxCell id="e_trip_depot" value="Смена расположения (Ф-ВАГ-03)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="trip" target="depot" edge="1">
           <mxGeometry x="-0.25" relative="1" as="geometry">
             <mxPoint as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_yard_trip" value="Отправление рейса (Ф-РЕЙ-03)&lt;br style=&quot;font-size: 16px;&quot;&gt;Прицепка (Ф-АКТ-01)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.7;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="yard" target="trip" edge="1">
-          <mxGeometry x="0.0476" relative="1" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="e_trip_yard" value="Отмена прицепки (Ф-АКТ-06)&lt;br style=&quot;font-size: 16px;&quot;&gt;Смена расположения (Ф-ВАГ-03)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="trip" target="yard" edge="1">
+        <mxCell id="e_trip_yard" value="Смена расположения (Ф-ВАГ-03)" style="endArrow=classic;html=1;fontSize=16;labelBackgroundColor=#ffffff;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="trip" target="yard" edge="1">
           <mxGeometry x="-0.3529" relative="1" as="geometry">
             <mxPoint as="offset" />
           </mxGeometry>

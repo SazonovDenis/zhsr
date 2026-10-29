@@ -6,7 +6,7 @@
                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
         objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
 
-    <!-- Заявки на ремонт: заявка, фото, движение по исполнителям, история корректировок, пояснения -->
+    <!-- Заявки на ремонт: заявка, фото, движение по исполнителям, пояснения -->
 
     <!-- заявка на ремонт вагона; usr - автор, created_dt - время подачи;
          number - код компании, год (две цифры), порядковый номер в году -->
@@ -101,30 +101,6 @@
             <column name="executor_usr" type="bigint"/>
             <column name="created_by_usr" type="bigint"/>
             <column name="request_status_type" type="bigint">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-    </changeSet>
-
-    <!-- история корректировок заявки: кто и когда изменил, значения изменённых полей до и после правки -->
-    <changeSet id="03-repair-tables-repair_request_change" author="zhsr">
-        <createTable tableName="repair_request_change">
-            <column name="id" type="bigint" autoIncrement="true">
-                <constraints primaryKey="true" nullable="false"/>
-            </column>
-            <column name="repair_request" type="bigint">
-                <constraints nullable="false"/>
-            </column>
-            <column name="created_by_usr" type="bigint">
-                <constraints nullable="false"/>
-            </column>
-            <column name="created_dt" type="timestamp">
-                <constraints nullable="false"/>
-            </column>
-            <column name="old_data" type="jsonb">
-                <constraints nullable="false"/>
-            </column>
-            <column name="new_data" type="jsonb">
                 <constraints nullable="false"/>
             </column>
         </createTable>
