@@ -156,8 +156,9 @@
         <addUniqueConstraint tableName="fault_category_type" columnNames="code" constraintName="uq_fault_category_type_code"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-uq_trip_phase_type_code" author="zhsr">
-        <addUniqueConstraint tableName="trip_phase_type" columnNames="code" constraintName="uq_trip_phase_type_code"/>
+    <changeSet id="01-nsi-indexes-fk_fault_category_type_service" author="zhsr">
+        <addForeignKeyConstraint baseTableName="fault_category_type" baseColumnNames="service" constraintName="fk_fault_category_type_service"
+                                 referencedTableName="service" referencedColumnNames="id"/>
     </changeSet>
 
     <changeSet id="01-nsi-indexes-uq_fault_group_type_code" author="zhsr">
@@ -186,6 +187,26 @@
     <changeSet id="01-nsi-indexes-fk_fault_type_service" author="zhsr">
         <addForeignKeyConstraint baseTableName="fault_type" baseColumnNames="service" constraintName="fk_fault_type_service"
                                  referencedTableName="service" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-uq_role_type_code" author="zhsr">
+        <addUniqueConstraint tableName="role_type" columnNames="code" constraintName="uq_role_type_code"/>
+    </changeSet>
+
+    <!-- usr_role -->
+
+    <changeSet id="01-nsi-indexes-uq_usr_role_usr_role_type" author="zhsr">
+        <addUniqueConstraint tableName="usr_role" columnNames="usr, role_type" constraintName="uq_usr_role_usr_role_type"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_usr_role_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="usr_role" baseColumnNames="usr" constraintName="fk_usr_role_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_usr_role_role_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="usr_role" baseColumnNames="role_type" constraintName="fk_usr_role_role_type"
+                                 referencedTableName="role_type" referencedColumnNames="id"/>
     </changeSet>
 
     <!-- usr_depot -->

@@ -24,11 +24,6 @@
                                  referencedTableName="trip" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="03-repair-indexes-fk_repair_request_trip_phase_type" author="zhsr">
-        <addForeignKeyConstraint baseTableName="repair_request" baseColumnNames="trip_phase_type" constraintName="fk_repair_request_trip_phase_type"
-                                 referencedTableName="trip_phase_type" referencedColumnNames="id"/>
-    </changeSet>
-
     <changeSet id="03-repair-indexes-fk_repair_request_service" author="zhsr">
         <addForeignKeyConstraint baseTableName="repair_request" baseColumnNames="service" constraintName="fk_repair_request_service"
                                  referencedTableName="service" referencedColumnNames="id"/>
@@ -142,9 +137,9 @@
                                  referencedTableName="request_status_type" referencedColumnNames="id"/>
     </changeSet>
 
-    <!-- dbeg и исполнитель заполняются вместе; без исполнителя пуст и тот, кто внёс запись -->
+    <!-- пока в журнале заявки нет записей, исполнитель и тот, кто внёс запись, пусты -->
     <changeSet id="03-repair-indexes-ck_repair_request_info_executor" author="zhsr">
-        <sql>alter table repair_request_info add constraint ck_repair_request_info_executor check (num_nulls(dbeg, executor_usr) in (0, 2) and (executor_usr is not null or created_by_usr is null))</sql>
+        <sql>alter table repair_request_info add constraint ck_repair_request_info_executor check (dbeg is not null or num_nonnulls(executor_usr, created_by_usr) = 0)</sql>
     </changeSet>
 
     <changeSet id="03-repair-indexes-ix_repair_request_info_executor_usr" author="zhsr">
@@ -156,6 +151,24 @@
     <changeSet id="03-repair-indexes-ix_repair_request_info_request_status_type" author="zhsr">
         <createIndex tableName="repair_request_info" indexName="ix_repair_request_info_request_status_type">
             <column name="request_status_type"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- repair_request_change: история удаляется вместе с заявкой -->
+
+    <changeSet id="03-repair-indexes-fk_repair_request_change_repair_request" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_change" baseColumnNames="repair_request" constraintName="fk_repair_request_change_repair_request"
+                                 referencedTableName="repair_request" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-fk_repair_request_change_created_by_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="repair_request_change" baseColumnNames="created_by_usr" constraintName="fk_repair_request_change_created_by_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="03-repair-indexes-ix_repair_request_change_repair_request" author="zhsr">
+        <createIndex tableName="repair_request_change" indexName="ix_repair_request_change_repair_request">
+            <column name="repair_request"/>
         </createIndex>
     </changeSet>
 

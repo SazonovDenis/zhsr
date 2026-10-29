@@ -33,3 +33,6 @@ Thumbs.db
 
 # кэш диаграмм doc-db
 .plantuml-cache/
+
+# ключ для публикации документации
+aws/

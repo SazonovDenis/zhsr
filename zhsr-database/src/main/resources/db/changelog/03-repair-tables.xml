@@ -6,9 +6,10 @@
                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
         objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
 
-    <!-- Заявки на ремонт: заявка, фото, движение по исполнителям, пояснения -->
+    <!-- Заявки на ремонт: заявка, фото, движение по исполнителям, история корректировок, пояснения -->
 
-    <!-- заявка на ремонт вагона; usr - автор, created_dt - время подачи -->
+    <!-- заявка на ремонт вагона; usr - автор, created_dt - время подачи;
+         number - код компании, год (две цифры), порядковый номер в году -->
     <changeSet id="03-repair-tables-repair_request" author="zhsr">
         <createTable tableName="repair_request">
             <column name="id" type="bigint" autoIncrement="true">
@@ -21,7 +22,6 @@
                 <constraints nullable="false"/>
             </column>
             <column name="trip" type="bigint"/>
-            <column name="trip_phase_type" type="bigint"/>
             <column name="service" type="bigint">
                 <constraints nullable="false"/>
             </column>
@@ -66,7 +66,8 @@
     </changeSet>
 
     <!-- журнал движения заявки по исполнителям: запись действует с dbeg по dend (не включая); dend пуст - текущая запись;
-         created_by_usr - кто внёс запись: назначил исполнителя или сменил статус; пусто - Система -->
+         created_by_usr - кто внёс запись: назначил исполнителя или сменил статус; пусто - Система;
+         executor_usr пуст, если исполнителя нет: заявка отклонена или отменена до назначения -->
     <changeSet id="03-repair-tables-repair_request_executor" author="zhsr">
         <createTable tableName="repair_request_executor">
             <column name="id" type="bigint" autoIncrement="true">
@@ -79,9 +80,7 @@
                 <constraints nullable="false"/>
             </column>
             <column name="dend" type="timestamp"/>
-            <column name="executor_usr" type="bigint">
-                <constraints nullable="false"/>
-            </column>
+            <column name="executor_usr" type="bigint"/>
             <column name="created_by_usr" type="bigint"/>
             <column name="request_status_type" type="bigint">
                 <constraints nullable="false"/>
@@ -91,8 +90,8 @@
 
     <!-- кэш текущего состояния заявки для быстрого доступа; поля вычисляемые - копия текущей записи
          repair_request_executor, обновляется в той же транзакции, что и журнал;
-         dbeg, executor_usr, created_by_usr пусты, пока у заявки нет исполнителя (статус NEW);
-         created_by_usr пуст и при исполнителе, если запись внесла Система -->
+         dbeg, executor_usr, created_by_usr пусты, пока в журнале заявки нет записей (статус NEW);
+         executor_usr пуст, если в текущей записи нет исполнителя; created_by_usr пуст, если запись внесла Система -->
     <changeSet id="03-repair-tables-repair_request_info" author="zhsr">
         <createTable tableName="repair_request_info">
             <column name="repair_request" type="bigint">
@@ -102,6 +101,30 @@
             <column name="executor_usr" type="bigint"/>
             <column name="created_by_usr" type="bigint"/>
             <column name="request_status_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- история корректировок заявки: кто и когда изменил, значения изменённых полей до и после правки -->
+    <changeSet id="03-repair-tables-repair_request_change" author="zhsr">
+        <createTable tableName="repair_request_change">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="repair_request" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by_usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_dt" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="old_data" type="jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="new_data" type="jsonb">
                 <constraints nullable="false"/>
             </column>
         </createTable>

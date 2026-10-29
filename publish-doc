@@ -1,0 +1,12 @@
+#!/bin/sh
+# Публикация _site на http://13.61.33.23/zhsr/ утилитой build-doc (каталог - в BUILD_DOC, по умолчанию
+# ../../build-doc от корня проекта). Ключ - PUBLISH_KEY, по умолчанию aws/apache.pem проекта, нет его - из zholserik.
+set -e
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+BUILD_DOC="${BUILD_DOC:-$ROOT/../../build-doc}"
+KEY="${PUBLISH_KEY:-$ROOT/aws/apache.pem}"
+[ -n "$PUBLISH_KEY" ] || [ -f "$KEY" ] || KEY="$ROOT/../zholserik/aws/apache.pem"
+cd "$ROOT"
+
+"$BUILD_DOC/publish-doc" -i "$KEY" ec2-user@ec2-13-61-33-23.eu-north-1.compute.amazonaws.com:/var/www/html/zhsr/

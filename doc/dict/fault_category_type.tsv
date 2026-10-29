@@ -1,4 +1,4 @@
-id	text	code	description
-1	Техническая	TECHNICAL	в пути - ПЭМ, до отправления - мастер депо
-2	Уборка	CLEANING	клининг
-3	Экипировка	EQUIPMENT	экипировщик
+id	text	code	service	description
+1	Техническая	TECHNICAL	1	служба ПЭМ
+2	Уборка	CLEANING	3	клининг
+3	Экипировка	EQUIPMENT	4	экипировщик

@@ -1,0 +1,8 @@
+id	text	code	description
+1	Администратор	ADMIN	
+2	Планировщик	PLANNER	
+3	Начальник поезда	TRAIN_CHIEF	в грузовом рейсе - машинист
+4	Мастер депо	DEPOT_MASTER	депо - usr_depot
+5	Приёмщик	RECEIVER	
+6	Проводник	CONDUCTOR	
+7	ПЭМ	PEM	поездной электромеханик
