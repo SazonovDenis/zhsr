@@ -6,14 +6,32 @@
                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
         objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
 
-    <!-- Данные справочников из doc/dict/<таблица>.tsv (копируются в db/dict при сборке).
+    <!-- Данные справочников из doc/dict/<таблица>.tsv (копируются в db/dict при сборке), станции, перегоны и депо - из db-data (в db/data).
          Изменили tsv - changeSet выполнится заново: строки обновятся по id, новые добавятся; description не загружается. -->
 
-    <changeSet id="01-nsi-data-route_type" author="zhsr" runOnChange="true">
-        <loadUpdateData tableName="route_type" primaryKey="id" file="db/dict/route_type.tsv" separator="\t" encoding="UTF-8">
+    <changeSet id="01-nsi-data-station" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="station" primaryKey="id" file="db/data/station.tsv" separator="\t" encoding="UTF-8">
             <column header="id" name="id" type="NUMERIC"/>
-            <column header="text" name="text" type="STRING"/>
             <column header="code" name="code" type="STRING"/>
+            <column header="name" name="name" type="STRING"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-depot" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="depot" primaryKey="id" file="db/data/depot.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="code" name="code" type="STRING"/>
+            <column header="name" name="name" type="STRING"/>
+            <column header="station" name="station" type="NUMERIC"/>
+        </loadUpdateData>
+    </changeSet>
+
+    <changeSet id="01-nsi-data-stage" author="zhsr" runOnChange="true">
+        <loadUpdateData tableName="stage" primaryKey="id" file="db/data/stage.tsv" separator="\t" encoding="UTF-8">
+            <column header="id" name="id" type="NUMERIC"/>
+            <column header="from_station" name="from_station" type="NUMERIC"/>
+            <column header="to_station" name="to_station" type="NUMERIC"/>
+            <column header="km" name="km" type="NUMERIC"/>
             <column header="description" type="skip"/>
         </loadUpdateData>
     </changeSet>

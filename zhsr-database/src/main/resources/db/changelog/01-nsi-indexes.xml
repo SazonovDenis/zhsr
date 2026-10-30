@@ -22,10 +22,6 @@
         <sql>alter table usr add constraint ck_usr_phone check (phone ~ '^\+7[0-9]{10}$')</sql>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-uq_route_type_code" author="zhsr">
-        <addUniqueConstraint tableName="route_type" columnNames="code" constraintName="uq_route_type_code"/>
-    </changeSet>
-
     <changeSet id="01-nsi-indexes-uq_transport_type_code" author="zhsr">
         <addUniqueConstraint tableName="transport_type" columnNames="code" constraintName="uq_transport_type_code"/>
     </changeSet>
@@ -66,6 +62,37 @@
         <addUniqueConstraint tableName="station" columnNames="code" constraintName="uq_station_code"/>
     </changeSet>
 
+    <!-- stage -->
+
+    <changeSet id="01-nsi-indexes-uq_stage_from_station_to_station" author="zhsr">
+        <addUniqueConstraint tableName="stage" columnNames="from_station, to_station" constraintName="uq_stage_from_station_to_station"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_stage_from_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="stage" baseColumnNames="from_station" constraintName="fk_stage_from_station"
+                                 referencedTableName="station" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_stage_to_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="stage" baseColumnNames="to_station" constraintName="fk_stage_to_station"
+                                 referencedTableName="station" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-ix_stage_to_station" author="zhsr">
+        <createIndex tableName="stage" indexName="ix_stage_to_station">
+            <column name="to_station"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ребро хранится один раз: меньший id станции - from_station -->
+    <changeSet id="01-nsi-indexes-ck_stage_station_order" author="zhsr">
+        <sql>alter table stage add constraint ck_stage_station_order check (from_station &lt; to_station)</sql>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-ck_stage_km" author="zhsr">
+        <sql>alter table stage add constraint ck_stage_km check (km &gt; 0)</sql>
+    </changeSet>
+
     <changeSet id="01-nsi-indexes-uq_depot_code" author="zhsr">
         <addUniqueConstraint tableName="depot" columnNames="code" constraintName="uq_depot_code"/>
     </changeSet>
@@ -96,6 +123,10 @@
         <addUniqueConstraint tableName="wagon" columnNames="number" constraintName="uq_wagon_number"/>
     </changeSet>
 
+    <changeSet id="01-nsi-indexes-ck_wagon_period" author="zhsr">
+        <sql>alter table wagon add constraint ck_wagon_period check (dend is null or dend &gt;= dbeg)</sql>
+    </changeSet>
+
     <changeSet id="01-nsi-indexes-fk_wagon_depot" author="zhsr">
         <addForeignKeyConstraint baseTableName="wagon" baseColumnNames="depot" constraintName="fk_wagon_depot"
                                  referencedTableName="depot" referencedColumnNames="id"/>
@@ -115,9 +146,8 @@
         <addUniqueConstraint tableName="route" columnNames="train_number" constraintName="uq_route_train_number"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-fk_route_route_type" author="zhsr">
-        <addForeignKeyConstraint baseTableName="route" baseColumnNames="route_type" constraintName="fk_route_route_type"
-                                 referencedTableName="route_type" referencedColumnNames="id"/>
+    <changeSet id="01-nsi-indexes-ck_route_period" author="zhsr">
+        <sql>alter table route add constraint ck_route_period check (dend is null or dend &gt;= dbeg)</sql>
     </changeSet>
 
     <changeSet id="01-nsi-indexes-fk_route_transport_type" author="zhsr">

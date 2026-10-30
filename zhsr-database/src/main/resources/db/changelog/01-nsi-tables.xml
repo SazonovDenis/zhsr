@@ -35,7 +35,7 @@
 
     <changeSet id="01-nsi-tables-station" author="zhsr">
         <createTable tableName="station">
-            <column name="id" type="bigint" autoIncrement="true">
+            <column name="id" type="bigint">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
             <column name="code" type="varchar(20)">
@@ -47,9 +47,27 @@
         </createTable>
     </changeSet>
 
+    <!-- перегон: ребро графа железных дорог между двумя станциями; from_station < to_station, направление не важно -->
+    <changeSet id="01-nsi-tables-stage" author="zhsr">
+        <createTable tableName="stage">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="from_station" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="to_station" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="km" type="integer">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
     <changeSet id="01-nsi-tables-depot" author="zhsr">
         <createTable tableName="depot">
-            <column name="id" type="bigint" autoIncrement="true">
+            <column name="id" type="bigint">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
             <column name="code" type="varchar(20)">
@@ -79,21 +97,6 @@
     </changeSet>
 
     <!-- Справочники: id, text, code - одноимённые колонки doc/dict/<таблица>.tsv; description из tsv - только в документации -->
-
-    <!-- маршрут: регулярный, разовый -->
-    <changeSet id="01-nsi-tables-route_type" author="zhsr">
-        <createTable tableName="route_type">
-            <column name="id" type="bigint">
-                <constraints primaryKey="true" nullable="false"/>
-            </column>
-            <column name="text" type="varchar(255)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="code" type="varchar(20)">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-    </changeSet>
 
     <!-- пассажирский, грузовой -->
     <changeSet id="01-nsi-tables-transport_type" author="zhsr">
@@ -273,6 +276,11 @@
             </column>
             <column name="model_type" type="bigint"/>
             <column name="build_year" type="integer"/>
+            <!-- dbeg - дата ввода вагона в эксплуатацию, dend - дата вывода из эксплуатации; dend пуст - вагон в эксплуатации -->
+            <column name="dbeg" type="date">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dend" type="date"/>
             <column name="depot" type="bigint"/>
             <column name="data" type="jsonb"/>
         </createTable>
@@ -295,10 +303,13 @@
             <column name="conductor_hours" type="integer"/>
             <column name="lnp_hours" type="integer"/>
             <column name="pem_hours" type="integer"/>
-            <column name="active" type="boolean" defaultValueBoolean="true">
+            <!-- период действия маршрута: dbeg - дата начала, dend - дата окончания; dend пуст - маршрут действует -->
+            <column name="dbeg" type="date">
                 <constraints nullable="false"/>
             </column>
-            <column name="route_type" type="bigint">
+            <column name="dend" type="date"/>
+            <!-- разовый маршрут: поезд без расписания -->
+            <column name="one_time" type="boolean" defaultValueBoolean="false">
                 <constraints nullable="false"/>
             </column>
             <column name="transport_type" type="bigint">

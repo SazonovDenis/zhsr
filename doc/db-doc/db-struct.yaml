@@ -193,8 +193,9 @@ tables:
       conductor_hours: {type: integer}
       lnp_hours: {type: integer}
       pem_hours: {type: integer}
-      active: {type: boolean, required: true}
-      route_type: {type: bigint, required: true, references: route_type}
+      dbeg: {type: date, required: true}
+      dend: {type: date}
+      one_time: {type: boolean, required: true}
       transport_type: {type: bigint, required: true, references: transport_type}
 
   route_station:
@@ -205,13 +206,6 @@ tables:
       seq: {type: integer, required: true}
       station: {type: bigint, required: true, references: station}
       km: {type: integer, required: true}
-
-  route_type:
-    primary_key: [id]
-    columns:
-      id: {type: bigint, required: true}
-      text: {type: varchar(255), required: true}
-      code: {type: varchar(20), required: true}
 
   service:
     primary_key: [id]
@@ -226,6 +220,14 @@ tables:
       id: {type: bigint, required: true}
       text: {type: varchar(255), required: true}
       code: {type: varchar(20), required: true}
+
+  stage:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      from_station: {type: bigint, required: true, references: station}
+      to_station: {type: bigint, required: true, references: station}
+      km: {type: integer, required: true}
 
   station:
     primary_key: [id]
@@ -362,6 +364,8 @@ tables:
       wagon_type: {type: bigint, required: true, references: wagon_type}
       model_type: {type: bigint, references: model_type}
       build_year: {type: integer}
+      dbeg: {type: date, required: true}
+      dend: {type: date}
       depot: {type: bigint, references: depot}
       data: {type: jsonb}
 

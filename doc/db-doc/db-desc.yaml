@@ -62,8 +62,14 @@ diagrams:
 
   route:
     title: "Справочник: маршруты"
-    tables: [ route, route_station, depot, station, route_type, transport_type ]
-    hide_fields: [ "route_type", "transport_type" ]
+    tables: [ route, route_station, depot, station, transport_type ]
+    hide_fields: [ "transport_type" ]
+
+  stage:
+    title: "Железные дороги: станции и перегоны"
+    description: "Граф: станции - вершины, перегоны - рёбра."
+    tables: [ station, stage, route_station, route ]
+    hide_fields: [ "route" ]
 
 tables:
 
@@ -199,21 +205,16 @@ tables:
         constants_from: doc/dict/model_type.tsv
       build_year:
         title: "Год постройки"
+      dbeg:
+        title: "Дата ввода в эксплуатацию"
+      dend:
+        title: "Дата вывода из эксплуатации"
+        description: "Пусто - вагон в эксплуатации"
       depot:
         title: "Депо приписки"
       data:
         title: "Прочие паспортные данные"
         description: "JSON без схемы (например, seats, manufacturer)"
-
-  route_type:
-    title: "Регулярный или разовый маршрут"
-    constants_from: doc/dict/route_type.tsv
-    columns:
-      text:
-        title: "Значение"
-      code:
-        title: "Код"
-        description: "Уникален"
 
   transport_type:
     title: "Пассажирский или грузовой маршрут"
@@ -423,11 +424,26 @@ tables:
 
   station:
     title: "Станция"
+    description: |
+      Вершина графа железных дорог; рёбра - перегоны (stage).
     columns:
       code:
         title: "Код станции"
       name:
         title: "Название"
+
+  stage:
+    title: "Перегон"
+    description: |
+      Ребро графа железных дорог между двумя станциями, направление не важно. Ребро хранится один раз:
+      from_station - станция с меньшим id.
+    columns:
+      from_station:
+        title: "Станция 1"
+      to_station:
+        title: "Станция 2"
+      km:
+        title: "Расстояние, км"
 
   route:
     title: "Маршрут (поезд)"
@@ -449,11 +465,14 @@ tables:
         title: "Норма часов за рейс для начальника поезда"
       pem_hours:
         title: "Норма часов за рейс для ПЭМ"
-      active:
-        title: "Действует"
-      route_type:
-        title: "Регулярный или разовый"
-        constants_from: doc/dict/route_type.tsv
+      dbeg:
+        title: "Дата начала действия"
+      dend:
+        title: "Дата окончания действия"
+        description: "Пусто - маршрут действует"
+      one_time:
+        title: "Разовый"
+        description: "Поезд без расписания"
       transport_type:
         title: "Пассажирский или грузовой"
         constants_from: doc/dict/transport_type.tsv
@@ -537,6 +556,7 @@ tables:
         constants_from: doc/dict/crew_duty_type.tsv
       wagon:
         title: "Вагон, если должность на рейсе - проводник"
+        description: "Пусто - проводник назначен на рейс без привязки к вагону"
 
   act_cancellation:
     title: "Акт отмены"
@@ -600,8 +620,9 @@ tables:
         description: "wagon_status, открытая актом: прицепка - в пути, отцепка - в простое"
 
   transfer_act:
-    title: "Акт приёма-передачи вагонов со станции в депо или парк отстоя и обратно"
+    title: "Приём передача вагонов со станции и обратно"
     description: |
+      Акт приёма-передачи вагонов со станции в депо или парк отстоя и обратно.
       Передающая сторона: со станции в депо или парк отстоя - приёмщик, из депо или парка отстоя на станцию - мастер депо.
       Принимающая сторона: со станции в депо или парк отстоя - мастер депо, из депо или парка отстоя на станцию - приёмщик.
       Заполнено ровно одно из: депо, парк отстоя. Расположение вагонов меняется только при статусе "проведён" (принят).
