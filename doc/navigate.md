@@ -3,9 +3,9 @@
 [ТЗ](tz.0.md)
 ---
 [Сущности](tz.entities.md)
+[Акторы](tz.actors.md)
 [Функции](tz.functions.md)
 [Процессы](tz.processes.md)
-[Акторы](tz.actors.md)
 ---
 [Термины](abbr.md)
 [Справочники](dict.html)
