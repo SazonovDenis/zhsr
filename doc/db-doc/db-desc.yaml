@@ -647,8 +647,6 @@ tables:
         title: "Вид работ"
         description: "При передаче для ремонта"
         constants_from: doc/dict/work_type.tsv
-      with_property:
-        title: "С имуществом"
       act_status_type:
         title: "Статус"
         constants_from: doc/dict/act_status_type.tsv
@@ -679,6 +677,8 @@ tables:
         description: "Уникален в акте"
       seq:
         title: "Порядок"
+      with_property:
+        title: "С имуществом"
       note:
         title: "Комментарий"
       wagon_location:

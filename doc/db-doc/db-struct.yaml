@@ -246,7 +246,6 @@ tables:
       depot: {type: bigint, references: depot}
       yard: {type: bigint, references: yard}
       work_type: {type: bigint, required: true, references: work_type}
-      with_property: {type: boolean, required: true}
       act_status_type: {type: bigint, required: true, references: act_status_type}
       transferred_by_usr: {type: bigint, required: true, references: usr}
       transferred_dt: {type: timestamp, required: true}
@@ -262,6 +261,7 @@ tables:
       transfer_act: {type: bigint, required: true, references: transfer_act}
       wagon: {type: bigint, required: true, references: wagon}
       seq: {type: integer, required: true}
+      with_property: {type: boolean, required: true}
       note: {type: text}
       wagon_location: {type: bigint, references: wagon_location}
 

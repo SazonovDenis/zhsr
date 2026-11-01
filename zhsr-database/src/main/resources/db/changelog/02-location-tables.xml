@@ -245,9 +245,6 @@
             <column name="work_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="with_property" type="boolean" defaultValueBoolean="false">
-                <constraints nullable="false"/>
-            </column>
             <column name="act_status_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
@@ -278,6 +275,9 @@
                 <constraints nullable="false"/>
             </column>
             <column name="seq" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="with_property" type="boolean" defaultValueBoolean="false">
                 <constraints nullable="false"/>
             </column>
             <column name="note" type="text"/>
