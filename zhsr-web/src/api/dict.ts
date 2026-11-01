@@ -37,11 +37,11 @@ function fakeVersion(name: DictName): string {
 
 const FAKE_DICTS: Record<DictName, DictRec[]> = {
   WagonState: [
-    { id: 'IN_IDLE', text: 'В простое', bg: '#ece6fa', fg: '#5b3a9e' },
-    { id: 'IN_TRIP', text: 'В пути', bg: '#dbe8f5', fg: '#0b3a63' },
-    { id: 'IN_REPAIR', text: 'В ремонте', bg: '#fbe9cf', fg: '#8a4b05' },
-    { id: 'RESERVE', text: 'Резерв', bg: '#e6e9f5', fg: '#3a4378' },
-    { id: 'OUT_OF_SERVICE', text: 'Отставлен', bg: '#f7dcd8', fg: '#8f2416' },
+    { id: 'IN_IDLE', text: 'В простое', bg: '#ece3fa', fg: '#5b2ba8' },
+    { id: 'IN_TRIP', text: 'В пути', bg: '#ddebfa', fg: '#14508f' },
+    { id: 'IN_REPAIR', text: 'В ремонте', bg: '#fcebc8', fg: '#8a4b00' },
+    { id: 'RESERVE', text: 'Резерв', bg: '#e6e8f0', fg: '#3b4470' },
+    { id: 'OUT_OF_SERVICE', text: 'Отставлен', bg: '#fbe1de', fg: '#a3261b' },
   ],
   WagonType: [
     { id: 'COMPARTMENT', text: 'Купейный' },
@@ -67,10 +67,10 @@ const FAKE_DICTS: Record<DictName, DictRec[]> = {
     { id: 'YARD', text: 'Парк отстоя' },
   ],
   TripState: [
-    { id: 'PLANNED', text: 'План', bg: '#ece6fa', fg: '#5b3a9e' },
-    { id: 'IN_PROGRESS', text: 'Выполняется', bg: '#dbe8f5', fg: '#0b3a63' },
+    { id: 'PLANNED', text: 'План', bg: '#ece3fa', fg: '#5b2ba8' },
+    { id: 'IN_PROGRESS', text: 'Выполняется', bg: '#ddebfa', fg: '#14508f' },
     { id: 'DONE', text: 'Выполнен', bg: '#dff0e2', fg: '#1d5e2c' },
-    { id: 'CANCELLED', text: 'Отменён', bg: '#f1f1ef', fg: '#8a8f8b' },
+    { id: 'CANCELLED', text: 'Отменён', bg: '#eef0f3', fg: '#62666d' },
   ],
   RouteKind: [
     { id: 'REGULAR', text: 'Регулярный' },

@@ -1,7 +1,7 @@
 // Переменные Sass для Quasar: цвета темы и другие параметры
 // https://v2.quasar.dev/style/sass-scss-variables
 
-$primary: #0b4f8a;
+$primary: #1a3fb0;
 $secondary: #26a69a;
 $accent: #9c27b0;
 
@@ -13,36 +13,53 @@ $negative: #c10015;
 $info: #31ccec;
 $warning: #f2c037;
 
-// Палитра макета (claude.ai/design, проект zhsr, prototype.dc.html)
+// Палитра — вариант 1g «Кобальт» (claude.ai/design, проект 167df9e0…, «Цветовые варианты»): тёмно-синее меню,
+// кобальтовый акцент, нейтральные серые без оттенка. Смысловые цвета состояний — в справочниках (bg, fg)
 
 // текст
-$zs-text: #14202b;
-$zs-text-muted: #5a6773;
-$zs-text-faint: #7d8a96;
+$zs-text: #1a1c1f;
+$zs-text-muted: #62666d;
+$zs-text-faint: #8a8e95;
 
 // рамки и фоны
-$zs-border: #dde3e8;
-$zs-border-input: #c9d1d8;
-$zs-border-row: #e9edf0;
-$zs-bg-header: #f6f8fa;
-$zs-bg-hover: #f3f6f9;
-$zs-bg-panel: #fdfdfe;
-$zs-bg-button-soft: #eef2f5;
+$zs-border: #d9dbdf;
+$zs-border-input: #d9dbdf;
+$zs-border-row: #ecedef;
+$zs-bg-header: #f6f7f8;
+$zs-bg-hover: #f4f5f7;
+$zs-bg-panel: #fff;
+$zs-bg-button-soft: #eef0f3;
 
-// выбранное значение в переключателях и готовых вариантах: неяркий светло-голубой фон, чёрный текст
+// выбранное значение в переключателях и готовых вариантах — чипы макета
 // (классы bg-selected и text-selected в app.scss)
-$zs-selected-bg: #bcd6f2;
-$zs-selected-border: #8db4de;
-$zs-selected-fg: $zs-text;
+$zs-selected-bg: #e3e9fa;
+$zs-selected-border: #bfccf0;
+$zs-selected-fg: #14224d;
 
 // левое меню
-$zs-menu-bg: #0b3a63;
-$zs-menu-fg: #d6e2ee;
-$zs-menu-fg-muted: #a9bdd0;
+$zs-menu-bg: #14224d;
+$zs-menu-fg: #d6ddf2;
+$zs-menu-fg-muted: #a7b2d3;
+$zs-menu-active-bg: #24397a;
 
-// точка станции на схеме маршрута
-$zs-route-dot: #5b8cc4;
+// Таблица и правая панель: шапка таблицы — светло-серая, полужирным текстом, под ней линия; у сортируемого
+// заголовка под курсором подсвечиваются значки сортировки. Выбранная строка — бледно-кобальтовая с полоской цвета
+// акцента, строка под курсором — ещё бледнее. Шапка правой панели — без заливки
+$zs-table-head-bg: $zs-bg-header;
+$zs-table-head-fg: $zs-text;
+$zs-table-head-border: $zs-border;
+$zs-table-head-icon: $zs-text-faint;
+$zs-table-head-icon-hover: $zs-text;
+$zs-table-head-icon-active: $primary;
+$zs-row-selected-bg: #f2f5fd;
+$zs-row-selected-bar: $primary;
+$zs-row-hover-bg: #f8f9fe;
+$zs-panel-head-bg: transparent;
+$zs-panel-close-bg: $zs-bg-header;
+
+// точка остановки на схеме маршрута
+$zs-route-dot: #5b77c9;
 
 // шрифты
 $zs-font: 'IBM Plex Sans', system-ui, sans-serif;
-$zs-font-mono: 'JetBrains Mono', monospace;
+$zs-font-mono: 'IBM Plex Mono', monospace;

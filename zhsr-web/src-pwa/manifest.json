@@ -5,7 +5,7 @@
   "start_url": "/m/",
   "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#0b3a63",
+  "theme_color": "#14224d",
   "display_override": ["fullscreen", "minimal-ui"],
   "display": "standalone",
   "icons": [

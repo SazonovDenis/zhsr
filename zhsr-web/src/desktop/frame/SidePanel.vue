@@ -49,11 +49,13 @@ const emit = defineEmits<{ close: [] }>()
   font-size: 0.875rem;
 }
 
+// шапка — своим цветом из палитры таблицы (quasar.variables.scss): в варианте А — цветом выбранной строки
 .side-panel__header {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  padding: 1.25rem 1.5rem 0.25rem;
+  padding: 1.25rem 1.5rem 1rem;
+  background: $zs-panel-head-bg;
 }
 
 .side-panel__titles {
@@ -80,7 +82,7 @@ const emit = defineEmits<{ close: [] }>()
   height: 2rem;
   border: 0;
   border-radius: 0.25rem;
-  background: $zs-bg-button-soft;
+  background: $zs-panel-close-bg;
   font-size: 0.9375rem;
   cursor: pointer;
 }

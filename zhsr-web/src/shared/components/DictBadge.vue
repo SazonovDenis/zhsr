@@ -17,6 +17,6 @@ const props = defineProps<{ dict: DictName; id: DictId }>()
 function color(field: 'bg' | 'fg'): string | undefined {
   const value = dictManager.getRec(props.dict, props.id)?.[field]
   if (typeof value === 'string') return value
-  return field === 'bg' ? '#f1f1ef' : '#5a6773'
+  return field === 'bg' ? '#eef0f3' : '#62666d'
 }
 </script>

@@ -189,7 +189,7 @@ function scrollHighlighted() {
   display: flex;
   justify-content: flex-end;
   padding: 0.25rem;
-  border-top: 0.0625rem solid #f0f0f0;
+  border-top: 0.0625rem solid $zs-border-row;
 }
 
 // выбранная строка — общим фоном bg-selected (app.scss)

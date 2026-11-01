@@ -171,8 +171,8 @@ onMounted(() => dictManager.prepareDict('Station'))
 
 .route-stops__dot {
   flex: none;
-  width: 0.8rem;
-  height: 0.8rem;
+  width: 0.6rem;
+  height: 0.6rem;
   border-radius: 50%;
   background: $zs-route-dot;
 }

@@ -834,7 +834,7 @@ function formatDateHeader(dateStr: string | null): string {
 
 // Обычная раскладка: календари стоят рядом, между ними — разделитель
 .custom-date--start:not(.custom-date-mobile) {
-  border-right: 0.125rem solid #f0f0f0;
+  border-right: 0.125rem solid $zs-border-row;
 }
 
 .custom-date :deep(.q-date__header) {

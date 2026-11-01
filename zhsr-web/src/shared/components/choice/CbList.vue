@@ -725,7 +725,7 @@ onBeforeUnmount(() => {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: #eef1f4;
+  background: $zs-bg-button-soft;
   color: $zs-text-faint;
   font-size: 0.5625rem;
   font-weight: 700;
@@ -733,7 +733,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
 
   &:hover {
-    background: #e1e6eb;
+    background: $zs-border-row;
     color: $zs-text-muted;
   }
 }
@@ -767,7 +767,7 @@ onBeforeUnmount(() => {
 
 .cb-list__search {
   padding: 0.25rem;
-  border-bottom: 0.0625rem solid #f0f3f5;
+  border-bottom: 0.0625rem solid $zs-border-row;
 }
 
 .cb-list__options {
@@ -808,7 +808,7 @@ onBeforeUnmount(() => {
 }
 
 .cb-list__add-custom {
-  border-bottom: 0.0625rem solid #f0f3f5;
+  border-bottom: 0.0625rem solid $zs-border-row;
   color: $primary;
 }
 
@@ -822,6 +822,6 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   padding: 0.25rem;
-  border-top: 0.0625rem solid #f0f3f5;
+  border-top: 0.0625rem solid $zs-border-row;
 }
 </style>

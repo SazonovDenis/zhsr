@@ -233,8 +233,8 @@ watch(
   position: sticky;
   top: 0;
   z-index: 1;
-  background: $zs-bg-header;
-  box-shadow: inset 0 -0.0625rem 0 $zs-border;
+  background: $zs-table-head-bg;
+  box-shadow: inset 0 -0.0625rem 0 $zs-table-head-border;
 }
 
 .data-table__head-cell {
@@ -242,8 +242,8 @@ watch(
   align-items: center;
   gap: 0.25rem;
   padding: 0.5625rem 0.875rem;
-  color: $zs-text-muted;
-  font-size: 0.75rem;
+  color: $zs-table-head-fg;
+  font-size: 0.8125rem;
   font-weight: 600;
   white-space: nowrap;
 
@@ -251,18 +251,20 @@ watch(
     cursor: pointer;
     user-select: none;
 
-    &:hover {
-      color: $zs-text;
+    // под курсором подсвечиваются значки сортировки
+    &:hover .data-table__sort-icon:not(.data-table__sort-icon--active) {
+      color: $zs-table-head-icon-hover;
+      opacity: 1;
     }
   }
 }
 
 .data-table__sort-icon {
-  color: $zs-text-faint;
+  color: $zs-table-head-icon;
   opacity: 0.5;
 
   &--active {
-    color: $primary;
+    color: $zs-table-head-icon-active;
     opacity: 1;
   }
 }
@@ -271,13 +273,13 @@ watch(
   cursor: pointer;
 
   &:hover {
-    background: $zs-bg-hover;
+    background: $zs-row-hover-bg;
   }
 
   &--selected,
   &--selected:hover {
-    background: #e8f0f8;
-    box-shadow: inset 0.1875rem 0 0 $primary;
+    background: $zs-row-selected-bg;
+    box-shadow: inset 0.125rem 0 0 $zs-row-selected-bar;
   }
 }
 

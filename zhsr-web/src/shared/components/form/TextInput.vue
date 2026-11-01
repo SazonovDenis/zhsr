@@ -91,7 +91,7 @@ const model = defineModel<string>({ default: '' })
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: #eef1f4;
+  background: $zs-bg-button-soft;
   color: $zs-text-faint;
   font-size: 0.5625rem;
   font-weight: 700;
@@ -100,7 +100,7 @@ const model = defineModel<string>({ default: '' })
   cursor: pointer;
 
   &:hover {
-    background: #e1e6eb;
+    background: $zs-border-row;
     color: $zs-text-muted;
   }
 }

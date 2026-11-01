@@ -53,8 +53,9 @@ defineProps<{ item: MenuItem; active: boolean; collapsed: boolean; indent?: bool
   cursor: pointer;
 
   &--active {
-    background: rgba(255, 255, 255, 0.14);
+    background: $zs-menu-active-bg;
     color: #fff;
+    font-weight: 600;
   }
 
   &--indent {
@@ -79,7 +80,7 @@ defineProps<{ item: MenuItem; active: boolean; collapsed: boolean; indent?: bool
 
 .menu-item__count {
   flex: none;
-  color: #9fb4c8;
+  color: inherit;
   font-size: 0.75rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
