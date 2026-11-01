@@ -1,0 +1,114 @@
+// глобальные стили приложения
+
+// Высота полей и кнопок рядом с ними: выпадающих списков, полей ввода, сегментов. По макету две высоты: 2.3rem в
+// формах и редакторах, 2.1rem в панели фильтров (FilterBar переопределяет переменную для своих полей). Поля и
+// кнопки в одном ряду берут высоту отсюда, поэтому всегда одного роста.
+:root {
+  --zs-control-height: 2.3rem;
+}
+
+body {
+  font-family: $zs-font;
+  font-size: 0.875rem;
+  color: $zs-text;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: $primary;
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+
+// Выбранное значение в переключателях (CbSegment, CbButton) и в готовых вариантах дат и периодов. Имена — по правилу
+// цветов Quasar: у q-btn-toggle toggle-color="selected" даёт класс bg-selected, toggle-text-color="selected" —
+// text-selected; свои кнопки ставят эти классы сами
+.bg-selected {
+  background: $zs-selected-bg !important;
+}
+
+.text-selected {
+  color: $zs-selected-fg !important;
+}
+
+// номера, коды и другие моноширинные значения
+.zs-mono {
+  font-family: $zs-font-mono;
+}
+
+// второстепенная строка под основным значением: в ячейке таблицы, в поле карточки
+.zs-sub {
+  font-size: 0.75rem;
+  color: $zs-text-muted;
+}
+
+// плашка состояния: цвета фона и текста задаются через style
+.zs-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.78125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+// основная кнопка заголовка фрейма: «Ввести вагон», «Создать рейс»
+.zs-btn-primary {
+  height: var(--zs-control-height);
+  padding: 0 1rem;
+  border: 0.0625rem solid $primary;
+  border-radius: 0.25rem;
+  background: $primary;
+  color: #fff;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+// Окно выбора даты и периода (PeriodPicker, DatePicker). Не scoped: на телефоне q-popup-proxy подменяет меню на
+// q-dialog, а его обёртки (.q-dialog__inner) рисует сам QDialog вне DOM компонента — scoped-стили до них не достают.
+// Всё ограничено классом .period-picker-popup, который проброшен на q-popup-proxy
+.period-picker-popup .q-dialog__inner--minimized {
+  padding: 0;
+}
+
+/* На телефоне диалог занимает весь экран: без height карточка растёт по содержимому и центрируется, оставляя поля
+   сверху и снизу, а без width боковые колонки (возврат и «Ок») с календарём не помещаются.
+   Высоту Quasar режет до calc(100vh - 108px) — запас под адресную строку, которую 100vh не учитывает. dvh считает
+   реально видимую область, поэтому такой запас не нужен. Браузер без поддержки dvh правило пропустит и останется на
+   ограничении Quasar — !important нужен, чтобы перебить его селектор body.platform-ios (он специфичнее) */
+.period-picker-popup .q-dialog__inner--minimized > div {
+  width: 100%;
+  max-width: 100vw;
+  height: 100%;
+  max-height: 100dvh !important;
+  border-radius: 0;
+}
+
+// Выбранный день в календарях окна дат и периодов — тем же фоном, что и выбранное значение в переключателях
+// (bg-selected), и голубой рамкой, как у выбранной кнопки CbButton: обводка сегодняшнего дня (q-date__today) иначе
+// рисовалась бы цветом текста, чёрным. q-date рисует день кнопкой цвета color (по умолчанию primary) сам, классы на
+// неё не поставить
+.period-picker-popup .q-date__calendar-item .q-btn.bg-primary {
+  background: $zs-selected-bg !important;
+  color: $zs-selected-fg !important;
+  box-shadow: inset 0 0 0 0.0625rem $zs-selected-border;
+}
+
+// Сегодняшний день в календарях окна дат и периодов — жирным, без кружка-обводки Quasar
+.period-picker-popup .q-date__today {
+  box-shadow: none;
+  font-weight: 700;
+}

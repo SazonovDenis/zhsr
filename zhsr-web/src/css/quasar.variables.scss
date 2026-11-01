@@ -1,0 +1,48 @@
+// Переменные Sass для Quasar: цвета темы и другие параметры
+// https://v2.quasar.dev/style/sass-scss-variables
+
+$primary: #0b4f8a;
+$secondary: #26a69a;
+$accent: #9c27b0;
+
+$dark: #1d1d1d;
+$dark-page: #121212;
+
+$positive: #21ba45;
+$negative: #c10015;
+$info: #31ccec;
+$warning: #f2c037;
+
+// Палитра макета (claude.ai/design, проект zhsr, prototype.dc.html)
+
+// текст
+$zs-text: #14202b;
+$zs-text-muted: #5a6773;
+$zs-text-faint: #7d8a96;
+
+// рамки и фоны
+$zs-border: #dde3e8;
+$zs-border-input: #c9d1d8;
+$zs-border-row: #e9edf0;
+$zs-bg-header: #f6f8fa;
+$zs-bg-hover: #f3f6f9;
+$zs-bg-panel: #fdfdfe;
+$zs-bg-button-soft: #eef2f5;
+
+// выбранное значение в переключателях и готовых вариантах: неяркий светло-голубой фон, чёрный текст
+// (классы bg-selected и text-selected в app.scss)
+$zs-selected-bg: #bcd6f2;
+$zs-selected-border: #8db4de;
+$zs-selected-fg: $zs-text;
+
+// левое меню
+$zs-menu-bg: #0b3a63;
+$zs-menu-fg: #d6e2ee;
+$zs-menu-fg-muted: #a9bdd0;
+
+// точка станции на схеме маршрута
+$zs-route-dot: #5b8cc4;
+
+// шрифты
+$zs-font: 'IBM Plex Sans', system-ui, sans-serif;
+$zs-font-mono: 'JetBrains Mono', monospace;

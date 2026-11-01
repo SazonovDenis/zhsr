@@ -1,0 +1,19 @@
+.DS_Store
+.thumbs.db
+node_modules
+
+# .env files
+.env*
+
+# Quasar
+.quasar
+/dist
+/quasar.config.*.temporary.compiled*
+
+# Playwright
+/test-results
+/playwright-report
+/playwright/.cache
+
+# Log files
+npm-debug.log*

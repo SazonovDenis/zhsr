@@ -1,0 +1,52 @@
+<template>
+  <div class="cell-trip-readiness">
+    <span
+      v-for="item in row.readiness"
+      :key="item.text"
+      class="cell-trip-readiness__chip"
+      :class="`cell-trip-readiness__chip--${item.level}`"
+    >
+      {{ t(item.text) }}
+    </span>
+  </div>
+</template>
+
+<script setup lang="ts">
+import type { Trip } from '@/api/trips'
+import { t } from '@/boot/i18n'
+import type { CellProps } from '@/shared/components/table/types'
+
+/** Готовность рейса: пункты цветными чипами — готово, есть замечания, не готово. */
+defineProps<CellProps<Trip>>()
+</script>
+
+<style scoped lang="scss">
+.cell-trip-readiness {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.cell-trip-readiness__chip {
+  padding: 0.125rem 0.4375rem;
+  border-radius: 62.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+
+  &--ok {
+    background: #dff0e2;
+    color: #1d5e2c;
+  }
+
+  &--warn {
+    background: #fbe9cf;
+    color: #8a4b05;
+  }
+
+  &--bad {
+    background: #f7dcd8;
+    color: #8f2416;
+  }
+}
+</style>

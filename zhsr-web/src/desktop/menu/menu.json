@@ -1,0 +1,77 @@
+{
+  "items": [
+    {
+      "id": "wagons",
+      "label": "Вагоны",
+      "icon": "wagons",
+      "route": "wagons"
+    },
+    {
+      "id": "trips",
+      "label": "Рейсы",
+      "icon": "trips",
+      "route": "trips"
+    },
+    {
+      "id": "routes",
+      "label": "Маршруты",
+      "sub": true,
+      "route": "routes"
+    },
+    {
+      "id": "requests",
+      "label": "Заявки",
+      "icon": "requests"
+    },
+    {
+      "id": "acts",
+      "label": "Передача",
+      "icon": "acts"
+    },
+    {
+      "id": "warranty",
+      "label": "Гарантийные талоны",
+      "icon": "warranty"
+    },
+    {
+      "id": "analytics",
+      "label": "Аналитика",
+      "icon": "analytics"
+    }
+  ],
+  "admin": {
+    "id": "admin",
+    "label": "Администрирование",
+    "icon": "settings",
+    "items": [
+      {
+        "id": "admin-users",
+        "label": "Пользователи"
+      },
+      {
+        "id": "admin-wagons",
+        "label": "Вагоны"
+      },
+      {
+        "id": "admin-faults",
+        "label": "Неисправности"
+      },
+      {
+        "id": "admin-schedule-norms",
+        "label": "Нормы графика"
+      },
+      {
+        "id": "admin-checklists",
+        "label": "Чек-листы"
+      },
+      {
+        "id": "admin-inventory-lists",
+        "label": "Перечни описи"
+      },
+      {
+        "id": "admin-journal",
+        "label": "Журнал"
+      }
+    ]
+  }
+}
