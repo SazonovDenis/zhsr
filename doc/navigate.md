@@ -11,4 +11,4 @@
 [Справочники](dict.html)
 [База данных](db.html)
 ---
-[Прототип](app/prototype.html)
+[Прототип](app/prototype.dc.html)
