@@ -21,7 +21,8 @@
     {
       "id": "requests",
       "label": "Заявки",
-      "icon": "requests"
+      "icon": "requests",
+      "route": "requests"
     },
     {
       "id": "acts",

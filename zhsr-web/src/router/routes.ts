@@ -6,6 +6,13 @@ declare module 'vue-router' {
     part?: 'pwa' | 'desktop'
     /** страница на весь экран без левого меню, например редактор маршрута */
     hideMenu?: boolean
+    /**
+     * имя парного маршрута в другой части: при смене режима устройства (например, эмуляция в DevTools) переход идёт
+     * на него, а не на главную части
+     */
+    pair?: string
+    /** мобильная часть: страница с нижней панелью вкладок («Сегодня», «Заявки», «+ Заявка», «Профиль») */
+    tabs?: boolean
   }
 }
 
@@ -26,7 +33,52 @@ const routes: RouteRecordRaw[] = [
     path: '/m',
     meta: { part: 'pwa' },
     component: () => pwa().then((m) => m.PwaLayout),
-    children: [{ path: '', name: 'pwa-home', component: () => pwa().then((m) => m.PwaHomePage) }],
+    children: [
+      {
+        path: '',
+        name: 'pwa-home',
+        meta: { tabs: true },
+        component: () => pwa().then((m) => m.PwaHomePage),
+      },
+      {
+        path: 'requests',
+        name: 'pwa-requests',
+        meta: { tabs: true, pair: 'requests' },
+        component: () => pwa().then((m) => m.PwaRequestsPage),
+      },
+      {
+        path: 'requests/new',
+        name: 'pwa-request-new',
+        meta: { pair: 'requests' },
+        component: () => pwa().then((m) => m.PwaRequestWizardPage),
+      },
+      {
+        path: 'requests/:id',
+        name: 'pwa-request',
+        meta: { pair: 'requests' },
+        props: true,
+        component: () => pwa().then((m) => m.PwaRequestPage),
+      },
+      {
+        path: 'requests/:id/edit',
+        name: 'pwa-request-edit',
+        meta: { pair: 'requests' },
+        props: true,
+        component: () => pwa().then((m) => m.PwaRequestWizardPage),
+      },
+      {
+        path: 'profile',
+        name: 'pwa-profile',
+        meta: { tabs: true },
+        component: () => pwa().then((m) => m.PwaProfilePage),
+      },
+      {
+        path: 'trip',
+        name: 'pwa-trip',
+        meta: { pair: 'trips' },
+        component: () => pwa().then((m) => m.PwaTripCrewPage),
+      },
+    ],
   },
   // десктопная часть
   {
@@ -38,6 +90,12 @@ const routes: RouteRecordRaw[] = [
       { path: 'wagons', name: 'wagons', component: () => desktop().then((m) => m.WagonsPage) },
       { path: 'trips', name: 'trips', component: () => desktop().then((m) => m.TripsPage) },
       { path: 'routes', name: 'routes', component: () => desktop().then((m) => m.RoutesPage) },
+      {
+        path: 'requests',
+        name: 'requests',
+        meta: { pair: 'pwa-requests' },
+        component: () => desktop().then((m) => m.RequestsPage),
+      },
       {
         path: 'routes/:id',
         name: 'route-edit',

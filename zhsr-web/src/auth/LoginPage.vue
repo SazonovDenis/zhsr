@@ -1,13 +1,16 @@
 <template>
-  <q-page class="login-page">
-    <div class="login-page__lang">
-      <LanguageSwitcher menu-anchor="bottom left" menu-self="top left" />
-    </div>
-
-    <form class="login-page__card" @submit.prevent="submit">
+  <q-page class="login-page" :class="{ 'login-page--mobile': isMobile }">
+    <form ref="formEl" class="login-page__card" @submit.prevent="submit">
+      <!-- выбор языка — в рамке формы, справа от названия -->
       <div class="login-page__brand">
-        <SvgIcon name="logo" size="2.5rem" />
+        <SvgIcon name="logo" size="2.1rem" />
         <span class="login-page__title">{{ t('Жолсерік') }}</span>
+        <LanguageSwitcher
+          class="login-page__lang"
+          icon-size="1.3rem"
+          menu-anchor="bottom right"
+          menu-self="top right"
+        />
       </div>
 
       <FormField label="Логин">
@@ -33,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { login } from '@/api/session'
@@ -41,11 +44,13 @@ import { t } from '@/boot/i18n'
 import FormField from '@/shared/components/form/FormField.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import LanguageSwitcher from '@/shared/components/LanguageSwitcher.vue'
+import { isMobile } from '@/shared/device'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
 
 /**
  * Заготовка страницы входа: логин, пароль и «Войти». После входа — главная страница; часть приложения (мобильная или
- * десктопная) выбирается по устройству (см. src/router/index.ts). Язык можно сменить до входа.
+ * десктопная) выбирается по устройству (см. src/router/index.ts). Язык можно сменить до входа — переключатель в рамке
+ * формы. На десктопе форма — карточкой в верхней трети окна; на телефоне — прижата к верху, без фона страницы и рамки.
  */
 
 const router = useRouter()
@@ -54,6 +59,10 @@ const username = ref('')
 const password = ref('')
 const running = ref(false)
 const error = ref('')
+
+// при открытии страницы фокус — в поле логина
+const formEl = ref<HTMLFormElement | null>(null)
+onMounted(() => formEl.value?.querySelector('input')?.focus())
 
 async function submit() {
   error.value = ''
@@ -70,20 +79,53 @@ async function submit() {
 </script>
 
 <style scoped lang="scss">
+// форма — в верхней трети окна: свободное место над ней и под ней делится как 1 : 2
 .login-page {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
   padding: 1rem;
   background: $zs-bg-header;
+
+  &::before {
+    content: '';
+    flex: 1;
+  }
+
+  &::after {
+    content: '';
+    flex: 2;
+  }
+
+  // телефон: форма прижата к верху, без фона страницы и без рамки карточки
+  &--mobile {
+    padding: 0;
+    background: #fff;
+
+    &::before {
+      display: none;
+    }
+  }
 }
 
+.login-page--mobile .login-page__card {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+// выбор языка в строке с названием — крупнее обычного (иконка 1.3rem, код языка 0.9rem) и не сжимается, в обоих
+// вариантах
 .login-page__lang {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
+  flex: none;
+  margin-left: auto;
   color: $zs-text-muted;
+
+  :deep(.language-switcher__short) {
+    font-size: 0.9rem;
+  }
 }
 
 .login-page__card {

@@ -1,7 +1,7 @@
 <template>
   <!-- как LanguageSwitcher в kis-web: иконка языка с кратким кодом текущего языка, по клику — список языков -->
   <button type="button" class="language-switcher" :title="t('Язык')" @click.stop>
-    <q-icon name="language" size="1.1rem" />
+    <q-icon name="language" :size="iconSize" />
     <span v-if="!iconOnly" class="language-switcher__short">{{ current?.short }}</span>
 
     <q-menu :anchor="menuAnchor" :self="menuSelf" :offset="[0, 4]">
@@ -36,10 +36,12 @@ import { LOCALES, setLocale } from '@/shared/locale'
 withDefaults(
   defineProps<{
     iconOnly?: boolean
-    menuAnchor?: 'top left' | 'bottom left' | 'top right'
+    /** размер иконки; код языка рядом — своим размером шрифта (класс language-switcher__short) */
+    iconSize?: string
+    menuAnchor?: 'top left' | 'bottom left' | 'top right' | 'bottom right'
     menuSelf?: 'bottom left' | 'top left' | 'top right' | 'bottom right'
   }>(),
-  { iconOnly: false, menuAnchor: 'top left', menuSelf: 'bottom left' },
+  { iconOnly: false, iconSize: '1.1rem', menuAnchor: 'top left', menuSelf: 'bottom left' },
 )
 
 const locale = computed(() => i18n.global.locale.value)

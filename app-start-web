@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+cd ./zhsr-web
+
+xterm -geometry 180x40 -title "zhsr-web" -e "npm run dev" &
+KIS_WEB_PID=$!
+echo $KIS_WEB_PID > ../.zhsr-web.pid
+
+cd ..

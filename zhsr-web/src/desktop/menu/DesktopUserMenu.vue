@@ -25,13 +25,13 @@
       type="button"
       class="user-block__user"
       :class="{ 'user-block__user--open': open }"
-      :title="collapsed ? `${user.name}, ${t(user.role)}` : undefined"
+      :title="collapsed ? `${user.name}, ${roles}` : undefined"
       @click="open = !open"
     >
       <SvgIcon name="user" class="user-block__icon" />
       <span v-if="!collapsed" class="user-block__text">
         <span class="user-block__name">{{ user.name }}</span>
-        <span class="user-block__role">{{ t(user.role) }}</span>
+        <span class="user-block__role">{{ roles }}</span>
       </span>
 
       <SvgIcon v-if="!collapsed" name="chevron-down" size="0.8rem" class="user-block__chevron" />
@@ -44,12 +44,13 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { CurrentUser } from '@/api/session'
-import { logout } from '@/api/session'
 import type { MessageLanguages } from '@/boot/i18n'
 import { i18n, t } from '@/boot/i18n'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { useCloseOnOutside } from '@/shared/composables/useCloseOnOutside'
+import { dictManager } from '@/shared/dict/DictManager'
 import { LOCALES, setLocale } from '@/shared/locale'
+import { logoutUser } from '@/shared/user'
 
 /**
  * Текущий пользователь внизу левого меню: иконка, фамилия и роль. Клик по пользователю разворачивает подменю прямо
@@ -57,7 +58,10 @@ import { LOCALES, setLocale } from '@/shared/locale'
  * В свёрнутом меню — иконка пользователя (подсказка — фамилия и роль); подменю разворачивается так же, с кодами
  * языков и иконкой выхода.
  */
-defineProps<{ user: CurrentUser; collapsed: boolean }>()
+const props = defineProps<{ user: CurrentUser; collapsed: boolean }>()
+
+// роли совмещаются: все роли пользователя через запятую
+const roles = computed(() => props.user.roles.map((r) => dictManager.getValue('Role', r)).join(', '))
 
 const router = useRouter()
 
@@ -74,7 +78,7 @@ function choose(value: MessageLanguages) {
 }
 
 async function onLogout() {
-  await logout()
+  await logoutUser()
   await router.push({ name: 'login' })
 }
 </script>
@@ -183,8 +187,10 @@ async function onLogout() {
 }
 
 .user-block__role {
+  overflow: hidden;
   color: $zs-menu-fg-muted;
   font-size: 0.75rem;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 </style>

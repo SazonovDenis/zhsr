@@ -6,12 +6,15 @@ import { createMemoryHistory, createRouter, createWebHashHistory, createWebHisto
 import { isMobile } from '@/shared/device'
 import routes from './routes'
 
-/** Куда перейти, если часть приложения у маршрута не соответствует режиму устройства. */
+/**
+ * Куда перейти, если часть приложения у маршрута не соответствует режиму устройства: на парный маршрут другой части
+ * (meta.pair, например «Заявки» /requests ↔ /m/requests), а если пары нет — на главную части.
+ */
 function partRedirect(route: RouteLocationNormalized): RouteLocationRaw | undefined {
   const part = route.meta.part
   if (!part) return
-  if (isMobile.value && part !== 'pwa') return { name: 'pwa-home' }
-  if (!isMobile.value && part === 'pwa') return { name: 'home' }
+  if (isMobile.value && part !== 'pwa') return { name: route.meta.pair ?? 'pwa-home' }
+  if (!isMobile.value && part === 'pwa') return { name: route.meta.pair ?? 'home' }
 }
 
 export default defineRouter(() => {

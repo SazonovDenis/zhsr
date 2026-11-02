@@ -31,6 +31,18 @@ export const dictDefs = {
   Depot: { translate: 'multilang' },
   Station: { translate: 'none', offline: true },
   Yard: { translate: 'none' },
+  // роли сотрудников; service — служба роли (id справочника Service), может не быть
+  Role: { translate: 'i18n', offline: true },
+  // заявки на ремонт: нужны мобильной части без сети — подача заявки и показ списка
+  RequestStatus: { translate: 'i18n', offline: true },
+  Severity: { translate: 'i18n', offline: true },
+  Service: { translate: 'i18n', offline: true },
+  // категория неисправности; service — служба-исполнитель категории, color — цвет метки категории
+  FaultCategory: { translate: 'i18n', offline: true },
+  // группа неисправностей; sort — порядок показа
+  FaultGroup: { translate: 'multilang', offline: true },
+  // вид неисправности: group, category, severity — критичность по умолчанию, service — служба-исполнитель (может не быть)
+  FaultType: { translate: 'multilang', offline: true },
 } satisfies Record<string, DictDef>
 
 export type DictName = keyof typeof dictDefs

@@ -1,5 +1,7 @@
 import type { TableSort } from '@/shared/components/table/types'
 import { fakeSort } from './fakeSort'
+import { fakeNetwork } from './http'
+import { FAKE_COMPOSITION } from './trips'
 // import { http } from './http'
 
 /**
@@ -102,7 +104,79 @@ export async function createWagon(draft: WagonDraft): Promise<Wagon> {
   return Promise.resolve(wagon)
 }
 
+/** Рейс в данных: id — для запросов, name — для показа. */
+export interface TripRef {
+  id: string
+  /** номер поезда и маршрут: «002 Алматы — Астана» */
+  name: string
+}
+
+/** Вагон для выбора в заявке на ремонт: номер, тип вагона, рейс и где вагон сейчас. */
+export interface RequestWagon {
+  number: string
+  /** тип вагона — id справочника WagonType */
+  type: string
+  /** рейс, в составе которого вагон едет сейчас; null — вагон не в рейсе */
+  trip: TripRef | null
+  /** где вагон сейчас: рейс, депо, станция или парк отстоя — для показа */
+  place: string
+  /** станция расположения вагона — id справочника Station; null — вагон в рейсе */
+  station: string | null
+}
+
+/** Вагоны состава рейса по порядку — фильтр по умолчанию при подаче заявки. */
+export async function fetchTripWagons(tripId: string): Promise<RequestWagon[]> {
+  // return (await http.get<RequestWagon[]>(`/trips/${tripId}/wagons`)).data
+  fakeNetwork()
+  const numbers = FAKE_COMPOSITION[tripId] ?? []
+  return Promise.resolve(numbers.map((n) => fakeRequestWagon(n)).filter((w): w is RequestWagon => !!w))
+}
+
+/** Поиск вагона по цифрам номера среди всех вагонов — когда фильтр по рейсу снят. */
+export async function findWagons(number: string): Promise<RequestWagon[]> {
+  // return (await http.get<RequestWagon[]>('/wagons/find', { params: { number } })).data
+  fakeNetwork()
+  return Promise.resolve(FAKE_WAGONS.filter((w) => w.number.includes(number)).map((w) => fakeRequestWagon(w.number)!))
+}
+
+/** Фиктивный вагон для заявки по номеру; нужен и заготовке API заявок. */
+export function fakeRequestWagon(number: string): RequestWagon | null {
+  const w = FAKE_WAGONS.find((x) => x.number === number)
+  if (!w) return null
+  const trip = Object.keys(FAKE_COMPOSITION).find((id) => FAKE_COMPOSITION[id]!.includes(number))
+  return {
+    number: w.number,
+    type: w.type,
+    trip: trip ? { id: trip, name: FAKE_TRIP_NAMES[trip] ?? trip } : null,
+    place: w.location.name,
+    station: FAKE_STATIONS[w.number] ?? null,
+  }
+}
+
 // --- фиктивные данные: значения из макета ---
+
+const FAKE_TRIP_NAMES: Record<string, string> = { T2: '002 Алматы — Астана' }
+
+/** Станция расположения вагонов не в рейсе. */
+const FAKE_STATIONS: Record<string, string> = {
+  '15021': 'AST',
+  '15023': 'ALA',
+  '15024': 'KRG',
+  '15025': 'ALA',
+  '16540': 'AST',
+  '27140': 'AST',
+}
+
+const inTrip = (number: string, type: string): Wagon => ({
+  id: number,
+  number,
+  type,
+  model: 'TULPAR_TMH',
+  depot: 'D2',
+  location: { kind: 'TRIP', name: 'Рейс 002 Алматы — Астана', since: '2026-10-28T21:05' },
+  state: 'IN_TRIP',
+  stateSince: '2026-10-28T21:05',
+})
 
 const FAKE_WAGONS: Wagon[] = [
   {
@@ -155,4 +229,32 @@ const FAKE_WAGONS: Wagon[] = [
     state: 'OUT_OF_SERVICE',
     stateSince: '2026-09-30T10:00',
   },
+  {
+    id: '16540',
+    number: '16540',
+    type: 'SLEEPER',
+    model: 'STADLER_SLEEPER',
+    depot: 'D1',
+    location: { kind: 'DEPOT', name: 'Вагонное депо Астана', since: '2026-10-29T14:00' },
+    state: 'IN_REPAIR',
+    stateSince: '2026-10-29T14:00',
+  },
+  {
+    id: '27140',
+    number: '27140',
+    type: 'COMPARTMENT',
+    model: 'TULPAR_TMH',
+    depot: 'D1',
+    location: { kind: 'STATION', name: 'Астана-1', since: '2026-10-30T07:40' },
+    state: 'IN_IDLE',
+    stateSince: '2026-10-30T07:40',
+  },
+  // состав рейса 002 Алматы — Астана
+  inTrip('17043', 'PLATZKART'),
+  inTrip('17431', 'PLATZKART'),
+  inTrip('27109', 'COMPARTMENT'),
+  inTrip('27133', 'COMPARTMENT'),
+  inTrip('16532', 'SLEEPER'),
+  inTrip('15030', 'RESTAURANT'),
+  inTrip('27000', 'STAFF'),
 ]
