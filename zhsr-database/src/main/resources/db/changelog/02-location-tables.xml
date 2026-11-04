@@ -20,10 +20,10 @@
             <column name="wagon" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="dbeg" type="timestamp">
+            <column name="dbeg" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
-            <column name="dend" type="timestamp"/>
+            <column name="dend" type="timestamptz"/>
             <column name="location_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
@@ -43,10 +43,10 @@
             <column name="wagon" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="dbeg" type="timestamp">
+            <column name="dbeg" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
-            <column name="dend" type="timestamp"/>
+            <column name="dend" type="timestamptz"/>
             <column name="wagon_status_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
@@ -60,7 +60,7 @@
             <column name="wagon" type="bigint">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
-            <column name="dbeg_location" type="timestamp">
+            <column name="dbeg_location" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
             <column name="location_type" type="bigint">
@@ -70,7 +70,7 @@
             <column name="depot" type="bigint"/>
             <column name="yard" type="bigint"/>
             <column name="trip" type="bigint"/>
-            <column name="dbeg_status" type="timestamp">
+            <column name="dbeg_status" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
             <column name="wagon_status_type" type="bigint">
@@ -87,15 +87,15 @@
             <column name="route" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="planned_dt" type="timestamp">
+            <column name="planned_dt" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
             <column name="trip_status_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="departed_dt" type="timestamp"/>
+            <column name="departed_dt" type="timestamptz"/>
             <column name="departed_by_usr" type="bigint"/>
-            <column name="arrived_dt" type="timestamp"/>
+            <column name="arrived_dt" type="timestamptz"/>
             <column name="arrived_by_usr" type="bigint"/>
         </createTable>
     </changeSet>
@@ -126,7 +126,7 @@
     </changeSet>
 
     <!-- бригада рейса: проводники по вагонам, начальник поезда, поездной электромеханик;
-         сотрудник - один раз на рейс, вагон - только у проводника, может быть пуст; начальник поезда и ПЭМ - не больше одного на рейс -->
+         сотрудник - один раз на рейс, вагон - только у проводника, может быть пуст; wagon2 - второй, соседний вагон проводника; начальник поезда и ПЭМ - не больше одного на рейс -->
     <changeSet id="02-location-tables-trip_crew" author="zhsr">
         <createTable tableName="trip_crew">
             <column name="id" type="bigint" autoIncrement="true">
@@ -142,6 +142,7 @@
                 <constraints nullable="false"/>
             </column>
             <column name="wagon" type="bigint"/>
+            <column name="wagon2" type="bigint"/>
         </createTable>
     </changeSet>
 
@@ -156,7 +157,7 @@
             <column name="created_by_usr" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="created_dt" type="timestamp">
+            <column name="created_dt" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
             <column name="reason" type="text">
@@ -188,7 +189,10 @@
             <column name="created_by_usr" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="created_dt" type="timestamp">
+            <column name="created_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="act_dt" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
             <column name="act_status_type" type="bigint">
@@ -251,11 +255,11 @@
             <column name="transferred_by_usr" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="transferred_dt" type="timestamp">
+            <column name="transferred_dt" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
             <column name="received_by_usr" type="bigint"/>
-            <column name="received_dt" type="timestamp"/>
+            <column name="received_dt" type="timestamptz"/>
             <column name="reject_reason" type="text"/>
             <column name="act_cancellation" type="bigint"/>
         </createTable>

@@ -8,7 +8,6 @@
 [Процессы](tz.processes.md)
 ---
 [Термины](abbr.md)
-[Справочники](dict.html)
 [База данных](db.html)
 ---
 [Прототип](app/prototype.dc.html)

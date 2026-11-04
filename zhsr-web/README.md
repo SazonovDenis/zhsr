@@ -8,7 +8,7 @@
 
 ```bash
 npm install        # ставит зависимости приложения и зависимости src-pwa
-npm run dev        # dev-сервер на http://localhost:9000, запросы /api проксируются на сервер zhsr-app (:8080)
+npm run dev        # dev-сервер на http://localhost:9999, запросы /api проксируются на сервер zhsr-app (:8080)
 npm run build      # сборка в dist/pwa
 npm run typecheck  # проверка типов
 npm run lint       # форматирование и ESLint

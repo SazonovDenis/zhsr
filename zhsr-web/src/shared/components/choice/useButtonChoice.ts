@@ -1,5 +1,6 @@
 import { computed, ref, watch } from 'vue'
 
+import type { Loadable } from '@/shared/loadable'
 import type { ChoiceId, ChoiceItem, ChoiceModel } from './choice'
 import { effectiveOf, isDisabled, modelIds, modelOf } from './choice'
 
@@ -10,11 +11,13 @@ export interface ButtonChoiceProps {
   /** хотя бы одно значение должно быть выбрано */
   required?: boolean
   values?: ChoiceItem[]
-  /** id значений, которые не показываются кнопками (доступны только через «...») */
+  /** id значений, которые не показываются кнопками, пока не выбраны (доступны через «...») */
   hidden?: ChoiceId[]
   /** сколько значений показывать кнопками до появления «...» */
   maxButtonCount?: number
   modelValue?: ChoiceModel
+  /** источник вариантов: загрузка и ошибка показываются на месте кнопок; null — варианты уже есть */
+  source?: Loadable | null
 }
 
 export interface ButtonChoiceEmit {
@@ -27,20 +30,29 @@ export interface ButtonChoiceEmit {
  * Общая для CbButton и CbSegment — они отличаются только видом.
  */
 export function useButtonChoice(props: ButtonChoiceProps, emit: ButtonChoiceEmit) {
+  // контрол создан или сменился источник вариантов — источник, который грузит контрол (справочник), начинает загрузку
+  watch(
+    () => props.source,
+    (source) => source?.ensure(),
+    { immediate: true },
+  )
+
   const values = computed(() => props.values ?? [])
   const maxCount = computed(() => props.maxButtonCount ?? 3)
 
   // объекты выбранных значений — единственный источник правды
   const selected = ref<ChoiceItem[]>([])
   // id значений, показываемых кнопками
-  const visibleOrder = ref<ChoiceId[]>([])
+  const visibleIds = ref<ChoiceId[]>([])
 
-  const visibleValues = computed(() =>
-    visibleOrder.value.flatMap((id) => values.value.filter((v) => v.id === id).slice(0, 1)),
-  )
+  // кнопки всегда в порядке values: выбор значения их не переставляет
+  const visibleValues = computed(() => {
+    const visibleSet = new Set(visibleIds.value)
+    return values.value.filter((item) => visibleSet.has(item.id))
+  })
 
   const hiddenValues = computed(() => {
-    const visibleSet = new Set(visibleOrder.value)
+    const visibleSet = new Set(visibleIds.value)
     return values.value.filter((item) => !visibleSet.has(item.id))
   })
 
@@ -48,25 +60,24 @@ export function useButtonChoice(props: ButtonChoiceProps, emit: ButtonChoiceEmit
     return selected.value.some((s) => s.id === item.id)
   }
 
-  function initVisibleOrder() {
+  function initVisibleIds() {
     const hiddenSet = new Set(props.hidden ?? [])
     const selectedIds = new Set(modelIds(props.modelValue))
-    const candidates = values.value.filter((v) => !hiddenSet.has(v.id))
+    const candidates = values.value.filter((v) => !hiddenSet.has(v.id) || selectedIds.has(v.id))
 
-    // всё нескрытое влезает в ряд — порядок остаётся словарным, и кнопки не переставляются при смене выбора
     if (candidates.length <= maxCount.value) {
-      visibleOrder.value = candidates.map((v) => v.id)
+      visibleIds.value = candidates.map((v) => v.id)
       return
     }
 
-    // не влезает — выбранное показываем первым, иначе оно оказалось бы под «...»
+    // не влезает — выбранное остаётся в ряду, иначе оно оказалось бы под «...»
     const selectedVisible = candidates.filter((v) => selectedIds.has(v.id)).map((v) => v.id)
     const slots = Math.max(0, maxCount.value - selectedVisible.length)
     const rest = candidates
       .filter((v) => !selectedIds.has(v.id))
       .slice(0, slots)
       .map((v) => v.id)
-    visibleOrder.value = [...selectedVisible, ...rest]
+    visibleIds.value = [...selectedVisible, ...rest]
   }
 
   function syncSelected() {
@@ -75,14 +86,14 @@ export function useButtonChoice(props: ButtonChoiceProps, emit: ButtonChoiceEmit
   }
 
   /** Убирает из ряда лишние невыбранные кнопки сверх maxButtonCount. */
-  function trimVisibleOrder(selectedSet: Set<ChoiceId>): ChoiceId[] {
-    let order = [...visibleOrder.value]
-    while (order.length > maxCount.value) {
-      const removable = order.find((id) => !selectedSet.has(id))
+  function trimVisibleIds(selectedSet: Set<ChoiceId>): ChoiceId[] {
+    let ids = [...visibleIds.value]
+    while (ids.length > maxCount.value) {
+      const removable = ids.find((id) => !selectedSet.has(id))
       if (removable === undefined) break
-      order = order.filter((id) => id !== removable)
+      ids = ids.filter((id) => id !== removable)
     }
-    return order
+    return ids
   }
 
   function selectedIdSet(): Set<ChoiceId> {
@@ -112,7 +123,7 @@ export function useButtonChoice(props: ButtonChoiceProps, emit: ButtonChoiceEmit
       if (other) selected.value = [other]
     }
 
-    if (wasSelected) visibleOrder.value = trimVisibleOrder(selectedIdSet())
+    if (wasSelected) visibleIds.value = trimVisibleIds(selectedIdSet())
     emitChange()
   }
 
@@ -121,16 +132,16 @@ export function useButtonChoice(props: ButtonChoiceProps, emit: ButtonChoiceEmit
     if (isDisabled(item)) return
 
     if (props.single) {
-      if (!visibleOrder.value.includes(item.id)) visibleOrder.value = [...visibleOrder.value, item.id]
-      visibleOrder.value = trimVisibleOrder(new Set([item.id]))
+      if (!visibleIds.value.includes(item.id)) visibleIds.value = [...visibleIds.value, item.id]
+      visibleIds.value = trimVisibleIds(new Set([item.id]))
       selected.value = [item]
     } else {
       const wasSelected = isSelected(item)
       selected.value = wasSelected ? selected.value.filter((s) => s.id !== item.id) : [...selected.value, item]
-      if (!wasSelected && !visibleOrder.value.includes(item.id)) {
-        visibleOrder.value = [...visibleOrder.value, item.id]
+      if (!wasSelected && !visibleIds.value.includes(item.id)) {
+        visibleIds.value = [...visibleIds.value, item.id]
       }
-      visibleOrder.value = trimVisibleOrder(selectedIdSet())
+      visibleIds.value = trimVisibleIds(selectedIdSet())
     }
     emitChange()
   }
@@ -139,13 +150,13 @@ export function useButtonChoice(props: ButtonChoiceProps, emit: ButtonChoiceEmit
     () => props.hidden,
     (newVal, oldVal) => {
       const serialize = (arr?: ChoiceId[]) => [...(arr ?? [])].sort().join('\0')
-      if (oldVal === undefined || serialize(newVal) !== serialize(oldVal)) initVisibleOrder()
+      if (oldVal === undefined || serialize(newVal) !== serialize(oldVal)) initVisibleIds()
     },
     { immediate: true },
   )
 
   watch(values, () => {
-    initVisibleOrder()
+    initVisibleIds()
     syncSelected()
   })
 

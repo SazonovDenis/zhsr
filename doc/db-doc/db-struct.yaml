@@ -9,7 +9,7 @@ tables:
     columns:
       id: {type: bigint, required: true}
       created_by_usr: {type: bigint, required: true, references: usr}
-      created_dt: {type: timestamp, required: true}
+      created_dt: {type: timestamptz, required: true}
       reason: {type: text, required: true}
 
   act_status_type:
@@ -37,7 +37,8 @@ tables:
       order_info: {type: varchar(100)}
       reason: {type: text}
       created_by_usr: {type: bigint, required: true, references: usr}
-      created_dt: {type: timestamp, required: true}
+      created_dt: {type: timestamptz, required: true}
+      act_dt: {type: timestamptz, required: true}
       act_status_type: {type: bigint, required: true, references: act_status_type}
       act_cancellation: {type: bigint, references: act_cancellation}
 
@@ -71,7 +72,16 @@ tables:
       id: {type: bigint, required: true}
       code: {type: varchar(20), required: true}
       name: {type: varchar(255), required: true}
+      name_kk: {type: varchar(255)}
+      name_en: {type: varchar(255)}
       station: {type: bigint, references: station}
+
+  dict_version:
+    primary_key: [name]
+    columns:
+      name: {type: varchar(50), required: true}
+      version: {type: bigint, required: true}
+      changed_dt: {type: timestamptz, required: true}
 
   fault_category_type:
     primary_key: [id]
@@ -99,7 +109,7 @@ tables:
       fault_category_type: {type: bigint, required: true, references: fault_category_type}
       severity_type: {type: bigint, required: true, references: severity_type}
       service: {type: bigint, references: service}
-      active: {type: boolean, required: true}
+      disabled: {type: boolean, required: true}
 
   location_type:
     primary_key: [id]
@@ -122,9 +132,8 @@ tables:
       number: {type: varchar(20), required: true}
       wagon: {type: bigint, required: true, references: wagon}
       trip: {type: bigint, references: trip}
-      service: {type: bigint, required: true, references: service}
-      usr: {type: bigint, required: true, references: usr}
-      created_dt: {type: timestamp, required: true}
+      created_by_usr: {type: bigint, required: true, references: usr}
+      created_dt: {type: timestamptz, required: true}
       fault_type: {type: bigint, required: true, references: fault_type}
       severity_type: {type: bigint, required: true, references: severity_type}
       description: {type: text}
@@ -134,28 +143,28 @@ tables:
     columns:
       id: {type: bigint, required: true}
       repair_request: {type: bigint, required: true, references: repair_request}
-      dbeg: {type: timestamp, required: true}
-      dend: {type: timestamp}
+      dbeg: {type: timestamptz, required: true}
+      dend: {type: timestamptz}
       executor_usr: {type: bigint, references: usr}
       created_by_usr: {type: bigint, references: usr}
-      request_status_type: {type: bigint, required: true, references: request_status_type}
 
   repair_request_info:
     primary_key: [repair_request]
     columns:
       repair_request: {type: bigint, required: true, references: repair_request}
-      dbeg: {type: timestamp}
-      executor_usr: {type: bigint, references: usr}
-      created_by_usr: {type: bigint, references: usr}
+      dbeg_status: {type: timestamptz, required: true}
       request_status_type: {type: bigint, required: true, references: request_status_type}
+      service: {type: bigint, required: true, references: service}
+      dbeg_executor: {type: timestamptz}
+      executor_usr: {type: bigint, references: usr}
 
   repair_request_note:
     primary_key: [id]
     columns:
       id: {type: bigint, required: true}
       repair_request: {type: bigint, required: true, references: repair_request}
-      created_dt: {type: timestamp, required: true}
-      usr: {type: bigint, required: true, references: usr}
+      created_dt: {type: timestamptz, required: true}
+      created_by_usr: {type: bigint, required: true, references: usr}
       note: {type: text, required: true}
 
   repair_request_photo:
@@ -165,8 +174,18 @@ tables:
       repair_request: {type: bigint, required: true, references: repair_request}
       storage_key: {type: varchar(200), required: true}
       size_bytes: {type: integer, required: true}
-      usr: {type: bigint, required: true, references: usr}
-      created_dt: {type: timestamp, required: true}
+      created_by_usr: {type: bigint, required: true, references: usr}
+      created_dt: {type: timestamptz, required: true}
+
+  repair_request_status:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      repair_request: {type: bigint, required: true, references: repair_request}
+      dbeg: {type: timestamptz, required: true}
+      dend: {type: timestamptz}
+      request_status_type: {type: bigint, required: true, references: request_status_type}
+      created_by_usr: {type: bigint, references: usr}
 
   request_status_type:
     primary_key: [id]
@@ -195,7 +214,7 @@ tables:
       pem_hours: {type: integer}
       dbeg: {type: date, required: true}
       dend: {type: date}
-      one_time: {type: boolean, required: true}
+      route_kind: {type: integer, required: true}
       transport_type: {type: bigint, required: true, references: transport_type}
 
   route_station:
@@ -206,6 +225,9 @@ tables:
       seq: {type: integer, required: true}
       station: {type: bigint, required: true, references: station}
       km: {type: integer, required: true}
+      have_stop: {type: boolean, required: true}
+      run_duration: {type: integer, required: true}
+      stop_duration: {type: integer, required: true}
 
   service:
     primary_key: [id]
@@ -229,12 +251,22 @@ tables:
       to_station: {type: bigint, required: true, references: station}
       km: {type: integer, required: true}
 
+  stage_point:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      stage: {type: bigint, required: true, references: stage}
+      seq: {type: integer, required: true}
+      x: {type: 'numeric(9,6)', required: true}
+      y: {type: 'numeric(9,6)', required: true}
+
   station:
     primary_key: [id]
     columns:
       id: {type: bigint, required: true}
       code: {type: varchar(20), required: true}
       name: {type: varchar(255), required: true}
+      stage_point: {type: bigint, references: stage_point}
 
   transfer_act:
     primary_key: [id]
@@ -248,9 +280,9 @@ tables:
       work_type: {type: bigint, required: true, references: work_type}
       act_status_type: {type: bigint, required: true, references: act_status_type}
       transferred_by_usr: {type: bigint, required: true, references: usr}
-      transferred_dt: {type: timestamp, required: true}
+      transferred_dt: {type: timestamptz, required: true}
       received_by_usr: {type: bigint, references: usr}
-      received_dt: {type: timestamp}
+      received_dt: {type: timestamptz}
       reject_reason: {type: text}
       act_cancellation: {type: bigint, references: act_cancellation}
 
@@ -284,11 +316,11 @@ tables:
     columns:
       id: {type: bigint, required: true}
       route: {type: bigint, required: true, references: route}
-      planned_dt: {type: timestamp, required: true}
+      planned_dt: {type: timestamptz, required: true}
       trip_status_type: {type: bigint, required: true, references: trip_status_type}
-      departed_dt: {type: timestamp}
+      departed_dt: {type: timestamptz}
       departed_by_usr: {type: bigint, references: usr}
-      arrived_dt: {type: timestamp}
+      arrived_dt: {type: timestamptz}
       arrived_by_usr: {type: bigint, references: usr}
 
   trip_crew:
@@ -299,6 +331,7 @@ tables:
       usr: {type: bigint, required: true, references: usr}
       crew_duty_type: {type: bigint, required: true, references: crew_duty_type}
       wagon: {type: bigint, references: wagon}
+      wagon2: {type: bigint, references: wagon}
 
   trip_status_type:
     primary_key: [id]
@@ -328,8 +361,9 @@ tables:
       full_name: {type: varchar(200), required: true}
       password_hash: {type: varchar(100), required: true}
       phone: {type: varchar(20)}
-      active: {type: boolean, required: true}
-      created_dt: {type: timestamp, required: true}
+      disabled: {type: boolean, required: true}
+      change_password: {type: boolean, required: true}
+      created_dt: {type: timestamptz, required: true}
 
   usr_category:
     primary_key: [id]
@@ -337,8 +371,8 @@ tables:
       id: {type: bigint, required: true}
       usr: {type: bigint, required: true, references: usr}
       category_type: {type: bigint, required: true, references: category_type}
-      dbeg: {type: timestamp, required: true}
-      dend: {type: timestamp}
+      dbeg: {type: timestamptz, required: true}
+      dend: {type: timestamptz}
 
   usr_depot:
     primary_key: [id]
@@ -346,8 +380,8 @@ tables:
       id: {type: bigint, required: true}
       usr: {type: bigint, required: true, references: usr}
       depot: {type: bigint, required: true, references: depot}
-      dbeg: {type: timestamp, required: true}
-      dend: {type: timestamp}
+      dbeg: {type: timestamptz, required: true}
+      dend: {type: timestamptz}
 
   usr_role:
     primary_key: [id]
@@ -364,6 +398,7 @@ tables:
       wagon_type: {type: bigint, required: true, references: wagon_type}
       model_type: {type: bigint, references: model_type}
       build_year: {type: integer}
+      maker: {type: varchar(255)}
       dbeg: {type: date, required: true}
       dend: {type: date}
       depot: {type: bigint, references: depot}
@@ -373,13 +408,13 @@ tables:
     primary_key: [wagon]
     columns:
       wagon: {type: bigint, required: true, references: wagon}
-      dbeg_location: {type: timestamp, required: true}
+      dbeg_location: {type: timestamptz, required: true}
       location_type: {type: bigint, required: true, references: location_type}
       station: {type: bigint, references: station}
       depot: {type: bigint, references: depot}
       yard: {type: bigint, references: yard}
       trip: {type: bigint, references: trip}
-      dbeg_status: {type: timestamp, required: true}
+      dbeg_status: {type: timestamptz, required: true}
       wagon_status_type: {type: bigint, required: true, references: wagon_status_type}
 
   wagon_location:
@@ -387,8 +422,8 @@ tables:
     columns:
       id: {type: bigint, required: true}
       wagon: {type: bigint, required: true, references: wagon}
-      dbeg: {type: timestamp, required: true}
-      dend: {type: timestamp}
+      dbeg: {type: timestamptz, required: true}
+      dend: {type: timestamptz}
       location_type: {type: bigint, required: true, references: location_type}
       station: {type: bigint, references: station}
       depot: {type: bigint, references: depot}
@@ -400,8 +435,8 @@ tables:
     columns:
       id: {type: bigint, required: true}
       wagon: {type: bigint, required: true, references: wagon}
-      dbeg: {type: timestamp, required: true}
-      dend: {type: timestamp}
+      dbeg: {type: timestamptz, required: true}
+      dend: {type: timestamptz}
       wagon_status_type: {type: bigint, required: true, references: wagon_status_type}
 
   wagon_status_type:

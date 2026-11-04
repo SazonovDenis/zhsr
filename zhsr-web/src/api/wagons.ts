@@ -1,260 +1,146 @@
 import type { TableSort } from '@/shared/components/table/types'
-import { fakeSort } from './fakeSort'
-import { fakeNetwork } from './http'
-import { FAKE_COMPOSITION } from './trips'
-// import { http } from './http'
+import { LocationType } from '@/shared/constants/systemDicts'
+import { http } from './http'
 
 /**
- * API вагонов. Сервер пока не готов: функции отдают фиктивные данные, а над ними закомментирован будущий вызов
- * REST.
+ * API вагонов. Список (GET /wagons) и варианты выбора (GET /wagons/options) — с сервера; ввод вагона сервер пока не
+ * умеет: createWagon — заготовка.
  */
 
-/** Расположение вагона: где он сейчас и с какого времени. */
-export interface WagonLocation {
-  /** вид расположения — id справочника LocationKind */
-  kind: string
-  /** название места: станция, депо, рейс, парк отстоя */
-  name: string
-  /** с какого времени, ISO */
-  since: string
-}
-
-export interface Wagon {
-  id: string
+/** Вагон как вариант выбора (подбор вагона в заявке): вагон, тип и где он сейчас. */
+export interface WagonOption {
+  id: number
   number: string
   /** тип вагона — id справочника WagonType */
-  type: string
-  /** модель — id справочника WagonModel */
-  model: string
-  /** депо приписки — id справочника Depot */
-  depot: string
-  location: WagonLocation
-  /** состояние вагона — id справочника WagonState */
-  state: string
-  /** с какого времени вагон в этом состоянии, ISO */
-  stateSince: string
+  wagonType: number
+  /** вид расположения — id справочника LocationKind (константы LocationType) */
+  locationType: number
+  /** место расположения по виду: id справочника Station, Depot, Yard или id рейса */
+  place: number
+  /** номер поезда рейса, в составе которого вагон; null — вагон не в рейсе */
+  trainNumber: string | null
+  /** маршрут рейса, в составе которого вагон: «Алматы — Астана»; null — вагон не в рейсе */
+  name: string | null
+}
+
+/** Строка таблицы вагонов: вариант выбора вагона и поля таблицы. */
+export interface WagonRow extends WagonOption {
+  /** модель — id справочника WagonModel; null — не задана */
+  modelType: number | null
+  /** депо приписки — id справочника Depot; null — не задано */
+  depot: number | null
+  /** с какого времени вагон в этом расположении, ISO с часовым поясом */
+  dbegLocation: string
+  /** состояние вагона — id справочника WagonState (константы WagonStatus) */
+  wagonStatusType: number
+  /** с какого времени вагон в этом состоянии, ISO с часовым поясом */
+  dbegStatus: string
 }
 
 export interface WagonFilter {
   /** поиск по номеру вагона */
   number: string
   /** станция — id справочника Station */
-  station: string | null
+  station: number | null
   /** рейс — id рейса (api/trips.ts) */
-  trip: string | null
+  trip: number | null
   /** виды расположения — id справочника LocationKind */
-  locationKinds: string[]
+  locationKinds: number[]
   /** состояния вагона — id справочника WagonState */
-  states: string[]
+  states: number[]
+  /** депо приписки — id справочника Depot; null — без ограничения (сервер может ограничить по роли) */
+  depot?: number | null
 }
 
-/** Новый вагон: паспорт, депо приписки, начальное расположение и состояние. */
+/** Новый вагон: паспорт (wagon), депо приписки, начальное расположение и состояние. */
 export interface WagonDraft {
   number: string
   /** тип вагона — id справочника WagonType */
-  type: string
+  wagonType: number | null
   /** модель — id справочника WagonModel */
-  /** модель — id справочника WagonModel */
-  model: string
-  year: string
+  modelType: number | null
+  buildYear: string
   maker: string
   /** депо приписки — id справочника Depot */
-  depot: string
-  /** вид начального расположения — id справочника LocationKind: DEPOT, YARD или STATION */
-  locationKind: string
+  depot: number | null
+  /** вид начального расположения — id справочника LocationKind: депо, парк отстоя или станция */
+  locationType: number
   /** место: id справочника Depot, Yard или Station — по виду расположения */
-  locationRef: string
+  place: number | null
   /** начальное состояние — id справочника WagonState */
-  state: string
-  /** ввод в эксплуатацию, ISO; null — ещё не задан */
-  since: string | null
+  wagonStatusType: number | null
+  /** ввод в эксплуатацию, ISO-дата; null — ещё не задан */
+  dbeg: string | null
 }
 
 /**
  * Список вагонов по фильтру. sort — поле и направление сортировки; null — порядок сервера по умолчанию.
  */
-export async function fetchWagons(filter: WagonFilter, sort: TableSort | null): Promise<Wagon[]> {
-  // return (await http.get<Wagon[]>('/wagons', { params: { ...filter, sort: sort?.field, desc: sort?.desc } })).data
-  return Promise.resolve(
-    fakeSort(
-      FAKE_WAGONS.filter(
-        (w) =>
-          w.number.includes(filter.number) &&
-          (filter.locationKinds.length === 0 || filter.locationKinds.includes(w.location.kind)) &&
-          (filter.states.length === 0 || filter.states.includes(w.state)),
-      ),
-      sort,
-    ),
-  )
+export async function fetchWagons(filter: WagonFilter, sort: TableSort | null): Promise<WagonRow[]> {
+  return (await http.get<WagonRow[]>('/wagons', { params: { ...filter, sort: sort?.field, desc: sort?.desc } })).data
 }
 
-export async function createWagon(draft: WagonDraft): Promise<Wagon> {
-  // return (await http.post<Wagon>('/wagons', draft)).data
-  const wagon: Wagon = {
-    id: draft.number,
-    number: draft.number,
-    type: draft.type,
-    model: draft.model,
-    depot: draft.depot,
-    location: { kind: draft.locationKind, name: draft.locationRef, since: draft.since ?? '' },
-    state: draft.state,
-    stateSince: draft.since ?? '',
-  }
-  FAKE_WAGONS.push(wagon)
-  return Promise.resolve(wagon)
+/** Вагоны как варианты выбора: фильтр — как у списка вагонов. */
+export async function fetchWagonOptions(filter: WagonFilter): Promise<WagonOption[]> {
+  return (await http.get<WagonOption[]>('/wagons/options', { params: filter })).data
+}
+
+/** Ввести вагон. Сервер пока не умеет: ошибка с текстом для пользователя. */
+export function createWagon(draft: WagonDraft): Promise<WagonRow> {
+  // return (await http.post<WagonRow>('/wagons', draft)).data
+  void draft
+  return Promise.reject(new Error('Ввод вагона пока не поддерживается сервером'))
 }
 
 /** Рейс в данных: id — для запросов, name — для показа. */
 export interface TripRef {
-  id: string
+  id: number
   /** номер поезда и маршрут: «002 Алматы — Астана» */
   name: string
 }
 
-/** Вагон для выбора в заявке на ремонт: номер, тип вагона, рейс и где вагон сейчас. */
+/** Вагон для выбора в заявке на ремонт: вагон, тип, рейс и где вагон сейчас. */
 export interface RequestWagon {
+  /** вагон — id вагона */
+  id: number
   number: string
   /** тип вагона — id справочника WagonType */
-  type: string
+  wagonType: number
   /** рейс, в составе которого вагон едет сейчас; null — вагон не в рейсе */
   trip: TripRef | null
-  /** где вагон сейчас: рейс, депо, станция или парк отстоя — для показа */
-  place: string
-  /** станция расположения вагона — id справочника Station; null — вагон в рейсе */
-  station: string | null
+  /** вид расположения — id справочника LocationKind */
+  locationType: number
+  /** место расположения — id справочника по виду расположения (Station, Depot, Yard); в рейсе — null */
+  place: number | null
+  /** станция расположения вагона — id справочника Station; null — вагон не на станции */
+  station: number | null
 }
 
-/** Вагоны состава рейса по порядку — фильтр по умолчанию при подаче заявки. */
-export async function fetchTripWagons(tripId: string): Promise<RequestWagon[]> {
-  // return (await http.get<RequestWagon[]>(`/trips/${tripId}/wagons`)).data
-  fakeNetwork()
-  const numbers = FAKE_COMPOSITION[tripId] ?? []
-  return Promise.resolve(numbers.map((n) => fakeRequestWagon(n)).filter((w): w is RequestWagon => !!w))
+/**
+ * Вагоны состава рейса — фильтр по умолчанию при подаче заявки. Из вариантов выбора (GET /wagons/options?trip=): порядок
+ * в составе сервер ещё не отдаёт — по номеру вагона.
+ */
+export async function fetchTripWagons(tripId: number): Promise<RequestWagon[]> {
+  const wagons = await fetchWagonOptions({ number: '', station: null, trip: tripId, locationKinds: [], states: [] })
+  return wagons.map(requestWagon)
 }
 
 /** Поиск вагона по цифрам номера среди всех вагонов — когда фильтр по рейсу снят. */
 export async function findWagons(number: string): Promise<RequestWagon[]> {
-  // return (await http.get<RequestWagon[]>('/wagons/find', { params: { number } })).data
-  fakeNetwork()
-  return Promise.resolve(FAKE_WAGONS.filter((w) => w.number.includes(number)).map((w) => fakeRequestWagon(w.number)!))
+  const wagons = await fetchWagonOptions({ number, station: null, trip: null, locationKinds: [], states: [] })
+  return wagons.map(requestWagon)
 }
 
-/** Фиктивный вагон для заявки по номеру; нужен и заготовке API заявок. */
-export function fakeRequestWagon(number: string): RequestWagon | null {
-  const w = FAKE_WAGONS.find((x) => x.number === number)
-  if (!w) return null
-  const trip = Object.keys(FAKE_COMPOSITION).find((id) => FAKE_COMPOSITION[id]!.includes(number))
+/** Вариант выбора вагона — вагон для заявки. */
+export function requestWagon(w: WagonOption): RequestWagon {
+  const inTrip = w.locationType === LocationType.TRIP
   return {
+    id: w.id,
     number: w.number,
-    type: w.type,
-    trip: trip ? { id: trip, name: FAKE_TRIP_NAMES[trip] ?? trip } : null,
-    place: w.location.name,
-    station: FAKE_STATIONS[w.number] ?? null,
+    wagonType: w.wagonType,
+    trip: inTrip ? { id: w.place, name: `${w.trainNumber ?? ''} ${w.name ?? ''}`.trim() } : null,
+    locationType: w.locationType,
+    place: inTrip ? null : w.place,
+    station: w.locationType === LocationType.STATION ? w.place : null,
   }
 }
-
-// --- фиктивные данные: значения из макета ---
-
-const FAKE_TRIP_NAMES: Record<string, string> = { T2: '002 Алматы — Астана' }
-
-/** Станция расположения вагонов не в рейсе. */
-const FAKE_STATIONS: Record<string, string> = {
-  '15021': 'AST',
-  '15023': 'ALA',
-  '15024': 'KRG',
-  '15025': 'ALA',
-  '16540': 'AST',
-  '27140': 'AST',
-}
-
-const inTrip = (number: string, type: string): Wagon => ({
-  id: number,
-  number,
-  type,
-  model: 'TULPAR_TMH',
-  depot: 'D2',
-  location: { kind: 'TRIP', name: 'Рейс 002 Алматы — Астана', since: '2026-10-28T21:05' },
-  state: 'IN_TRIP',
-  stateSince: '2026-10-28T21:05',
-})
-
-const FAKE_WAGONS: Wagon[] = [
-  {
-    id: '15021',
-    number: '15021',
-    type: 'COMPARTMENT',
-    model: 'TULPAR_TALGO',
-    depot: 'D1',
-    location: { kind: 'DEPOT', name: 'Вагонное депо Астана', since: '2026-10-27T09:10' },
-    state: 'IN_IDLE',
-    stateSince: '2026-10-27T09:10',
-  },
-  {
-    id: '15022',
-    number: '15022',
-    type: 'PLATZKART',
-    model: 'TULPAR_TMH',
-    depot: 'D1',
-    location: { kind: 'TRIP', name: 'Рейс 001 Астана — Алматы', since: '2026-10-28T21:00' },
-    state: 'IN_TRIP',
-    stateSince: '2026-10-28T21:00',
-  },
-  {
-    id: '15023',
-    number: '15023',
-    type: 'SLEEPER',
-    model: 'STADLER_SLEEPER',
-    depot: 'D2',
-    location: { kind: 'DEPOT', name: 'Вагонное депо Алматы', since: '2026-10-20T08:00' },
-    state: 'IN_REPAIR',
-    stateSince: '2026-10-20T08:00',
-  },
-  {
-    id: '15024',
-    number: '15024',
-    type: 'RESTAURANT',
-    model: 'TULPAR_TALGO',
-    depot: 'D4',
-    location: { kind: 'YARD', name: 'Караганды-Сортировочная', since: '2026-10-15T12:30' },
-    state: 'RESERVE',
-    stateSince: '2026-10-15T12:30',
-  },
-  {
-    id: '15025',
-    number: '15025',
-    type: 'STAFF',
-    model: 'STADLER_STAFF',
-    depot: 'D2',
-    location: { kind: 'STATION', name: 'Алматы-2', since: '2026-09-30T10:00' },
-    state: 'OUT_OF_SERVICE',
-    stateSince: '2026-09-30T10:00',
-  },
-  {
-    id: '16540',
-    number: '16540',
-    type: 'SLEEPER',
-    model: 'STADLER_SLEEPER',
-    depot: 'D1',
-    location: { kind: 'DEPOT', name: 'Вагонное депо Астана', since: '2026-10-29T14:00' },
-    state: 'IN_REPAIR',
-    stateSince: '2026-10-29T14:00',
-  },
-  {
-    id: '27140',
-    number: '27140',
-    type: 'COMPARTMENT',
-    model: 'TULPAR_TMH',
-    depot: 'D1',
-    location: { kind: 'STATION', name: 'Астана-1', since: '2026-10-30T07:40' },
-    state: 'IN_IDLE',
-    stateSince: '2026-10-30T07:40',
-  },
-  // состав рейса 002 Алматы — Астана
-  inTrip('17043', 'PLATZKART'),
-  inTrip('17431', 'PLATZKART'),
-  inTrip('27109', 'COMPARTMENT'),
-  inTrip('27133', 'COMPARTMENT'),
-  inTrip('16532', 'SLEEPER'),
-  inTrip('15030', 'RESTAURANT'),
-  inTrip('27000', 'STAFF'),
-]

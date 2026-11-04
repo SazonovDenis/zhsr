@@ -1,10 +1,12 @@
 #!/bin/sh
+# Запустить веб-клиент zhsr-web (dev-сервер Quasar, http://localhost:9999) в отдельном окне xterm.
+# Прежний dev-сервер, если он ещё работает, сначала останавливается (app-stop-web): иначе он держит порт 9999,
+# новый молча поднимается на соседнем порту, а браузер продолжает ходить к старому.
 set -e
+cd "$(dirname "$0")"
+
+./app-stop-web
 
 cd ./zhsr-web
-
-xterm -geometry 180x40 -title "zhsr-web" -e "npm run dev" &
-KIS_WEB_PID=$!
-echo $KIS_WEB_PID > ../.zhsr-web.pid
-
-cd ..
+xterm -geometry 180x50+0+500 -title "zhsr-web" -e "npm run dev" &
+echo $! > ../.zhsr-web.pid

@@ -1,24 +1,73 @@
+import type { AxiosError } from 'axios'
 import axios from 'axios'
 
 // HTTP-клиент сервера zhsr-app; в dev-режиме /api проксируется (quasar.config.ts > devServer.proxy)
-export const http = axios.create({ baseURL: '/api' })
+// списки в параметрах — повтором имени, как их разбирает Spring: states=1&states=2
+export const http = axios.create({ baseURL: '/api', paramsSerializer: { indexes: null } })
 
-/** Запрос не дошёл до сервера: нет связи. */
-export class NetworkError extends Error {
-  constructor() {
-    super('Нет связи')
+/**
+ * Ошибка запроса к серверу: статус (0 — ответа нет), текст для пользователя из {"message": "..."} и запрос, который
+ * упал, — «GET /api/wagons?number=12»: его показывают второй строкой под текстом ошибки.
+ */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly request: string,
+  ) {
+    super(message)
   }
 }
 
-/** Ошибка связи, а не ответ сервера: мобильная часть по ней берёт данные из копии на телефоне или ставит ввод в очередь. */
-export function isNetworkError(e: unknown): boolean {
-  return e instanceof NetworkError || (axios.isAxiosError(e) && !e.response)
+/** Запрос axios для показа: метод и адрес с параметрами. */
+function requestOf(e: AxiosError): string {
+  const config = e.config
+  if (!config) return ''
+  return `${(config.method ?? 'get').toUpperCase()} ${http.getUri(config)}`
 }
 
-/**
- * Проверка связи для фиктивных данных: без сети фиктивный вызов падает так же, как упал бы настоящий запрос. Так
- * работу без связи можно проверить, выключив сеть в DevTools. Нужна только заготовкам API, пока сервера нет.
- */
-export function fakeNetwork(): void {
-  if (!navigator.onLine) throw new NetworkError()
+/** Сервер требует сменить пароль (406): разрешена только смена пароля. */
+export function isPasswordChangeRequired(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 406
+}
+
+/** Нет входа (401): сеанс не открыт или истёк. */
+export function isLoginRequired(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 401
+}
+
+let passwordChangeHandler: (() => void) | null = null
+let loginHandler: (() => void) | null = null
+
+/** Что делать, когда сервер требует сменить пароль; задаёт роутер — переход на страницу смены пароля. */
+export function onPasswordChangeRequired(handler: () => void): void {
+  passwordChangeHandler = handler
+}
+
+/** Что делать, когда нет входа; задаёт роутер — переход на страницу входа. */
+export function onLoginRequired(handler: () => void): void {
+  loginHandler = handler
+}
+
+// запрос входа: его 401 — неверный логин или пароль, это ошибка формы входа, а не потеря сеанса
+const LOGIN_URL = '/session/login'
+
+// ответ с ошибкой — ApiError с текстом сервера и запросом; 406 — переход на смену пароля, 401 (кроме запроса входа) —
+// переход на страницу входа. Нет ответа (нет связи) —
+// ApiError со статусом 0: её распознаёт isNetworkError
+http.interceptors.response.use(undefined, (e: unknown) => {
+  if (!axios.isAxiosError(e)) return Promise.reject(e instanceof Error ? e : new Error(String(e)))
+  if (!e.response) return Promise.reject(new ApiError(0, 'Нет связи', requestOf(e)))
+  const data = e.response.data as { message?: unknown } | undefined
+  const message =
+    typeof data?.message === 'string' ? data.message : `Ошибка сервера: ${e.response.status} ${e.response.statusText}`
+  const error = new ApiError(e.response.status, message, requestOf(e))
+  if (isPasswordChangeRequired(error)) passwordChangeHandler?.()
+  if (isLoginRequired(error) && e.config?.url !== LOGIN_URL) loginHandler?.()
+  return Promise.reject(error)
+})
+
+/** Ошибка связи, а не ответ сервера: мобильная часть по ней берёт данные из копии на телефоне или ставит ввод в очередь. */
+export function isNetworkError(e: unknown): boolean {
+  return (e instanceof ApiError && e.status === 0) || (axios.isAxiosError(e) && !e.response)
 }

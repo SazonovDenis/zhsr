@@ -20,7 +20,7 @@
         <TextInput v-model="password" password />
       </FormField>
 
-      <div v-if="error" class="login-page__error">{{ error }}</div>
+      <ErrorBox v-if="error" :error="error" class="login-page__error" />
 
       <q-btn
         type="submit"
@@ -32,6 +32,20 @@
         :loading="running"
       />
     </form>
+
+    <!-- быстрый вход фиктивными пользователями — только при dev-запуске: клик заполняет логин и пароль -->
+    <div v-if="isDev" class="login-page__dev">
+      <span class="login-page__dev-title">{{ t('Демо вход') }}:</span>
+      <button
+        v-for="u in DEMO_LOGINS"
+        :key="u.login"
+        type="button"
+        class="login-page__dev-user"
+        @click="fillDemo(u.login, u.password)"
+      >
+        <b>{{ u.login }}</b> {{ u.name }}
+      </button>
+    </div>
   </q-page>
 </template>
 
@@ -39,8 +53,12 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { login } from '@/api/session'
+import { isPasswordChangeRequired } from '@/api/http'
+import { DEMO_LOGINS, login } from '@/api/session'
 import { t } from '@/boot/i18n'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
+import type { ShownError } from '@/shared/errors'
+import { shownError } from '@/shared/errors'
 import FormField from '@/shared/components/form/FormField.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import LanguageSwitcher from '@/shared/components/LanguageSwitcher.vue'
@@ -51,27 +69,41 @@ import SvgIcon from '@/shared/icons/SvgIcon.vue'
  * Заготовка страницы входа: логин, пароль и «Войти». После входа — главная страница; часть приложения (мобильная или
  * десктопная) выбирается по устройству (см. src/router/index.ts). Язык можно сменить до входа — переключатель в рамке
  * формы. На десктопе форма — карточкой в верхней трети окна; на телефоне — прижата к верху, без фона страницы и рамки.
+ * При dev-запуске внизу страницы — панель быстрого входа демо-пользователями (DEMO_LOGINS); в сборке продукта
+ * её нет.
  */
+
+const isDev = import.meta.env.DEV
 
 const router = useRouter()
 
 const username = ref('')
 const password = ref('')
 const running = ref(false)
-const error = ref('')
+// ошибка формы: проверки (formError) или запроса (shownError, запрос второй строкой); null — ошибки нет
+const error = ref<ShownError | null>(null)
 
 // при открытии страницы фокус — в поле логина
 const formEl = ref<HTMLFormElement | null>(null)
 onMounted(() => formEl.value?.querySelector('input')?.focus())
 
+// быстрый вход: заполнить логин фиктивного пользователя и пароль (у каждого пользователя свой — DEMO_LOGINS)
+function fillDemo(login: string, demoPassword: string) {
+  username.value = login
+  password.value = demoPassword
+  error.value = null
+}
+
 async function submit() {
-  error.value = ''
+  error.value = null
   running.value = true
   try {
     await login(username.value, password.value)
     await router.push({ name: 'home' })
   } catch (e) {
-    error.value = t(e instanceof Error ? e.message : String(e))
+    // нужно сменить пароль: переход на страницу смены пароля уже выполнен (onPasswordChangeRequired)
+    if (isPasswordChangeRequired(e)) return
+    error.value = shownError(e)
   } finally {
     running.value = false
   }
@@ -158,9 +190,39 @@ async function submit() {
 .login-page__error {
   padding: 0.625rem 0.875rem;
   border-radius: 0.25rem;
-  background: #fbe5e1;
-  color: #8f2416;
+  background: $zs-error-bg;
+  color: $zs-error-fg;
   font-size: 0.8125rem;
+}
+
+.login-page__dev {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-top: 0.0625rem dashed $zs-border;
+  color: $zs-text-muted;
+  font-size: 0.8125rem;
+}
+
+.login-page__dev-user {
+  padding: 0.25rem 0.5rem;
+  border: 0.0625rem solid $zs-border;
+  border-radius: 0.25rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    border-color: $primary;
+  }
 }
 
 .login-page__submit {

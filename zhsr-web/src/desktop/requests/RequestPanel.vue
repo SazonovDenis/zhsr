@@ -1,22 +1,23 @@
 <template>
   <SidePanel
     :empty="requestId ? '' : 'Выберите заявку в списке'"
-    :title="r ? faultName(r.fault) : ''"
-    :subtitle="r ? `${r.number} • ${formatDateTime(r.created)}` : ''"
+    :title="r ? faultName(r.faultType) : ''"
+    :subtitle="r ? `${r.number} • ${formatDateTime(r.createdDt)}` : ''"
     @close="emit('close')"
   >
-    <div v-if="card.error.value && !r" class="request-panel__error">{{ card.error.value }}</div>
+    <LoadSpinner v-if="busy.active.value && !r" />
+    <ErrorBox v-if="card.error.value && !r" :error="card.error.value" :retry="card.load" class="request-panel__error" />
 
     <template v-if="r">
       <div v-if="r.tor" class="request-panel__tor">{{ t('ТОР: вагон отцеплен, ремонт в депо') }}</div>
 
       <div class="request-panel__badges">
-        <DictBadge :id="r.status" dict="RequestStatus" />
-        <span :style="severityStyle(r.severity)">{{ dictManager.getValue('Severity', r.severity) }}</span>
+        <DictBadge :id="r.requestStatusType" dict="RequestStatus" />
+        <span :style="severityStyle(r.severityType)">{{ dictManager.getValue('Severity', r.severityType) }}</span>
         <span v-if="r.forwarded" class="request-panel__mark">{{ t('передана в депо') }}</span>
       </div>
 
-      <RequestSteps :status="r.status" />
+      <RequestSteps :status="r.requestStatusType" />
       <div class="request-panel__next">
         <span class="request-panel__next-title">{{ t('Что дальше') }}</span>
         <span>{{ nextText(r) }}</span>
@@ -68,32 +69,34 @@
           {{ t('Исправить') }}
         </button>
       </div>
-      <div v-if="card.error.value" class="request-panel__error">{{ card.error.value }}</div>
+      <ErrorBox v-if="card.error.value" :error="card.error.value" class="request-panel__error" />
 
       <SidePanelFields>
         <span>{{ t('Вагон') }}</span>
         <span>
-          <span class="zs-mono">{{ r.wagon }}</span> • {{ dictManager.getValue('WagonType', r.wagonType) }}
-          <span v-if="r.wagonPlace" class="zs-sub request-panel__block">{{ r.wagonPlace }}</span>
+          <span class="zs-mono">{{ r.wagonNumber }}</span> • {{ dictManager.getValue('WagonType', r.wagonType) }}
+          <span v-if="r.locationType" class="zs-sub request-panel__block">{{
+            placeText(r.locationType, r.place, r.wagonTripName)
+          }}</span>
         </span>
         <span>{{ t('Рейс') }}</span>
         <span>{{ r.trip?.name ?? '—' }}</span>
         <span>{{ t('Служба') }}</span>
         <span>{{ dictManager.getValue('Service', r.service) }}</span>
         <span>{{ t('Автор') }}</span>
-        <span>{{ r.author.name }}</span>
+        <span>{{ r.createdByUsr.name }}</span>
         <span>{{ t('Исполнитель') }}</span>
         <span>
           <CbList
             v-if="card.assignable.value"
-            :model-value="r.executor?.id ?? null"
+            :model-value="r.executorUsr?.id ?? null"
             single
             placeholder="Не назначен"
             :values="staffChoices"
             class="request-panel__executor"
             @update:model-value="onAssign"
           />
-          <template v-else>{{ r.executor?.name ?? t('не назначен') }}</template>
+          <template v-else>{{ r.executorUsr?.name ?? t('не назначен') }}</template>
         </span>
       </SidePanelFields>
 
@@ -120,7 +123,7 @@
             </button>
           </div>
         </div>
-        <RequestHistory :events="r.events" :status="r.status" />
+        <RequestHistory :events="r.events" :status="r.requestStatusType" />
       </div>
     </template>
   </SidePanel>
@@ -135,8 +138,12 @@ import CbList from '@/shared/components/choice/CbList.vue'
 import type { ChoiceModel } from '@/shared/components/choice/choice'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import DictBadge from '@/shared/components/DictBadge.vue'
+import { provideBusy } from '@/shared/busy'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
+import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
 import { dictManager } from '@/shared/dict/DictManager'
+import { placeText } from '@/shared/wagonPlace'
 import { formatDateTime } from '@/shared/format'
 import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
 import PhotoStrip from '@/shared/requests/PhotoStrip.vue'
@@ -153,22 +160,24 @@ import RequestDialog from './RequestDialog.vue'
  * пользователя, атрибуты, исполнитель (мастер депо выбирает его здесь), описание, фото, история и пояснения.
  * После изменения заявки в шину уходит requests-refresh — список за панелью загружается заново.
  */
-const props = defineProps<{ requestId: string | null }>()
+const props = defineProps<{ requestId: number | null }>()
 
 const emit = defineEmits<{ close: [] }>()
 
-const card = useRequestCard(toRef(props, 'requestId'))
+// правая панель — свой фрейм: своё ожидание, спиннер на месте карточки
+const busy = provideBusy()
+const card = useRequestCard(toRef(props, 'requestId'), false, busy)
 const r = computed(() => card.request.value)
 
 // исполнитель — из сотрудников службы заявки; текущий исполнитель есть в списке, даже если он из другой службы
 const staffChoices = computed(() => {
   const list = card.staff.value.map((u) => ({ id: u.id, text: u.name }))
-  const current = r.value?.executor
+  const current = r.value?.executorUsr
   return current && !list.some((c) => c.id === current.id) ? [{ id: current.id, text: current.name }, ...list] : list
 })
 
 async function onAssign(value: ChoiceModel) {
-  await card.assign(typeof value === 'string' ? value : null)
+  await card.assign(typeof value === 'number' ? value : null)
 }
 
 // пояснение к заявке: текст и фото
@@ -203,7 +212,7 @@ async function edit() {
   padding: 0.625rem 0.875rem;
   border-radius: 0.25rem;
   background: #fbe1de;
-  color: #8f2416;
+  color: $zs-error-fg;
   font-size: 0.8125rem;
   font-weight: 700;
 }
@@ -237,6 +246,11 @@ async function edit() {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.request-panel__next-title {
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.25rem)
+  margin-bottom: calc(-0.25rem / 3);
 }
 
 .request-panel__buttons {
@@ -322,8 +336,8 @@ async function edit() {
 .request-panel__error {
   padding: 0.625rem 0.875rem;
   border-radius: 0.25rem;
-  background: #fbe5e1;
-  color: #8f2416;
+  background: $zs-error-bg;
+  color: $zs-error-fg;
   font-size: 0.8125rem;
 }
 
@@ -348,6 +362,8 @@ async function edit() {
 }
 
 .request-panel__section-head {
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.75rem)
+  margin-bottom: calc(-0.75rem / 3);
   display: flex;
   align-items: center;
   justify-content: space-between;

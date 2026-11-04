@@ -1,0 +1,106 @@
+#!/bin/bash
+# Пересоздать БД с нуля:
+#   1. удалить БД DB_NAME и создать пустую с владельцем DB_USER (пользователь создаётся, если его нет);
+#   2. накатить структуру и системные справочники (zhsr-database, db/dict) - миграции Liquibase (zhsr-database);
+#   3. загрузить начальные данные db-data/default: станции, перегоны, типы и модели вагонов, пользователь admin;
+#   4. с ключом --demo - ещё и демо-данные db-data/demo.
+# Файлы данных загружаются по порядку имён: <nn>-<таблица>.tsv - в таблицу, *.sql - выполняются. Столбцы tsv, которых
+# нет в таблице (description - пояснение к строке), не загружаются. Все данные - одной транзакцией.
+# Параметры подключения - в .env; нет .env - копируется из .env.sample.
+#
+#   install/db-reset           - без демо-данных
+#   install/db-reset --demo    - с демо-данными
+# Обычно вызывается из env-reset вместе с очисткой хранилища файлов (install/storage-reset).
+set -euo pipefail
+# пути данных и .env - от корня проекта
+cd "$(dirname "$0")/.."
+
+dirs=(db-data/default)
+for a in "$@"; do
+  case $a in
+    --demo) dirs+=(db-data/demo) ;;
+    *) echo "неизвестный параметр: $a" >&2; exit 1 ;;
+  esac
+done
+
+[ -f .env ] || { cp .env.sample .env; echo '.env создан из .env.sample'; }
+set -a; . ./.env; set +a
+
+admin() { PGPASSWORD=$DB_ADMIN_PASSWORD psql -X -q -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN_USER" "$@"; }
+app() { PGPASSWORD=$DB_PASSWORD psql -X -q -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" "$@"; }
+
+echo "--- пустая БД $DB_NAME"
+admin -d postgres -v user="$DB_USER" -v password="$DB_PASSWORD" -v db="$DB_NAME" <<'SQL'
+select format('create role %I login password %L', :'user', :'password')
+where not exists (select from pg_roles where rolname = :'user') \gexec
+drop database if exists :"db" with (force);
+create database :"db" owner :"user";
+SQL
+
+echo '--- структура и системные справочники: миграции Liquibase'
+./gradlew -q :zhsr-database:bootRun
+
+# колонки таблиц: "таблица<TAB>колонка,колонка,..."
+declare -A table_cols
+while IFS=$'\t' read -r table cols; do
+  table_cols[$table]=",$cols,"
+done < <(app -tA -F $'\t' -c "select table_name, string_agg(column_name, ',') from information_schema.columns
+                               where table_schema = current_schema() group by table_name")
+
+# \copy одного tsv: только столбцы, которые есть в таблице
+copy_cmd() {
+  local f=$1 table=$2
+  [ -n "${table_cols[$table]:-}" ] || { echo "нет таблицы $table для $f" >&2; exit 1; }
+  local -a header keep_idx=() keep_col=()
+  IFS=$'\t' read -r -a header < <(head -n 1 "$f")
+  for i in "${!header[@]}"; do
+    if [[ ${table_cols[$table]} == *",${header[$i]},"* ]]; then
+      keep_idx+=($((i + 1))); keep_col+=("${header[$i]}")
+    fi
+  done
+  local cols idx src
+  cols=$(IFS=,; echo "${keep_col[*]}")
+  idx=$(IFS=,; echo "${keep_idx[*]}")
+  if [ ${#keep_idx[@]} = ${#header[@]} ]; then
+    src="'$PWD/$f'"
+  else
+    src="program 'cut -f$idx \"$PWD/$f\"'"
+  fi
+  # csv с табуляцией: пустое поле - null; кавычек в данных нет (символ \x01 не встречается)
+  echo "\\copy $table ($cols) from $src with (format csv, delimiter e'\\t', header true, quote e'\\x01')"
+}
+
+echo "--- данные: ${dirs[*]}"
+{
+  echo 'begin;'
+  for dir in "${dirs[@]}"; do
+    for f in "$dir"/*; do
+      name=$(basename "$f")
+      case $name in
+        *.tsv)
+          table=${name#*-}; table=${table%.tsv}
+          copy_cmd "$f" "$table"
+          echo "\\echo '$dir/$name: $(($(wc -l < "$f") - 1)) строк'"
+          ;;
+        *.sql)
+          echo "\\i '$PWD/$f'"
+          echo "\\echo '$dir/$name: выполнен'"
+          ;;
+      esac
+    done
+  done
+  # id заданы в данных явно: счётчики id (identity или serial) - за наибольший id
+  cat <<'SQL'
+\o /dev/null
+select format('select setval(%L, coalesce(max(%I), 0) + 1, false) from %I',
+              pg_get_serial_sequence(table_name, column_name), column_name, table_name)
+from information_schema.columns
+where table_schema = current_schema()
+  and pg_get_serial_sequence(format('%I', table_name), column_name) is not null \gexec
+\o
+\echo 'счётчики id: обновлены'
+SQL
+  echo 'commit;'
+} | app
+
+echo "--- готово: БД $DB_NAME пересоздана"

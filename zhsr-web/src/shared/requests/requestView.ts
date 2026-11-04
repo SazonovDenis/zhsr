@@ -1,5 +1,6 @@
 import type { RepairRequest, RequestEvent } from '@/api/requests'
 import { t } from '@/boot/i18n'
+import { RequestStatus } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
 
 /**
@@ -16,20 +17,23 @@ export const REQUEST_DICTS = [
   'FaultGroup',
   'FaultCategory',
   'WagonType',
+  'Station',
+  'Depot',
+  'Yard',
 ] as const
 
 /** Название неисправности заявки. */
-export function faultName(fault: string): string {
+export function faultName(fault: number): string {
   return dictManager.getValue('FaultType', fault)
 }
 
 /** Кому заявка: исполнитель, а если его нет — служба. */
-export function executorText(r: RepairRequest): string {
-  return r.executor?.name ?? dictManager.getValue('Service', r.service)
+export function executorText(r: Omit<RepairRequest, 'id'>): string {
+  return r.executorUsr?.name ?? dictManager.getValue('Service', r.service)
 }
 
 /** Цвет и насыщенность текста критичности — из справочника Severity. */
-export function severityStyle(severity: string): Record<string, string> {
+export function severityStyle(severity: number): Record<string, string> {
   const rec = dictManager.getRec('Severity', severity)
   return {
     color: (rec?.fg as string | undefined) ?? 'inherit',
@@ -43,10 +47,16 @@ export interface RequestStep {
   state: 'done' | 'current' | 'todo'
 }
 
-const STEP_OF: Record<string, number> = { NEW: 0, ASSIGNED: 0, IN_PROGRESS: 1, DONE: 2, CLOSED: 3 }
+const STEP_OF: Record<number, number> = {
+  [RequestStatus.NEW]: 0,
+  [RequestStatus.ASSIGNED]: 0,
+  [RequestStatus.IN_PROGRESS]: 1,
+  [RequestStatus.DONE]: 2,
+  [RequestStatus.CLOSED]: 3,
+}
 
 /** Шаги заявки; queued — заявка ещё в очереди на телефоне: ни один шаг не пройден. */
-export function requestSteps(status: string, queued = false): RequestStep[] {
+export function requestSteps(status: number, queued = false): RequestStep[] {
   const current = queued ? -1 : (STEP_OF[status] ?? 0)
   return ['Подана', 'В работе', 'Выполнена', 'Закрыта'].map((label, i) => ({
     label: t(label),
@@ -55,26 +65,26 @@ export function requestSteps(status: string, queued = false): RequestStep[] {
 }
 
 /** Что будет с заявкой дальше — подсказка под шагами. */
-export function nextText(r: RepairRequest, queued = false): string {
+export function nextText(r: Omit<RepairRequest, 'id'>, queued = false): string {
   if (queued) return t('Отправится, когда появится связь')
   const who = executorText(r)
-  switch (r.status) {
-    case 'NEW':
-    case 'ASSIGNED':
+  switch (r.requestStatusType) {
+    case RequestStatus.NEW:
+    case RequestStatus.ASSIGNED:
       return t('{who} — взять в работу', { who })
-    case 'IN_PROGRESS':
+    case RequestStatus.IN_PROGRESS:
       return t('{who} выполняет работу', { who })
-    case 'DONE':
+    case RequestStatus.DONE:
       return r.wagonTrip
         ? t('Проводник вагона или начальник поезда принимает работу')
         : t('Инструктор поездных бригад или эксплуатационщик депо принимает работу')
-    case 'CLOSED':
+    case RequestStatus.CLOSED:
       return t('Работа принята, запись внесена в журнал ВУ-8')
-    case 'REJECTED':
+    case RequestStatus.REJECTED:
       return t('Заявка отклонена')
-    case 'DEFERRED':
+    case RequestStatus.DEFERRED:
       return t('Будет выполнена на следующем ТО')
-    case 'CANCELLED':
+    case RequestStatus.CANCELLED:
       return t('Заявка отменена')
     default:
       return ''
@@ -110,12 +120,12 @@ export function eventTitle(e: RequestEvent): string {
 }
 
 /** Шаги, которые заявке ещё предстоят, — серым концом истории. */
-export function futureSteps(status: string): { title: string; meta: string }[] {
+export function futureSteps(status: number): { title: string; meta: string }[] {
   const all = [
     { title: t('В работе'), meta: t('работа не начата') },
     { title: t('Выполнена'), meta: t('работа не выполнена') },
     { title: t('Закрыта'), meta: t('приёмка не выполнена') },
   ]
-  const from = { NEW: 0, ASSIGNED: 0, IN_PROGRESS: 1, DONE: 2 }[status]
+  const from = status === RequestStatus.CLOSED ? undefined : STEP_OF[status]
   return from === undefined ? [] : all.slice(from)
 }

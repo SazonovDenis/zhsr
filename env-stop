@@ -1,0 +1,17 @@
+#!/bin/bash
+# Остановить окружение разработки в Docker (docker/docker-compose.env.yml). Контейнеры удаляются, данные БД и файлы остаются
+# в томах zhsr_db_data и zhsr_s3_data.
+#
+#   ./env-stop          - все сервисы окружения
+#   ./env-stop db       - только указанные
+set -euo pipefail
+cd "$(dirname "$0")"
+
+env_file=.env
+[ -f "$env_file" ] || env_file=.env.sample
+
+if [ $# -eq 0 ]; then
+  docker compose --env-file "$env_file" -f docker/docker-compose.env.yml down
+else
+  docker compose --env-file "$env_file" -f docker/docker-compose.env.yml rm -s -f "$@"
+fi

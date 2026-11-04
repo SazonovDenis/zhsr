@@ -21,7 +21,7 @@ diagrams:
     top: [ usr ]
 
   wagon_location_status:
-    title: "Перемещение вагонов и смена их состояния"
+    title: "Вагоны: перемещение и смена состояния"
     description: "Главные журналы для любых изменений вагона. Другие таблицы могут хранить дополнительную информацию, но ссылаются сюда."
     tables: [ wagon_location, wagon_status, wagon: { hide_references: [ "depot" ] }, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, station, trip, location_type ]
     hide_fields: [ "depot", "yard", "station" , "wagon", "trip", "location_type" ]
@@ -37,10 +37,15 @@ diagrams:
     tables: [ wagon: { hide_references: [ "depot" ] }, transfer_act, transfer_act_wagon, transfer_direction_type, act_status_type, act_cancellation, station, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, wagon_location: { hide_references: [ "depot", "wagon", "yard" ] } ]
     hide_fields: [ "wagon", "transfer_direction_type", "act_status_type", "station", "depot", "yard", "wagon_location" ]
 
-  repair_request:
-    title: "Заявки на ремонт"
-    tables: [ repair_request, repair_request_photo, repair_request_executor, repair_request_note, fault_type, request_status_type, wagon, trip: { hide_references: [ "arrived_by_usr", "departed_by_usr" ] }, usr ]
-    hide_fields: [ "request_status_type", "fault_type", "wagon", "trip", "usr" ]
+  repair_request_data:
+    title: "Заявки на ремонт: описание"
+    tables: [ repair_request, repair_request_photo, repair_request_note, fault_type, wagon, severity_type, trip ]
+    hide_fields: [ "fault_type", "wagon", "severity_type", "trip" ]
+
+  repair_request_executor:
+    title: "Заявки на ремонт: состояние и исполнители"
+    tables: [ repair_request, repair_request_executor, repair_request_status, repair_request_info, fault_type, request_status_type, usr, service, role_type ]
+    hide_fields: [ "request_status_type", "fault_type", "usr" ]
     top: [ usr ]
 
   info:
@@ -48,8 +53,13 @@ diagrams:
     description: |
       Для каждого объекта (вагон, заявка на ремонт) в таблицах ***_info хранится одна запись, в которую копируются последние данные со всех версионных таблиц объекта. 
       Предназначены для быстрого построения списков.
-    tables: [ wagon_info, wagon, wagon_location, wagon_status, repair_request_info, repair_request: { hide_references: [ "wagon" ] }, repair_request_executor ]
-    hide_fields: [ "wagon", "wagon_location", "wagon_status", "repair_request", "repair_request_executor" ]
+    tables: [ wagon_info, wagon, wagon_location, wagon_status, repair_request_info, repair_request: { hide_references: [ "wagon" ] }, repair_request_status, repair_request_executor ]
+    hide_fields: [ "wagon", "wagon_location", "wagon_status", "repair_request", "repair_request_status", "repair_request_executor" ]
+
+  system_dict:
+    title: "Справочники: системные константы"
+    description: "Значения отражены в константах кода (kz.zhsr.app.constants) и меняются только вместе с кодом. Данные - zhsr-database/src/main/resources/db/dict/*.tsv, загружаются при создании БД. В администрировании не редактируются."
+    tables: [ role_type, service, category_type, transport_type, location_type, trip_status_type, crew_duty_type, coupling_type, transfer_direction_type, act_status_type, work_type, wagon_status_type, request_status_type, severity_type, fault_category_type ]
 
   fault_type:
     title: "Справочник: типы неисправностей"
@@ -68,14 +78,16 @@ diagrams:
   stage:
     title: "Железные дороги: станции и перегоны"
     description: "Граф: станции - вершины, перегоны - рёбра."
-    tables: [ station, stage, route_station, route ]
+    tables: [ station, stage, stage_point, route_station, route ]
     hide_fields: [ "route" ]
 
 tables:
 
   role_type:
     title: "Роль сотрудника"
-    constants_from: doc/dict/role_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/role_type.tsv
     columns:
       text:
         title: "Значение"
@@ -85,7 +97,7 @@ tables:
       service:
         title: "Служба роли"
         description: "Пусто - роль не относится к службе"
-        constants_from: doc/dict/service.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/service.tsv
 
   usr_role:
     title: "Роли сотрудника"
@@ -96,11 +108,13 @@ tables:
         title: "Сотрудник"
       role_type:
         title: "Роль"
-        constants_from: doc/dict/role_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/role_type.tsv
 
   category_type:
     title: "Категория проводника"
-    constants_from: doc/dict/category_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/category_type.tsv
     columns:
       text:
         title: "Значение"
@@ -118,7 +132,7 @@ tables:
         title: "Сотрудник"
       category_type:
         title: "Категория"
-        constants_from: doc/dict/category_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/category_type.tsv
       dbeg:
         title: "Начало периода"
       dend:
@@ -156,9 +170,12 @@ tables:
       phone:
         title: "Телефон"
         description: "В формате +7XXXXXXXXXX"
-      active:
-        title: "Учётная запись включена"
-        description: "Отключение не удаляет историю"
+      disabled:
+        title: "Учётная запись отключена"
+        description: "Войти нельзя. Сотрудник не удаляется, а отключается: история остаётся"
+      change_password:
+        title: "Сменить пароль при входе"
+        description: "Пароль задал администратор или пароль по умолчанию. Пока пароль не сменён, сервер разрешает только смену пароля"
       created_dt:
         title: "Когда заведён"
 
@@ -171,7 +188,11 @@ tables:
         title: "Код депо"
         description: "Уникален в компании"
       name:
-        title: "Название"
+        title: "Название на русском"
+      name_kk:
+        title: "Название на казахском"
+      name_en:
+        title: "Название на английском"
       station:
         title: "Расположение депо"
         description: "Задаёт территориальную привязку"
@@ -199,12 +220,14 @@ tables:
         description: "Уникален в компании"
       wagon_type:
         title: "Тип вагона"
-        constants_from: doc/dict/wagon_type.tsv
+        constants_from: db-data/default/04-wagon_type.tsv
       model_type:
         title: "Модель"
-        constants_from: doc/dict/model_type.tsv
+        constants_from: db-data/default/05-model_type.tsv
       build_year:
         title: "Год постройки"
+      maker:
+        title: "Завод-изготовитель"
       dbeg:
         title: "Дата ввода в эксплуатацию"
       dend:
@@ -218,7 +241,9 @@ tables:
 
   transport_type:
     title: "Пассажирский или грузовой маршрут"
-    constants_from: doc/dict/transport_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/transport_type.tsv
     columns:
       text:
         title: "Значение"
@@ -228,7 +253,9 @@ tables:
 
   location_type:
     title: "Вид расположения вагона"
-    constants_from: doc/dict/location_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/location_type.tsv
     columns:
       text:
         title: "Значение"
@@ -238,7 +265,9 @@ tables:
 
   trip_status_type:
     title: "Статус рейса"
-    constants_from: doc/dict/trip_status_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/trip_status_type.tsv
     columns:
       text:
         title: "Значение"
@@ -248,7 +277,9 @@ tables:
 
   crew_duty_type:
     title: "Должность члена бригады"
-    constants_from: doc/dict/crew_duty_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/crew_duty_type.tsv
     columns:
       text:
         title: "Значение"
@@ -258,7 +289,9 @@ tables:
 
   coupling_type:
     title: "Отцепка или прицепка"
-    constants_from: doc/dict/coupling_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/coupling_type.tsv
     columns:
       text:
         title: "Значение"
@@ -268,7 +301,9 @@ tables:
 
   transfer_direction_type:
     title: "Направление акта приёма-передачи"
-    constants_from: doc/dict/transfer_direction_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/transfer_direction_type.tsv
     columns:
       text:
         title: "Значение"
@@ -279,9 +314,10 @@ tables:
   act_status_type:
     title: "Статус акта"
     description: |
+      Системный справочник.
       Общий для актов отцепки, прицепки и приёма-передачи. Какие статусы допустимы, задаёт проверка в таблице акта:
       у акта отцепки, прицепки - только "проведён" и "отменён".
-    constants_from: doc/dict/act_status_type.tsv
+    constants_from: zhsr-database/src/main/resources/db/dict/act_status_type.tsv
     columns:
       text:
         title: "Значение"
@@ -291,7 +327,9 @@ tables:
 
   work_type:
     title: "Вид работ"
-    constants_from: doc/dict/work_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/work_type.tsv
     columns:
       text:
         title: "Значение"
@@ -301,9 +339,10 @@ tables:
 
   wagon_status_type:
     title: "Состояние вагона"
-    constants_from: doc/dict/wagon_status_type.tsv
+    constants_from: zhsr-database/src/main/resources/db/dict/wagon_status_type.tsv
     description: |
-      Состояния вагона, например: в простое, в пути, в ремонте. Состояние определяет парк (doc/dict/park_type.tsv).
+      Системный справочник.
+      Состояния вагона, например: в простое, в пути, в ремонте. Состояние определяет парк (zhsr-database/src/main/resources/db/dict/park_type.tsv).
     columns:
       text:
         title: "Значение"
@@ -313,7 +352,7 @@ tables:
 
   wagon_type:
     title: "Тип вагона"
-    constants_from: doc/dict/wagon_type.tsv
+    constants_from: db-data/default/04-wagon_type.tsv
     description: |
       Типы вагонов по назначению, например: купейный, плацкартный, ресторан.
     columns:
@@ -325,7 +364,7 @@ tables:
 
   model_type:
     title: "Модель вагона"
-    constants_from: doc/dict/model_type.tsv
+    constants_from: db-data/default/05-model_type.tsv
     description: |
       Модели вагонов парка, например: Тулпар-Тальго, Stadler спальный.
     columns:
@@ -337,7 +376,9 @@ tables:
 
   request_status_type:
     title: "Статус заявки на ремонт"
-    constants_from: doc/dict/request_status_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/request_status_type.tsv
     columns:
       text:
         title: "Значение"
@@ -347,7 +388,9 @@ tables:
 
   severity_type:
     title: "Критичность неисправности"
-    constants_from: doc/dict/severity_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/severity_type.tsv
     columns:
       text:
         title: "Значение"
@@ -358,9 +401,10 @@ tables:
   service:
     title: "Служба-исполнитель"
     description: |
+      Системный справочник.
       Служба, которой адресуется заявка на ремонт. Служба - свойство роли: у роли не больше одной службы, одну службу
       могут иметь несколько ролей (role_type.service).
-    constants_from: doc/dict/service.tsv
+    constants_from: zhsr-database/src/main/resources/db/dict/service.tsv
     columns:
       text:
         title: "Значение"
@@ -370,7 +414,9 @@ tables:
 
   fault_category_type:
     title: "Категория неисправности"
-    constants_from: doc/dict/fault_category_type.tsv
+    description: |
+      Системный справочник.
+    constants_from: zhsr-database/src/main/resources/db/dict/fault_category_type.tsv
     columns:
       text:
         title: "Значение"
@@ -380,7 +426,7 @@ tables:
       service:
         title: "Служба-исполнитель"
         description: "Если у типа неисправности служба-исполнитель не задана"
-        constants_from: doc/dict/service.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/service.tsv
 
   fault_group_type:
     title: "Группа неисправностей"
@@ -399,7 +445,7 @@ tables:
     title: "Тип неисправности"
     description: |
       Позиция справочника неисправностей. Группа и категория - независимые поля, не связанные между собой.
-      Отключается, а не удаляется.
+      Тип с заявками не удаляется, а отключается; тип без заявок можно удалить.
     columns:
       code:
         title: "Код"
@@ -408,19 +454,19 @@ tables:
         title: "Название"
       fault_group_type:
         title: "Группа неисправности"
-        constants_from: doc/dict/fault_group_type.tsv
       fault_category_type:
         title: "Категория неисправности"
-        constants_from: doc/dict/fault_category_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/fault_category_type.tsv
       severity_type:
         title: "Критичность по умолчанию"
-        constants_from: doc/dict/severity_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/severity_type.tsv
       service:
-        title: "Служба-исполнитель по умолчанию"
+        title: "Служба-исполнитель"
         description: "Пусто - служба определяется категорией неисправности"
-        constants_from: doc/dict/service.tsv
-      active:
-        title: "Действует"
+        constants_from: zhsr-database/src/main/resources/db/dict/service.tsv
+      disabled:
+        title: "Отключён"
+        description: "Не предлагается при подаче заявки. Тип неисправности с заявками не удаляется, а отключается"
 
   station:
     title: "Станция"
@@ -429,8 +475,12 @@ tables:
     columns:
       code:
         title: "Код станции"
+        description: "Код ЕСР; если в OpenStreetMap его нет - 'OSM' и id точки станции в OpenStreetMap"
       name:
         title: "Название"
+      stage_point:
+        title: "Точка станции на карте"
+        description: "Одна из крайних точек перегонов станции; концы остальных её перегонов совпадают с ней по координатам. Пусто - у станции нет перегонов"
 
   stage:
     title: "Перегон"
@@ -445,6 +495,21 @@ tables:
       km:
         title: "Расстояние, км"
 
+  stage_point:
+    title: "Точка линии перегона"
+    description: |
+      Линия перегона для рисунка пути на карте. Точки идут по порядку seq от from_station к to_station перегона;
+      первая точка - координаты from_station, последняя - координаты to_station.
+    columns:
+      seq:
+        title: "Порядковый номер точки"
+      x:
+        title: "Долгота"
+        description: "Градусы, WGS 84"
+      y:
+        title: "Широта"
+        description: "Градусы, WGS 84"
+
   route:
     title: "Маршрут (поезд)"
     description: |
@@ -457,8 +522,7 @@ tables:
         title: "Название (сообщение)"
         description: "Пример: 'Астана-Алматы'"
       duration:
-        title: "Длительность рейса, часы"
-        description: "От явки до сдачи состава"
+        title: "Время в пути, мин"
       conductor_hours:
         title: "Норма часов за рейс для проводника"
       lnp_hours:
@@ -470,26 +534,50 @@ tables:
       dend:
         title: "Дата окончания действия"
         description: "Пусто - маршрут действует"
-      one_time:
-        title: "Разовый"
-        description: "Поезд без расписания"
+      route_kind:
+        title: "Вид маршрута"
+        description: "Константы RouteKind в коде: 1 - регулярный, 2 - разовый (поезд без расписания)"
       transport_type:
         title: "Пассажирский или грузовой"
-        constants_from: doc/dict/transport_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/transport_type.tsv
 
   route_station:
-    title: "Остановка на маршруте"
+    title: "Станция маршрута"
     description: |
-      Станции маршрута по порядку с нарастающим километражем. Основа натурного листа и расчёта пробега. В оба конца, например: Алматы-Астана-Алматы.
+      Станции маршрута по порядку с нарастающим километражем: остановки и станции следования, которые поезд проходит
+      без остановки. Основа натурного листа и расчёта пробега. В оба конца, например: Алматы-Астана-Алматы.
     columns:
       route:
         title: "Маршрут"
       seq:
-        title: "Порядковый номер остановки"
+        title: "Порядковый номер станции на маршруте"
       station:
         title: "Станция"
       km:
         title: "Километраж от начала маршрута"
+      have_stop:
+        title: "Остановка"
+        description: "Нет - станция следования, поезд проходит её без остановки"
+      run_duration:
+        title: "Время в пути от предыдущей станции маршрута, мин"
+        description: "У начальной станции 0"
+      stop_duration:
+        title: "Стоянка, мин"
+        description: "У станций следования, начальной и конечной станций 0"
+
+  dict_version:
+    title: "Версия справочника"
+    description: |
+      Версия справочника для кэша справочников на фронте (DictManager): меняется при каждом изменении справочника.
+      Фронт сверяет версии и перечитывает только изменившиеся справочники.
+    columns:
+      name:
+        title: "Имя справочника"
+        description: "Как на фронте: WagonState, Depot, Station ..."
+      version:
+        title: "Версия"
+      changed_dt:
+        title: "Когда изменён"
 
   trip:
     title: "Рейс"
@@ -504,7 +592,7 @@ tables:
         title: "Плановое отправление"
       trip_status_type:
         title: "Статус"
-        constants_from: doc/dict/trip_status_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/trip_status_type.tsv
       departed_dt:
         title: "Дата отправления"
       arrived_dt:
@@ -553,10 +641,13 @@ tables:
         description: "Один раз на рейс"
       crew_duty_type:
         title: "Должность на рейсе"
-        constants_from: doc/dict/crew_duty_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/crew_duty_type.tsv
       wagon:
         title: "Вагон, если должность на рейсе - проводник"
         description: "Пусто - проводник назначен на рейс без привязки к вагону"
+      wagon2:
+        title: "Второй вагон проводника"
+        description: "Соседний с первым; пусто - проводник обслуживает один вагон"
 
   act_cancellation:
     title: "Акт отмены"
@@ -581,7 +672,7 @@ tables:
         description: "Уникален"
       coupling_type:
         title: "Отцепка или прицепка"
-        constants_from: doc/dict/coupling_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/coupling_type.tsv
       trip:
         title: "Рейс"
       route_station:
@@ -594,10 +685,13 @@ tables:
         title: "Кто составил"
       created_dt:
         title: "Когда"
+      act_dt:
+        title: "Время акта"
+        description: "Время, которое указал пользователь: с него действуют записи журналов вагонов"
       act_status_type:
         title: "Статус"
         description: "Проведён или отменён"
-        constants_from: doc/dict/act_status_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/act_status_type.tsv
       act_cancellation:
         title: "Акт отмены"
         description: "Заполнен только при статусе \"отменён\""
@@ -633,7 +727,7 @@ tables:
         description: "Уникален"
       transfer_direction_type:
         title: "Направление"
-        constants_from: doc/dict/transfer_direction_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/transfer_direction_type.tsv
       station:
         title: "Станция, на которой происходит передача"
         description: "Станция депо или парка отстоя"
@@ -646,10 +740,10 @@ tables:
       work_type:
         title: "Вид работ"
         description: "При передаче для ремонта"
-        constants_from: doc/dict/work_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/work_type.tsv
       act_status_type:
         title: "Статус"
-        constants_from: doc/dict/act_status_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/act_status_type.tsv
       transferred_by_usr:
         title: "Кто сдал"
       transferred_dt:
@@ -689,7 +783,7 @@ tables:
     title: "Заявка на ремонт"
     description: |
       Неисправность вагона, поданная сотрудником. Автор корректирует заявку в течение ограниченного времени после подачи;
-      корректировка в журналы не попадает.
+      корректировка в журналы не попадает. Статус - в журнале repair_request_status, служба-исполнитель определяется типом неисправности.
     columns:
       number:
         title: "Номер"
@@ -698,10 +792,7 @@ tables:
         title: "Вагон"
       trip:
         title: "Рейс"
-      service:
-        title: "Служба-исполнитель"
-        constants_from: doc/dict/service.tsv
-      usr:
+      created_by_usr:
         title: "Автор"
       created_dt:
         title: "Время подачи"
@@ -709,14 +800,14 @@ tables:
         title: "Неисправность"
       severity_type:
         title: "Критичность"
-        constants_from: doc/dict/severity_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/severity_type.tsv
       description:
         title: "Описание от автора"
 
   repair_request_photo:
     title: "Фото к заявке"
     description: |
-      Файл лежит в хранилище, здесь - ссылка.
+      Файл лежит в хранилище файлов (S3), здесь - ключ файла в бакете.
     columns:
       repair_request:
         title: "Заявка"
@@ -724,15 +815,36 @@ tables:
         title: "Ключ файла в хранилище"
       size_bytes:
         title: "Размер, байт"
-      usr:
+      created_by_usr:
         title: "Автор фото"
       created_dt:
         title: "Когда загружено"
+
+  repair_request_status:
+    title: "Журнал статусов заявки"
+    description: |
+      Запись действует с dbeg по dend (не включая); dend пуст - текущая запись. Периоды заявки не пересекаются.
+      Первая запись вносится при подаче заявки.
+    columns:
+      repair_request:
+        title: "Заявка"
+      dbeg:
+        title: "Начало периода"
+      dend:
+        title: "Конец периода"
+        description: "Пусто - текущая запись"
+      request_status_type:
+        title: "Статус"
+        constants_from: zhsr-database/src/main/resources/db/dict/request_status_type.tsv
+      created_by_usr:
+        title: "Кто внёс запись"
+        description: "Подал заявку или сменил статус. Пусто - Система"
 
   repair_request_executor:
     title: "Движение заявки по исполнителям"
     description: |
       Запись действует с dbeg по dend (не включая); dend пуст - текущая запись. Периоды заявки не пересекаются.
+      Записей нет, пока исполнителя не назначали.
     columns:
       repair_request:
         title: "Заявка"
@@ -743,36 +855,37 @@ tables:
         description: "Пусто - текущая запись"
       executor_usr:
         title: "Исполнитель"
-        description: "Пусто - исполнителя нет: заявка отклонена или отменена до назначения"
+        description: "Пусто - исполнитель снят"
       created_by_usr:
         title: "Кто внёс запись"
-        description: "Назначил исполнителя или сменил статус. Пусто - Система"
-      request_status_type:
-        title: "Статус"
-        constants_from: doc/dict/request_status_type.tsv
+        description: "Назначил или снял исполнителя. Пусто - Система"
 
   repair_request_info:
-    title: "Текущее состояние заявки"
+    title: "Текущие данные заявки"
     description: |
-      Кэш состояния заявки для быстрого доступа. Все поля вычисляемые: копия текущей записи журнала
-      repair_request_executor, обновляется в одной транзакции с журналом. Одна запись на заявку. Пока у заявки нет
-      исполнителя (статус - новая), поля исполнителя пусты.
+      Кэш состояния заявки для быстрого доступа. Все поля вычисляемые: копия текущих записей журналов
+      repair_request_status и repair_request_executor, обновляется в одной транзакции с журналами; служба - по типу
+      неисправности. Одна запись на заявку.
     columns:
       repair_request:
         title: "Заявка"
-      dbeg:
-        title: "Начало текущей записи журнала"
-        description: "Вычисляемое: dbeg текущей записи repair_request_executor"
+      dbeg_status:
+        title: "Начало текущего статуса"
+        description: "Вычисляемое: dbeg текущей записи repair_request_status"
+      request_status_type:
+        title: "Статус"
+        description: "Вычисляемое: из текущей записи repair_request_status"
+        constants_from: zhsr-database/src/main/resources/db/dict/request_status_type.tsv
+      service:
+        title: "Служба-исполнитель"
+        description: "Вычисляемое: из типа неисправности, иначе из его категории; запоминается при подаче и при смене типа корректировкой"
+        constants_from: zhsr-database/src/main/resources/db/dict/service.tsv
+      dbeg_executor:
+        title: "Начало текущего исполнителя"
+        description: "Вычисляемое: dbeg текущей записи repair_request_executor; пусто - исполнителя не назначали"
       executor_usr:
         title: "Исполнитель"
-        description: "Вычисляемое: из текущей записи repair_request_executor"
-      created_by_usr:
-        title: "Кто внёс запись"
-        description: "Вычисляемое: из текущей записи repair_request_executor; пусто - Система или нет исполнителя"
-      request_status_type:
-        title: "Текущий статус"
-        description: "Вычисляемое: из текущей записи repair_request_executor; без исполнителя - новая"
-        constants_from: doc/dict/request_status_type.tsv
+        description: "Вычисляемое: из текущей записи repair_request_executor; пусто - исполнителя нет"
 
   repair_request_note:
     title: "Пояснение к заявке"
@@ -781,8 +894,8 @@ tables:
         title: "Заявка"
       created_dt:
         title: "Дата"
-      usr:
-        title: "Автор"
+      created_by_usr:
+        title: "Автор пояснения"
       note:
         title: "Пояснение"
 
@@ -802,7 +915,7 @@ tables:
       location_type:
         title: "Вид расположения"
         description: "Задаёт, какая из ссылок заполнена: станция, депо, парк отстоя, рейс"
-        constants_from: doc/dict/location_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/location_type.tsv
       station:
         title: "Расположение: станция"
       depot:
@@ -820,17 +933,17 @@ tables:
     columns:
       wagon:
         title: "Вагон"
-      wagon_status_type:
-        title: "Состояние"
-        constants_from: doc/dict/wagon_status_type.tsv
       dbeg:
         title: "Начало состояния"
       dend:
         title: "Конец состояния"
         description: "Пусто - текущая запись"
+      wagon_status_type:
+        title: "Состояние"
+        constants_from: zhsr-database/src/main/resources/db/dict/wagon_status_type.tsv
 
   wagon_info:
-    title: "Текущее состояние вагона"
+    title: "Текущие данные вагона"
     description: |
       Кэш состояния вагона для быстрого доступа. Все поля вычисляемые: копия текущих записей журналов wagon_location и
       wagon_status, обновляется в одной транзакции с журналами. Одна запись на вагон. Расположение ровно одно из:
@@ -844,7 +957,7 @@ tables:
       location_type:
         title: "Вид расположения"
         description: "Вычисляемое: из текущей записи wagon_location"
-        constants_from: doc/dict/location_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/location_type.tsv
       station:
         title: "Расположение: станция"
         description: "Вычисляемое: из текущей записи wagon_location"
@@ -863,4 +976,4 @@ tables:
       wagon_status_type:
         title: "Состояние"
         description: "Вычисляемое: из текущей записи wagon_status"
-        constants_from: doc/dict/wagon_status_type.tsv
+        constants_from: zhsr-database/src/main/resources/db/dict/wagon_status_type.tsv

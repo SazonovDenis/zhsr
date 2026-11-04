@@ -7,7 +7,8 @@
       'menu-item--indent': item.sub || indent,
       'menu-item--collapsed': collapsed,
     }"
-    :title="t(item.label)"
+    :disabled="disabled"
+    :title="disabled ? t('{label}: пока не сделано', { label: t(item.label) }) : t(item.label)"
   >
     <span class="menu-item__body">
       <!-- вложенный пункт в развёрнутом меню — без иконки, с отступом -->
@@ -29,8 +30,16 @@ import type { MenuItem } from './menu'
 /**
  * indent — пункт группы: с отступом, как вложенный.
  * count — счётчик пункта (например, сколько актов ждут приёма); 0 — счётчика нет.
+ * disabled — пункт виден, но не выбирается: раздел пока не сделан.
  */
-defineProps<{ item: MenuItem; active: boolean; collapsed: boolean; indent?: boolean; count?: number }>()
+defineProps<{
+  item: MenuItem
+  active: boolean
+  collapsed: boolean
+  indent?: boolean
+  count?: number
+  disabled?: boolean
+}>()
 </script>
 
 <style scoped lang="scss">
@@ -68,6 +77,11 @@ defineProps<{ item: MenuItem; active: boolean; collapsed: boolean; indent?: bool
   &--collapsed {
     justify-content: center;
     padding-left: 0.75rem;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
 }
 

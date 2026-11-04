@@ -32,7 +32,7 @@ import { eventTitle, futureSteps } from './requestView'
  * История заявки лентой: подача, смены статуса с комментариями, назначения, пояснения с фото; в конце серым — шаги,
  * которые заявке ещё предстоят. large — крупнее, для телефона.
  */
-const props = withDefaults(defineProps<{ events: RequestEvent[]; status: string; large?: boolean }>(), {
+const props = withDefaults(defineProps<{ events: RequestEvent[]; status: number; large?: boolean }>(), {
   large: false,
 })
 

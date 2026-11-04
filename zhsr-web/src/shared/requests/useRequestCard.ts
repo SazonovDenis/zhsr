@@ -5,6 +5,11 @@ import type { RequestAction, RequestDetail, UserRef } from '@/api/requests'
 import { addRequestNote, assignRequest, fetchRequest, fetchServiceStaff, runRequestAction } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
+import { dictManager } from '@/shared/dict/DictManager'
+import type { Busy } from '@/shared/busy'
+import { useBusy } from '@/shared/busy'
+import type { ShownError } from '@/shared/errors'
+import { shownError } from '@/shared/errors'
 import { isOnline } from '@/shared/network'
 import { loadCached } from '@/shared/offline/cache'
 import { currentUser } from '@/shared/user'
@@ -17,12 +22,13 @@ import { ACTIONS, canAssign, canEdit, editBlockReason, requestActions } from './
  * offline — мобильная часть: заявка сохраняется на телефоне и без связи показывается из копии; действия без связи
  * недоступны.
  */
-export function useRequestCard(id: Ref<string | null>, offline = false) {
+export function useRequestCard(id: Ref<number | null>, offline = false, busy: Busy = useBusy()) {
   const request = shallowRef<RequestDetail | null>(null)
   const loading = ref(false)
   /** заявка показана из копии на телефоне */
   const stale = ref(false)
-  const error = ref('')
+  /** ошибка загрузки или действия; null — ошибки нет */
+  const error = ref<ShownError | null>(null)
   /** идёт действие: кнопки недоступны */
   const running = ref(false)
 
@@ -35,21 +41,28 @@ export function useRequestCard(id: Ref<string | null>, offline = false) {
   async function load() {
     const current = id.value
     pending.value = null
-    error.value = ''
+    error.value = null
     if (!current) {
       request.value = null
       return
     }
     loading.value = true
     try {
-      const result = offline
-        ? await loadCached(`request:${current}`, () => fetchRequest(current))
-        : { data: await fetchRequest(current), stale: false }
+      // в счёт ожидания фрейма карточки: спиннер фрейма — на всю цепочку
+      // карточка и справочники для её показа (неисправность, тип вагона, место вагона) — параллельно
+      const [, result] = await busy.run(
+        Promise.all([
+          dictManager.prepareDicts('FaultType', 'WagonType', 'Station', 'Depot', 'Yard'),
+          offline
+            ? loadCached(`request:${current}`, () => fetchRequest(current))
+            : fetchRequest(current).then((data) => ({ data, stale: false })),
+        ]),
+      )
       if (id.value !== current) return
       request.value = result.data
       stale.value = result.stale
     } catch (e) {
-      error.value = e instanceof Error ? t(e.message) : String(e)
+      error.value = shownError(e)
       request.value = null
     } finally {
       loading.value = false
@@ -93,12 +106,12 @@ export function useRequestCard(id: Ref<string | null>, offline = false) {
   async function run(work: () => Promise<RequestDetail>): Promise<boolean> {
     if (blocked.value) return false
     running.value = true
-    error.value = ''
+    error.value = null
     try {
       changed(await work())
       return true
     } catch (e) {
-      error.value = e instanceof Error ? t(e.message) : String(e)
+      error.value = shownError(e)
       return false
     } finally {
       running.value = false
@@ -127,7 +140,7 @@ export function useRequestCard(id: Ref<string | null>, offline = false) {
     pending.value = null
   }
 
-  async function assign(executor: string | null) {
+  async function assign(executor: number | null) {
     if (!request.value) return
     await run(() => assignRequest(request.value!.id, executor))
   }

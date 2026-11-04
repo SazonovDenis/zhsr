@@ -1,20 +1,28 @@
 import { reactive } from 'vue'
 
 import { loadDict, loadDictValue, loadDictVersions } from '@/api/dict'
+import { isNetworkError } from '@/api/http'
 import { i18n, t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
+import type { ShownError } from '@/shared/errors'
+import { shownError } from '@/shared/errors'
 import { db } from '@/shared/db/db'
+import { ROUTE_KIND_RECORDS } from '@/shared/constants/RouteKind'
+import { SYSTEM_DICT_RECORDS } from '@/shared/constants/systemDicts'
 import { subscribe } from '@/shared/ws'
+import { DICT_COLORS } from './dictColors'
 import type { DictData, DictDef, DictId, DictName, DictRec, MultiText } from './dicts'
 import { dictDefs } from './dicts'
 
 /**
  * Загрузчик справочников и их кэш. Один экземпляр на приложение: dictManager.
  *
- * Работа со справочником:
- * 1. перед показом — await dictManager.prepareDict('WagonState'): справочник загружается один раз, параллельные
- *    запросы одного справочника дают один запрос к серверу;
- * 2. при показе — dictManager.getValue('WagonState', id): текст записи на текущем языке (см. translate в dicts.ts).
+ * Работа со справочником — явно, грузит прикладной код, менеджер при чтении ничего не грузит:
+ * 1. загрузить — await dictManager.prepareDict('Depot'): фрейм грузит справочники своего главного показывающего в своей
+ *    цепочке, контрол выбора — свой справочник (dictSource); справочник загружается один раз, параллельные запросы дают
+ *    один запрос к серверу;
+ * 2. показать — dictManager.getValue('Depot', id): текст записи на текущем языке (см. translate в dicts.ts). Справочник
+ *    не загружен или записи нет — «<<id>>»: бросается в глаза, а в консоли — какой справочник не загрузили.
  *
  * Обновление:
  * - refreshDict(name) — перезагрузить справочник целиком, refreshValue(name, id) — одну запись,
@@ -28,9 +36,18 @@ import { dictDefs } from './dicts'
  * показывали значения справочника, перерисовываются сами после его загрузки и обновления. Событие `dict-refresh`
  * нужно для логики, не связанной с отрисовкой.
  *
- * Справочники с признаком offline хранятся и в IndexedDB: при старте они берутся оттуда, а при наличии сети
- * сверяются с сервером по версии.
+ * Справочники с признаком offline хранятся и в IndexedDB: без связи они берутся оттуда, при связи копия сверяется
+ * с сервером по версии до показа. Ошибка сервера не прячется за копией.
+ *
+ * Системные справочники (system в dicts.ts) с сервера не загружаются и не обновляются: записи — из кода
+ * (shared/constants), оформление — из dictColors.ts.
  */
+
+/** Состояние загрузки справочника: идёт ли загрузка и ошибка последней загрузки (null — нет). */
+export interface DictLoadState {
+  loading: boolean
+  error: ShownError | null
+}
 
 /** Команда сервера в канале `dict-manager`. */
 type DictCommand =
@@ -74,30 +91,33 @@ class DictManager {
 
   private staleCheck: Promise<void> | null = null
 
+  // состояние загрузки справочников: для показа в выпадающих списках
+  private readonly states = reactive<Partial<Record<DictName, DictLoadState>>>({})
+
   /** Подписка на команды сервера и загрузка справочников, нужных без сети. Вызывается один раз (src/boot/ws.ts). */
   start() {
     subscribe('dict-manager', (body) => void this.onCommand(body as DictCommand))
     bus.on('connection-restored', () => void this.refreshStale())
 
     for (const name of Object.keys(dictDefs) as DictName[]) {
-      if (this.isOffline(name)) void this.prepareDict(name)
+      if (this.isOffline(name) && !this.isSystem(name)) void this.prepareDict(name)
     }
   }
 
   // --- чтение ---
 
   /**
-   * Текст поля записи на текущем языке. Справочник не загружен или записи нет — возвращается id, чтобы интерфейс
-   * показал хоть что-то; причина пишется в консоль.
+   * Текст поля записи на текущем языке. Справочник не загружен или записи нет — «<<id>>»: бросается в глаза, что
+   * значение не показано; причина пишется в консоль.
    */
   getValue(name: DictName, id: DictId | null | undefined, field = 'text'): string {
     if (id === null || id === undefined) return ''
     const rec = this.getRec(name, id)
-    if (!rec) return String(id)
+    if (!rec) return `<<${id}>>`
     const value = rec[field]
     if (value === null || value === undefined) {
       console.warn(`Dict value is empty, dict: ${name}, id: ${id}, field: ${field}`)
-      return String(id)
+      return `<<${id}>>`
     }
     return this.translate(name, value)
   }
@@ -106,6 +126,7 @@ class DictManager {
     this.track(name)
     const dict = this.dicts.get(name)
     if (!dict) {
+      // справочник не загрузили: прикладной код должен загрузить его до показа (prepareDict)
       console.warn(`Dict not loaded: ${name}`)
       return null
     }
@@ -128,6 +149,11 @@ class DictManager {
   /** Загрузить справочник, если он ещё не загружен. */
   async prepareDict(name: DictName): Promise<void> {
     if (this.dicts.has(name)) return
+    if (this.isSystem(name)) {
+      this.dicts.set(name, systemDict(name))
+      this.changed(name)
+      return
+    }
     await this.load(name, () => this.loadInitial(name))
   }
 
@@ -141,7 +167,7 @@ class DictManager {
   async refreshDict(name: DictName): Promise<void> {
     // идёт загрузка — дожидаемся её, затем перезагружаем: она могла начаться до изменения на сервере
     await this.loading.get(name)
-    if (!this.dicts.has(name)) return
+    if (!this.dicts.has(name) || this.isSystem(name)) return
     await this.load(name, async () => this.save(name, await loadDict(name)))
   }
 
@@ -150,7 +176,7 @@ class DictManager {
     // идёт полная загрузка — сначала она, иначе она затёрла бы свежую запись
     await this.loading.get(name)
     const dict = this.dicts.get(name)
-    if (!dict) return
+    if (!dict || this.isSystem(name)) return
 
     const { version, record } = await loadDictValue(name, id)
     if (record) dict.put(record)
@@ -185,7 +211,7 @@ class DictManager {
   // --- внутреннее ---
 
   private async checkStale() {
-    const names = [...this.dicts.keys()]
+    const names = [...this.dicts.keys()].filter((name) => !this.isSystem(name))
     if (names.length === 0) return
     const versions = await loadDictVersions(names)
     const stale = names.filter(
@@ -208,22 +234,29 @@ class DictManager {
   }
 
   /** Первая загрузка: справочник offline берётся из IndexedDB и сверяется с сервером, остальные — с сервера. */
+  /**
+   * Первая загрузка. Справочник offline: копия из IndexedDB берётся, только если связи нет; при связи версия копии
+   * сверяется с сервером (совпала — копия, нет — справочник с сервера). Ошибка сервера не прячется за копией: она
+   * уходит тому, кто загружает справочник, и показывается у него.
+   */
   private async loadInitial(name: DictName): Promise<Dict> {
     if (this.isOffline(name)) {
       const stored = await this.readStored(name)
       if (stored) {
-        if (navigator.onLine) void this.revalidate(name, stored.version)
-        return stored
+        if (!navigator.onLine) return stored
+        try {
+          const versions = await loadDictVersions([name])
+          if (versions[name] === stored.version) return stored
+        } catch (e) {
+          if (isNetworkError(e)) return stored
+          throw e
+        }
       }
     }
     return this.save(name, await loadDict(name))
   }
 
   /** Сверка версии справочника, взятого из IndexedDB. */
-  private async revalidate(name: DictName, version: string) {
-    const versions = await loadDictVersions([name])
-    if (versions[name] !== undefined && versions[name] !== version) await this.refreshDict(name)
-  }
 
   /** Загрузка с общим ожиданием: параллельные запросы получают один промис. */
   private async load(name: DictName, loader: () => Promise<Dict>): Promise<Dict> {
@@ -232,15 +265,29 @@ class DictManager {
 
     const promise = loader()
     this.loading.set(name, promise)
+    this.states[name] = { loading: true, error: null }
     // отметку снимаем в любом случае: после неудачи справочник можно запросить заново; ошибку получают все ждущие
     try {
       const dict = await promise
       this.dicts.set(name, dict)
+      this.states[name] = { loading: false, error: null }
       this.changed(name)
       return dict
+    } catch (e) {
+      // ошибку получает тот, кто загружает справочник, и она же видна в контролах выбора справочника (dictSource)
+      this.states[name] = { loading: false, error: shownError(e) }
+      throw e
     } finally {
       this.loading.delete(name)
     }
+  }
+
+  /**
+   * Состояние загрузки справочника — реактивно: идёт ли загрузка и ошибка последней загрузки (null — нет). Его
+   * показывают контролы выбора справочника вместо вариантов (dictSource).
+   */
+  loadState(name: DictName): DictLoadState {
+    return this.states[name] ?? { loading: false, error: null }
   }
 
   /** Справочник с сервера: в память, а справочник offline — ещё и в IndexedDB. */
@@ -266,6 +313,10 @@ class DictManager {
     )
   }
 
+  private isSystem(name: DictName): boolean {
+    return (dictDefs[name] as DictDef).system === true
+  }
+
   private isOffline(name: DictName): boolean {
     return (dictDefs[name] as DictDef).offline === true
   }
@@ -285,6 +336,8 @@ class DictManager {
   }
 
   private track(name: DictName) {
+    // системный справочник — в коде: доступен сразу, без prepareDict
+    if (!this.dicts.has(name) && this.isSystem(name)) this.dicts.set(name, systemDict(name))
     void this.ticks[name]
   }
 
@@ -292,6 +345,22 @@ class DictManager {
     this.ticks[name] = (this.ticks[name] ?? 0) + 1
     bus.emit('dict-refresh', id === undefined ? { dictName: name } : { dictName: name, id })
   }
+}
+
+/** Системный справочник из кода: записи и их оформление (dictColors.ts). */
+function systemDict(name: DictName): Dict {
+  const source: Partial<Record<DictName, readonly DictRec[]>> = {
+    ...SYSTEM_DICT_RECORDS,
+    RouteKind: ROUTE_KIND_RECORDS,
+  }
+  const records = source[name]
+  if (!records) throw new Error(`System dict has no records: ${name}`)
+  const colors = DICT_COLORS[name] ?? {}
+  return new Dict(
+    name,
+    'system',
+    records.map((rec) => ({ ...rec, ...colors[rec.id] })),
+  )
 }
 
 export const dictManager = new DictManager()

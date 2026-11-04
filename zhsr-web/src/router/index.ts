@@ -3,7 +3,9 @@ import { watch } from 'vue'
 import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
 import { createMemoryHistory, createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 
+import { onLoginRequired, onPasswordChangeRequired } from '@/api/http'
 import { isMobile } from '@/shared/device'
+import { currentUser } from '@/shared/user'
 import routes from './routes'
 
 /**
@@ -33,6 +35,17 @@ export default defineRouter(() => {
 
   // на телефоне открывается мобильная часть, на компьютере — десктопная
   router.beforeEach(partRedirect)
+
+  // сервер требует сменить пароль (ответ 406) — на страницу смены пароля
+  onPasswordChangeRequired(() => {
+    if (router.currentRoute.value.name !== 'change-password') void router.push({ name: 'change-password' })
+  })
+
+  // нет входа (ответ 401: сеанс не открыт или истёк) — на страницу входа; пользователь забывается: войти может другой
+  onLoginRequired(() => {
+    currentUser.value = null
+    if (router.currentRoute.value.name !== 'login') void router.push({ name: 'login' })
+  })
 
   // режим устройства сменился (например, включена эмуляция в DevTools) — переходим в соответствующую часть
   watch(isMobile, () => {

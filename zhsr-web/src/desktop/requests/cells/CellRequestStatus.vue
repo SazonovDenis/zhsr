@@ -1,7 +1,7 @@
 <template>
-  <DictBadge :id="row.status" dict="RequestStatus" class="cell-request-status" />
-  <div class="cell-request-status__sev" :style="severityStyle(row.severity)">
-    {{ dictManager.getValue('Severity', row.severity) }}
+  <DictBadge :id="row.requestStatusType" dict="RequestStatus" class="cell-request-status" />
+  <div class="cell-request-status__sev" :style="severityStyle(row.severityType)">
+    {{ dictManager.getValue('Severity', row.severityType) }}
   </div>
 </template>
 

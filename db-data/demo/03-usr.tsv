@@ -1,0 +1,58 @@
+id	login	full_name	password_hash	phone	disabled	change_password	created_dt
+2	plan	Жумабаева Гульнара Сериковна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+3	lnp	Ахметов Болат Кайратович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+4	master	Оспанова Мадина Тимуровна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+7	pem	Касымов Данияр Ерланович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+8	900101300008	Нуртаев Азамат Серикович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+9	900101300009	Жумабаев Ерлан Канатович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+10	instr	Сейткали Руслан Аскарович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+16	cond	Абенова Динара Сериковна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+17	900101300017	Серикова Айгерим Маратовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+18	900101300018	Жумабаев Нурлан Кайратович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+19	900101300019	Ким Ольга Викторовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+20	900101300020	Тулеуова Дана Асхатовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+21	900101300021	Омаров Ерик Болатович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+22	900101300022	Бекова Салтанат Нурлановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+23	900101300023	Нурланов Азат Тимурович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+24	900101300024	Исаева Гаухар Руслановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+25	900101300025	Рахимов Тимур Сапарович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+26	900101300026	Садыкова Мария Ерлановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+27	900101300027	Абенов Канат Жанатович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+31	900101300031	Иванова Ольга Петровна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+32	900101300032	Серикова Гульмира Алиевна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+33	900101300033	Тулегенов Кайрат Маратович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+34	900101300034	Ли Виктория Владимировна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+35	900101300035	Сейтов Нурлан Асетович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+101	000000000001	Администратор системы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
+102	920320550100	Сейткали Динара Маратовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
+103	850515400200	Иванов Алексей Владимирович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
+104	820715400500	Жолдасов Нурлан Ибрагимович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
+105	780910300400	Мұханов Ерлан Жақсыбекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
+106	880405400700	Омарова Сауле Кайратовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
+107	910812400800	Ким Елена Викторовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
+108	950220350600	Смирнова Анна Павловна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
+109	870301400900	Бекова Айгуль Нурлановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+110	790615300300	Петров Сергей Иванович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+111	930512400101	Абенова Гульнара Ериковна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+112	940218300102	Касымов Данияр Маратович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+113	910707400103	Ли Ирина Сергеевна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+114	890303300104	Нурланов Арман Бекович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+115	950909400105	Оспанова Мадина Талгатовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+116	920101300106	Федоров Андрей Петрович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+117	960425400107	Жумабаева Асель Нуржановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+118	880812300108	Сагындыков Ерлан Аскарович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+119	830330300109	Тулегенов Марат Сейтович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+120	900101300100	Ахметов Болат Серікұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.	+77011234567	false	false	2026-10-07 13:00:05+05:00
+121	990101400204	Калиев Асхат Муратович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
+122	810505400111	Сарсенова Айгерим Болатовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 11:30:04+05:00
+123	000000000002	Администратор ПП	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:36:24+05:00
+124	990101400205	Жунусова Алия Ермековна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
+125	990101400206	Тлеубаев Нуржан Аскарович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
+126	990101400207	Ким Виктор Олегович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
+127	990101400201	Иманов Ерлан Серикович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
+128	990101400202	Ахметова Гульмира Каировна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
+129	990101400203	Сериков Даурен Болатович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
+130	990101400208	Байжанова Сауле Маратовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
+131	990101400209	Омаров Ержан Талгатович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
+132	990101400210	Ибраева Динара Нурлановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
+133	990101400211	Бригадир клининга ПК «Марат»	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00

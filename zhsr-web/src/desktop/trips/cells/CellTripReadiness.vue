@@ -12,12 +12,12 @@
 </template>
 
 <script setup lang="ts">
-import type { Trip } from '@/api/trips'
+import type { TripRow } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import type { CellProps } from '@/shared/components/table/types'
 
 /** Готовность рейса: пункты цветными чипами — готово, есть замечания, не готово. */
-defineProps<CellProps<Trip>>()
+defineProps<CellProps<TripRow>>()
 </script>
 
 <style scoped lang="scss">
@@ -46,7 +46,7 @@ defineProps<CellProps<Trip>>()
 
   &--bad {
     background: #f7dcd8;
-    color: #8f2416;
+    color: $zs-error-fg;
   }
 }
 </style>

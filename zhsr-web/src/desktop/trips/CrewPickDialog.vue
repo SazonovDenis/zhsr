@@ -22,13 +22,13 @@
         <span>{{ t('Проводник') }}</span>
         <span>{{ t('Сейчас') }}</span>
       </div>
-      <label v-for="c in candidates" :key="c.user" class="crew-pick__row">
-        <q-checkbox v-model="selected" :val="c.user" dense />
+      <label v-for="c in candidates" :key="c.usr" class="crew-pick__row">
+        <q-checkbox v-model="selected" :val="c.usr" dense />
         <span>
           {{ c.name }}
           <span v-if="c.senior" class="zs-sub">{{ t('ст.') }}</span>
         </span>
-        <span class="zs-sub">{{ c.busy ?? t('свободен') }}</span>
+        <span class="zs-sub">{{ busyText(c) }}</span>
       </label>
       <div v-if="!loading && candidates.length === 0" class="crew-pick__empty">{{ t('Проводников нет') }}</div>
     </div>
@@ -37,12 +37,16 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, shallowRef } from 'vue'
+import { ref, shallowRef } from 'vue'
 
 import type { ConductorCandidate } from '@/api/trips'
 import { fetchConductorCandidates, setTripConductors } from '@/api/trips'
 import { t } from '@/boot/i18n'
+import type { ShownError } from '@/shared/errors'
+import { shownError } from '@/shared/errors'
+import { provideBusy } from '@/shared/busy'
 import FormDialog from '@/shared/components/dialog/FormDialog.vue'
+import { formatDateTime } from '@/shared/format'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 
 /**
@@ -51,36 +55,48 @@ import SidePanelFields from '../frame/SidePanelFields.vue'
  * другом рейсе, показан, если освободится к отправлению: «в рейсе … • свободен с …». Новые проводники попадают в
  * нераспределённые, снятые — уходят из бригады и с вагона. Открывается через openDialog, результат — true.
  */
-const props = defineProps<{ tripId: string; tripName: string; station: string }>()
+const props = defineProps<{ tripId: number; tripName: string; station: string }>()
 
 const show = defineModel<boolean>('show', { default: false })
+// ожидание диалога: спиннер в подвале (FormDialog) — на всю цепочку загрузок формы
+const busy = provideBusy()
 const emit = defineEmits<{ done: [saved: boolean] }>()
 
 const candidates = shallowRef<ConductorCandidate[]>([])
-const selected = ref<string[]>([])
+const selected = ref<number[]>([])
 const loading = ref(true)
 const running = ref(false)
-const error = ref('')
+// ошибка формы: проверки (formError) или запроса (shownError, запрос второй строкой); null — ошибки нет
+const error = ref<ShownError | null>(null)
 
-onMounted(async () => {
+// загрузка формы — сразу в setup и в счёт ожидания диалога: спиннер в подвале с первой отрисовки
+void busy.run(async () => {
   try {
     candidates.value = await fetchConductorCandidates(props.tripId)
-    selected.value = candidates.value.filter((c) => c.assigned).map((c) => c.user)
+    selected.value = candidates.value.filter((c) => c.assigned).map((c) => c.usr)
   } catch (e) {
-    error.value = e instanceof Error ? t(e.message) : String(e)
+    error.value = shownError(e)
   } finally {
     loading.value = false
   }
 })
 
+function busyText(c: ConductorCandidate): string {
+  if (!c.busyUntil) return t('свободен')
+  return t('в рейсе {trip} • свободен с {until}', {
+    trip: `${c.busyTrain ?? ''} ${c.busyName ?? ''}`.trim(),
+    until: formatDateTime(c.busyUntil),
+  })
+}
+
 async function save() {
-  error.value = ''
+  error.value = null
   running.value = true
   try {
     await setTripConductors(props.tripId, selected.value)
     emit('done', true)
   } catch (e) {
-    error.value = e instanceof Error ? t(e.message) : String(e)
+    error.value = shownError(e)
   } finally {
     running.value = false
   }

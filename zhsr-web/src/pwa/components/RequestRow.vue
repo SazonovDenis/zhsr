@@ -1,15 +1,18 @@
 <template>
   <router-link :to="to" class="request-row" :class="{ 'request-row--queued': queued }">
     <div class="request-row__main">
-      <div class="request-row__title">{{ faultName(request.fault) }}</div>
+      <div class="request-row__title">{{ faultName(request.faultType) }}</div>
       <div class="request-row__meta">
-        {{ queued ? t('номер присвоят при отправке') : request.number }} • {{ t('ваг. {n}', { n: request.wagon }) }} •
-        {{ formatDateTime(request.created) }}
+        {{ queued ? t('номер присвоят при отправке') : request.number }} •
+        {{ t('ваг. {n}', { n: request.wagonNumber }) }} •
+        {{ formatDateTime(request.createdDt) }}
       </div>
       <div class="request-row__badges">
         <span v-if="queued" class="zs-badge request-row__queued">{{ t('Ожидает отправки') }}</span>
-        <DictBadge v-else :id="request.status" dict="RequestStatus" />
-        <span :style="severityStyle(request.severity)">{{ dictManager.getValue('Severity', request.severity) }}</span>
+        <DictBadge v-else :id="request.requestStatusType" dict="RequestStatus" />
+        <span :style="severityStyle(request.severityType)">{{
+          dictManager.getValue('Severity', request.severityType)
+        }}</span>
         <span class="request-row__to">→ {{ executorText(request) }}</span>
       </div>
     </div>
@@ -21,6 +24,7 @@
 import { computed } from 'vue'
 
 import type { RepairRequest } from '@/api/requests'
+import type { QueuedRequest } from '@/shared/offline/outbox'
 import { t } from '@/boot/i18n'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -31,7 +35,9 @@ import { executorText, faultName, severityStyle } from '@/shared/requests/reques
  * Строка заявки в списках мобильной части: неисправность, номер, вагон, время подачи, статус, критичность и кому
  * заявка. Заявка из очереди на телефоне (queued) — «Ожидает отправки», номера ещё нет.
  */
-const props = withDefaults(defineProps<{ request: RepairRequest; queued?: boolean }>(), { queued: false })
+const props = withDefaults(defineProps<{ request: RepairRequest | QueuedRequest; queued?: boolean }>(), {
+  queued: false,
+})
 
 const to = computed(() => ({ name: 'pwa-request', params: { id: props.request.id } }))
 </script>

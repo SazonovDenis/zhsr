@@ -28,7 +28,7 @@ export async function logoutUser(): Promise<void> {
   await clearCached()
 }
 
-/** Есть ли у пользователя роль — id справочника Role. */
-export function hasRole(user: CurrentUser | null, role: string): boolean {
+/** Есть ли у пользователя роль — id справочника Role (константы RoleType). */
+export function hasRole(user: CurrentUser | null, role: number): boolean {
   return !!user?.roles.includes(role)
 }

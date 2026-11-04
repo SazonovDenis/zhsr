@@ -1,15 +1,15 @@
 <template>
-  <div class="cell-trip-route__name">{{ row.train }} • {{ row.routeName }}</div>
-  <div class="zs-sub">{{ t(row.routeKind) }}</div>
+  <div class="cell-trip-route__name">{{ row.trainNumber }} • {{ row.name }}</div>
+  <div class="zs-sub">{{ dictManager.getValue('TransportType', row.transportType) }}</div>
 </template>
 
 <script setup lang="ts">
-import type { Trip } from '@/api/trips'
-import { t } from '@/boot/i18n'
+import type { TripRow } from '@/api/trips'
 import type { CellProps } from '@/shared/components/table/types'
+import { dictManager } from '@/shared/dict/DictManager'
 
-/** Маршрут рейса: номер поезда, название и вид маршрута. */
-defineProps<CellProps<Trip>>()
+/** Маршрут рейса: номер поезда, название и вид перевозки. */
+defineProps<CellProps<TripRow>>()
 </script>
 
 <style scoped lang="scss">

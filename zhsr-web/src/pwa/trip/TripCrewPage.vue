@@ -2,14 +2,14 @@
   <PwaPage
     :back="goBack"
     :title="t('Формирование рейса')"
-    :subtitle="crew ? `${crew.trip.train} • ${crew.trip.name}` : ''"
+    :subtitle="crew ? `${crew.trip.trainNumber} • ${crew.trip.name}` : ''"
   >
-    <div v-if="error" class="crew__error">{{ error }}</div>
-    <div v-if="!crew && !error" class="crew__muted">{{ t('Загрузка…') }}</div>
+    <ErrorBox v-if="error" :error="error" :retry="crew ? null : loadCrew" class="crew__error" />
+    <LoadSpinner v-if="frameBusy.active.value" />
 
     <template v-if="crew && norm">
       <div class="crew__state">
-        <DictBadge :id="crew.trip.state" dict="TripState" />
+        <DictBadge :id="crew.trip.tripStatusType" dict="TripState" />
         <span class="crew__muted">
           {{
             t('отпр. {from} • приб. {to}', {
@@ -43,7 +43,7 @@
         <div v-if="norm.pool.length > 0" class="crew__chips">
           <button
             v-for="m in norm.pool"
-            :key="m.user"
+            :key="m.usr"
             type="button"
             class="crew__chip"
             :disabled="!editable || busy"
@@ -77,12 +77,12 @@
               v-if="editable"
               class="crew__select"
               :class="{ 'crew__select--empty': !w.conductors[slot], 'crew__select--bad': slotBad(w, slot) }"
-              :value="w.conductors[slot]?.user ?? ''"
+              :value="w.conductors[slot]?.usr ?? ''"
               :disabled="busy"
               @change="onSlot(w, slot, $event)"
             >
               <option value="" disabled>{{ t('Назначить проводника') }}</option>
-              <option v-for="o in slotOptions(w, slot)" :key="o.user" :value="o.user">{{ o.label }}</option>
+              <option v-for="o in slotChoices(w, slot)" :key="o.user" :value="o.user">{{ o.label }}</option>
             </select>
             <span v-else class="crew__slot-text">{{ w.conductors[slot] ? label(w.conductors[slot]!) : '—' }}</span>
             <button
@@ -150,22 +150,28 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { CrewMember, TripCrew } from '@/api/trips'
 import { fetchTripCrew, setConductorWagons } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import DictBadge from '@/shared/components/DictBadge.vue'
+import { provideBusy } from '@/shared/busy'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
+import LoadSpinner from '@/shared/components/LoadSpinner.vue'
+import { CrewDuty, TripStatus } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
+import type { ShownError } from '@/shared/errors'
+import { shownError } from '@/shared/errors'
 import { formatDateTime } from '@/shared/format'
 import { isOnline } from '@/shared/network'
 import { loadCached } from '@/shared/offline/cache'
+import type { WagonNorm } from '@/shared/trips/crewNorm'
+import { crewNorm, normDone, slotOptions } from '@/shared/trips/crewNorm'
 import { currentUser, loadCurrentUser } from '@/shared/user'
 import BottomSheet from '../components/BottomSheet.vue'
 import PwaPage from '../components/PwaPage.vue'
-import type { WagonNorm } from './crewNorm'
-import { crewNorm, normDone } from './crewNorm'
 
 /**
  * Формирование рейса на телефоне (Ф-РЕЙ-06): начальник поезда распределяет проводников своего рейса по вагонам — и у
@@ -179,18 +185,22 @@ const router = useRouter()
 
 const crew = shallowRef<TripCrew | null>(null)
 const stale = ref(false)
-const error = ref('')
+const error = ref<ShownError | null>(null)
+// общее ожидание страницы: спиннер на месте содержимого — на всю цепочку загрузок
+const frameBusy = provideBusy()
 const busy = ref(false)
 const poolPick = ref<CrewMember | null>(null)
 
 const norm = computed(() => (crew.value ? crewNorm(crew.value) : null))
-const conductorCount = computed(() => crew.value?.crew.filter((m) => m.duty === 'CONDUCTOR').length ?? 0)
+const conductorCount = computed(() => crew.value?.crew.filter((m) => m.crewDutyType === CrewDuty.CONDUCTOR).length ?? 0)
 
 // правит начальник поезда своего рейса, пока рейс не закончен и есть связь
 const isChief = computed(
-  () => currentUser.value?.trip?.duty === 'LNP' && currentUser.value.trip.id === crew.value?.trip.id,
+  () => currentUser.value?.trip?.crewDutyType === CrewDuty.LNP && currentUser.value.trip.id === crew.value?.trip.id,
 )
-const tripOpen = computed(() => ['PLANNED', 'IN_PROGRESS'].includes(crew.value?.trip.state ?? ''))
+const tripOpen = computed(() =>
+  ([TripStatus.PLANNED, TripStatus.IN_PROGRESS] as number[]).includes(crew.value?.trip.tripStatusType ?? 0),
+)
 const editable = computed(() => isChief.value && tripOpen.value && isOnline.value && !stale.value)
 const readOnlyReason = computed(() => {
   if (!isChief.value) return t('Распределяет проводников начальник поезда рейса')
@@ -202,8 +212,8 @@ const label = (m: CrewMember) => (m.senior ? `${m.name} • ${t('ст.')}` : m.n
 
 const readiness = computed(() => {
   const n = norm.value!
-  const chief = crew.value!.crew.find((m) => m.duty === 'LNP')
-  const pem = crew.value!.crew.find((m) => m.duty === 'PEM')
+  const chief = crew.value!.crew.find((m) => m.crewDutyType === CrewDuty.LNP)
+  const pem = crew.value!.crew.find((m) => m.crewDutyType === CrewDuty.PEM)
   return [
     {
       ok: n.chiefAndPem,
@@ -249,44 +259,28 @@ function slotBad(w: WagonNorm, slot: number): boolean {
   return w.notAdjacent || (w.tail && !m.senior)
 }
 
-/** Кого можно поставить в место вагона: текущего, нераспределённых и проводников соседнего вагона с одним вагоном. */
-function slotOptions(w: WagonNorm, slot: number): { user: string; label: string }[] {
-  const order = crew.value!.wagons.map((x) => x.number)
-  const i = order.indexOf(w.number)
-  const neighbours = [order[i - 1], order[i + 1]].filter((x): x is string => !!x)
-  const current = w.conductors[slot]
-  const all = crew.value!.crew.filter((m) => m.duty === 'CONDUCTOR')
-  return [
-    ...(current
-      ? [{ user: current.user, label: label(current) + (current.wagons.length === 2 ? ` • ${t('2 вагона')}` : '') }]
-      : []),
-    ...all.filter((m) => m.wagons.length === 0).map((m) => ({ user: m.user, label: label(m) })),
-    ...all
-      .filter((m) => m.wagons.length === 1 && neighbours.includes(m.wagons[0]!) && !m.wagons.includes(w.number))
-      .map((m) => ({ user: m.user, label: `${label(m)} • ${t('с вагона {n}', { n: m.wagons[0]! })}` })),
-  ]
-}
+const slotChoices = (w: WagonNorm, slot: number) => slotOptions(crew.value!, w, slot, label)
 
 async function save(changes: [CrewMember, string[]][]) {
   if (!crew.value || !editable.value) return
   busy.value = true
-  error.value = ''
+  error.value = null
   try {
     let result = crew.value
-    for (const [m, wagons] of changes) result = await setConductorWagons(result.trip.id, m.user, wagons)
+    for (const [m, wagons] of changes) result = await setConductorWagons(result.trip.id, m.usr, wagons)
     crew.value = result
   } catch (e) {
-    error.value = e instanceof Error ? t(e.message) : String(e)
+    error.value = shownError(e)
   } finally {
     busy.value = false
   }
 }
 
 function onSlot(w: WagonNorm, slot: number, e: Event) {
-  const user = (e.target as HTMLSelectElement).value
+  const user = Number((e.target as HTMLSelectElement).value)
   const prev = w.conductors[slot]
-  if (prev?.user === user) return
-  const next = crew.value!.crew.find((m) => m.user === user)
+  if (prev?.usr === user) return
+  const next = crew.value!.crew.find((m) => m.usr === user)
   const changes: [CrewMember, string[]][] = []
   // прежний проводник места уходит с этого вагона
   if (prev) changes.push([prev, prev.wagons.filter((x) => x !== w.number)])
@@ -329,22 +323,28 @@ function goBack() {
   else void router.push({ name: 'pwa-home' })
 }
 
-onMounted(async () => {
-  try {
-    await dictManager.prepareDicts('TripState', 'WagonType')
-    const u = await loadCurrentUser()
-    if (!u.trip) {
-      error.value = t('Вы сейчас не в бригаде рейса')
-      return
+// загрузка — сразу в setup и в счёт ожидания страницы: спиннер виден с первой отрисовки
+// загрузка бригады; она же — повтор по клику на ошибку загрузки
+function loadCrew() {
+  error.value = null
+  return frameBusy.run(async () => {
+    try {
+      // справочник типов вагонов для состава — параллельно с пользователем
+      const [u] = await Promise.all([loadCurrentUser(), dictManager.prepareDict('WagonType')])
+      if (!u.trip) {
+        error.value = { text: t('Вы сейчас не в бригаде рейса'), request: '' }
+        return
+      }
+      const id = u.trip.id
+      const result = await loadCached(`crew:${id}`, () => fetchTripCrew(id))
+      crew.value = result.data
+      stale.value = result.stale
+    } catch (e) {
+      error.value = shownError(e)
     }
-    const id = u.trip.id
-    const result = await loadCached(`crew:${id}`, () => fetchTripCrew(id))
-    crew.value = result.data
-    stale.value = result.stale
-  } catch (e) {
-    error.value = e instanceof Error ? t(e.message) : String(e)
-  }
-})
+  })
+}
+void loadCrew()
 </script>
 
 <style scoped lang="scss">
@@ -362,8 +362,8 @@ onMounted(async () => {
 .crew__error {
   padding: 0.625rem 0.875rem;
   border-radius: 0.25rem;
-  background: #fbe5e1;
-  color: #8f2416;
+  background: $zs-error-bg;
+  color: $zs-error-fg;
   font-size: 0.8125rem;
 }
 
@@ -381,11 +381,14 @@ onMounted(async () => {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 
+  // отступ под подписью группы — на треть меньше
   &--card {
-    padding: 0.75rem 0.875rem 0.25rem;
+    padding: 0.75rem 0.875rem calc(0.25rem * 2 / 3);
   }
 
   &--line {
+    // отступ под подписью группы — на треть меньше промежутка между блоками (1rem)
+    margin-bottom: calc(-1rem / 3);
     padding-top: 0.875rem;
     border-top: 0.0625rem solid $zs-border;
   }
@@ -444,6 +447,8 @@ onMounted(async () => {
 }
 
 .crew__pool-head {
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.625rem)
+  margin-bottom: calc(-0.625rem / 3);
   display: flex;
   align-items: baseline;
   justify-content: space-between;

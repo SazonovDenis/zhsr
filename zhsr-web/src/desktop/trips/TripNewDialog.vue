@@ -1,8 +1,8 @@
 <template>
   <FormDialog
     v-model:show="show"
-    title="Создание рейса"
-    ok-text="Создать рейс"
+    :title="trip ? 'Редактирование рейса' : 'Создание рейса'"
+    :ok-text="trip ? 'Сохранить' : 'Создать рейс'"
     width="40rem"
     hint="Рейс создаётся в статусе «План». Станция отправления — первая остановка маршрута, прибытия — последняя."
     :running="running"
@@ -11,7 +11,7 @@
   >
     <FormSection>
       <FormField label="Маршрут">
-        <RouteChoice v-model="draft.route" :routes="routes" />
+        <RouteSelect v-model="draft.route" :routes="routes" />
         <SoftLink text="Создать новый маршрут" class="trip-new__new-route" @click="newRoute" />
       </FormField>
     </FormSection>
@@ -19,7 +19,7 @@
     <FormSection columns="max-content">
       <FormField label="Плановое отправление">
         <DatePicker
-          v-model="draft.planned"
+          v-model="draft.plannedDt"
           date-text="Плановое отправление"
           with-time
           :quick="['today', 'todayPlus1', 'todayPlus2', 'todayPlus3', 'inWeek']"
@@ -30,43 +30,61 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, shallowRef } from 'vue'
+import { date } from 'quasar'
+import { reactive, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 
-import type { Route } from '@/api/routes'
-import { fetchRoutes } from '@/api/routes'
-import type { Trip, TripDraft } from '@/api/trips'
-import { createTrip } from '@/api/trips'
+import type { RouteOption } from '@/api/routes'
+import { fetchRouteOptions } from '@/api/routes'
+import type { TripRow, TripDraft } from '@/api/trips'
+import { createTrip, updateTrip } from '@/api/trips'
 import { t } from '@/boot/i18n'
+import type { ShownError } from '@/shared/errors'
+import { formError, shownError } from '@/shared/errors'
+import { provideBusy } from '@/shared/busy'
 import FormDialog from '@/shared/components/dialog/FormDialog.vue'
 import FormField from '@/shared/components/form/FormField.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
 import FormSection from '@/shared/components/form/FormSection.vue'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
-import { dictManager } from '@/shared/dict/DictManager'
 import { openRouteNew } from '../routes/openRouteNew'
-import RouteChoice from '../routes/RouteChoice.vue'
+import RouteSelect from '../routes/RouteSelect.vue'
 
 /**
- * Диалог «Создание рейса»: маршрут и плановое отправление. Открывается через openDialog, результат —
- * созданный рейс. Нужного маршрута нет — «Создать новый маршрут» закрывает диалог и открывает «Новый маршрут».
+ * Диалог «Создание рейса» и «Редактирование рейса» (задан trip): маршрут и плановое отправление. Открывается через
+ * openDialog, результат — созданный или исправленный рейс. Нужного маршрута нет — «Создать новый маршрут» закрывает диалог и открывает «Новый маршрут».
  */
 
+const props = withDefaults(defineProps<{ trip?: { id: number; route: number; plannedDt: string } | null }>(), {
+  trip: null,
+})
+
 const show = defineModel<boolean>('show', { default: false })
-const emit = defineEmits<{ done: [trip: Trip] }>()
+// ожидание диалога: спиннер в подвале (FormDialog) — на всю цепочку загрузок формы
+const busy = provideBusy()
+const emit = defineEmits<{ done: [trip: TripRow] }>()
 
 const router = useRouter()
 
-const draft = reactive<TripDraft>({ route: null, planned: null })
-const routes = shallowRef<Route[]>([])
+const draft = reactive<TripDraft>({
+  route: props.trip?.route ?? null,
+  plannedDt: props.trip ? date.formatDate(props.trip.plannedDt, 'YYYY-MM-DDTHH:mm') : null,
+})
+const routes = shallowRef<RouteOption[]>([])
 
 const running = ref(false)
-const error = ref('')
+// ошибка формы: проверки (formError) или запроса (shownError, запрос второй строкой); null — ошибки нет
+const error = ref<ShownError | null>(null)
 
 // в списке — маршруты всех видов, которые действуют сейчас; вид маршрута показан в строке маршрута
-onMounted(async () => {
-  await dictManager.prepareDict('RouteKind')
-  routes.value = await fetchRoutes({ kinds: [], states: ['active'] }, null)
+// ошибка загрузки маршрутов — в поле ошибки диалога
+// загрузка формы — сразу в setup и в счёт ожидания диалога: спиннер в подвале с первой отрисовки
+void busy.run(async () => {
+  try {
+    routes.value = await fetchRouteOptions({ kinds: [], states: ['active'] })
+  } catch (e) {
+    error.value = shownError(e)
+  }
 })
 
 function newRoute() {
@@ -75,16 +93,16 @@ function newRoute() {
 }
 
 async function save() {
-  if (!draft.route || !draft.planned) {
-    error.value = t('Заполните все поля')
+  if (!draft.route || !draft.plannedDt) {
+    error.value = formError(t('Заполните все поля'))
     return
   }
-  error.value = ''
+  error.value = null
   running.value = true
   try {
-    emit('done', await createTrip({ ...draft }))
+    emit('done', props.trip ? await updateTrip(props.trip.id, { ...draft }) : await createTrip({ ...draft }))
   } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
+    error.value = shownError(e)
   } finally {
     running.value = false
   }

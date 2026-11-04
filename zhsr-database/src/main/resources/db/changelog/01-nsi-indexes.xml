@@ -93,6 +93,23 @@
         <sql>alter table stage add constraint ck_stage_km check (km &gt; 0)</sql>
     </changeSet>
 
+    <changeSet id="01-nsi-indexes-uq_stage_point_stage_seq" author="zhsr">
+        <addUniqueConstraint tableName="stage_point" columnNames="stage, seq" constraintName="uq_stage_point_stage_seq"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_stage_point_stage" author="zhsr">
+        <addForeignKeyConstraint baseTableName="stage_point" baseColumnNames="stage" constraintName="fk_stage_point_stage"
+                                 referencedTableName="stage" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <!-- deferrable: станции ссылаются на точки перегонов, а точки - через перегоны на станции; данные загружаются
+         одной транзакцией (install/db-reset), ссылка проверяется при её завершении -->
+    <changeSet id="01-nsi-indexes-fk_station_stage_point" author="zhsr">
+        <addForeignKeyConstraint baseTableName="station" baseColumnNames="stage_point" constraintName="fk_station_stage_point"
+                                 referencedTableName="stage_point" referencedColumnNames="id"
+                                 deferrable="true" initiallyDeferred="true"/>
+    </changeSet>
+
     <changeSet id="01-nsi-indexes-uq_depot_code" author="zhsr">
         <addUniqueConstraint tableName="depot" columnNames="code" constraintName="uq_depot_code"/>
     </changeSet>
@@ -160,6 +177,10 @@
     </changeSet>
 
     <!-- остановки маршрута удаляются вместе с маршрутом -->
+    <changeSet id="01-nsi-indexes-ck_route_station_duration" author="zhsr">
+        <sql>alter table route_station add constraint ck_route_station_duration check (run_duration &gt;= 0 and stop_duration &gt;= 0)</sql>
+    </changeSet>
+
     <changeSet id="01-nsi-indexes-fk_route_station_route" author="zhsr">
         <addForeignKeyConstraint baseTableName="route_station" baseColumnNames="route" constraintName="fk_route_station_route"
                                  referencedTableName="route" referencedColumnNames="id" onDelete="CASCADE"/>
@@ -268,7 +289,7 @@
 
     <!-- сотрудник в каждый момент работает не больше чем в одном депо -->
     <changeSet id="01-nsi-indexes-ex_usr_depot_overlap" author="zhsr">
-        <sql>alter table usr_depot add constraint ex_usr_depot_overlap exclude using gist (usr with =, tsrange(dbeg, dend) with &amp;&amp;)</sql>
+        <sql>alter table usr_depot add constraint ex_usr_depot_overlap exclude using gist (usr with =, tstzrange(dbeg, dend) with &amp;&amp;)</sql>
     </changeSet>
 
     <!-- category_type -->
@@ -295,7 +316,7 @@
 
     <!-- у сотрудника в каждый момент не больше одной категории -->
     <changeSet id="01-nsi-indexes-ex_usr_category_overlap" author="zhsr">
-        <sql>alter table usr_category add constraint ex_usr_category_overlap exclude using gist (usr with =, tsrange(dbeg, dend) with &amp;&amp;)</sql>
+        <sql>alter table usr_category add constraint ex_usr_category_overlap exclude using gist (usr with =, tstzrange(dbeg, dend) with &amp;&amp;)</sql>
     </changeSet>
 
 </databaseChangeLog>

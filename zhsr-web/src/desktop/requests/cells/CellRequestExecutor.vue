@@ -1,6 +1,6 @@
 <template>
   <div>{{ dictManager.getValue('Service', row.service) }}</div>
-  <div class="zs-sub">{{ row.executor?.name ?? t('не назначен') }}</div>
+  <div class="zs-sub">{{ row.executorUsr?.name ?? t('не назначен') }}</div>
 </template>
 
 <script setup lang="ts">

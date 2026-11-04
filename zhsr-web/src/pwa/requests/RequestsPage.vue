@@ -28,7 +28,8 @@
     </div>
 
     <div v-if="stale" class="requests__stale">{{ t('Нет связи — показаны сохранённые данные') }}</div>
-    <div v-if="error" class="requests__error">{{ error }}</div>
+    <ErrorBox v-if="error" :error="error" :retry="load" class="requests__error" />
+    <LoadSpinner v-if="busy.active.value" />
 
     <RequestSection
       :title="t(closed ? 'Закрытые' : 'Открытые')"
@@ -40,12 +41,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 
 import type { RepairRequest, RequestScope } from '@/api/requests'
 import { fetchRequests, requestFilter } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
+import { dictManager } from '@/shared/dict/DictManager'
+import { provideBusy } from '@/shared/busy'
+import LoadSpinner from '@/shared/components/LoadSpinner.vue'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
+import type { ShownError } from '@/shared/errors'
+import { shownError } from '@/shared/errors'
 import { loadCached } from '@/shared/offline/cache'
 import { outbox, outboxAsRequest } from '@/shared/offline/outbox'
 import { currentUser } from '@/shared/user'
@@ -72,7 +79,7 @@ const closed = ref(false)
 
 const requests = shallowRef<RepairRequest[]>([])
 const stale = ref(false)
-const error = ref('')
+const error = ref<ShownError | null>(null)
 
 const queued = computed(() => {
   const u = currentUser.value
@@ -80,14 +87,21 @@ const queued = computed(() => {
   return outbox.value.filter((x) => x.author === u.id).map((x) => outboxAsRequest(x, u.name))
 })
 
+// общее ожидание страницы: спиннер на месте содержимого — на всю цепочку загрузок
+const busy = provideBusy()
+
 let seq = 0
 async function load() {
   const my = ++seq
-  error.value = ''
+  error.value = null
   try {
     const key = `requests:${scope.value}:${closed.value}`
-    const result = await loadCached(key, () =>
-      fetchRequests(requestFilter(scope.value, { closed: closed.value }), null),
+    // заявки и справочник неисправностей для строк — параллельно
+    const [, result] = await busy.run(
+      Promise.all([
+        dictManager.prepareDict('FaultType'),
+        loadCached(key, () => fetchRequests(requestFilter(scope.value, { closed: closed.value }), null)),
+      ]),
     )
     if (my !== seq) return
     requests.value = result.data
@@ -95,7 +109,7 @@ async function load() {
   } catch (e) {
     if (my !== seq) return
     requests.value = []
-    error.value = e instanceof Error ? t(e.message) : String(e)
+    error.value = shownError(e)
   }
 }
 
@@ -109,7 +123,8 @@ onBeforeUnmount(() => {
   bus.off('connection-restored', onRefresh)
 })
 
-onMounted(load)
+// загрузка — сразу в setup: спиннер виден с первой отрисовки
+void load()
 </script>
 
 <style scoped lang="scss">
@@ -159,8 +174,8 @@ onMounted(load)
 .requests__error {
   padding: 0.625rem 0.875rem;
   border-radius: 0.25rem;
-  background: #fbe5e1;
-  color: #8f2416;
+  background: $zs-error-bg;
+  color: $zs-error-fg;
   font-size: 0.8125rem;
 }
 </style>

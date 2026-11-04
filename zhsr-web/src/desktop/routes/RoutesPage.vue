@@ -17,9 +17,11 @@
       v-model:selected="selectedId"
       :columns="routesColumns"
       :rows="rows"
+      :error="loadError"
+      :retry="init"
       row-key="id"
       :sort="sort"
-      :loading="loading"
+      :loading="busy.active.value"
       empty="Маршрутов по выбранному фильтру нет"
       @sort="sort = $event"
       @row-dblclick="edit"
@@ -32,18 +34,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import type { Route, RouteFilter } from '@/api/routes'
+import type { RouteFilter, RouteRow } from '@/api/routes'
 import { fetchRoutes } from '@/api/routes'
 import { t } from '@/boot/i18n'
 import type { ChoiceItem } from '@/shared/components/choice/choice'
 import CbButton from '@/shared/components/choice/CbButton.vue'
 import type { RowKey, TableSort } from '@/shared/components/table/types'
 import DataTable from '@/shared/components/table/DataTable.vue'
+import type { ShownError } from '@/shared/errors'
+import { shownError } from '@/shared/errors'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import { dictChoices } from '@/shared/dict/dictChoices'
+import { provideBusy } from '@/shared/busy'
 import { dictManager } from '@/shared/dict/DictManager'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { useSidePanel } from '../frame/useSidePanel'
@@ -65,32 +70,47 @@ const states: ChoiceItem[] = [
 
 const filter = reactive<RouteFilter>({ kinds: [], states: ['active'] })
 
-const rows = shallowRef<Route[]>([])
-const loading = ref(false)
+const rows = shallowRef<RouteRow[]>([])
+// общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок (справочники, фильтры, список)
+const busy = provideBusy()
 const selectedId = ref<RowKey | null>(null)
 // правая панель: рядом со списком на широком окне, поверх него — на узком
 const panel = useSidePanel(selectedId)
 const selected = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null)
 const sort = ref<TableSort | null>(null)
 
+// ошибка загрузки показывается на месте строк таблицы
+const loadError = ref<ShownError | null>(null)
+
 async function load() {
-  loading.value = true
+  loadError.value = null
   try {
-    rows.value = await fetchRoutes(filter, sort.value)
-  } finally {
-    loading.value = false
+    rows.value = await busy.run(fetchRoutes(filter, sort.value))
+  } catch (e) {
+    rows.value = []
+    loadError.value = shownError(e)
   }
 }
 
 // фильтр или сортировка изменились — данные загружаются заново
 watch([filter, sort], load, { deep: true })
 
-function edit(route: Route) {
+function edit(route: RouteRow) {
   void router.push({ name: 'route-edit', params: { id: route.id } })
 }
 
-onMounted(async () => {
-  await dictManager.prepareDicts('RouteKind', 'Station')
-  await load()
-})
+// цепочка загрузок — сразу в setup: спиннер виден с первой отрисовки; она же — повтор по клику на ошибку в таблице
+async function init() {
+  // станции для строк (остановки маршрута) и сами строки — независимо, параллельно
+  await Promise.all([loadDicts(), load()])
+}
+
+async function loadDicts() {
+  try {
+    await busy.run(dictManager.prepareDict('Station'))
+  } catch (e) {
+    loadError.value = shownError(e)
+  }
+}
+void init()
 </script>

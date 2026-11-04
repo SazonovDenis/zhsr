@@ -6,7 +6,7 @@
     class="route-stops route-stops--horizontal"
     :class="{ 'route-stops--toggle': hasPassing }"
     :title="hasPassing ? t('Показать или скрыть станции следования') : undefined"
-    @click="hasPassing && (full = !full)"
+    @click="hasPassing && (collapsed = !collapsed)"
   >
     <template v-for="(item, index) in items" :key="index">
       <!-- стрелка перед станцией; после свёрнутых станций следования стрелка у самого свёрнутого блока -->
@@ -40,7 +40,7 @@
     class="route-stops route-stops--vertical"
     :class="{ 'route-stops--toggle': hasPassing }"
     :title="hasPassing ? t('Показать или скрыть станции следования') : undefined"
-    @click="hasPassing && (full = !full)"
+    @click="hasPassing && (collapsed = !collapsed)"
   >
     <!-- заголовки колонок справа -->
     <div v-if="items.length > 0" class="route-stops__columns">
@@ -79,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 
 import type { RoutePoint } from '@/api/routes'
 import { t } from '@/boot/i18n'
@@ -100,9 +100,19 @@ import { formatHm } from './duration'
  *   кольцо и серое название. Клик по компоненту сворачивает станции следования в их число между остановками и
  *   разворачивает обратно.
  */
-const props = withDefaults(defineProps<{ points: RoutePoint[]; layout?: 'vertical' | 'horizontal' }>(), {
-  layout: 'vertical',
-})
+const props = withDefaults(
+  defineProps<{
+    points: RoutePoint[]
+    layout?: 'vertical' | 'horizontal'
+  }>(),
+  { layout: 'vertical' },
+)
+
+/**
+ * Станции следования свёрнуты в их число между остановками; клик по компоненту переключает. Владелец задаёт начальное
+ * значение (collapsed) или следит за переключением (v-model:collapsed).
+ */
+const collapsed = defineModel<boolean>('collapsed', { default: false })
 
 /**
  * Элемент показа. runDuration — время в пути до элемента от предыдущего показанного, мин.
@@ -115,16 +125,14 @@ type Item =
    */
   | { kind: 'gap'; count: number; runDuration: number; passDuration: number }
 
-const full = ref(true)
-
-const hasPassing = computed(() => props.points.some((p) => !p.stop))
+const hasPassing = computed(() => props.points.some((p) => !p.haveStop))
 
 const items = computed<Item[]>(() => {
   const result: Item[] = []
   let gap: { kind: 'gap'; count: number; runDuration: number; passDuration: number } | null = null
 
   for (const point of props.points) {
-    if (!point.stop && !full.value) {
+    if (!point.haveStop && collapsed.value) {
       if (!gap) {
         gap = { kind: 'gap', count: 0, runDuration: 0, passDuration: 0 }
         result.push(gap)
@@ -139,7 +147,7 @@ const items = computed<Item[]>(() => {
       gap.runDuration += point.runDuration
       gap = null
     }
-    result.push({ kind: point.stop ? 'stop' : 'pass', point, runDuration: point.runDuration })
+    result.push({ kind: point.haveStop ? 'stop' : 'pass', point, runDuration: point.runDuration })
   }
   return result
 })
@@ -156,13 +164,11 @@ function kmText(point: RoutePoint, index: number): string {
 function formatDuration(min: number): string {
   return min ? formatHm(min) : ''
 }
-
-onMounted(() => dictManager.prepareDict('Station'))
 </script>
 
 <style scoped lang="scss">
 .route-stops {
-  font-size: 0.875rem;
+  font-size: $zs-route-name-size;
 
   &--toggle {
     cursor: pointer;
@@ -171,8 +177,8 @@ onMounted(() => dictManager.prepareDict('Station'))
 
 .route-stops__dot {
   flex: none;
-  width: 0.6rem;
-  height: 0.6rem;
+  width: $zs-route-stop-size;
+  height: $zs-route-stop-size;
   border-radius: 50%;
   background: $zs-route-dot;
 }
@@ -180,25 +186,25 @@ onMounted(() => dictManager.prepareDict('Station'))
 // станция следования — пустое кольцо
 .route-stops__station--pass .route-stops__dot,
 .route-stops__row--pass .route-stops__dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border: 0.1rem solid $zs-border-input;
-  background: #fff;
+  width: $zs-route-pass-size;
+  height: $zs-route-pass-size;
+  border: $zs-route-pass-ring solid $zs-route-pass-ring-color;
+  background: $zs-route-pass-bg;
 }
 
 .route-stops__name {
-  color: $zs-text;
+  color: $zs-route-stop-name;
   white-space: nowrap;
 }
 
 .route-stops__station--stop .route-stops__name,
 .route-stops__row--stop .route-stops__name {
-  font-weight: 700;
+  font-weight: $zs-route-stop-weight;
 }
 
 .route-stops__station--pass .route-stops__name,
 .route-stops__row--pass .route-stops__name {
-  color: $zs-text-faint;
+  color: $zs-route-pass-name;
 }
 
 .route-stops__sub {
@@ -294,8 +300,8 @@ onMounted(() => dictManager.prepareDict('Station'))
 
 .route-stops__line {
   flex: 1;
-  width: 0.1rem;
-  background: $zs-border-input;
+  width: $zs-route-line-width;
+  background: $zs-route-line;
 
   // верхний отрезок постоянной высоты: точка стоит на строке названия, а не посередине строки станции
   &:first-child {

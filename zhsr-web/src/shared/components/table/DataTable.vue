@@ -40,7 +40,7 @@
           <div
             :key="keyOf(item)"
             class="data-table__row"
-            :class="{ 'data-table__row--selected': isSelected(item) }"
+            :class="{ 'data-table__row--selected': isSelected(item), 'data-table__row--struck': struck?.(item) }"
             role="row"
             @click="onRowClick(item)"
             @dblclick="emit('row-dblclick', item)"
@@ -62,7 +62,11 @@
         </template>
       </q-virtual-scroll>
 
-      <div v-if="rows.length === 0 && !loading" class="data-table__empty">{{ emptyText }}</div>
+      <!-- строк ещё нет и идёт загрузка — спиннер на месте строк: у пустой таблицы высота — только шапка -->
+      <LoadSpinner v-if="loading && rows.length === 0" />
+      <!-- ошибка загрузки — на месте строк, а не «нет данных» -->
+      <ErrorBox v-else-if="error && !loading" :error="error" :retry="retry" class="data-table__error" />
+      <div v-else-if="rows.length === 0 && !loading" class="data-table__empty">{{ emptyText }}</div>
 
       <!-- подвал по колонкам: есть, если подвал задан хотя бы у одной колонки -->
       <div v-if="hasColumnFooter" class="data-table__foot data-table__grid" :style="gridStyle" role="row">
@@ -78,7 +82,10 @@
       <slot name="footer" :rows="rows" />
     </div>
 
-    <q-inner-loading :showing="loading" />
+    <!-- строки уже есть, идёт новая загрузка — спиннер поверх строк, без плавного появления -->
+    <q-inner-loading :showing="loading && rows.length > 0" :transition-duration="0">
+      <q-spinner color="primary" size="2.5rem" />
+    </q-inner-loading>
   </div>
 </template>
 
@@ -87,6 +94,9 @@ import type { QVirtualScroll } from 'quasar'
 import { computed, nextTick, ref, watch } from 'vue'
 
 import { t } from '@/boot/i18n'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
+import LoadSpinner from '@/shared/components/LoadSpinner.vue'
+import type { ShownError } from '@/shared/errors'
 import CellText from './CellText.vue'
 import type { Column, RowKey, TableSort } from './types'
 
@@ -101,6 +111,7 @@ import type { Column, RowKey, TableSort } from './types'
  *   кругу: по возрастанию → по убыванию → без сортировки (null, порядок сервера). Клик по другой колонке —
  *   сортировка по ней по возрастанию.
  * - Выбранная строка (v-model:selected) подсвечивается, а при смене выбора прокручивается в видимую область.
+ * - Строка может быть зачёркнута (struck): значения перечёркнуты, например у отключённой записи.
  * - Подвал: строка по колонкам (column.footer) и свободный слот footer под таблицей.
  */
 const props = withDefaults(
@@ -112,12 +123,18 @@ const props = withDefaults(
     rowKey: (keyof Row & string) | ((row: Row) => RowKey)
     /** ключ выбранной строки */
     selected?: RowKey | null
+    /** строка показывается зачёркнутой: например, отключённая запись; null — зачёркнутых строк нет */
+    struck?: ((row: Row) => boolean) | null
     sort?: TableSort | null
     loading?: boolean
     /** текст на русском, когда строк нет; переводится при показе */
     empty?: string
+    /** ошибка загрузки строк: показывается вместо строк; null — ошибки нет */
+    error?: ShownError | null
+    /** повтор загрузки: клик по ошибке запускает его; null — повтора нет */
+    retry?: (() => void) | null
   }>(),
-  { selected: null, sort: null, loading: false, empty: 'Нет данных' },
+  { selected: null, struck: null, sort: null, loading: false, empty: 'Нет данных', error: null, retry: null },
 )
 
 const emit = defineEmits<{
@@ -289,6 +306,10 @@ watch(
   border-bottom: 0.0625rem solid $zs-border-row;
 }
 
+.data-table__row--struck .data-table__cell {
+  text-decoration: line-through;
+}
+
 .data-table__foot {
   position: sticky;
   bottom: 0;
@@ -311,6 +332,10 @@ watch(
   padding: 2rem;
   color: $zs-text-muted;
   text-align: center;
+}
+
+.data-table__error {
+  margin: 1rem;
 }
 
 .data-table--align-left {

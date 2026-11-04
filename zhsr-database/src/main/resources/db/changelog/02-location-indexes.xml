@@ -27,7 +27,7 @@
 
     <!-- периоды вагона не пересекаются -->
     <changeSet id="02-location-indexes-ex_wagon_location_overlap" author="zhsr">
-        <sql>alter table wagon_location add constraint ex_wagon_location_overlap exclude using gist (wagon with =, tsrange(dbeg, dend) with &amp;&amp;)</sql>
+        <sql>alter table wagon_location add constraint ex_wagon_location_overlap exclude using gist (wagon with =, tstzrange(dbeg, dend) with &amp;&amp;)</sql>
     </changeSet>
 
     <changeSet id="02-location-indexes-fk_wagon_location_station" author="zhsr">
@@ -117,7 +117,7 @@
 
     <!-- периоды вагона не пересекаются -->
     <changeSet id="02-location-indexes-ex_wagon_status_overlap" author="zhsr">
-        <sql>alter table wagon_status add constraint ex_wagon_status_overlap exclude using gist (wagon with =, tsrange(dbeg, dend) with &amp;&amp;)</sql>
+        <sql>alter table wagon_status add constraint ex_wagon_status_overlap exclude using gist (wagon with =, tstzrange(dbeg, dend) with &amp;&amp;)</sql>
     </changeSet>
 
     <!-- wagon_info: кэш удаляется вместе с вагоном -->
@@ -297,6 +297,11 @@
 
     <changeSet id="02-location-indexes-fk_trip_crew_wagon" author="zhsr">
         <addForeignKeyConstraint baseTableName="trip_crew" baseColumnNames="wagon" constraintName="fk_trip_crew_wagon"
+                                 referencedTableName="wagon" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_trip_crew_wagon2" author="zhsr">
+        <addForeignKeyConstraint baseTableName="trip_crew" baseColumnNames="wagon2" constraintName="fk_trip_crew_wagon2"
                                  referencedTableName="wagon" referencedColumnNames="id"/>
     </changeSet>
 

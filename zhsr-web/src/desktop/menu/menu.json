@@ -27,7 +27,8 @@
     {
       "id": "acts",
       "label": "Передача",
-      "icon": "acts"
+      "icon": "acts",
+      "route": "acts"
     },
     {
       "id": "warranty",
@@ -47,15 +48,48 @@
     "items": [
       {
         "id": "admin-users",
-        "label": "Пользователи"
+        "label": "Пользователи",
+        "route": "admin-users"
       },
       {
-        "id": "admin-wagons",
-        "label": "Вагоны"
+        "id": "admin-depot",
+        "label": "Депо",
+        "route": "admin-depot"
+      },
+      {
+        "id": "admin-yard",
+        "label": "Парки отстоя",
+        "route": "admin-yard"
+      },
+      {
+        "id": "admin-station",
+        "label": "Станции",
+        "route": "admin-station"
+      },
+      {
+        "id": "admin-stage",
+        "label": "Перегоны",
+        "route": "admin-stage"
+      },
+      {
+        "id": "admin-wagon_type",
+        "label": "Типы вагонов",
+        "route": "admin-wagon_type"
+      },
+      {
+        "id": "admin-model_type",
+        "label": "Модели вагонов",
+        "route": "admin-model_type"
+      },
+      {
+        "id": "admin-fault_group_type",
+        "label": "Группы неисправностей",
+        "route": "admin-fault_group_type"
       },
       {
         "id": "admin-faults",
-        "label": "Неисправности"
+        "label": "Неисправности",
+        "route": "admin-fault_type"
       },
       {
         "id": "admin-schedule-norms",

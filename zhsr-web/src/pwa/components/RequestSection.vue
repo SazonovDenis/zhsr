@@ -14,13 +14,14 @@
 
 <script setup lang="ts">
 import type { RepairRequest } from '@/api/requests'
+import type { QueuedRequest } from '@/shared/offline/outbox'
 import RequestRow from './RequestRow.vue'
 
 /**
  * Раздел со списком заявок на экранах мобильной части: заголовок с числом заявок и карточка со строками; пустой
  * раздел — текст empty. queued — заявки из очереди на телефоне, показываются первыми. Тексты — уже переведённые.
  */
-withDefaults(defineProps<{ title: string; requests: RepairRequest[]; queued?: RepairRequest[]; empty: string }>(), {
+withDefaults(defineProps<{ title: string; requests: RepairRequest[]; queued?: QueuedRequest[]; empty: string }>(), {
   queued: () => [],
 })
 </script>
@@ -33,6 +34,8 @@ withDefaults(defineProps<{ title: string; requests: RepairRequest[]; queued?: Re
 }
 
 .request-section__head {
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.5rem)
+  margin-bottom: calc(-0.5rem / 3);
   display: flex;
   align-items: center;
   gap: 0.5rem;

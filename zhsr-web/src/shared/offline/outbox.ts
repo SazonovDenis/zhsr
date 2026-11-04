@@ -1,13 +1,15 @@
-import { date } from 'quasar'
 import { ref } from 'vue'
 
 import { isNetworkError } from '@/api/http'
 import type { RepairRequest, RequestDraft } from '@/api/requests'
 import { createRequest } from '@/api/requests'
 import { bus } from '@/shared/bus'
+import { RequestStatus } from '@/shared/constants/systemDicts'
 import type { OutboxRow } from '@/shared/db/db'
 import { db } from '@/shared/db/db'
+import { isoDateTime } from '@/shared/format'
 import { isOnline } from '@/shared/network'
+import { faultDefaults } from '@/shared/requests/faults'
 
 /**
  * Очередь заявок, поданных без связи (IndexedDB, таблица outbox). Заявка ждёт на телефоне вместе с фото и уходит на
@@ -21,9 +23,13 @@ import { isOnline } from '@/shared/network'
 export interface OutboxRequest {
   id: string
   draft: Omit<RequestDraft, 'photos'>
+  /** номер вагона — для показа заявки в очереди */
+  wagonNumber: string
   photos: Blob[]
+  /** время подачи, ISO с часовым поясом */
   created: string
-  author: string
+  /** автор — id сотрудника */
+  author: number
   /** ошибка отправки, кроме ошибки связи: сервер не принял заявку */
   error: string
 }
@@ -43,14 +49,15 @@ export async function startOutbox(): Promise<void> {
   if (isOnline.value) void flushOutbox()
 }
 
-/** Поставить заявку в очередь. */
-export async function queueRequest(draft: RequestDraft, author: string): Promise<OutboxRequest> {
+/** Поставить заявку в очередь. wagonNumber — номер вагона черновика: для показа, пока заявка в очереди. */
+export async function queueRequest(draft: RequestDraft, author: number, wagonNumber: string): Promise<OutboxRequest> {
   const { photos, ...rest } = draft
   const row: OutboxRow = {
     id: `local-${Date.now()}`,
     draft: { ...rest },
+    wagonNumber,
     photos: [...photos],
-    created: date.formatDate(new Date(), 'YYYY-MM-DDTHH:mm'),
+    created: isoDateTime(new Date()),
     author,
     error: '',
   }
@@ -100,28 +107,34 @@ async function reload() {
 }
 
 function toItem(row: OutboxRow): OutboxRequest {
-  return { ...row, draft: row.draft as Omit<RequestDraft, 'photos'> }
+  return { ...row, draft: row.draft as Omit<RequestDraft, 'photos'>, wagonNumber: row.wagonNumber ?? '' }
 }
 
+/** Заявка из очереди в виде строки списка: id — локальный, «local-…». */
+export type QueuedRequest = Omit<RepairRequest, 'id'> & { id: string }
+
 /** Заявка из очереди в виде строки списка: номера ещё нет, место вагона и тип — из выбора при подаче. */
-export function outboxAsRequest(item: OutboxRequest, authorName: string, wagonType = ''): RepairRequest {
+export function outboxAsRequest(item: OutboxRequest, authorName: string, wagonType = 0): QueuedRequest {
   return {
     id: item.id,
     number: '',
     wagon: item.draft.wagon,
+    wagonNumber: item.wagonNumber,
     wagonType,
-    wagonPlace: '',
+    locationType: null,
+    place: null,
     wagonTrip: null,
+    wagonTripName: null,
     wagonStation: null,
     trip: null,
-    service: item.draft.service,
-    fault: item.draft.fault,
-    severity: item.draft.severity,
-    author: { id: item.author, name: authorName },
-    created: item.created,
+    service: faultDefaults(item.draft.faultType).service,
+    faultType: item.draft.faultType,
+    severityType: item.draft.severityType,
+    createdByUsr: { id: item.author, name: authorName },
+    createdDt: item.created,
     description: item.draft.description,
-    status: 'NEW',
-    executor: null,
+    requestStatusType: RequestStatus.NEW,
+    executorUsr: null,
     tor: false,
     forwarded: false,
     photoCount: item.photos.length,

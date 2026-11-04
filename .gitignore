@@ -1,6 +1,9 @@
 # Claude Code project instructions (local only)
 CLAUDE.md
 
+# локальные параметры подключения; образец - .env.sample
+.env
+
 # Ignore IntelliJ IDEA project files
 .idea/
 
@@ -20,7 +23,6 @@ tmp/
 logs/
 notuse/
 _*/
-gradle/wrapper/*.jar
 
 # Ignore OS-specific files
 .DS_Store

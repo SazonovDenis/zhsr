@@ -1,0 +1,13 @@
+#!/bin/bash
+# Запустить окружение разработки в Docker (docker/docker-compose.env.yml): сервер БД PostgreSQL на порту DB_PORT и
+# хранилище файлов S3 на порту S3_PORT.
+# Параметры - в .env; нет .env - копируется из .env.sample. БД приложения и хранилище файлов готовит env-reset.
+#
+#   ./env-start         - все сервисы окружения
+#   ./env-start db      - только указанные (db, s3)
+set -euo pipefail
+cd "$(dirname "$0")"
+
+[ -f .env ] || { cp .env.sample .env; echo '.env создан из .env.sample'; }
+
+docker compose --env-file .env -f docker/docker-compose.env.yml up -d --build "$@"

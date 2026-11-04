@@ -1,6 +1,6 @@
 <template>
   <!-- клики здесь не сворачивают левое меню: до aside они не доходят -->
-  <div ref="blockEl" class="user-block" :class="{ 'user-block--collapsed': collapsed }" @click.stop>
+  <div class="user-block" :class="{ 'user-block--collapsed': collapsed }" @click.stop>
     <!-- блок внизу панели: подменю раскрывается вверх, над пользователем -->
     <div v-if="open" class="user-block__submenu">
       <button
@@ -26,7 +26,7 @@
       class="user-block__user"
       :class="{ 'user-block__user--open': open }"
       :title="collapsed ? `${user.name}, ${roles}` : undefined"
-      @click="open = !open"
+      @click="toggle"
     >
       <SvgIcon name="user" class="user-block__icon" />
       <span v-if="!collapsed" class="user-block__text">
@@ -40,17 +40,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { CurrentUser } from '@/api/session'
 import type { MessageLanguages } from '@/boot/i18n'
 import { i18n, t } from '@/boot/i18n'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
-import { useCloseOnOutside } from '@/shared/composables/useCloseOnOutside'
 import { dictManager } from '@/shared/dict/DictManager'
 import { LOCALES, setLocale } from '@/shared/locale'
 import { logoutUser } from '@/shared/user'
+import { menuState, USER_MENU_GROUP } from './menuState'
 
 /**
  * Текущий пользователь внизу левого меню: иконка, фамилия и роль. Клик по пользователю разворачивает подменю прямо
@@ -67,14 +67,16 @@ const router = useRouter()
 
 const locale = computed(() => i18n.global.locale.value)
 
-// подменю пользователя развёрнуто; сворачивается, как только теряет фокус
-const open = ref(false)
-const blockEl = ref<HTMLElement | null>(null)
-useCloseOnOutside(blockEl, () => (open.value = false))
+// подменю пользователя развёрнуто: оно одна из групп меню (menuState.openGroup)
+const open = computed(() => menuState.openGroup === USER_MENU_GROUP)
+
+function toggle() {
+  menuState.openGroup = open.value ? null : USER_MENU_GROUP
+}
 
 function choose(value: MessageLanguages) {
   setLocale(value)
-  open.value = false
+  menuState.openGroup = null
 }
 
 async function onLogout() {

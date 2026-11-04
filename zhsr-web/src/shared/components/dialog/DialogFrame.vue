@@ -17,6 +17,9 @@
 
       <DialogActions v-if="actions.length > 0" :actions="actions" :action-running="actionRunning" @action="onAction">
         <template #left>
+          <slot name="actions-left" />
+          <!-- общий спиннер диалога: идёт загрузка данных формы -->
+          <q-spinner v-if="busy" color="primary" size="1.5rem" class="dialog-frame__busy" />
           <div v-if="actionsStateText" class="dialog-frame__state">{{ actionsStateText }}</div>
         </template>
       </DialogActions>
@@ -62,6 +65,8 @@ const props = withDefaults(
     actionsStateText?: string
     /** имя действия, которое сейчас выполняется */
     actionRunning?: string | null
+    /** идёт загрузка данных диалога: спиннер в подвале */
+    busy?: boolean
   }>(),
   {
     show: false,
@@ -71,6 +76,7 @@ const props = withDefaults(
     actions: () => [],
     actionsStateText: '',
     actionRunning: null,
+    busy: false,
   },
 )
 
@@ -178,8 +184,12 @@ function onAction(action: DialogAction) {
   overflow-y: auto;
 }
 
+.dialog-frame__busy {
+  flex: none;
+}
+
 .dialog-frame__state {
-  color: #8f2416;
+  color: $zs-error-fg;
   font-size: 0.8125rem;
 }
 </style>

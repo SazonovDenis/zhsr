@@ -2,35 +2,40 @@
   <div class="cb-button">
     <span v-if="label" class="cb-button__label">{{ t(label) }}</span>
 
-    <button
-      v-for="(item, index) in visibleValues"
-      :key="item.id"
-      type="button"
-      :data-index="index"
-      :tabindex="item.id === tabStopId ? 0 : -1"
-      class="cb-button__btn zs-focusable"
-      :class="{ 'cb-button__btn--selected bg-selected text-selected': isSelected(item) }"
-      :disabled="isDisabled(item)"
-      :title="displayOf(item)"
-      @click="onButtonClick(item)"
-      @focus="onItemFocus(item)"
-      @keydown="onItemKeydown($event, item)"
-      @keyup.space.prevent
-    >
-      <span class="cb-button__text">{{ displayOf(item) }}</span>
-      <span v-if="item.count !== undefined" class="cb-button__count">{{ item.count }}</span>
-    </button>
+    <!-- варианты грузятся или не загрузились — на месте кнопок -->
+    <ChoiceSourceState v-if="source && (source.loading || source.error)" :source="source" />
 
-    <CbMoreMenu
-      v-if="hiddenValues.length > 0"
-      class="cb-button__more"
-      tabindex="-1"
-      :values="values"
-      :single="single"
-      :is-selected="isSelected"
-      @keydown="onItemKeydown($event)"
-      @pick="onMenuPick"
-    />
+    <template v-else>
+      <button
+        v-for="(item, index) in visibleValues"
+        :key="item.id"
+        type="button"
+        :data-index="index"
+        :tabindex="item.id === tabStopId ? 0 : -1"
+        class="cb-button__btn zs-focusable"
+        :class="{ 'cb-button__btn--selected bg-selected text-selected': isSelected(item) }"
+        :disabled="isDisabled(item)"
+        :title="displayOf(item)"
+        @click="onButtonClick(item)"
+        @focus="onItemFocus(item)"
+        @keydown="onItemKeydown($event, item)"
+        @keyup.space.prevent
+      >
+        <span class="cb-button__text">{{ displayOf(item) }}</span>
+        <span v-if="item.count !== undefined" class="cb-button__count">{{ item.count }}</span>
+      </button>
+
+      <CbMoreMenu
+        v-if="hiddenValues.length > 0"
+        class="cb-button__more"
+        tabindex="-1"
+        :values="values"
+        :single="single"
+        :is-selected="isSelected"
+        @keydown="onItemKeydown($event)"
+        @pick="onMenuPick"
+      />
+    </template>
   </div>
 </template>
 
@@ -39,6 +44,7 @@ import { t } from '@/boot/i18n'
 import type { ChoiceItem } from './choice'
 import { displayOf, isDisabled } from './choice'
 import CbMoreMenu from './CbMoreMenu.vue'
+import ChoiceSourceState from './ChoiceSourceState.vue'
 import type { ButtonChoiceEmit, ButtonChoiceProps } from './useButtonChoice'
 import { useButtonChoice } from './useButtonChoice'
 
@@ -59,6 +65,7 @@ const props = withDefaults(defineProps<ButtonChoiceProps & { label?: string }>()
   hidden: () => [],
   maxButtonCount: 3,
   modelValue: null,
+  source: null,
   label: '',
 })
 

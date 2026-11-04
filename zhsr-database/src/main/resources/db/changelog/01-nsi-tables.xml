@@ -24,10 +24,16 @@
                 <constraints nullable="false"/>
             </column>
             <column name="phone" type="varchar(20)"/>
-            <column name="active" type="boolean" defaultValueBoolean="true">
+            <!-- отключён: войти нельзя; сотрудник не удаляется, а отключается -->
+            <column name="disabled" type="boolean" defaultValueBoolean="false">
                 <constraints nullable="false"/>
             </column>
-            <column name="created_dt" type="timestamp" defaultValueComputed="now()">
+            <!-- сменить пароль при входе: пароль задал администратор (или пароль по умолчанию); до смены пароля
+                 сервер разрешает только смену пароля, если в .env не задано dev=true -->
+            <column name="change_password" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_dt" type="timestamptz" defaultValueComputed="now()">
                 <constraints nullable="false"/>
             </column>
         </createTable>
@@ -35,7 +41,7 @@
 
     <changeSet id="01-nsi-tables-station" author="zhsr">
         <createTable tableName="station">
-            <column name="id" type="bigint">
+            <column name="id" type="bigint" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
             <column name="code" type="varchar(20)">
@@ -44,13 +50,15 @@
             <column name="name" type="varchar(255)">
                 <constraints nullable="false"/>
             </column>
+            <!-- точка станции на карте: одна из крайних точек её перегонов; пусто - у станции нет перегонов -->
+            <column name="stage_point" type="bigint"/>
         </createTable>
     </changeSet>
 
     <!-- перегон: ребро графа железных дорог между двумя станциями; from_station < to_station, направление не важно -->
     <changeSet id="01-nsi-tables-stage" author="zhsr">
         <createTable tableName="stage">
-            <column name="id" type="bigint">
+            <column name="id" type="bigint" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
             <column name="from_station" type="bigint">
@@ -65,17 +73,42 @@
         </createTable>
     </changeSet>
 
+    <!-- точка линии перегона для рисунка пути на карте: x - долгота, y - широта (WGS 84); точки идут по порядку seq
+         от from_station к to_station, первая и последняя точки - сами станции -->
+    <changeSet id="01-nsi-tables-stage_point" author="zhsr">
+        <createTable tableName="stage_point">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="stage" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="seq" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="x" type="numeric(9,6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="y" type="numeric(9,6)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
     <changeSet id="01-nsi-tables-depot" author="zhsr">
         <createTable tableName="depot">
-            <column name="id" type="bigint">
+            <column name="id" type="bigint" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
             <column name="code" type="varchar(20)">
                 <constraints nullable="false"/>
             </column>
+            <!-- название: name - на русском, name_kk - на казахском, name_en - на английском -->
             <column name="name" type="varchar(255)">
                 <constraints nullable="false"/>
             </column>
+            <column name="name_kk" type="varchar(255)"/>
+            <column name="name_en" type="varchar(255)"/>
             <column name="station" type="bigint"/>
         </createTable>
     </changeSet>
@@ -96,7 +129,7 @@
         </createTable>
     </changeSet>
 
-    <!-- Справочники: id, text, code - одноимённые колонки doc/dict/<таблица>.tsv; description из tsv - только в документации -->
+    <!-- Справочники: id, text, code - одноимённые колонки db/dict/<таблица>.tsv; description из tsv - только в документации -->
 
     <!-- пассажирский, грузовой -->
     <changeSet id="01-nsi-tables-transport_type" author="zhsr">
@@ -236,7 +269,7 @@
     <!-- Тип вагона: купейный, плацкартный и т. п. -->
     <changeSet id="01-nsi-tables-wagon_type" author="zhsr">
         <createTable tableName="wagon_type">
-            <column name="id" type="bigint">
+            <column name="id" type="bigint" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
             <column name="text" type="varchar(255)">
@@ -251,7 +284,7 @@
     <!-- Модель вагона: Тулпар-Тальго, Stadler и т. п. -->
     <changeSet id="01-nsi-tables-model_type" author="zhsr">
         <createTable tableName="model_type">
-            <column name="id" type="bigint">
+            <column name="id" type="bigint" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
             <column name="text" type="varchar(255)">
@@ -276,6 +309,8 @@
             </column>
             <column name="model_type" type="bigint"/>
             <column name="build_year" type="integer"/>
+            <!-- завод-изготовитель вагона -->
+            <column name="maker" type="varchar(255)"/>
             <!-- dbeg - дата ввода вагона в эксплуатацию, dend - дата вывода из эксплуатации; dend пуст - вагон в эксплуатации -->
             <column name="dbeg" type="date">
                 <constraints nullable="false"/>
@@ -297,6 +332,7 @@
             <column name="name" type="varchar(255)">
                 <constraints nullable="false"/>
             </column>
+            <!-- время в пути, мин -->
             <column name="duration" type="integer">
                 <constraints nullable="false"/>
             </column>
@@ -308,8 +344,8 @@
                 <constraints nullable="false"/>
             </column>
             <column name="dend" type="date"/>
-            <!-- разовый маршрут: поезд без расписания -->
-            <column name="one_time" type="boolean" defaultValueBoolean="false">
+            <!-- вид маршрута: константы RouteKind в коде (1 - регулярный, 2 - разовый: поезд без расписания) -->
+            <column name="route_kind" type="integer">
                 <constraints nullable="false"/>
             </column>
             <column name="transport_type" type="bigint">
@@ -332,7 +368,20 @@
             <column name="station" type="bigint">
                 <constraints nullable="false"/>
             </column>
+            <!-- расстояние от начальной станции маршрута -->
             <column name="km" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <!-- остановка поезда; false - станция следования, поезд проходит её без остановки -->
+            <column name="have_stop" type="boolean">
+                <constraints nullable="false"/>
+            </column>
+            <!-- время в пути от предыдущей станции маршрута, мин; у начальной станции 0 -->
+            <column name="run_duration" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <!-- стоянка, мин; у станций следования, начальной и конечной станций 0 -->
+            <column name="stop_duration" type="integer">
                 <constraints nullable="false"/>
             </column>
         </createTable>
@@ -404,7 +453,7 @@
     <!-- группа неисправностей: группа DIN, раздел экипировки или уборки -->
     <changeSet id="01-nsi-tables-fault_group_type" author="zhsr">
         <createTable tableName="fault_group_type">
-            <column name="id" type="bigint">
+            <column name="id" type="bigint" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
             <column name="code" type="varchar(20)">
@@ -439,7 +488,8 @@
                 <constraints nullable="false"/>
             </column>
             <column name="service" type="bigint"/>
-            <column name="active" type="boolean" defaultValueBoolean="true">
+            <!-- отключён: не предлагается при подаче заявки; тип неисправности с заявками не удаляется, а отключается -->
+            <column name="disabled" type="boolean" defaultValueBoolean="false">
                 <constraints nullable="false"/>
             </column>
         </createTable>
@@ -488,10 +538,10 @@
             <column name="depot" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="dbeg" type="timestamp">
+            <column name="dbeg" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
-            <column name="dend" type="timestamp"/>
+            <column name="dend" type="timestamptz"/>
         </createTable>
     </changeSet>
 
@@ -522,10 +572,26 @@
             <column name="category_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="dbeg" type="timestamp">
+            <column name="dbeg" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
-            <column name="dend" type="timestamp"/>
+            <column name="dend" type="timestamptz"/>
+        </createTable>
+    </changeSet>
+
+    <!-- версия справочника для DictManager: меняется при каждом изменении справочника; name - имя справочника на фронте
+         (WagonState, Depot, Station ...) -->
+    <changeSet id="01-nsi-tables-dict_version" author="zhsr">
+        <createTable tableName="dict_version">
+            <column name="name" type="varchar(50)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="version" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="changed_dt" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
     </changeSet>
 

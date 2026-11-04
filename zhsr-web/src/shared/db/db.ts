@@ -42,11 +42,13 @@ export interface OutboxRow {
   id: string
   /** черновик заявки без фото (RequestDraft) */
   draft: Record<string, unknown>
+  /** номер вагона — для показа заявки в очереди: в черновике вагон — id; у записей до этого поля его нет */
+  wagonNumber?: string
   photos: Blob[]
   /** когда подана, ISO */
   created: string
   /** автор — id сотрудника */
-  author: string
+  author: number
   /** текст последней ошибки отправки, кроме ошибки связи; пусто — ошибок не было */
   error: string
 }

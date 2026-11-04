@@ -1,0 +1,2 @@
+id	login	full_name	password_hash	change_password	created_dt	description
+1	admin	Администратор	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.	true	2026-01-01 00:00:00+05:00	пароль по умолчанию 123456; сменить при первом входе

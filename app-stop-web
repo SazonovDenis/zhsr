@@ -1,0 +1,10 @@
+#!/bin/sh
+# Остановить веб-клиент zhsr-web: окно xterm и все dev-серверы Quasar этого проекта, в том числе оставшиеся
+# без окна (запущенные в фоне из другого терминала) - их вывод в чужой терминал может заблокировать сервер.
+cd "$(dirname "$0")"
+
+if [ -f ./.zhsr-web.pid ]; then
+    kill "$(cat ./.zhsr-web.pid)" 2>/dev/null || true
+    rm -f ./.zhsr-web.pid
+fi
+pkill -f "$PWD/zhsr-web/node_modules/.bin/quasar dev" 2>/dev/null || true

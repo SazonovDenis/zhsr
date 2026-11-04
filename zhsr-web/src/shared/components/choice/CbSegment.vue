@@ -2,34 +2,39 @@
   <div class="cb-segment">
     <span v-if="label" class="cb-segment__label">{{ t(label) }}</span>
 
-    <button
-      v-for="(item, index) in visibleValues"
-      :key="item.id"
-      type="button"
-      :data-index="index"
-      :tabindex="item.id === tabStopId ? 0 : -1"
-      class="cb-segment__item zs-focusable"
-      :class="{ 'cb-segment__item--active bg-selected text-selected': isSelected(item) }"
-      :disabled="isDisabled(item)"
-      :title="displayOf(item)"
-      @click="onButtonClick(item)"
-      @focus="onItemFocus(item)"
-      @keydown="onItemKeydown($event, item)"
-      @keyup.space.prevent
-    >
-      {{ displayOf(item) }}
-    </button>
+    <!-- варианты грузятся или не загрузились — на месте кнопок -->
+    <ChoiceSourceState v-if="source && (source.loading || source.error)" :source="source" />
 
-    <CbMoreMenu
-      v-if="hiddenValues.length > 0"
-      class="cb-segment__more"
-      tabindex="-1"
-      :values="values"
-      :single="single"
-      :is-selected="isSelected"
-      @keydown="onItemKeydown($event)"
-      @pick="onMenuPick"
-    />
+    <template v-else>
+      <button
+        v-for="(item, index) in visibleValues"
+        :key="item.id"
+        type="button"
+        :data-index="index"
+        :tabindex="item.id === tabStopId ? 0 : -1"
+        class="cb-segment__item zs-focusable"
+        :class="{ 'cb-segment__item--active bg-selected text-selected': isSelected(item) }"
+        :disabled="isDisabled(item)"
+        :title="displayOf(item)"
+        @click="onButtonClick(item)"
+        @focus="onItemFocus(item)"
+        @keydown="onItemKeydown($event, item)"
+        @keyup.space.prevent
+      >
+        {{ displayOf(item) }}
+      </button>
+
+      <CbMoreMenu
+        v-if="hiddenValues.length > 0"
+        class="cb-segment__more"
+        tabindex="-1"
+        :values="values"
+        :single="single"
+        :is-selected="isSelected"
+        @keydown="onItemKeydown($event)"
+        @pick="onMenuPick"
+      />
+    </template>
   </div>
 </template>
 
@@ -38,6 +43,7 @@ import { t } from '@/boot/i18n'
 import type { ChoiceItem } from './choice'
 import { displayOf, isDisabled } from './choice'
 import CbMoreMenu from './CbMoreMenu.vue'
+import ChoiceSourceState from './ChoiceSourceState.vue'
 import type { ButtonChoiceEmit, ButtonChoiceProps } from './useButtonChoice'
 import { useButtonChoice } from './useButtonChoice'
 
@@ -57,6 +63,7 @@ const props = withDefaults(defineProps<ButtonChoiceProps & { label?: string }>()
   hidden: () => [],
   maxButtonCount: 3,
   modelValue: null,
+  source: null,
   label: '',
 })
 

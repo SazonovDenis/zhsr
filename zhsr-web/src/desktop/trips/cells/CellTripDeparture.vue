@@ -1,17 +1,17 @@
 <template>
-  <DictBadge :id="row.state" dict="TripState" class="cell-trip-departure__state" />
-  <div>{{ formatDateTime(row.planned) }}</div>
-  <div class="zs-sub">{{ formatDateTime(row.fact) }}</div>
+  <DictBadge :id="row.tripStatusType" dict="TripState" class="cell-trip-departure__state" />
+  <div>{{ formatDateTime(row.plannedDt) }}</div>
+  <div class="zs-sub">{{ formatDateTime(row.departedDt) }}</div>
 </template>
 
 <script setup lang="ts">
-import type { Trip } from '@/api/trips'
+import type { TripRow } from '@/api/trips'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import type { CellProps } from '@/shared/components/table/types'
 import { formatDateTime } from '@/shared/format'
 
 /** Отправление: состояние рейса, плановое время и фактическое второй строкой. */
-defineProps<CellProps<Trip>>()
+defineProps<CellProps<TripRow>>()
 </script>
 
 <style scoped lang="scss">

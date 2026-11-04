@@ -1,0 +1,171 @@
+<mxfile host="drawio-plugin" modified="2026-11-03T22:42:50.937Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36" version="22.1.22" etag="wJmT3-QRwMicy3A4Jvh-" type="embed">
+  <diagram id="request-transitions" name="Статусы заявки">
+    <mxGraphModel dx="1820" dy="1437" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="new" value="Новая" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fontSize=20;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="360" y="500" width="240" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="assigned" value="Назначена" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fontSize=20;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="360" y="120" width="240" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="progress" value="В работе" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fontSize=20;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="960" y="500" width="240" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="done" value="Выполнена" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fontSize=20;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+          <mxGeometry x="1560" y="500" width="240" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="closed" value="Закрыта&lt;br style=&quot;font-size: 20px;&quot;&gt;(конечный статус)" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fontSize=20;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=3;" parent="1" vertex="1">
+          <mxGeometry x="2100" y="500" width="240" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="deferred" value="Отложена до ТО" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fontSize=20;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+          <mxGeometry x="1260" y="120" width="240" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="rejected" value="Отклонена&lt;br style=&quot;font-size: 20px;&quot;&gt;(конечный статус)" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fontSize=20;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=3;" parent="1" vertex="1">
+          <mxGeometry x="660" y="900" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="cancelled" value="Отменена (конечный статус)" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fontSize=20;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=3;" parent="1" vertex="1">
+          <mxGeometry x="200" y="1200" width="1800" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="e_start_new" value="Подача заявки (Ф-ЗАЯ-01)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;entryX=0;entryY=0.375;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" target="new" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="90" y="560" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="140" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_new_assigned" value="Назначение исполнителя (Ф-ЗАЯ-02)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.3;exitY=0;exitDx=0;exitDy=0;entryX=0.3;entryY=1;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="new" target="assigned" edge="1">
+          <mxGeometry x="-0.4545" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_assigned_new" value="Снятие назначения (Ф-ЗАЯ-02)&lt;br style=&quot;font-size: 18px;&quot;&gt;Передать в депо (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="assigned" target="new" edge="1">
+          <mxGeometry x="-0.4545" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_new_new" value="Передать в депо (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.625;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="new" target="new" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="396" y="720" />
+              <mxPoint x="320" y="720" />
+              <mxPoint x="320" y="600" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_new_progress" value="Взять в работу (Ф-ЗАЯ-03)&lt;br style=&quot;font-size: 18px;&quot;&gt;ТОР — отцепить вагон (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="new" target="progress" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_assigned_progress" value="Взять в работу (Ф-ЗАЯ-03)&lt;br style=&quot;font-size: 18px;&quot;&gt;ТОР — отцепить вагон (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="assigned" target="progress" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1020" y="240" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_progress_new" value="Снять себя (Ф-ЗАЯ-03)&lt;br style=&quot;font-size: 18px;&quot;&gt;Передать в депо (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="progress" target="new" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_progress_progress" value="ТОР — отцепить вагон (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.9;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.8;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="progress" target="progress" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1176" y="760" />
+              <mxPoint x="1360" y="760" />
+              <mxPoint x="1360" y="628" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_progress_done" value="Выполнено (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="progress" target="done" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_done_progress" value="Вернуть на доработку (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="done" target="progress" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1632" y="840" />
+              <mxPoint x="1080" y="840" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_done_closed" value="Принять работу (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="done" target="closed" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_new_deferred" value="Отложить до ТО (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.9;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="new" target="deferred" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="576" y="380" />
+              <mxPoint x="1320" y="380" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_assigned_deferred" value="Отложить до ТО (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="assigned" target="deferred" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_progress_deferred" value="Отложить до ТО (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.85;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="progress" target="deferred" edge="1">
+          <mxGeometry x="-0.6153" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1164" y="232" />
+            </Array>
+            <mxPoint y="1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_deferred_progress" value="Взять в работу (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.2;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="deferred" target="progress" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1380" y="532" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_new_rejected" value="Отклонить (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="new" target="rejected" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="504" y="960" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_assigned_rejected" value="Отклонить (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.3;entryY=1;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="assigned" target="rejected" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="240" y="200" />
+              <mxPoint x="240" y="1100" />
+              <mxPoint x="732" y="1100" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_progress_rejected" value="Не выполнено (Ф-ЗАЯ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="progress" target="rejected" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1032" y="960" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_new_cancelled" value="Отменить (Ф-ЗАЯ-07)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.1356;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="new" target="cancelled" edge="1">
+          <mxGeometry x="-0.5927" relative="1" as="geometry">
+            <mxPoint y="1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_assigned_cancelled" value="Отменить (Ф-ЗАЯ-07)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=0.0556;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="assigned" target="cancelled" edge="1">
+          <mxGeometry x="0.85" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="300" y="248" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_progress_cancelled" value="Отменить (Ф-ЗАЯ-07)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.5022;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="progress" target="cancelled" edge="1">
+          <mxGeometry x="0.7" relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_done_cancelled" value="Отменить (Ф-ЗАЯ-07)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.8489;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="done" target="cancelled" edge="1">
+          <mxGeometry x="0.7" relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_deferred_cancelled" value="Отменить (Ф-ЗАЯ-07)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.9444;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;" parent="1" source="deferred" target="cancelled" edge="1">
+          <mxGeometry x="0.7" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1900" y="200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -41,7 +41,7 @@ async function loadState() {
   try {
     requests.value = (await loadCached('state', fetchCurrentState)).data.counters.requests ?? 0
   } catch {
-    // без связи и без копии счётчик просто не показывается
+    // счётчик: ошибку осознанно не показываем — без связи и без копии счётчик просто не виден
   }
 }
 

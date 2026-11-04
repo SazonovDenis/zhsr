@@ -1,7 +1,7 @@
 <template>
-  <PwaPage :back="goBack" :title="r ? faultName(r.fault) : t('Заявка')" :subtitle="subtitle">
-    <div v-if="card.loading.value && !r" class="card__muted">{{ t('Загрузка…') }}</div>
-    <div v-if="card.error.value" class="card__error">{{ card.error.value }}</div>
+  <PwaPage :back="goBack" :title="r ? faultName(r.faultType) : t('Заявка')" :subtitle="subtitle">
+    <LoadSpinner v-if="busy.active.value && !r" />
+    <ErrorBox v-if="card.error.value" :error="card.error.value" :retry="r ? null : card.load" class="card__error" />
     <div v-if="!queuedItem && !r && !card.loading.value && !card.error.value" class="card__muted">
       {{ t('Заявка не найдена') }}
     </div>
@@ -13,12 +13,12 @@
 
       <div class="card__badges">
         <span v-if="queuedItem" class="zs-badge card__queued">{{ t('Ожидает отправки') }}</span>
-        <DictBadge v-else :id="r.status" dict="RequestStatus" />
-        <span :style="severityStyle(r.severity)">{{ dictManager.getValue('Severity', r.severity) }}</span>
+        <DictBadge v-else :id="r.requestStatusType" dict="RequestStatus" />
+        <span :style="severityStyle(r.severityType)">{{ dictManager.getValue('Severity', r.severityType) }}</span>
         <span v-if="r.forwarded" class="card__muted">{{ t('передана в депо') }}</span>
       </div>
 
-      <RequestSteps :status="r.status" :queued="!!queuedItem" large />
+      <RequestSteps :status="r.requestStatusType" :queued="!!queuedItem" large />
       <div class="card__next">
         <span class="card__section-title">{{ t('Что дальше') }}</span>
         <span class="card__next-text">{{ nextText(r, !!queuedItem) }}</span>
@@ -29,7 +29,7 @@
         <div class="card__attrs">
           <span>{{ t('Вагон') }}</span>
           <span>
-            <span class="zs-mono">{{ r.wagon }}</span>
+            <span class="zs-mono">{{ r.wagonNumber }}</span>
             <template v-if="r.wagonType"> • {{ dictManager.getValue('WagonType', r.wagonType) }}</template>
           </span>
           <span>{{ t('Рейс') }}</span>
@@ -37,20 +37,20 @@
           <span>{{ t('Служба') }}</span>
           <span>{{ dictManager.getValue('Service', r.service) }}</span>
           <span>{{ t('Автор') }}</span>
-          <span>{{ r.author.name }}</span>
+          <span>{{ r.createdByUsr.name }}</span>
           <span>{{ t('Исполнитель') }}</span>
           <span>
             <select
               v-if="card.assignable.value"
               class="card__select"
-              :value="r.executor?.id ?? ''"
+              :value="r.executorUsr?.id ?? ''"
               :disabled="card.blocked.value"
               @change="onAssign"
             >
               <option value="">{{ t('Не назначен') }}</option>
               <option v-for="u in staffOptions" :key="u.id" :value="u.id">{{ u.name }}</option>
             </select>
-            <template v-else>{{ r.executor?.name ?? t('не назначен') }}</template>
+            <template v-else>{{ r.executorUsr?.name ?? t('не назначен') }}</template>
           </span>
         </div>
         <PhotoStrip v-if="photos.length > 0" :photos="photos" />
@@ -63,7 +63,7 @@
             {{ t('Добавить пояснение') }}
           </button>
         </div>
-        <RequestHistory :events="detail.events" :status="detail.status" large />
+        <RequestHistory :events="detail.events" :status="detail.requestStatusType" large />
       </section>
     </template>
 
@@ -145,9 +145,13 @@ import { useRouter } from 'vue-router'
 import type { RepairRequest, RequestPhoto } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import DictBadge from '@/shared/components/DictBadge.vue'
+import { provideBusy } from '@/shared/busy'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
+import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { formatDateTime } from '@/shared/format'
 import { isOnline } from '@/shared/network'
+import type { QueuedRequest } from '@/shared/offline/outbox'
 import { outboxAsRequest, outboxItem } from '@/shared/offline/outbox'
 import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
 import PhotoStrip from '@/shared/requests/PhotoStrip.vue'
@@ -172,9 +176,11 @@ const props = defineProps<{ id: string }>()
 const router = useRouter()
 
 const queuedItem = computed(() => (props.id.startsWith('local-') ? outboxItem(props.id) : null))
-const serverId = computed(() => (props.id.startsWith('local-') ? null : props.id))
+const serverId = computed(() => (props.id.startsWith('local-') ? null : Number(props.id)))
 
-const card = useRequestCard(serverId, true)
+// общее ожидание страницы: спиннер на месте карточки — на всю цепочку загрузок
+const busy = provideBusy()
+const card = useRequestCard(serverId, true, busy)
 
 // заявка из очереди ушла на сервер, пока открыта её карточка, — номер присвоен, возвращаемся в список
 watch(queuedItem, (now, before) => {
@@ -182,7 +188,7 @@ watch(queuedItem, (now, before) => {
 })
 
 const detail = computed(() => card.request.value)
-const r = computed<RepairRequest | null>(() => {
+const r = computed<RepairRequest | QueuedRequest | null>(() => {
   const q = queuedItem.value
   if (q) return outboxAsRequest(q, currentUser.value?.name ?? '')
   return detail.value
@@ -207,7 +213,7 @@ const photos = computed<RequestPhoto[]>(() =>
 const subtitle = computed(() => {
   if (!r.value) return ''
   const number = queuedItem.value ? t('номер присвоят при отправке') : r.value.number
-  return `${number} • ${formatDateTime(r.value.created)}`
+  return `${number} • ${formatDateTime(r.value.createdDt)}`
 })
 
 const hasBar = computed(() => !queuedItem.value && (card.actions.value.length > 0 || card.editable.value))
@@ -215,13 +221,13 @@ const hasBar = computed(() => !queuedItem.value && (card.actions.value.length > 
 // исполнитель — из сотрудников службы заявки; текущий исполнитель есть в списке всегда
 const staffOptions = computed(() => {
   const list = card.staff.value
-  const current = detail.value?.executor
+  const current = detail.value?.executorUsr
   return current && !list.some((u) => u.id === current.id) ? [current, ...list] : list
 })
 
 function onAssign(e: Event) {
   const value = (e.target as HTMLSelectElement).value
-  void card.assign(value || null)
+  void card.assign(value ? Number(value) : null)
 }
 
 // пояснение
@@ -270,8 +276,8 @@ function goBack() {
 .card__error {
   padding: 0.625rem 0.875rem;
   border-radius: 0.25rem;
-  background: #fbe5e1;
-  color: #8f2416;
+  background: $zs-error-bg;
+  color: $zs-error-fg;
   font-size: 0.8125rem;
 }
 
@@ -279,7 +285,7 @@ function goBack() {
   padding: 0.625rem 0.875rem;
   border-radius: 0.25rem;
   background: #fbe1de;
-  color: #8f2416;
+  color: $zs-error-fg;
   font-size: 0.8125rem;
   font-weight: 700;
 }
@@ -324,6 +330,17 @@ function goBack() {
   margin: 0 -1rem;
   padding: 1rem 1rem 0;
   border-top: 0.0625rem solid $zs-border;
+}
+
+.card__section > .card__section-title,
+.card__section-head {
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.75rem)
+  margin-bottom: calc(-0.75rem / 3);
+}
+
+.card__next > .card__section-title {
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.25rem)
+  margin-bottom: calc(-0.25rem / 3);
 }
 
 .card__section-head {

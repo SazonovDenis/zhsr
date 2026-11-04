@@ -1,6 +1,6 @@
 <template>
   <div class="zs-mono">{{ row.number }}</div>
-  <div class="zs-sub">{{ formatDateTime(row.created) }}</div>
+  <div class="zs-sub">{{ formatDateTime(row.createdDt) }}</div>
 </template>
 
 <script setup lang="ts">

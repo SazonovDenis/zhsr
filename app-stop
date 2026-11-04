@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e  
+
+
+
+#
+./app-stop-web
+
+
+#
+if [ -f ./.zhsr-app.pid ]; then
+    kill "$(cat ./.zhsr-app.pid)" 2>/dev/null || true
+    rm -f ./.zhsr-app.pid
+fi
+

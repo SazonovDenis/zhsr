@@ -21,6 +21,10 @@ $zs-text: #1a1c1f;
 $zs-text-muted: #62666d;
 $zs-text-faint: #8a8e95;
 
+// ошибка: блок ошибки (ErrorBox), всплывашка ошибки (notifyError), тексты ошибок
+$zs-error-bg: #fbe5e1;
+$zs-error-fg: #8f2416;
+
 // рамки и фоны
 $zs-border: #d9dbdf;
 $zs-border-input: #d9dbdf;
@@ -57,8 +61,23 @@ $zs-row-hover-bg: #f8f9fe;
 $zs-panel-head-bg: transparent;
 $zs-panel-close-bg: $zs-bg-header;
 
-// точка остановки на схеме маршрута
+// схема маршрута: станции по порядку (RouteStops) и маршрут на карте (RouteMap) — одно оформление
+// остановка — заполненная точка
 $zs-route-dot: #5b77c9;
+$zs-route-stop-size: 0.6rem;
+// станция следования — пустое кольцо
+$zs-route-pass-size: 0.5rem;
+$zs-route-pass-ring: 0.1rem;
+$zs-route-pass-ring-color: $zs-border-input;
+$zs-route-pass-bg: #fff;
+// линия пути между станциями
+$zs-route-line: $zs-border-input;
+$zs-route-line-width: 0.1rem;
+// названия станций: остановка — жирным, станция следования — бледным
+$zs-route-name-size: 0.875rem;
+$zs-route-stop-name: $zs-text;
+$zs-route-stop-weight: 700;
+$zs-route-pass-name: $zs-text-faint;
 
 // шрифты
 $zs-font: 'IBM Plex Sans', system-ui, sans-serif;

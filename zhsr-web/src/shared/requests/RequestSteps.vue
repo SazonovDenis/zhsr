@@ -19,7 +19,7 @@ import { requestSteps } from './requestView'
  * Путь заявки «Подана → В работе → Выполнена → Закрыта»: пройденные шаги отмечены галочкой, текущий — обведён.
  * large — крупнее, для телефона.
  */
-const props = withDefaults(defineProps<{ status: string; queued?: boolean; large?: boolean }>(), {
+const props = withDefaults(defineProps<{ status: number; queued?: boolean; large?: boolean }>(), {
   queued: false,
   large: false,
 })

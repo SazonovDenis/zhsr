@@ -3,7 +3,29 @@ plugins {
 }
 
 dependencies {
+    // Библиотеки kis-smart-catalog: собираются там командой build-lib, копируются из её out/ в lib/
+    implementation files("$rootDir/lib/kis-dbtools-0.0.1.jar", "$rootDir/lib/kis-core-0.0.1.jar")
+
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    // WebSocket (STOMP): команды обновления справочников фронту (канал dict-manager)
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.postgresql:postgresql'
+    // хранилище файлов S3 (фото заявок) - клиент MinIO, как в kis-smart-catalog
+    implementation 'io.minio:minio:8.5.12'
+    // кэш вошедших пользователей (CurrentUserService)
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+
+    // Зависимости kis-core и kis-dbtools: в plain jar их нет
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'commons-io:commons-io:2.17.0'
+    implementation 'org.apache.commons:commons-text:1.13.0'
+
+    // Lombok: геттеры и сеттеры DTO, у которых есть наследник
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
     // миграции Liquibase применяются при старте приложения
     implementation project(':zhsr-database')
 }

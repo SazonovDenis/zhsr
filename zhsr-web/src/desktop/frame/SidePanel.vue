@@ -8,10 +8,12 @@
           <div class="side-panel__title">{{ title }}</div>
           <div v-if="subtitle" class="side-panel__subtitle">{{ subtitle }}</div>
         </div>
-        <button type="button" class="side-panel__close" :title="t('Закрыть')" @click="emit('close')">✕</button>
+        <button v-if="closable" type="button" class="side-panel__close" :title="t('Закрыть')" @click="emit('close')">
+          ✕
+        </button>
       </div>
 
-      <div class="side-panel__body">
+      <div class="side-panel__body" :class="{ 'side-panel__body--fixed': !scroll }">
         <slot />
       </div>
     </template>
@@ -22,15 +24,24 @@
 import { t } from '@/boot/i18n'
 
 /**
- * Оформление правой панели фрейма по макету: заголовок, подзаголовок, крестик закрытия и тело (слот default).
+ * Оформление правой панели фрейма по макету: заголовок, подзаголовок, крестик закрытия (closable) и тело (слот
+ * default).
  * Пока в списке ничего не выбрано, панель показывает подсказку empty («Выберите вагон в списке») — текст на русском,
  * переводится при показе.
+ *
+ * Тело прокручивается целиком (scroll); scroll = false — тело не прокручивается, прокрутку внутри себя делает
+ * содержимое: например, только список остановок, а атрибуты над ним стоят на месте.
  */
-withDefaults(defineProps<{ title?: string; subtitle?: string; empty?: string }>(), {
-  title: '',
-  subtitle: '',
-  empty: '',
-})
+withDefaults(
+  defineProps<{ title?: string; subtitle?: string; empty?: string; scroll?: boolean; closable?: boolean }>(),
+  {
+    title: '',
+    subtitle: '',
+    empty: '',
+    scroll: true,
+    closable: true,
+  },
+)
 
 const emit = defineEmits<{ close: [] }>()
 </script>
@@ -92,7 +103,12 @@ const emit = defineEmits<{ close: [] }>()
   flex: 1;
   flex-direction: column;
   gap: 1.375rem;
+  min-height: 0;
   padding: 1.125rem 1.5rem;
   overflow-y: auto;
+
+  &--fixed {
+    overflow-y: hidden;
+  }
 }
 </style>

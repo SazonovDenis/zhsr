@@ -72,7 +72,7 @@
     </div>
 
     <!-- выпадающий список -->
-    <Teleport to="body">
+    <Teleport :to="dropdownHost">
       <div
         v-if="isOpen"
         ref="dropdownEl"
@@ -104,7 +104,10 @@
           <span>{{ t('Добавить') }}: {{ customCandidates.join(', ') }}</span>
         </div>
 
-        <div ref="optionsEl" class="cb-list__options">
+        <!-- варианты грузятся или не загрузились — спиннер или ошибка вместо вариантов -->
+        <div v-if="source?.loading" class="cb-list__state"><q-spinner color="primary" size="1.5rem" /></div>
+        <ErrorBox v-else-if="source?.error" :error="source.error" :retry="retrySource" class="cb-list__error" />
+        <div v-else ref="optionsEl" class="cb-list__options">
           <div
             v-for="(item, index) in filtered"
             :key="item.id"
@@ -144,9 +147,11 @@
 
 <script setup lang="ts">
 import type { QInput } from 'quasar'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 import { t } from '@/boot/i18n'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
+import type { Loadable } from '@/shared/loadable'
 import { isMobile } from '@/shared/device'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { screenScale } from '@/shared/screen'
@@ -181,7 +186,7 @@ import { displayOf, effectiveOf, isDisabled, labelOf, modelIds, modelOf, nextEna
  * Слот option — свой вид строки списка, например с пометкой и числом справа; данные для него — в item.data.
  * Слот value (single) — свой вид выбранного значения в поле, пока список закрыт; с началом ввода на его месте
  * обычное поле поиска. item.search — дополнительный текст для поиска: «Карага» находит маршрут через Караганду.
- * Сложный вид строки собирается в предметном компоненте поверх CbList (пример — RouteChoice), сам CbList про
+ * Сложный вид строки собирается в предметном компоненте поверх CbList (пример — RouteOption), сам CbList про
  * предметную область не знает.
  * Событие open — список открывается: значения, которые зависят от обстоятельств, можно загрузить в этот момент.
  */
@@ -200,6 +205,11 @@ const props = withDefaults(
     /** текст строки ввода вместо «Поиск...» */
     customPlaceholder?: string
     noSearch?: boolean
+    /**
+     * источник вариантов: в открытом списке спиннер или ошибка вместо вариантов; открыли список после ошибки —
+     * загрузка заново (source.retry); null — варианты уже есть
+     */
+    source?: Loadable | null
   }>(),
   {
     single: false,
@@ -211,6 +221,7 @@ const props = withDefaults(
     customParse: null,
     customPlaceholder: '',
     noSearch: false,
+    source: null,
   },
 )
 
@@ -416,17 +427,40 @@ function onSingleInput(e: Event) {
   query.value = event.inputType === 'insertText' && event.data ? event.data : text
 }
 
-/** mousedown в поле и списке не забирает фокус у поля ввода: иначе фокус ушёл бы, и список закрылся. */
+/**
+ * mousedown в поле и списке не забирает фокус у поля ввода: иначе фокус ушёл бы, и список закрылся. Кнопка «повторить»
+ * в ошибке загрузки тоже не забирает фокус: по нажатию ошибка сменяется загрузкой, кнопка с фокусом исчезает, и список
+ * закрылся бы.
+ */
 function keepFocus(e: MouseEvent) {
   const target = e.target as HTMLElement
-  if (!target.closest('input, button')) e.preventDefault()
+  if (!target.closest('input, button') || target.closest('.error-box')) e.preventDefault()
 }
 
-/** Фокус ушёл из поля и списка — список закрывается; переход фокуса между ними список не трогает. */
+/**
+ * Фокус ушёл из поля и списка — список закрывается; переход фокуса между ними список не трогает. Пока повторяется
+ * загрузка вариантов (retrySource), уход фокуса список тоже не закрывает: ошибка с кнопкой «повторить» сменяется
+ * спиннером, и браузер снимает фокус с исчезнувшей кнопки.
+ */
 function onFocusOut(e: FocusEvent) {
+  if (retrying) return
   const next = e.relatedTarget as Node | null
   if (next && (rootEl.value?.contains(next) || dropdownEl.value?.contains(next))) return
   closeDropdown()
+}
+
+// повтор загрузки вариантов по кнопке в ошибке: список остаётся открытым, фокус возвращается в поле ввода
+let retrying = false
+
+function retrySource() {
+  retrying = true
+  props.source?.retry()
+  void nextTick(() => {
+    retrying = false
+    if (props.noSearch || isMobile.value) return
+    if (props.single) singleInput.value?.focus()
+    else multiInput.value?.focus()
+  })
 }
 
 function toggleDropdown() {
@@ -434,9 +468,34 @@ function toggleDropdown() {
   else openDropdown()
 }
 
+/**
+ * Куда выносится выпадающий список: в диалоге — в сам диалог (после его окна), иначе — в body. Диалог Quasar держит
+ * фокус в себе: фокус в списке, вынесенном в body, он забирает обратно, и список закрывался бы.
+ */
+const dropdownHost = shallowRef<HTMLElement | string>('body')
+
+/**
+ * Место выпадающих списков в диалоге: отдельный блок в корне .q-dialog, один на диалог. Прямо в корень ставить нельзя:
+ * Teleport держит в цели служебные узлы и снимает их, только когда удаляется сам. В корне они стоят сразу за содержимым
+ * диалога, а Vue при закрытии берёт соседа содержимого как место для заглушки и тут же удаляет содержимое вместе с
+ * CbList и этими узлами — вставка падает с ошибкой insertBefore. Блок не входит в дерево Vue и живёт, пока жив диалог.
+ */
+function dialogDropdownHost(dialog: HTMLElement): HTMLElement {
+  const found = dialog.querySelector<HTMLElement>(':scope > .cb-list-host')
+  if (found) return found
+  const host = document.createElement('div')
+  host.className = 'cb-list-host'
+  dialog.append(host)
+  return host
+}
+
 function openDropdown() {
+  const dialog = rootEl.value?.closest<HTMLElement>('.q-dialog')
+  dropdownHost.value = dialog ? dialogDropdownHost(dialog) : 'body'
   isOpen.value = true
   emit('open')
+  // прошлая загрузка вариантов упала — загрузить заново (если владелец не начал загрузку сам в обработчике open)
+  props.source?.retry()
   query.value = ''
   highlighted.value = -1
   // первый тик — список отрисован (считаем положение), второй — фокус
@@ -590,6 +649,13 @@ function onOutsideClick(e: MouseEvent) {
   if (rootEl.value?.contains(target) || dropdownEl.value?.contains(target)) return
   closeDropdown()
 }
+
+// контрол создан или сменился источник вариантов — источник, который грузит контрол (справочник), начинает загрузку
+watch(
+  () => props.source,
+  (source) => source?.ensure(),
+  { immediate: true },
+)
 
 onMounted(() => {
   document.addEventListener('mousedown', onOutsideClick)
@@ -753,6 +819,8 @@ onBeforeUnmount(() => {
 
 .cb-list__dropdown {
   z-index: 9000;
+  // в диалоге список стоит внутри его корня, а корень не принимает мышь (no-pointer-events)
+  pointer-events: auto;
   display: flex;
   flex-direction: column;
   // ширина — по содержимому, не уже поля (min-width ставит calcDropdownStyle); длинные строки ограничивает сам
@@ -810,6 +878,16 @@ onBeforeUnmount(() => {
 .cb-list__add-custom {
   border-bottom: 0.0625rem solid $zs-border-row;
   color: $primary;
+}
+
+.cb-list__state {
+  display: flex;
+  justify-content: center;
+  margin: 0.5rem;
+}
+
+.cb-list__error {
+  margin: 0.5rem;
 }
 
 .cb-list__no-options {

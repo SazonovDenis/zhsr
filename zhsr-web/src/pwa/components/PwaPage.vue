@@ -7,7 +7,9 @@
         </button>
         <div class="pwa-page__titles">
           <div class="pwa-page__title">{{ title }}</div>
-          <div v-if="subtitle" class="pwa-page__subtitle">{{ subtitle }}</div>
+          <div v-if="subtitle || $slots.subtitle" class="pwa-page__subtitle">
+            <slot name="subtitle">{{ subtitle }}</slot>
+          </div>
         </div>
         <slot name="head" />
       </div>
@@ -26,9 +28,9 @@ import { t } from '@/boot/i18n'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
 
 /**
- * Экран мобильной части: шапка с кнопкой «назад» (задан back) и заголовком, прокручиваемое тело (слот default) и
- * нижняя панель кнопок (слот bar) — она стоит внизу экрана и не прокручивается. Шапка прилипает к верху при
- * прокрутке.
+ * Экран мобильной части: шапка с кнопкой «назад» (задан back), заголовком и подзаголовком (subtitle или слот subtitle),
+ * прокручиваемое тело (слот default) и нижняя панель кнопок (слот bar) — она стоит внизу экрана и не прокручивается.
+ * Шапка прилипает к верху при прокрутке.
  */
 withDefaults(defineProps<{ title?: string; subtitle?: string; back?: (() => void) | null }>(), {
   title: '',

@@ -178,6 +178,8 @@ import { dialogHistory } from '@/shared/components/dialog/dialogHistory'
 import { vRovingButtons } from '@/shared/composables/rovingButtons'
 
 import { i18n, t } from '@/boot/i18n'
+import type { PeriodPreset } from './period'
+import { presetDates } from './period'
 import { isLandscape, SCALE0_MAX_PX, screenScale, screenScaleMin } from '@/shared/screen'
 
 /**
@@ -191,6 +193,7 @@ import { isLandscape, SCALE0_MAX_PX, screenScale, screenScaleMin } from '@/share
  * - Готовый период выводится из самих дат (getPeriodCode): диапазон может прийти снаружи, и подсвечена должна быть
  *   кнопка, которой он отвечает. Если период не из коротких, третья кнопка короткого ряда показывает его подписью.
  * - Пустая дата — это пусто (null), а не сегодня.
+ * - presets — свои готовые периоды вместо встроенных, в днях от сегодня (PeriodPreset).
  * - Выбор в коротком ряду применяется сразу. В окне «...» период применяется кнопкой «Ок» (или сразу при
  *   applyImmediately).
  * - Раскладка окна зависит от экрана: обычная (готовые периоды и календари рядом), компактная (одна панель с
@@ -198,7 +201,8 @@ import { isLandscape, SCALE0_MAX_PX, screenScale, screenScaleMin } from '@/share
  *   кнопка «назад» браузера сворачивает выбор по шагам).
  */
 
-type PeriodCode = 'd1' | 'd3' | 'd7' | 'm1' | 'mStart' | 'm3' | 'm6' | 'y' | 'yStart' | 'custom'
+// код готового периода: встроенные d1, d3, d7, m1, mStart, m3, m6, y, yStart, свои — из presets; custom — свой интервал
+type PeriodCode = string
 interface PeriodError {
   text: string
 }
@@ -240,6 +244,8 @@ const props = withDefaults(
     clearable?: boolean
     /** подпись внутри рамки перед кнопками, например «Период:» — на русском */
     label?: string
+    /** свои готовые периоды вместо встроенных, от мелких к широким; могут меняться на ходу */
+    presets?: PeriodPreset[] | null
   }>(),
   {
     periodCheck: null,
@@ -253,6 +259,7 @@ const props = withDefaults(
     nullableEndDate: true,
     clearable: false,
     label: '',
+    presets: null,
   },
 )
 
@@ -378,7 +385,12 @@ const endDateTextResolved = computed(() => t(props.endDateText || 'Конечн�
 
 // --- готовые периоды ---
 
-const periodOptions = computed<{ label: string; value: PeriodCode }[]>(() => [
+const periodOptions = computed<{ label: string; value: PeriodCode }[]>(() => {
+  if (props.presets) return props.presets.map((p) => ({ label: t(p.label), value: p.value }))
+  return BUILT_IN_PERIODS.value
+})
+
+const BUILT_IN_PERIODS = computed<{ label: string; value: PeriodCode }[]>(() => [
   { label: t('Сегодня'), value: 'd1' },
   { label: t('3 дня'), value: 'd3' },
   { label: t('Неделя'), value: 'd7' },
@@ -413,7 +425,7 @@ const dateRangeStr = computed(() => {
  * выводим период. Своих правок это не касается: там даты приходят из самого контрола, и период уже посчитан (см.
  * onStartUpdate/onEndUpdate).
  */
-watch(() => [props.startDate, props.endDate], applyDatesFromProps)
+watch(() => [props.startDate, props.endDate, props.presets], applyDatesFromProps)
 
 /** Принять даты, пришедшие снаружи: внутренние значения и период, им отвечающий. */
 function applyDatesFromProps() {
@@ -574,6 +586,13 @@ function onClick() {
 // --- арифметика периодов ---
 
 function setDatesByPeriod(code: PeriodCode | null) {
+  const preset = props.presets?.find((p) => p.value === code)
+  if (preset) {
+    const dates = presetDates(preset)
+    onStartUpdate(fromIso(dates.from))
+    onEndUpdate(fromIso(dates.to))
+    return
+  }
   const end = date.extractDate(endDateInner.value ?? today(), DATE_FORMAT)
   let start: Date
   switch (code) {
@@ -618,6 +637,15 @@ function setDatesByPeriod(code: PeriodCode | null) {
 
 function getPeriodCode(startDate: string | null, endDate: string | null): PeriodCode | null {
   if (!startDate && !endDate) return null
+  if (props.presets) {
+    const from = toIso(startDate)
+    const to = toIso(endDate)
+    const match = props.presets.find((p) => {
+      const dates = presetDates(p)
+      return dates.from === from && dates.to === to
+    })
+    return match?.value ?? 'custom'
+  }
   if (!startDate || !endDate) return 'custom'
   const now = new Date()
   // обнулим время
@@ -802,7 +830,7 @@ function formatDateHeader(dateStr: string | null): string {
 }
 
 .period-picker__error {
-  color: #8f2416;
+  color: $zs-error-fg;
   font-size: 0.8125rem;
 }
 

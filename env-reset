@@ -1,0 +1,13 @@
+#!/bin/bash
+# Пересоздать окружение разработки с нуля: поднять сервисы (env-start), очистить хранилище файлов
+# и создать бакет (install/storage-reset), пересоздать БД (install/db-reset). Остановите zhsr-app перед запуском:
+# он держит соединения с БД.
+#
+#   ./env-reset          - без демо-данных
+#   ./env-reset --demo   - с демо-данными (передаётся в install/db-reset)
+set -euo pipefail
+cd "$(dirname "$0")"
+
+./env-start
+install/storage-reset
+install/db-reset "$@"

@@ -27,10 +27,12 @@
         @click="choose(w)"
       >
         <span class="zs-mono wagon-pick__number">{{ w.number }}</span>
-        <span>{{ dictManager.getValue('WagonType', w.type) }}</span>
-        <span class="zs-sub wagon-pick__place">{{ w.place }}</span>
+        <span>{{ dictManager.getValue('WagonType', w.wagonType) }}</span>
+        <span class="zs-sub wagon-pick__place">{{ placeText(w.locationType, w.place, w.trip?.name) }}</span>
       </button>
-      <div v-if="!pick.loading.value && pick.wagons.value.length === 0" class="wagon-pick__empty">
+      <LoadSpinner v-if="pick.loading.value && pick.wagons.value.length === 0" size="1.5rem" />
+      <ErrorBox v-else-if="pick.error.value" :error="pick.error.value" :retry="pick.load" />
+      <div v-else-if="!pick.loading.value && pick.wagons.value.length === 0" class="wagon-pick__empty">
         {{ t('Вагоны не найдены') }}
       </div>
     </div>
@@ -42,8 +44,11 @@ import { onMounted, ref, watch } from 'vue'
 
 import type { RequestWagon } from '@/api/wagons'
 import { t } from '@/boot/i18n'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
+import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictManager } from '@/shared/dict/DictManager'
+import { placeText } from '@/shared/wagonPlace'
 import { useWagonPick } from '@/shared/requests/useWagonPick'
 import { currentUser } from '@/shared/user'
 

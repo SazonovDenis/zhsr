@@ -22,11 +22,21 @@ const pwa = () => import('@/pwa/pwa')
 const desktop = () => import('@/desktop/desktop')
 const admin = () => import('@/admin/admin')
 
+/**
+ * Таблицы общего редактора администрирования (их перечень и поля задаёт сервер: AdminTables). Маршрут таблицы —
+ * admin-<таблица>, на него ссылается пункт меню.
+ */
+const ADMIN_TABLES = ['depot', 'yard', 'station', 'stage', 'wagon_type', 'model_type', 'fault_group_type', 'fault_type']
+
 const routes: RouteRecordRaw[] = [
   {
     path: '/auth',
     component: () => import('@/layouts/AuthLayout.vue'),
-    children: [{ path: '', name: 'login', component: () => import('@/auth/LoginPage.vue') }],
+    children: [
+      { path: '', name: 'login', component: () => import('@/auth/LoginPage.vue') },
+      // смена пароля: сюда переводит ответ сервера 406 — пароль задан администратором или пароль по умолчанию
+      { path: 'password', name: 'change-password', component: () => import('@/auth/ChangePasswordPage.vue') },
+    ],
   },
   // мобильная часть (PWA): только этот префикс входит в scope service worker и manifest
   {
@@ -78,6 +88,13 @@ const routes: RouteRecordRaw[] = [
         meta: { pair: 'trips' },
         component: () => pwa().then((m) => m.PwaTripCrewPage),
       },
+      {
+        path: 'trip/:id/coupling/:kind',
+        name: 'pwa-trip-coupling',
+        meta: { pair: 'trips' },
+        props: true,
+        component: () => pwa().then((m) => m.PwaCouplingPage),
+      },
     ],
   },
   // десктопная часть
@@ -89,6 +106,27 @@ const routes: RouteRecordRaw[] = [
       { path: '', name: 'home', component: () => desktop().then((m) => m.DesktopHomePage) },
       { path: 'wagons', name: 'wagons', component: () => desktop().then((m) => m.WagonsPage) },
       { path: 'trips', name: 'trips', component: () => desktop().then((m) => m.TripsPage) },
+      {
+        path: 'trips/:id',
+        name: 'trip-form',
+        meta: { hideMenu: true, pair: 'pwa-trip' },
+        props: true,
+        component: () => desktop().then((m) => m.TripFormPage),
+      },
+      { path: 'acts', name: 'acts', component: () => desktop().then((m) => m.ActsPage) },
+      {
+        path: 'acts/new',
+        name: 'transfer',
+        meta: { hideMenu: true },
+        component: () => desktop().then((m) => m.TransferPage),
+      },
+      {
+        path: 'trips/:id/coupling/:kind',
+        name: 'trip-coupling',
+        meta: { hideMenu: true },
+        props: true,
+        component: () => desktop().then((m) => m.TripCouplingPage),
+      },
       { path: 'routes', name: 'routes', component: () => desktop().then((m) => m.RoutesPage) },
       {
         path: 'requests',
@@ -105,6 +143,13 @@ const routes: RouteRecordRaw[] = [
       },
       // администрирование: пункты меню десктопной части, страницы загружаются чанком admin при первом переходе
       { path: 'admin', name: 'admin-home', component: () => admin().then((m) => m.AdminHomePage) },
+      { path: 'admin/users', name: 'admin-users', component: () => admin().then((m) => m.AdminUsersPage) },
+      ...ADMIN_TABLES.map((table) => ({
+        path: `admin/tables/${table}`,
+        name: `admin-${table}`,
+        props: { table },
+        component: () => admin().then((m) => m.AdminTablePage),
+      })),
     ],
   },
 ]

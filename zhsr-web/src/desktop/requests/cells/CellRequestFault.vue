@@ -1,6 +1,6 @@
 <template>
   <div class="cell-request-fault">
-    <span class="cell-request-fault__name">{{ faultName(row.fault) }}</span>
+    <span class="cell-request-fault__name">{{ faultName(row.faultType) }}</span>
     <span v-if="row.tor" class="cell-request-fault__tor">{{ t('ТОР') }}</span>
   </div>
   <div v-if="row.description" class="zs-sub cell-request-fault__desc">{{ row.description }}</div>

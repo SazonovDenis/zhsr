@@ -1,12 +1,19 @@
 #!/bin/sh
 # Документация -> _site: утилиты build-doc и doc-db (каталоги - в BUILD_DOC и DOC_DB, по умолчанию ../../build-doc
-# и ../../doc-db от корня проекта). Структура БД - из миграций Liquibase модуля zhsr-database.
+# и ../../doc-db от корня проекта). Структура БД - из миграций Liquibase модуля zhsr-database. Схемы doc/*.drawio
+# (location-transitions, request-transitions) - в png рядом с исходником: нужен drawio (draw.io desktop).
 set -e
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DOC="${BUILD_DOC:-$ROOT/../../build-doc}"
 export DOC_DB="${DOC_DB:-$ROOT/../../doc-db}"
 cd "$ROOT"
+
+# схемы draw.io -> png рядом: doc/location-transitions.drawio -> doc/location-transitions.png
+find doc -name '*.drawio' | while read -r file; do
+    echo "drawio: $file"
+    drawio -x -f png -o "${file%.drawio}.png" "$file" 2>/dev/null
+done
 
 "$DOC_DB/import-struct" --liquibase zhsr-database/src/main/resources/db/changelog/db.changelog-master.xml \
     -o doc/db-doc/db-struct.yaml

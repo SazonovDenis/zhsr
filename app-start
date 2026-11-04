@@ -1,0 +1,11 @@
+#!/bin/bash
+# Запустить сервер zhsr-app (http://localhost:8080); при старте он накатывает миграции Liquibase.
+# БД DB_NAME должна уже быть - её создаёт env-reset (install/db-reset). Нет .env - копируется из .env.sample.
+# Веб-клиент запускается отдельно: app-start-web.
+set -euo pipefail
+cd "$(dirname "$0")"
+
+[ -f .env ] || { cp .env.sample .env; echo '.env создан из .env.sample'; }
+
+xterm -geometry 300x50+0+0 -title "zhsr-app" -e "./gradlew :zhsr-app:bootRun" &
+echo $! > .zhsr-app.pid

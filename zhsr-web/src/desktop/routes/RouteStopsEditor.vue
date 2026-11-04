@@ -18,6 +18,7 @@
           placeholder="Выберите станцию…"
           :model-value="stop.station || null"
           :values="valuesFor(index)"
+          :source="openRow === index ? optionsLoad : null"
           @open="loadOptions(index)"
           @update:model-value="choose(index, $event)"
         >
@@ -84,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 
 import type { RouteStop } from '@/api/routes'
 import { fetchNextStations, recalcStops } from '@/api/routes'
@@ -93,6 +94,7 @@ import type { ChoiceItem, ChoiceModel } from '@/shared/components/choice/choice'
 import CbList from '@/shared/components/choice/CbList.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import { dictManager } from '@/shared/dict/DictManager'
+import { useLoad } from '@/shared/loadable'
 
 /**
  * Редактор «Остановки по порядку». Правит список остановок в памяти (v-model); сохраняет маршрут владелец.
@@ -113,9 +115,7 @@ const stops = defineModel<RouteStop[]>({ required: true })
 const openRow = ref(-1)
 const options = shallowRef<ChoiceItem[]>([])
 
-onMounted(() => dictManager.prepareDict('Station'))
-
-function isHub(station: string): boolean {
+function isHub(station: number): boolean {
   return dictManager.getRec('Station', station)?.hub === true
 }
 
@@ -138,7 +138,7 @@ function previousOf(index: number): RouteStop | null {
   return null
 }
 
-function stationItem(station: string, km: number, runDuration: number, distance = 0, via: string[] = []): ChoiceItem {
+function stationItem(station: number, km: number, runDuration: number, distance = 0, via: number[] = []): ChoiceItem {
   return { id: station, text: dictManager.getValue('Station', station), data: { km, runDuration, distance, via } }
 }
 
@@ -146,7 +146,7 @@ function stationItem(station: string, km: number, runDuration: number, distance 
 function viaText(item: ChoiceItem): string {
   const via = item.data?.via
   if (!Array.isArray(via) || via.length === 0) return ''
-  return t('через {stations}', { stations: via.map((s: string) => dictManager.getValue('Station', s)).join(' → ') })
+  return t('через {stations}', { stations: via.map((s: number) => dictManager.getValue('Station', s)).join(' → ') })
 }
 
 /**
@@ -161,11 +161,16 @@ function valuesFor(index: number): ChoiceItem[] {
   return loaded.some((o) => o.id === stop?.station) ? loaded : [...current, ...loaded]
 }
 
-async function loadOptions(index: number) {
-  openRow.value = index
+// станции для открытого списка; ошибка загрузки — в самом выпадающем списке вместо вариантов
+const optionsLoad = useLoad(async () => {
   options.value = []
-  const next = await fetchNextStations(previousOf(index))
+  const next = await fetchNextStations(previousOf(openRow.value))
   options.value = next.map((n) => stationItem(n.station, n.km, n.runDuration, n.distance, n.via))
+})
+
+function loadOptions(index: number) {
+  openRow.value = index
+  void optionsLoad.run()
 }
 
 /** Применить правку; changed — остановки, у которых сменилась станция или предыдущая остановка. */
@@ -176,7 +181,7 @@ async function update(next: RouteStop[], changed: number[]) {
 }
 
 function choose(index: number, value: ChoiceModel) {
-  if (typeof value !== 'string') return
+  if (typeof value !== 'number') return
   const data = options.value.find((o) => o.id === value)?.data
   const stop: RouteStop = {
     station: value,
@@ -199,16 +204,21 @@ function setMinutes(index: number, field: 'runDuration' | 'stopDuration', text: 
 
 function insert(index: number) {
   const next = [...stops.value]
-  next.splice(index + 1, 0, { station: '', km: 0, runDuration: 0, stopDuration: 0 })
+  // станция 0 — ещё не выбрана
+  next.splice(index + 1, 0, { station: 0, km: 0, runDuration: 0, stopDuration: 0 })
   stops.value = next
 }
 
+/**
+ * Удалить остановку. На её место встала следующая остановка: у неё сменилась предыдущая. Соседи удалённой — одна и та
+ * же станция (Шортанды — Айсары — Шортанды): маршрут схлопывается, две остановки сливаются в первую, на место второй
+ * встаёт следующая за ней.
+ */
 function remove(index: number) {
-  // на место удалённой встала следующая остановка: у неё сменилась предыдущая
-  void update(
-    stops.value.filter((_, i) => i !== index),
-    [index],
-  )
+  const next = stops.value.filter((_, i) => i !== index)
+  const prev = next[index - 1]
+  const same = prev && prev.station && next[index]?.station === prev.station
+  void update(same ? next.filter((_, i) => i !== index) : next, [index])
 }
 </script>
 

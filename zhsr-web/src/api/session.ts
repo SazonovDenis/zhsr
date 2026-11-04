@@ -1,152 +1,82 @@
-import { isMobile } from '@/shared/device'
-import { fakeTime } from './fakeTime'
-import { fakeNetwork } from './http'
-// import { http } from './http'
+import { http } from './http'
 
 /**
- * API текущего пользователя. Сервер пока не готов: функции отдают фиктивные данные, а над ними закомментирован
- * будущий вызов REST.
- *
- * Фиктивный пользователь выбирается логином при входе (см. FAKE_USERS): lnp — начальник поезда, cond — проводник,
- * pem — ПЭМ, master — мастер депо, instr — инструктор поездных бригад, plan — планировщик. Без входа — начальник
- * поезда на телефоне и планировщик с ролью мастера депо на компьютере.
+ * API текущего пользователя: вход, выход, смена пароля и кто вошёл (сервер zhsr-app: SessionController).
  */
 
 /** Текущий рейс пользователя: рейс, в бригаде которого он состоит сейчас. */
 export interface UserTrip {
   /** id рейса — для запросов */
-  id: string
+  id: number
   /** номер поезда */
-  train: string
+  trainNumber: string
   /** маршрут рейса — для показа: «Алматы — Астана» */
   name: string
-  /** состояние рейса — id справочника TripState */
-  state: string
-  /** отправление: фактическое, если было, иначе плановое; ISO */
+  /** состояние рейса — id справочника TripState (константы TripStatus) */
+  tripStatusType: number
+  /** отправление: фактическое, если было, иначе плановое; ISO с часовым поясом */
   departure: string
-  /** плановое прибытие, ISO */
+  /** плановое прибытие, ISO с часовым поясом */
   arrival: string
-  /** должность пользователя в бригаде рейса: LNP, PEM или CONDUCTOR */
-  duty: string
-  /** вагоны, за которыми закреплён проводник; у остальных должностей пусто */
+  /** должность пользователя в бригаде рейса — id справочника CrewDuty (константы CrewDuty) */
+  crewDutyType: number
+  /** номера вагонов, за которыми закреплён проводник; у остальных должностей пусто */
   wagons: string[]
 }
 
 export interface CurrentUser {
-  id: string
+  id: number
   /** фамилия и инициалы */
   name: string
   /** имя — для приветствия */
   firstName: string
-  /** роли — id справочника Role; роли совмещаются */
-  roles: string[]
-  /** службы ролей пользователя — id справочника Service */
-  services: string[]
+  /** роли — id справочника Role (константы RoleType); роли совмещаются */
+  roles: number[]
+  /** службы ролей пользователя — id справочника Service (константы ServiceType) */
+  services: number[]
   /** депо, в котором работает сотрудник, — id справочника Depot */
-  depot: string | null
+  depot: number | null
   /** станция этого депо — id справочника Station */
-  depotStation: string | null
+  depotStation: number | null
   /** текущий рейс; null — пользователь сейчас не в бригаде рейса */
   trip: UserTrip | null
 }
 
-/** Войти: проверить логин и пароль и открыть сеанс. Неверные данные — ошибка с текстом для пользователя. */
+/**
+ * Войти: проверить логин и пароль и открыть сеанс. Неверные данные — ошибка с текстом для пользователя. Пароль задан
+ * администратором — ответ 406 (isPasswordChangeRequired): сеанс открыт, нужно сменить пароль.
+ */
 export async function login(username: string, password: string): Promise<CurrentUser> {
-  // return (await http.post<CurrentUser>('/session/login', { username, password })).data
-  if (!username || !password) throw new Error('Неверный логин или пароль')
-  fakeUserKey = username in FAKE_USERS ? username : null
-  return fetchCurrentUser()
+  return (await http.post<CurrentUser>('/session/login', { username, password })).data
+}
+
+/**
+ * Сменить пароль вошедшему пользователю. Неверный текущий пароль, короткий новый — ошибка с текстом для пользователя.
+ */
+export async function changePassword(oldPassword: string, newPassword: string): Promise<CurrentUser> {
+  return (await http.post<CurrentUser>('/session/password', { oldPassword, newPassword })).data
 }
 
 /** Завершить сеанс пользователя на сервере. */
 export async function logout(): Promise<void> {
-  // await http.post('/session/logout')
-  fakeUserKey = null
-  return Promise.resolve()
+  await http.post('/session/logout')
 }
 
 /** Текущий пользователь: роли, депо, текущий рейс. */
 export async function fetchCurrentUser(): Promise<CurrentUser> {
-  // return (await http.get<CurrentUser>('/getUserInfo')).data
-  fakeNetwork()
-  return Promise.resolve(fakeCurrentUser())
+  return (await http.get<CurrentUser>('/getUserInfo')).data
 }
 
-// --- фиктивные данные ---
-
-let fakeUserKey: string | null = null
-
-/** Фиктивный текущий пользователь; нужен и другим заготовкам API — например, чтобы отобрать «мои» заявки. */
-export function fakeCurrentUser(): CurrentUser {
-  return FAKE_USERS[fakeUserKey ?? (isMobile.value ? 'lnp' : 'plan')]!
-}
-
-/** Рейс, в котором едет бригада фиктивных пользователей: отправился 10 часов назад. */
-export const FAKE_TRIP = { id: 'T2', train: '002', name: 'Алматы — Астана', state: 'IN_PROGRESS' }
-
-function trip(duty: string, wagons: string[] = []): UserTrip {
-  return { ...FAKE_TRIP, departure: fakeTime(-10), arrival: fakeTime(9), duty, wagons }
-}
-
-const FAKE_USERS: Record<string, CurrentUser> = {
-  lnp: {
-    id: 'u3',
-    name: 'Ахметов Б. К.',
-    firstName: 'Болат',
-    roles: ['LNP', 'CONDUCTOR'],
-    services: [],
-    depot: 'D2',
-    depotStation: 'ALA',
-    trip: trip('LNP'),
-  },
-  cond: {
-    id: 'u16',
-    name: 'Абенова Д. С.',
-    firstName: 'Динара',
-    roles: ['CONDUCTOR'],
-    services: [],
-    depot: 'D2',
-    depotStation: 'ALA',
-    trip: trip('CONDUCTOR', ['17043']),
-  },
-  pem: {
-    id: 'u7',
-    name: 'Касымов Д. Е.',
-    firstName: 'Данияр',
-    roles: ['PEM'],
-    services: ['TECHNICAL'],
-    depot: 'D2',
-    depotStation: 'ALA',
-    trip: trip('PEM'),
-  },
-  master: {
-    id: 'u4',
-    name: 'Оспанова М. Т.',
-    firstName: 'Мадина',
-    roles: ['MASTER'],
-    services: ['TECHNICAL'],
-    depot: 'D1',
-    depotStation: 'AST',
-    trip: null,
-  },
-  instr: {
-    id: 'u10',
-    name: 'Сейткали Р. А.',
-    firstName: 'Руслан',
-    roles: ['INSTRUCTOR'],
-    services: ['INSTRUCTOR'],
-    depot: 'D1',
-    depotStation: 'AST',
-    trip: null,
-  },
-  plan: {
-    id: 'u2',
-    name: 'Жумабаева Г. С.',
-    firstName: 'Гульнара',
-    roles: ['PLANNER', 'MASTER'],
-    services: ['TECHNICAL'],
-    depot: 'D1',
-    depotStation: 'AST',
-    trip: null,
-  },
-}
+/**
+ * Демо-пользователи для быстрого входа при dev-запуске (см. LoginPage): db-data/demo, пароль у всех — 123456; admin —
+ * из db-data/default, пароль тоже 123456.
+ */
+export const DEMO_LOGINS = [
+  { login: 'plan', name: 'Жумабаева Г. С.', password: '123456' },
+  { login: 'lnp', name: 'Ахметов Б. К.', password: '123456' },
+  { login: 'cond', name: 'Абенова Д. С.', password: '123456' },
+  { login: 'pem', name: 'Касымов Д. Е.', password: '123456' },
+  { login: 'master', name: 'Оспанова М. Т.', password: '123456' },
+  { login: 'instr', name: 'Сейткали Р. А.', password: '123456' },
+  { login: 'admin', name: 'Администратор', password: '123456' },
+]

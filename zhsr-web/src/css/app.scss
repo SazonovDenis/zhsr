@@ -112,3 +112,24 @@ button {
   box-shadow: none;
   font-weight: 700;
 }
+
+// всплывашка ошибки (notifyError): цвета — штатно через color и textColor уведомления (классы bg-zs-error и
+// text-zs-error), те же, что у блока ошибки ErrorBox; запрос (caption) — бледной моноширинной строкой, как в ErrorBox
+.bg-zs-error {
+  background: $zs-error-bg !important;
+}
+
+.text-zs-error {
+  color: $zs-error-fg !important;
+}
+
+.q-notification.zs-error-notify {
+  font-size: 0.875rem;
+  cursor: pointer;
+
+  .q-notification__caption {
+    font-family: $zs-font-mono;
+    font-size: 0.75rem;
+    opacity: 0.65;
+  }
+}

@@ -3,8 +3,8 @@
     <input
       v-model="model"
       class="text-input__field zs-focusable"
-      :class="{ 'text-input__field--mono': mono }"
-      :type="password ? 'password' : 'text'"
+      :class="{ 'text-input__field--mono': mono, 'text-input__field--password': password }"
+      :type="password && !revealed ? 'password' : 'text'"
       :inputmode="inputmode"
       :placeholder="placeholder && t(placeholder)"
     />
@@ -18,10 +18,24 @@
     >
       ✕
     </button>
+    <!-- пароль: «глаз» показывает и снова скрывает введённые символы -->
+    <button
+      v-if="password"
+      type="button"
+      tabindex="-1"
+      class="text-input__reveal"
+      :title="t(revealed ? 'Скрыть пароль' : 'Показать пароль')"
+      @mousedown.prevent
+      @click="revealed = !revealed"
+    >
+      <q-icon :name="revealed ? 'visibility_off' : 'visibility'" size="1.1rem" />
+    </button>
   </span>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+
 import { t } from '@/boot/i18n'
 
 /**
@@ -37,13 +51,15 @@ withDefaults(
     /** моноширинный шрифт: номера вагонов и поездов */
     mono?: boolean
     inputmode?: 'text' | 'numeric' | 'decimal'
-    /** ввод пароля: символы скрыты */
+    /** ввод пароля: символы скрыты, «глаз» справа показывает их */
     password?: boolean
   }>(),
   { placeholder: '', width: '100%', mono: false, inputmode: 'text', password: false },
 )
 
 const model = defineModel<string>({ default: '' })
+// пароль показан открытым текстом
+const revealed = ref(false)
 </script>
 
 <style scoped lang="scss">
@@ -76,6 +92,34 @@ const model = defineModel<string>({ default: '' })
 
   &--mono {
     font-family: $zs-font-mono;
+  }
+
+  // справа — и крестик, и «глаз»
+  &--password {
+    padding-right: 3.1rem;
+  }
+}
+
+.text-input__field--password ~ .text-input__clear {
+  right: 1.9rem;
+}
+
+.text-input__reveal {
+  position: absolute;
+  top: 50%;
+  right: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: $zs-text-faint;
+  transform: translateY(-50%);
+  cursor: pointer;
+
+  &:hover {
+    color: $zs-text-muted;
   }
 }
 

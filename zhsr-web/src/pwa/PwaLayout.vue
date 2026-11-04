@@ -61,6 +61,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { i18n, t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
+import { notifyError } from '@/shared/errors'
 import { dictManager } from '@/shared/dict/DictManager'
 import { LOCALES, setLocale } from '@/shared/locale'
 import { isOnline } from '@/shared/network'
@@ -101,13 +102,13 @@ async function onLogout() {
 }
 
 // связь восстановилась — данные пользователя (текущий рейс) могли измениться
-const onRestored = () => void loadCurrentUser(true).catch(() => undefined)
+const onRestored = () => void loadCurrentUser(true).catch(notifyError)
 bus.on('connection-restored', onRestored)
 onBeforeUnmount(() => bus.off('connection-restored', onRestored))
 
 onMounted(async () => {
   await Promise.all([
-    loadCurrentUser().catch(() => undefined),
+    loadCurrentUser().catch(notifyError),
     dictManager.prepareDicts(...REQUEST_DICTS, 'TripState', 'Role'),
     startOutbox(),
   ])

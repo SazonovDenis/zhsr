@@ -6,7 +6,20 @@
 
     <template v-if="route">
       <div v-if="previewPoints.length > 0" class="route-edit__chain">
-        <RouteStops :points="previewPoints" layout="horizontal" />
+        <!-- маршрут на карте — по остановкам из редактора, перерисовывается при их правке. В левом углу, маленький;
+             станции следования развёрнуты — карта крупнее и показывает их всегда, свёрнуты — только при увеличении.
+             Щелчок по станции выбирает её -->
+        <RouteMap
+          :points="previewPoints"
+          :selected="selectedStation"
+          :show-passing="!chainCollapsed"
+          class="route-edit__map"
+          :class="{ 'route-edit__map--wide': !chainCollapsed }"
+          @station="selectedStation = $event.station"
+        />
+        <div class="route-edit__stops">
+          <RouteStops v-model:collapsed="chainCollapsed" :points="previewPoints" layout="horizontal" />
+        </div>
       </div>
 
       <div class="route-edit__columns">
@@ -64,22 +77,23 @@
             </FormSection>
 
             <FormSection title="Время в пути и нормы часов" divided columns="repeat(2, minmax(0, 1fr))">
-              <!-- время в пути не вводится: оно считается по остановкам — путь по перегонам и стоянки -->
-              <FormField label="Время в пути">
-                <span class="route-edit__duration">{{ durationText }}</span>
+              <!-- время в пути вводит пользователь; по остановкам (перегоны и стоянки) — подсказка и значение по умолчанию -->
+              <FormField label="Время в пути, ч:мм">
+                <TextInput v-model="form.duration" placeholder="ч:мм" @update:model-value="onDurationInput" />
+                <span class="route-edit__hint">{{ t('по остановкам — {time}', { time: durationText }) }}</span>
               </FormField>
               <FormField label="Проводник, ч">
-                <TextInput v-model="form.hc" inputmode="decimal" />
+                <TextInput v-model="form.hc" inputmode="numeric" />
               </FormField>
               <FormField label="ЛНП, ч">
-                <TextInput v-model="form.hl" inputmode="decimal" />
+                <TextInput v-model="form.hl" inputmode="numeric" />
               </FormField>
               <FormField label="ПЭМ, ч">
-                <TextInput v-model="form.hp" inputmode="decimal" />
+                <TextInput v-model="form.hp" inputmode="numeric" />
               </FormField>
             </FormSection>
 
-            <div v-if="error" class="route-edit__error">{{ error }}</div>
+            <ErrorBox v-if="error" :error="error" class="route-edit__error" />
           </div>
           <div class="route-edit__save">
             <q-btn
@@ -96,24 +110,33 @@
       </div>
     </template>
 
-    <div v-else-if="!loading" class="route-edit__missing">{{ t('Маршрут не найден') }}</div>
+    <!-- главное показывающее страницы — место маршрута: общий спиннер на всю цепочку, ошибка загрузки -->
+    <LoadSpinner v-else-if="busy.active.value" />
+    <ErrorBox v-else-if="loadError" :error="loadError" :retry="init" class="route-edit__load-error" />
   </DesktopFrame>
 </template>
 
 <script setup lang="ts">
 import { Notify } from 'quasar'
-import { computed, onMounted, reactive, ref, shallowRef } from 'vue'
+import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { Route, RoutePoint, RouteStop } from '@/api/routes'
 import { fetchRoute, saveRoute } from '@/api/routes'
 import { t } from '@/boot/i18n'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
+import type { ShownError } from '@/shared/errors'
+import { formError, shownError } from '@/shared/errors'
 import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import FormField from '@/shared/components/form/FormField.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
 import FormSection from '@/shared/components/form/FormSection.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import { dictChoices } from '@/shared/dict/dictChoices'
+import { RouteKind } from '@/shared/constants/RouteKind'
+import { provideBusy } from '@/shared/busy'
+import LoadSpinner from '@/shared/components/LoadSpinner.vue'
+import RouteMap from '@/shared/components/map/RouteMap.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { formatHm, totalMinutes } from './duration'
@@ -132,54 +155,116 @@ const props = defineProps<{ id: string }>()
 const router = useRouter()
 
 const route = shallowRef<Route | null>(null)
-const loading = ref(true)
+// общее ожидание страницы: спиннер на месте маршрута — на всю цепочку загрузок
+const busy = provideBusy()
+// ошибка загрузки маршрута; показывается на месте маршрута
+const loadError = ref<ShownError | null>(null)
 const stops = ref<RouteStop[]>([])
 const form = reactive({
   train: '',
   name: '',
-  kind: 'REGULAR',
+  kind: RouteKind.REGULAR,
   since: '',
   until: '',
+  // время в пути «ч:мм»
+  duration: '',
   hc: '',
   hl: '',
   hp: '',
 })
 const saving = ref(false)
-const error = ref('')
+// станции следования в цепочке сверху свёрнуты; развёрнуты — карта крупнее и показывает их
+const chainCollapsed = ref(true)
+// станция, выбранная щелчком на карте; null — не выбрана
+const selectedStation = ref<number | null>(null)
+// ошибка формы: проверки (formError) или запроса (shownError, запрос второй строкой); null — ошибки нет
+const error = ref<ShownError | null>(null)
 
-const title = computed(() => (route.value ? t('Маршрут № {train}', { train: route.value.train }) : t('Маршрут')))
+const title = computed(() => (route.value ? t('Маршрут № {train}', { train: route.value.trainNumber }) : t('Маршрут')))
 
 /**
- * Остановки для показа сверху. Станции следования известны только для пар соседних остановок, которые были в
- * маршруте до правки; для новых пар их построит сервер при сохранении.
+ * Остановки для показа сверху и на карте. Станции следования берутся из маршрута до правки: между соседними
+ * остановками — станции самого короткого куска маршрута между ними, от последнего появления предыдущей станции до
+ * первого появления следующей; петли станций следования в этом куске вырезаются. Удалили остановку — она и станции
+ * следования вокруг неё становятся станциями следования между её соседями; соседи — одна станция (маршрут
+ * схлопнулся в редакторе) — вся петля между ними пропадает. Для пар остановок, которых в маршруте до правки не было
+ * (новая станция), станции следования построит сервер при сохранении.
  */
 const previewPoints = computed<RoutePoint[]>(() => {
   const original = route.value?.points ?? []
   const filled = stops.value.filter((s) => s.station)
-  return filled.flatMap((stop, i) => {
+  const result: RoutePoint[] = []
+  // место в маршруте до правки, с которого ищется следующая пара остановок: пары идут по порядку
+  let cursor = 0
+  filled.forEach((stop, i) => {
     const prev = filled[i - 1]
-    const passing = prev ? passingBetween(original, prev, stop) : []
+    let passing: RoutePoint[] = []
+    if (prev) {
+      const found = passingBetween(original, cursor, prev, stop.station)
+      if (found) {
+        passing = found.passing
+        cursor = found.end
+      }
+    }
     // время в пути остановки — от предыдущей остановки; часть его приходится на перегоны до станций следования
     const passingMin = passing.reduce((sum, p) => sum + p.runDuration, 0)
     const last = i === filled.length - 1
-    return [
-      ...passing,
-      {
-        ...stop,
-        stop: true,
-        runDuration: Math.max(0, stop.runDuration - passingMin),
-        stopDuration: i === 0 || last ? 0 : stop.stopDuration,
-      },
-    ]
+    result.push(...passing, {
+      ...stop,
+      haveStop: true,
+      runDuration: Math.max(0, stop.runDuration - passingMin),
+      stopDuration: i === 0 || last ? 0 : stop.stopDuration,
+    })
   })
+  return result
 })
 
-function passingBetween(points: RoutePoint[], from: RouteStop, to: RouteStop): RoutePoint[] {
-  const start = points.findIndex((p) => p.stop && p.station === from.station && p.km === from.km)
-  if (start === -1) return []
-  const end = points.findIndex((p, i) => i > start && p.stop)
-  if (end === -1 || points[end]!.station !== to.station) return []
-  return points.slice(start + 1, end)
+/**
+ * Станции следования между станциями from и to по маршруту до правки, начиная с места cursor: самый короткий кусок
+ * маршрута — первое появление to после from и последнее появление from перед ним; все станции куска — станции
+ * следования, в том числе бывшие остановки; петли вырезаются. Расстояние станции следования от начала маршрута —
+ * от предыдущей остановки from (её расстояние уже пересчитано в редакторе) плюс путь по маршруту до правки без
+ * вырезанных петель. end — место станции to.
+ *
+ * @return null — пары from, to в маршруте до правки нет
+ */
+function passingBetween(
+  points: RoutePoint[],
+  cursor: number,
+  from: RouteStop,
+  to: number,
+): { passing: RoutePoint[]; end: number } | null {
+  const first = points.findIndex((p, i) => i >= cursor && p.station === from.station)
+  if (first === -1) return null
+  const end = points.findIndex((p, i) => i > first && p.station === to)
+  if (end === -1) return null
+  let start = first
+  for (let i = first; i < end; i++) if (points[i]!.station === from.station) start = i
+  const shift = from.km - points[start]!.km
+  const passing = withoutLoops(points.slice(start + 1, end))
+  return { passing: passing.map((p) => ({ ...p, km: p.km + shift, haveStop: false, stopDuration: 0 })), end }
+}
+
+/**
+ * Станции без петель: станция встретилась снова — всё, что было между её появлениями, и само повторное появление
+ * выпадают. Время в пути выпавших перегонов не учитывается, расстояния следующих станций уменьшаются на длину петли:
+ * путь короче.
+ */
+function withoutLoops(points: RoutePoint[]): RoutePoint[] {
+  const result: RoutePoint[] = []
+  // длина вырезанных петель, км
+  let removed = 0
+  for (const p of points) {
+    const km = p.km - removed
+    const seen = result.findIndex((r) => r.station === p.station)
+    if (seen === -1) {
+      result.push({ ...p, km })
+    } else {
+      removed += km - result[seen]!.km
+      result.length = seen + 1
+    }
+  }
+  return result
 }
 
 /** Остановки из точек маршрута: время в пути остановки — от предыдущей остановки, вместе со станциями следования. */
@@ -188,7 +273,7 @@ function toStops(points: RoutePoint[]): RouteStop[] {
   let runDuration = 0
   for (const p of points) {
     runDuration += p.runDuration
-    if (!p.stop) continue
+    if (!p.haveStop) continue
     result.push({
       station: p.station,
       km: p.km,
@@ -204,15 +289,25 @@ function fill(r: Route) {
   route.value = r
   stops.value = toStops(r.points)
   Object.assign(form, {
-    train: r.train,
+    train: r.trainNumber,
     name: r.name,
-    kind: r.kind,
-    since: r.since,
-    until: r.until ?? '',
-    hc: String(r.hoursConductor),
-    hl: String(r.hoursLnp),
-    hp: String(r.hoursPem),
+    kind: r.routeKind,
+    since: r.dbeg,
+    until: r.dend ?? '',
+    duration: r.duration > 0 ? formatHm(r.duration) : '',
+    hc: r.conductorHours === null ? '' : String(r.conductorHours),
+    hl: r.lnpHours === null ? '' : String(r.lnpHours),
+    hp: r.pemHours === null ? '' : String(r.pemHours),
   })
+  durationTouched = r.duration > 0
+  if (!durationTouched) form.duration = durationText.value
+}
+
+// время в пути не вводили (новый маршрут) — оно идёт за подсказкой по остановкам
+let durationTouched = false
+
+function onDurationInput() {
+  durationTouched = true
 }
 
 function back() {
@@ -224,10 +319,21 @@ const routeMinutes = computed(() => totalMinutes(stops.value))
 
 /** «19:05» — часы и минуты, тот же формат, что у времени в пути на схеме маршрута */
 const durationText = computed(() => formatHm(routeMinutes.value))
+watch(routeMinutes, () => {
+  if (!durationTouched) form.duration = durationText.value
+})
 
+/** Норма часов: целое неотрицательное число; иначе null. */
 function hours(value: string): number | null {
-  const n = Number(value.replace(',', '.'))
-  return value && Number.isFinite(n) && n >= 0 ? n : null
+  const text = value.trim()
+  return /^\d+$/.test(text) ? Number(text) : null
+}
+
+/** Время в пути «ч:мм» → минуты; не «ч:мм» или 0 — null. */
+function durationMinutes(value: string): number | null {
+  const m = /^(\d+):([0-5]\d)$/.exec(value.trim())
+  const minutes = m ? Number(m[1]) * 60 + Number(m[2]) : 0
+  return minutes > 0 ? minutes : null
 }
 
 async function save() {
@@ -235,55 +341,62 @@ async function save() {
   if (!r) return
   const values = [form.hc, form.hl, form.hp].map(hours)
   if (!form.train || !form.name || !form.since) {
-    error.value = t('Заполните номер поезда, сообщение и дату ввода маршрута')
+    error.value = formError(t('Заполните номер поезда, сообщение и дату ввода маршрута'))
+    return
+  }
+  const duration = durationMinutes(form.duration)
+  if (duration === null) {
+    error.value = formError(t('Укажите время в пути в виде ч:мм, например 19:05'))
     return
   }
   if (values.some((v) => v === null)) {
-    error.value = t('Время в пути и нормы часов — неотрицательные числа')
+    error.value = formError(t('Нормы часов — целые неотрицательные числа'))
     return
   }
   if (stops.value.length < 2 || stops.value.some((s) => !s.station)) {
-    error.value = t('Заполните остановки маршрута')
+    error.value = formError(t('Заполните остановки маршрута'))
     return
   }
-  error.value = ''
+  error.value = null
   saving.value = true
   try {
     const [hc, hl, hp] = values as number[]
     const saved = await saveRoute(
       {
         ...r,
-        train: form.train,
+        trainNumber: form.train,
         name: form.name,
-        kind: form.kind,
-        since: form.since,
-        until: form.until || null,
-        // время в пути — по остановкам, в часах с точностью до десятых
-        durationHours: Math.round(routeMinutes.value / 6) / 10,
-        hoursConductor: hc!,
-        hoursLnp: hl!,
-        hoursPem: hp!,
+        routeKind: form.kind,
+        dbeg: form.since,
+        dend: form.until || null,
+        duration,
+        conductorHours: hc!,
+        lnpHours: hl!,
+        pemHours: hp!,
       },
-      stops.value,
+      previewPoints.value,
     )
     fill(saved)
     Notify.create({ message: t('Маршрут сохранён'), color: 'primary' })
   } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
+    error.value = shownError(e)
   } finally {
     saving.value = false
   }
 }
 
-onMounted(async () => {
-  await dictManager.prepareDicts('RouteKind', 'Station')
+// цепочка загрузок — сразу в setup: спиннер виден с первой отрисовки
+async function init() {
+  loadError.value = null
   try {
-    const r = await fetchRoute(props.id)
-    if (r) fill(r)
-  } finally {
-    loading.value = false
+    // станции нужны редактору (названия, узловые станции) — грузятся параллельно с маршрутом
+    const [, r] = await busy.run(Promise.all([dictManager.prepareDict('Station'), fetchRoute(Number(props.id))]))
+    fill(r)
+  } catch (e) {
+    loadError.value = shownError(e)
   }
-})
+}
+void init()
 </script>
 
 <style scoped lang="scss">
@@ -292,11 +405,32 @@ onMounted(async () => {
 }
 
 .route-edit__chain {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
   margin-bottom: 1rem;
   padding: 0.75rem 1rem;
-  border: 0.0625rem solid $zs-border;
   border-radius: 0.25rem;
   background: #fff;
+}
+
+.route-edit__stops {
+  flex: 1;
+  min-width: 0;
+}
+
+// карта в левом углу цепочки: узкая, при развёрнутых станциях следования — шире. По высоте — во весь блок цепочки,
+// прижата к его верху, низу и левому краю: поля блока (.route-edit__chain) с этих сторон снимаются; между картой и
+// станциями — отступ блока (gap)
+.route-edit__map {
+  flex: none;
+  align-self: stretch;
+  width: 12rem;
+  margin: -0.75rem 0 -0.75rem -1rem;
+}
+
+.route-edit__map--wide {
+  width: 30rem;
 }
 
 .route-edit__columns {
@@ -314,6 +448,8 @@ onMounted(async () => {
 }
 
 .route-edit__section-title {
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.75rem)
+  margin-bottom: calc(-0.75rem / 3);
   color: $zs-text-muted;
   font-size: 0.75rem;
   font-weight: 600;
@@ -339,13 +475,9 @@ onMounted(async () => {
   align-self: flex-start;
 }
 
-.route-edit__duration {
-  display: flex;
-  align-items: center;
-  height: var(--zs-control-height);
-  color: $zs-text;
-  font-size: 0.875rem;
-  font-variant-numeric: tabular-nums;
+.route-edit__hint {
+  color: $zs-text-muted;
+  font-size: 0.75rem;
 }
 
 .route-edit__note {
@@ -358,7 +490,7 @@ onMounted(async () => {
   padding: 0.625rem 0.875rem;
   border-radius: 0.25rem;
   background: #f7dcd8;
-  color: #8f2416;
+  color: $zs-error-fg;
   font-size: 0.84375rem;
 }
 
@@ -372,7 +504,7 @@ onMounted(async () => {
   font-weight: 600;
 }
 
-.route-edit__missing {
-  color: $zs-text-muted;
+.route-edit__load-error {
+  margin: 1rem;
 }
 </style>

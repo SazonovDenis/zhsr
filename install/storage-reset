@@ -1,0 +1,37 @@
+#!/bin/bash
+# Очистить хранилище файлов (S3, контейнер zhsr-s3) с нуля, как db-reset - БД: контейнер s3 удаляется вместе с томом
+# zhsr_s3_data, поднимается пустым, и в нём создаётся бакет S3_BUCKET - клиентом mc из образа хранилища
+# (внутри контейнера, адрес хранилища там - localhost:9000).
+# Параметры - в .env; нет .env - копируется из .env.sample.
+#
+#   install/storage-reset
+# Обычно вызывается из env-reset вместе с пересозданием БД (install/db-reset).
+set -euo pipefail
+# пути docker и .env - от корня проекта
+cd "$(dirname "$0")/.."
+
+[ -f .env ] || { cp .env.sample .env; echo '.env создан из .env.sample'; }
+set -a; . ./.env; set +a
+
+compose() { docker compose --env-file .env -f docker/docker-compose.env.yml "$@"; }
+
+echo '--- хранилище файлов: удаление контейнера и тома'
+compose rm -s -f s3
+docker volume rm -f zhsr_s3_data >/dev/null
+
+echo '--- хранилище файлов: пустой контейнер'
+compose up -d s3
+
+echo "--- хранилище файлов: ожидание $S3_ENDPOINT"
+for _ in $(seq 60); do
+  curl -sf "$S3_ENDPOINT/minio/health/live" >/dev/null && break
+  sleep 1
+done
+# последняя проверка - с текстом ошибки curl (-S): в цикле ошибки ожидаемы, пока хранилище поднимается
+curl -sSf "$S3_ENDPOINT/minio/health/live" >/dev/null || { echo "хранилище $S3_ENDPOINT не отвечает" >&2; exit 1; }
+
+echo "--- хранилище файлов: бакет $S3_BUCKET"
+docker exec -e "MC_HOST_zhsr=http://$S3_ACCESS_KEY:$S3_SECRET_KEY@localhost:9000" zhsr-s3 \
+  mc mb --ignore-existing "zhsr/$S3_BUCKET"
+
+echo '--- готово: хранилище файлов очищено, бакет создан'

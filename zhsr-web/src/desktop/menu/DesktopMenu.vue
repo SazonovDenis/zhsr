@@ -17,8 +17,9 @@
         @click.stop="select(item)"
       />
 
-      <!-- «Администрирование» — последним в верхней группе; пункты раскрываются вниз, под заголовком группы -->
-      <div ref="adminEl" class="desktop-menu__admin">
+      <!-- «Администрирование» — последним в верхней группе; пункты раскрываются вниз, под заголовком группы. Пункт без
+           route — раздел пока не сделан: виден, но не выбирается -->
+      <div class="desktop-menu__admin">
         <button type="button" class="desktop-menu__group" :title="t(menu.admin.label)" @click.stop="onAdminClick">
           <span class="desktop-menu__item-body">
             <SvgIcon v-if="menu.admin.icon" :name="menu.admin.icon" />
@@ -41,6 +42,7 @@
             :active="isActive(item)"
             :collapsed="collapsed"
             :count="counters[item.id] ?? 0"
+            :disabled="!item.route"
             @click.stop="bus.emit(menuEvent(item))"
           />
         </template>
@@ -56,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue'
 import { useRoute } from 'vue-router'
 
 import type { CurrentUser } from '@/api/session'
@@ -64,7 +66,6 @@ import { fetchCurrentState } from '@/api/state'
 import { t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
-import { useCloseOnOutside } from '@/shared/composables/useCloseOnOutside'
 import { isMenuAutoCollapsed } from '@/shared/screen'
 import { loadCurrentUser } from '@/shared/user'
 import { MENU_COLLAPSED_WIDTH, MENU_WIDTH, menuState } from './menuState'
@@ -88,19 +89,20 @@ const route = useRoute()
 // сворачивается само: на узком окне (уже 1300px) или когда фрейму с правой панелью не хватает места при развёрнутом
 // меню (menuState.panelNeedsSpace, решает DesktopFrame). Выбор пользователя дальше сохраняется
 const collapsed = computed(() => menuState.userCollapsed ?? (isMenuAutoCollapsed() || menuState.panelNeedsSpace))
-const adminOpen = ref(false)
-
-// группа, раскрытая шевроном, сворачивается, как только теряет фокус
-const adminEl = ref<HTMLElement | null>(null)
-useCloseOnOutside(adminEl, () => (adminOpen.value = false))
+const adminOpen = computed(() => menuState.openGroup === menu.admin.id)
 const user = shallowRef<CurrentUser | null>(null)
 
 // счётчики пунктов меню из текущего состояния (fetchCurrentState); загружаются при показе меню, после
 // восстановления связи и по событию шины state-refresh — его отправляет тот, кто изменил данные, влияющие на счётчики
 const counters = shallowRef<Record<string, number>>({})
 
+// счётчики: ошибку их загрузки осознанно не показываем — пункты меню остаются без чисел
 async function loadState() {
-  counters.value = (await fetchCurrentState()).counters
+  try {
+    counters.value = (await fetchCurrentState()).counters
+  } catch {
+    counters.value = {}
+  }
 }
 
 const onStateRefresh = () => void loadState()
@@ -127,20 +129,18 @@ function onToggleClick() {
   bus.emit(collapsed.value ? 'menu-expand' : 'menu-collapse')
 }
 
-// пункт основного списка закрывает список администрирования; пункты администрирования его оставляют открытым
 function select(item: MenuItem) {
-  adminOpen.value = false
   bus.emit(menuEvent(item))
 }
 
 // в свёрнутом меню пунктам группы показаться негде: меню разворачивается и сразу показывает их
 function onAdminClick() {
   if (collapsed.value) {
-    adminOpen.value = true
+    menuState.openGroup = menu.admin.id
     bus.emit('menu-expand')
     return
   }
-  adminOpen.value = !adminOpen.value
+  menuState.openGroup = adminOpen.value ? null : menu.admin.id
 }
 
 function isActive(item: MenuItem): boolean {

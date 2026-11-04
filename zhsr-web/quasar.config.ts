@@ -5,7 +5,7 @@ import { defineConfig } from '#q-app'
 export default defineConfig((ctx) => {
   return {
     // загрузочные файлы из src/boot, выполняются до создания приложения
-    boot: ['i18n', 'ws'],
+    boot: ['i18n', 'errors', 'ws'],
 
     css: ['app.scss'],
 
@@ -45,7 +45,7 @@ export default defineConfig((ctx) => {
     },
 
     devServer: {
-      port: 9000,
+      port: 9999,
       open: false,
       // запросы /api уходят на сервер zhsr-app; у контроллеров сервера префикса /api нет, поэтому он отрезается
       proxy: {
