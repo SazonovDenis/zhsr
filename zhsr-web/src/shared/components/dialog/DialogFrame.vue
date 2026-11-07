@@ -9,7 +9,7 @@
     >
       <DialogHeader :title="title" @close="close" />
 
-      <div class="dialog-frame__body">
+      <div class="dialog-frame__body q-py-md q-px-lg">
         <slot />
       </div>
 
@@ -163,9 +163,9 @@ function onAction(action: DialogAction) {
   display: flex;
   flex-direction: column;
   max-width: 100%;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
-  box-shadow: 0 1.5rem 3.75rem rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1.5rem 3.8rem rgba(0, 0, 0, 0.2);
 
   &--maximized {
     width: 100%;
@@ -180,7 +180,6 @@ function onAction(action: DialogAction) {
   flex-direction: column;
   gap: 1rem;
   min-height: 0;
-  padding: 1.125rem 1.375rem;
   overflow-y: auto;
 }
 
@@ -190,6 +189,6 @@ function onAction(action: DialogAction) {
 
 .dialog-frame__state {
   color: $zs-error-fg;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 </style>

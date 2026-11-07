@@ -1,5 +1,5 @@
 <template>
-  <div class="load-spinner">
+  <div class="load-spinner q-py-lg q-px-md">
     <q-spinner color="primary" :size="size" />
   </div>
 </template>
@@ -14,6 +14,5 @@ withDefaults(defineProps<{ size?: string }>(), { size: '2.5rem' })
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
 }
 </style>

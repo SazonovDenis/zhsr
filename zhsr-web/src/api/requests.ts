@@ -3,7 +3,7 @@ import { http } from './http'
 import type { TripRef } from './wagons'
 
 /**
- * API заявок на ремонт (Ф-ЗАЯ-01 … Ф-ЗАЯ-07): сервер zhsr-app, RequestController. Подача, исправление и пояснение —
+ * API заявок на ремонт (Ф-ЗАЯ-01 … Ф-ЗАЯ-07): сервер zhsr-app, RequestController. Подача, исправление и примечание —
  * multipart: черновик частью draft (JSON) или текст полем text, фото — частями photos.
  */
 
@@ -11,6 +11,14 @@ import type { TripRef } from './wagons'
 export interface UserRef {
   id: number
   name: string
+}
+
+/** Вагон в данных. */
+export interface WagonRef {
+  id: number
+  number: string
+  /** тип вагона — id справочника WagonType */
+  wagonType: number
 }
 
 /**
@@ -35,20 +43,13 @@ export interface RepairRequest {
   id: number
   /** номер: код компании, год, порядковый номер в году — «KZR-26-00042» */
   number: string
-  /** вагон — id вагона */
-  wagon: number
-  /** номер вагона */
-  wagonNumber: string
-  /** тип вагона — id справочника WagonType */
-  wagonType: number
+  wagon: WagonRef
   /** вид расположения вагона сейчас — id справочника LocationKind; null — расположение не задано */
   locationType: number | null
   /** где вагон сейчас: станция, депо или парк отстоя — id справочника по виду расположения; null — вагон в рейсе */
   place: number | null
-  /** рейс, в составе которого вагон едет сейчас, — id рейса; null — вагон не в рейсе */
-  wagonTrip: number | null
-  /** рейс вагона для показа: номер поезда и маршрут; null — вагон не в рейсе */
-  wagonTripName: string | null
+  /** рейс, в составе которого вагон едет сейчас; null — вагон не в рейсе */
+  wagonTrip: TripRef | null
   /** станция расположения вагона — id справочника Station; null — вагон в рейсе */
   wagonStation: number | null
   /** рейс заявки */
@@ -61,8 +62,10 @@ export interface RepairRequest {
   severityType: number
   /** автор заявки */
   createdByUsr: UserRef
-  /** время подачи, ISO */
+  /** время создания заявки пользователем, ISO */
   createdDt: string
+  /** время поступления заявки на сервер, ISO; заявка, поданная без связи, поступает позже создания */
+  receivedDt: string
   description: string
   /** статус — id справочника RequestStatus (константы RequestStatus) */
   requestStatusType: number
@@ -72,42 +75,61 @@ export interface RepairRequest {
   tor: boolean
   /** ПЭМ передал заявку в депо: бригада рейса её уже не исполняет; сервер пока не хранит — всегда false */
   forwarded: boolean
-  /** сколько фото приложено к заявке и пояснениям */
+  /** сколько фото приложено к заявке и примечаниям */
   photoCount: number
 }
 
-/** Фото заявки или пояснения. url — адрес файла; null — файла пока нет (показывается заглушка). */
+/** Фото заявки или примечания. url — адрес файла; null — файла пока нет (показывается заглушка). */
 export interface RequestPhoto {
   id: string
   url: string | null
 }
 
-/**
- * Запись истории заявки: подача, смена статуса (журнал repair_request_status), назначение исполнителя (журнал
- * repair_request_executor) или пояснение (repair_request_note).
- */
-export interface RequestEvent {
-  /** время, ISO */
-  at: string
-  /** кто внёс запись; null — Система */
-  by: UserRef | null
-  kind: 'CREATED' | 'STATUS' | 'ASSIGN' | 'NOTE'
-  /** STATUS: действие, которым сменился статус */
-  action?: RequestAction
-  /** ASSIGN: новый исполнитель; null — назначение снято */
-  executor?: UserRef | null
-  /** комментарий к действию или текст пояснения */
-  text?: string
-  /** фото пояснения */
-  photos?: RequestPhoto[]
+/** Фото заявки на сервере. */
+export interface StoredPhoto extends RequestPhoto {
+  /** когда приложено, ISO */
+  createdDt: string
+  /** когда поступило на сервер, ISO */
+  receivedDt: string
+  createdByUsr: UserRef
 }
 
-/** Заявка с историей и фото — для карточки. */
+/** Запись журнала статусов. */
+export interface RequestStatusRecord {
+  /** начало записи, ISO */
+  dbeg: string
+  /** статус — id справочника RequestStatus */
+  requestStatusType: number
+  /** кто внёс запись; null — Система */
+  createdByUsr: UserRef | null
+}
+
+/** Запись журнала исполнителей. */
+export interface RequestExecutorRecord {
+  /** начало записи, ISO */
+  dbeg: string
+  /** исполнитель; null — назначение снято */
+  executorUsr: UserRef | null
+  /** кто внёс запись; null — Система */
+  createdByUsr: UserRef | null
+}
+
+/** Примечание к заявке. */
+export interface RequestNote {
+  /** когда написано, ISO */
+  createdDt: string
+  /** когда поступило на сервер, ISO */
+  receivedDt: string
+  createdByUsr: UserRef
+  note: string
+}
+
+/** Заявка с плоскими списками журналов, примечаний и фото: историю из них строит shared/requests/historyTree.ts. */
 export interface RequestDetail extends RepairRequest {
-  /** история по времени, от старых к новым */
-  events: RequestEvent[]
-  /** фото, приложенные при подаче */
-  photos: RequestPhoto[]
+  statuses: RequestStatusRecord[]
+  executors: RequestExecutorRecord[]
+  notes: RequestNote[]
+  photos: StoredPhoto[]
 }
 
 /** Список заявок (Ф-ЗАЯ-06): «мои» — поданные пользователем; «на исполнение» — видные ему или назначенные лично. */
@@ -163,6 +185,10 @@ export interface RequestDraft {
   photos: Blob[]
   /** исполнитель — id сотрудника; задаёт только мастер депо при подаче, null — не назначать */
   executorUsr: number | null
+  /** когда пользователь подал или исправил заявку, ISO: задаётся при отправке из очереди; нет — время сервера */
+  clientDt?: string
+  /** guid записи с телефона: сервер принимает её один раз, повторная отправка после обрыва связи дубля не создаёт */
+  clientGuid?: string
 }
 
 /** Сколько заявок по фильтру в каждом статусе и каждой критичности — числа у кнопок фильтров. */
@@ -172,29 +198,14 @@ export interface RequestCounts {
 }
 
 /** Фото в ответе сервера: файл — GET /requests/photos/{id}. */
-interface ServerPhoto {
-  id: number
-}
+type ServerPhoto = Omit<StoredPhoto, 'id' | 'url'> & { id: number }
 
-interface ServerEvent extends Omit<RequestEvent, 'photos'> {
-  photos: ServerPhoto[]
-}
-
-interface ServerDetail extends RepairRequest {
-  events: ServerEvent[]
-  photos: ServerPhoto[]
-}
-
-/** Фото сервера — фото для показа: адрес файла на сервере. */
-function photoOf(p: ServerPhoto): RequestPhoto {
-  return { id: String(p.id), url: http.getUri({ url: `/requests/photos/${p.id}` }) }
-}
+type ServerDetail = Omit<RequestDetail, 'photos'> & { photos: ServerPhoto[] }
 
 function detailOf(d: ServerDetail): RequestDetail {
   return {
     ...d,
-    photos: d.photos.map(photoOf),
-    events: d.events.map((e) => ({ ...e, photos: e.photos.map(photoOf) })),
+    photos: d.photos.map((p) => ({ ...p, id: String(p.id), url: http.getUri({ url: `/requests/photos/${p.id}` }) })),
   }
 }
 
@@ -233,7 +244,7 @@ export async function updateRequest(id: number, draft: RequestDraft): Promise<Re
   return (await http.put<RepairRequest>(`/requests/${id}`, draftForm(draft))).data
 }
 
-/** Выполнить действие над заявкой (Ф-ЗАЯ-03, Ф-ЗАЯ-07); comment пишется пояснением к заявке. */
+/** Выполнить действие над заявкой (Ф-ЗАЯ-03, Ф-ЗАЯ-07); comment пишется примечанием к заявке. */
 export async function runRequestAction(id: number, action: RequestAction, comment = ''): Promise<RequestDetail> {
   return detailOf((await http.post<ServerDetail>(`/requests/${id}/actions/${action}`, { comment })).data)
 }
@@ -243,12 +254,32 @@ export async function assignRequest(id: number, executor: number | null): Promis
   return detailOf((await http.put<ServerDetail>(`/requests/${id}/executor`, { executor })).data)
 }
 
-/** Пояснение к заявке: текст и фото (Ф-ЗАЯ-05). */
-export async function addRequestNote(id: number, text: string, photos: Blob[]): Promise<RequestDetail> {
+/**
+ * Примечание к заявке: текст и фото (Ф-ЗАЯ-05). clientDt — когда написано, ISO: при отправке из очереди; clientGuid —
+ * guid записи с телефона.
+ */
+export async function addRequestNote(
+  id: number,
+  text: string,
+  photos: Blob[],
+  clientDt?: string,
+  clientGuid?: string,
+): Promise<RequestDetail> {
   const form = new FormData()
   form.append('text', text)
+  if (clientDt) form.append('clientDt', clientDt)
+  if (clientGuid) form.append('clientGuid', clientGuid)
   photos.forEach((p) => form.append('photos', p))
   return detailOf((await http.post<ServerDetail>(`/requests/${id}/notes`, form)).data)
+}
+
+/** Одно фото к заявке с телефона: каждое фото — своя отправка. clientDt — время заявки или примечания, ISO. */
+export async function addRequestPhoto(id: number, photo: Blob, clientDt: string, clientGuid: string): Promise<void> {
+  const form = new FormData()
+  form.append('photo', photo)
+  form.append('clientDt', clientDt)
+  form.append('clientGuid', clientGuid)
+  await http.post(`/requests/${id}/photos`, form)
 }
 
 /** Сотрудники службы — кому можно назначить заявку. */

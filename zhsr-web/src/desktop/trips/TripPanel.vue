@@ -10,27 +10,43 @@
       <span>{{ dictManager.getValue('TransportType', trip.transportType) }}</span>
       <span>{{ t('Время в пути') }}</span>
       <span>{{ formatHm(trip.duration) }}</span>
-      <span>{{ t('Отправление') }}</span>
-      <span>{{ formatDateTime(trip.plannedDt) }}</span>
+      <TripTimes
+        :planned-dt="trip.plannedDt"
+        :departed-dt="trip.departedDt"
+        :arrived-dt="trip.arrivedDt"
+        :duration="trip.duration"
+      />
       <span>{{ t('Состояние') }}</span>
       <span><DictBadge :id="trip.tripStatusType" dict="TripState" /></span>
     </SidePanelFields>
     <div v-if="trip" class="trip-panel__actions">
-      <button type="button" class="trip-panel__btn" @click="openForm">{{ t('Формирование') }}</button>
-      <button v-if="canEditTrip" type="button" class="trip-panel__btn" @click="editTrip">
+      <button type="button" class="trip-panel__btn q-py-none q-px-md" @click="openForm">{{ t('Формирование') }}</button>
+      <button v-if="canEditTrip" type="button" class="trip-panel__btn q-py-none q-px-md" @click="editTrip">
         {{ t('Редактировать') }}
       </button>
-      <button v-if="canDepart" type="button" class="trip-panel__btn" @click="mark(true)">
+      <button v-if="canDepart" type="button" class="trip-panel__btn q-py-none q-px-md" @click="mark(true)">
         {{ t('Отметить отправление') }}
       </button>
-      <button v-if="canArrive" type="button" class="trip-panel__btn" @click="mark(false)">
+      <button v-if="canArrive" type="button" class="trip-panel__btn q-py-none q-px-md" @click="mark(false)">
         {{ t('Отметить прибытие') }}
       </button>
+      <button v-if="fixDeparture" type="button" class="trip-panel__btn q-py-none q-px-md" @click="mark(true, true)">
+        {{ t('Исправить отправление') }}
+      </button>
+      <button v-if="fixArrival" type="button" class="trip-panel__btn q-py-none q-px-md" @click="mark(false, true)">
+        {{ t('Исправить прибытие') }}
+      </button>
       <template v-if="canCouple">
-        <button type="button" class="trip-panel__btn" @click="couple('detach')">{{ t('Отцепка') }}</button>
-        <button type="button" class="trip-panel__btn" @click="couple('attach')">{{ t('Прицепка') }}</button>
+        <button type="button" class="trip-panel__btn q-py-none q-px-md" @click="couple('detach')">
+          {{ t('Отцепка') }}
+        </button>
+        <button type="button" class="trip-panel__btn q-py-none q-px-md" @click="couple('attach')">
+          {{ t('Прицепка') }}
+        </button>
       </template>
-      <button v-if="canCancel" type="button" class="trip-panel__btn" @click="cancel">{{ t('Отменить рейс') }}</button>
+      <button v-if="canCancel" type="button" class="trip-panel__btn q-py-none q-px-md" @click="cancel">
+        {{ t('Отменить рейс') }}
+      </button>
     </div>
   </SidePanel>
 </template>
@@ -47,13 +63,14 @@ import { openDialog } from '@/shared/components/dialog/openDialog'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import { CrewDuty, RoleType, TripStatus } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
-import { formatDateTime } from '@/shared/format'
 import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import TripCancelDialog from './TripCancelDialog.vue'
 import TripMarkDialog from './TripMarkDialog.vue'
 import TripNewDialog from './TripNewDialog.vue'
+import TripTimes from './TripTimes.vue'
+import { markEditable, useNow } from '@/shared/trips/tripTimes'
 
 /**
  * Правая панель списка рейсов: карточка выбранного рейса, переход к формированию рейса и отметки отправления и
@@ -74,6 +91,21 @@ const isAdmin = computed(() => hasRole(currentUser.value, RoleType.ADMIN))
 const canMark = computed(() => isChief.value || isAdmin.value)
 const canDepart = computed(() => canMark.value && props.trip?.tripStatusType === TripStatus.PLANNED)
 const canArrive = computed(() => canMark.value && props.trip?.tripStatusType === TripStatus.IN_PROGRESS)
+
+// исправить или отменить отметку можно 10 минут после неё
+const now = useNow()
+const fixDeparture = computed(
+  () =>
+    canMark.value &&
+    props.trip?.tripStatusType === TripStatus.IN_PROGRESS &&
+    markEditable(props.trip.departureMarkedDt, now.value),
+)
+const fixArrival = computed(
+  () =>
+    canMark.value &&
+    props.trip?.tripStatusType === TripStatus.DONE &&
+    markEditable(props.trip.arrivalMarkedDt, now.value),
+)
 
 const planned = computed(() => props.trip?.tripStatusType === TripStatus.PLANNED)
 const canEditTrip = computed(() => planned.value && (hasRole(currentUser.value, RoleType.PLANNER) || isAdmin.value))
@@ -114,14 +146,17 @@ function openForm() {
   void router.push({ name: 'trip-form', params: { id: props.trip!.id } })
 }
 
-async function mark(depart: boolean) {
-  const result = await openDialog<TripCrew>(TripMarkDialog, { tripId: props.trip!.id, depart })
-  if (!result) return
-  Notify.create({
-    message: depart ? t('Отправление отмечено') : t('Прибытие отмечено'),
-    type: 'positive',
-    position: 'bottom',
+// отметить; fix — исправить время уже сделанной отметки или отменить её
+async function mark(depart: boolean, fix = false) {
+  const trip = props.trip!
+  const markedTime = depart ? trip.departedDt : trip.arrivedDt
+  const result = await openDialog<{ crew: TripCrew; message: string }>(TripMarkDialog, {
+    tripId: trip.id,
+    depart,
+    fix: fix ? markedTime : null,
   })
+  if (!result) return
+  Notify.create({ message: result.message, type: 'positive', position: 'bottom' })
   void loadCurrentUser(true)
   emit('changed')
 }
@@ -136,13 +171,12 @@ async function mark(depart: boolean) {
 
 .trip-panel__btn {
   height: var(--zs-control-height);
-  padding: 0 0.875rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
   color: $primary;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
 

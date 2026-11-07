@@ -9,8 +9,9 @@ import { bus } from './bus'
  * Сервер шлёт сообщения в каналы: канал `<имя>` — это destination `/topic/<имя>` на сервере. Подписка переживает
  * разрывы: после переподключения клиент подписывается заново.
  *
- * После повторного подключения и при событии браузера online в шину уходит `connection-restored`: за время разрыва
- * могли пропасть сообщения сервера, и тот, кому это важно (например, DictManager), сверяет своё состояние.
+ * После повторного подключения и при событии браузера online в шину уходит `connection-back`. Его слушает только
+ * shared/user.ts: он сверяет локальную БД с сервером и отправляет `connection-restored`, по которому остальные обновляют
+ * свои данные: за время разрыва могли пропасть сообщения сервера.
  *
  * Адрес — /api/ws: в dev-режиме он проксируется на сервер zhsr-app (quasar.config.ts > devServer.proxy).
  */
@@ -32,11 +33,11 @@ const client = new Client({
 client.onConnect = () => {
   subscriptions.clear()
   for (const channel of handlers.keys()) subscribeChannel(channel)
-  if (wasConnected) bus.emit('connection-restored')
+  if (wasConnected) bus.emit('connection-back')
   wasConnected = true
 }
 
-window.addEventListener('online', () => bus.emit('connection-restored'))
+window.addEventListener('online', () => bus.emit('connection-back'))
 
 function subscribeChannel(channel: string) {
   const subscription = client.subscribe(`/topic/${channel}`, (message) => {

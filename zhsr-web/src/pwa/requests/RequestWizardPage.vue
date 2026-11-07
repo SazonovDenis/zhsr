@@ -17,7 +17,7 @@
           v-for="f in frequent"
           :key="f.id"
           type="button"
-          class="wizard__chip"
+          class="wizard__chip q-py-none q-px-md"
           :class="{ 'wizard__chip--on': draft.faultType === f.id }"
           @click="pickFault(f.id)"
         >
@@ -26,7 +26,7 @@
       </div>
       <div class="wizard__tree">
         <template v-for="c in tree" :key="c.id">
-          <button type="button" class="wizard__cat" @click="toggleCat(c.id)">
+          <button type="button" class="wizard__cat q-py-none q-px-md" @click="toggleCat(c.id)">
             <span class="wizard__cat-mark" :style="{ background: c.color }" />
             <span class="wizard__grow">{{ c.name }}</span>
             <span class="wizard__count">{{ c.count }}</span>
@@ -34,7 +34,7 @@
           </button>
           <template v-if="catOpen(c.id)">
             <template v-for="g in c.groups" :key="g.id">
-              <button type="button" class="wizard__group" @click="toggleGroup(g.id)">
+              <button type="button" class="wizard__group q-py-none q-pr-md q-pl-lg" @click="toggleGroup(g.id)">
                 <span class="wizard__grow">{{ g.name }}</span>
                 <span class="wizard__count">{{ g.items.length }}</span>
                 <SvgIcon name="chevron-down" size="0.8rem" :class="{ 'wizard__chevron--closed': !groupOpen(g.id) }" />
@@ -44,7 +44,7 @@
                   v-for="f in g.items"
                   :key="f.id"
                   type="button"
-                  class="wizard__fault"
+                  class="wizard__fault q-py-sm q-pr-md q-pl-xl"
                   :class="{ 'wizard__fault--on': draft.faultType === f.id }"
                   @click="pickFault(f.id)"
                 >
@@ -55,7 +55,7 @@
             </template>
           </template>
         </template>
-        <div v-if="tree.length === 0" class="wizard__empty">{{ t('Ничего не найдено') }}</div>
+        <div v-if="tree.length === 0" class="wizard__empty q-py-lg q-px-md">{{ t('Ничего не найдено') }}</div>
       </div>
     </template>
 
@@ -68,7 +68,7 @@
             v-for="s in severities"
             :key="s.id"
             type="button"
-            class="wizard__chip"
+            class="wizard__chip q-py-none q-px-md"
             :class="{ 'wizard__chip--on': draft.severityType === s.id }"
             @click="draft.severityType = Number(s.id)"
           >
@@ -82,7 +82,7 @@
       </div>
       <div v-if="canChooseExecutor" class="wizard__field">
         <span class="wizard__label">{{ t('Исполнитель') }}</span>
-        <select v-model="draft.executorUsr" class="wizard__select">
+        <select v-model="draft.executorUsr" class="wizard__select q-py-none q-px-md">
           <option :value="null">{{ t('Не назначать — возьмёт любой сотрудник службы') }}</option>
           <option v-for="u in staff" :key="u.id" :value="u.id">{{ u.name }}</option>
         </select>
@@ -91,14 +91,14 @@
         <span class="wizard__label">{{ t('Описание') }}</span>
         <textarea
           v-model="draft.description"
-          class="wizard__textarea"
+          class="wizard__textarea q-pa-md"
           rows="3"
           :placeholder="t('Например: в 3-м купе не закрывается окно')"
         />
       </div>
       <div class="wizard__field">
         <span class="wizard__label">{{ t('Фото • {n} из 5', { n: draft.photos.length }) }}</span>
-        <PhotoPicker v-model="draft.photos" :max="5" large />
+        <PhotoPicker v-model="draft.photos" :max="5" large compress />
       </div>
     </template>
 
@@ -108,7 +108,7 @@
       <button
         v-if="pick.myWagon.value"
         type="button"
-        class="wizard__mine"
+        class="wizard__mine q-pa-md"
         :class="{ 'wizard__mine--on': draft.wagon === pick.myWagon.value.id }"
         @click="chooseWagon(pick.myWagon.value)"
       >
@@ -124,7 +124,7 @@
       <div v-if="pick.hasTrip.value" class="wizard__chips">
         <button
           type="button"
-          class="wizard__chip wizard__chip--small"
+          class="wizard__chip wizard__chip--small q-py-none q-px-md"
           :class="{
             'wizard__chip--on': pick.tripOn.value,
             'wizard__chip--faded': pick.tripOn.value && !!pick.query.value,
@@ -147,7 +147,7 @@
           v-for="w in pick.wagons.value"
           :key="w.number"
           type="button"
-          class="wizard__wagon"
+          class="wizard__wagon q-py-none q-px-md"
           :class="{ 'wizard__wagon--on': draft.wagon === w.id }"
           @click="chooseWagon(w)"
         >
@@ -157,29 +157,36 @@
         </button>
         <LoadSpinner v-if="pick.loading.value && pick.wagons.value.length === 0" size="1.5rem" />
         <ErrorBox v-else-if="pick.error.value" :error="pick.error.value" :retry="pick.load" />
-        <div v-else-if="!pick.loading.value && pick.wagons.value.length === 0" class="wizard__empty">
+        <div v-else-if="!pick.loading.value && pick.wagons.value.length === 0" class="wizard__empty q-py-lg q-px-md">
           {{ t('Вагоны не найдены') }}
         </div>
       </div>
       <div class="wizard__field">
         <span class="wizard__label">{{ t('Рейс') }}</span>
-        <select v-model="draft.trip" class="wizard__select">
+        <select v-model="draft.trip" class="wizard__select q-py-none q-px-md">
           <option :value="null">{{ t('Без рейса') }}</option>
-          <option v-for="tr in tripOptions" :key="tr.id" :value="tr.id">{{ tr.name }}</option>
+          <option v-for="tr in tripOptions" :key="tr.id" :value="tr.id">{{ tr.text }}</option>
         </select>
       </div>
-      <div v-if="draft.faultType" class="wizard__goes">
+      <div v-if="draft.faultType" class="wizard__goes q-pa-md">
         <span class="wizard__caption">{{ t('Уйдёт') }}</span>
         <span class="wizard__goes-to">{{ goesTo }}</span>
       </div>
     </template>
 
-    <div v-if="error" class="wizard__error">{{ error }}</div>
+    <div v-if="error" class="wizard__error q-py-sm q-px-md">{{ error }}</div>
 
     <template #bar>
       <div class="wizard__nav">
-        <button type="button" class="wizard__btn" @click="back">{{ step === 0 ? t('Отмена') : t('Назад') }}</button>
-        <button type="button" class="wizard__btn wizard__btn--primary" :disabled="!canNext || running" @click="next">
+        <button type="button" class="wizard__btn q-py-none q-px-md" @click="back">
+          {{ step === 0 ? t('Отмена') : t('Назад') }}
+        </button>
+        <button
+          type="button"
+          class="wizard__btn wizard__btn--primary q-py-none q-px-md"
+          :disabled="!canNext || running"
+          @click="next"
+        >
           {{ step < 2 ? t('Далее') : id ? t('Сохранить') : t('Отправить') }}
         </button>
       </div>
@@ -189,14 +196,15 @@
 
 <script setup lang="ts">
 import { Notify } from 'quasar'
-import { computed, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, reactive, ref, shallowRef, toRaw, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { isNetworkError } from '@/api/http'
 import type { RequestDraft, UserRef } from '@/api/requests'
-import { createRequest, fetchRequest, fetchServiceStaff, updateRequest } from '@/api/requests'
+import { createRequest, fetchServiceStaff, updateRequest } from '@/api/requests'
 import type { TripRef, RequestWagon } from '@/api/wagons'
 import { t } from '@/boot/i18n'
+import { randomGuid } from '@/shared/db/db'
 import { dictChoices } from '@/shared/dict/dictChoices'
 import { dictManager } from '@/shared/dict/DictManager'
 import { provideBusy } from '@/shared/busy'
@@ -205,23 +213,36 @@ import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { notifyError } from '@/shared/errors'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { isOnline } from '@/shared/network'
-import { loadCached } from '@/shared/offline/cache'
-import { queueRequest } from '@/shared/offline/outbox'
+import type { DraftView } from '@/shared/offline/outbox'
+import {
+  flushOutbox,
+  outboxItem,
+  queuedEdit,
+  queueEdit,
+  queuePhotos,
+  queueRequest,
+  updateQueuedRequest,
+  withQueuedEdit,
+} from '@/shared/offline/outbox'
+import { isoDateTime } from '@/shared/format'
 import { faultDefaults, faultTree, frequentFaults, frequentGroupId, isFaultSearch } from '@/shared/requests/faults'
 import { FaultCategory, Severity } from '@/shared/constants/systemDicts'
 import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
 import { faultName } from '@/shared/requests/requestView'
 import { canAssignOnCreate } from '@/shared/requests/rights'
+import { loadOffline } from '@/shared/requests/useRequestCard'
 import { useWagonPick } from '@/shared/requests/useWagonPick'
 import { currentUser, loadCurrentUser } from '@/shared/user'
 import PwaPage from '../components/PwaPage.vue'
+import { tripRefText } from '@/shared/trips/tripRefText'
 
 /**
  * Подача заявки на телефоне в 3 шага (Ф-ЗАЯ-01): неисправность, детали (критичность, описание, фото), вагон
  * (мой вагон, состав рейса или поиск по номеру) и рейс. Критичность подставляется из неисправности, служба определяется ею, рейс —
  * из вагона; всё можно изменить. Без связи заявка встаёт в очередь на телефоне и отправится сама.
  *
- * Задан id — исправление заявки (Ф-ЗАЯ-07): поля заполнены из заявки, сохранить можно только при связи.
+ * Задан id — исправление заявки (Ф-ЗАЯ-07): поля заполнены из заявки. Без связи исправление встаёт в очередь на
+ * телефоне и отправится само. Id «local-…» — заявка из очереди: она ещё не на сервере, исправляется прямо в очереди.
  */
 const props = withDefaults(defineProps<{ id?: string }>(), { id: '' })
 
@@ -241,17 +262,21 @@ const draft = reactive<RequestDraft>({
   photos: [],
   executorUsr: null,
 })
-// номер выбранного вагона — для заявки в очереди на телефоне
+// номер и тип выбранного вагона — для показа, пока черновик в очереди на телефоне
 const wagonNumber = ref('')
+const wagonType = ref(0)
 
 // на шаге деталей в заголовке — выбранная неисправность
 const pageTitle = computed(() => {
   if (step.value === 1 && draft.faultType) return faultName(draft.faultType)
-  return props.id ? t('Исправление заявки') : t('Новая заявка')
+  return step.value === 0 ? t('Вид неисправности') : t('Вагон и рейс')
 })
 
 const running = ref(false)
 const error = ref('')
+
+// исправляется заявка из очереди на телефоне: на сервере её ещё нет
+const isQueued = computed(() => props.id.startsWith('local-'))
 
 // --- шаг 1: неисправность ---
 
@@ -307,22 +332,32 @@ function onDigits(e: Event) {
 function chooseWagon(w: RequestWagon) {
   draft.wagon = w.id
   wagonNumber.value = w.number
+  wagonType.value = w.wagonType
   pickedWagon.value = w
   draft.trip = w.trip?.id ?? null
 }
 
 // рейс: рейс вагона, текущий рейс пользователя, рейс исправляемой заявки
 const tripOptions = computed(() => {
-  const list: TripRef[] = []
-  const add = (tr: TripRef | null | undefined) => {
-    if (tr && !list.some((x) => x.id === tr.id)) list.push(tr)
+  const list: { id: number; text: string }[] = []
+  const add = (id: number, text: string) => {
+    if (!list.some((x) => x.id === id)) list.push({ id, text })
   }
-  add(pickedWagon.value?.trip)
+  const wagonTrip = pickedWagon.value?.trip
+  if (wagonTrip) add(wagonTrip.id, tripRefText(wagonTrip))
   const u = currentUser.value?.trip
-  if (u) add({ id: u.id, name: `${u.trainNumber} ${u.name}` })
-  add(requestTrip.value)
+  if (u) add(u.id, `${u.trainNumber} ${u.name}`)
+  if (requestTrip.value) add(requestTrip.value.id, tripRefText(requestTrip.value))
   return list
 })
+
+// выбранный рейс для показа, пока черновик в очереди; у рейса пользователя плановое отправление — его отправление
+function chosenTrip(): TripRef | null {
+  const u = currentUser.value?.trip
+  const trips = [pickedWagon.value?.trip, requestTrip.value, u && { ...u, plannedDt: u.departure }]
+  const trip = trips.find((x) => x?.id === draft.trip)
+  return trip ? { id: trip.id, trainNumber: trip.trainNumber, name: trip.name, plannedDt: trip.plannedDt } : null
+}
 
 const goesTo = computed(() => (service.value ? dictManager.getValue('Service', service.value) : ''))
 
@@ -350,31 +385,87 @@ async function next() {
   await submit()
 }
 
+function toCard() {
+  void router.replace({ name: 'pwa-request', params: { id: props.id } })
+}
+
 async function submit() {
   error.value = ''
   running.value = true
-  const data: RequestDraft = { ...draft, photos: [...draft.photos] }
+  // guid и время — с первой попытки: сервер мог принять запись, а ответ — потеряться; у заявки и её фото одно время
+  const at = isoDateTime(new Date())
+  const data: RequestDraft = { ...draft, photos: [...draft.photos], clientGuid: randomGuid(), clientDt: at }
+  const view: DraftView = { wagonNumber: wagonNumber.value, wagonType: wagonType.value, trip: chosenTrip() }
+  const author = currentUser.value?.id ?? 0
   try {
-    if (props.id) {
-      await updateRequest(Number(props.id), data)
-      void router.replace({ name: 'pwa-request', params: { id: props.id } })
+    if (isQueued.value) {
+      if (await updateQueuedRequest(props.id, data, view)) toCard()
+      else error.value = t('Заявка уже ушла на сервер — откройте её в списке заявок')
       return
     }
-    const created = await createRequest(data)
+    if (props.id) {
+      const id = Number(props.id)
+      // исправление уже ждёт в очереди — новое должно его заменить, иначе из очереди ушло бы старое
+      if (queuedEdit(id)) {
+        await queueEdit(id, data, author, view)
+        void flushOutbox()
+      } else {
+        // фото уходят по одному, за исправлением
+        await updateRequest(id, { ...data, photos: [] })
+        await queuePhotos({ request: id }, at, data.photos, author)
+      }
+      toCard()
+      return
+    }
+    // фото уходят по одному, за заявкой
+    const created = await createRequest({ ...data, photos: [] })
+    await queuePhotos({ request: created.id }, at, data.photos, author)
     Notify.create({ message: t('Заявка отправлена: {n}', { n: created.number }), position: 'bottom' })
     void router.replace({ name: 'pwa-request', params: { id: created.id } })
   } catch (e) {
-    if (!props.id && isNetworkError(e)) {
+    if (props.id && isNetworkError(e)) {
+      // связи нет — исправление ждёт на телефоне и уйдёт само
+      await queueEdit(Number(props.id), data, author, view)
+      Notify.create({
+        message: t('Связи нет. Исправление сохранено на телефоне и отправится само'),
+        position: 'bottom',
+      })
+      toCard()
+      return
+    }
+    if (isNetworkError(e)) {
       // связи нет — заявка ждёт на телефоне и уйдёт сама
-      await queueRequest(data, currentUser.value?.id ?? 0, wagonNumber.value)
+      await queueRequest(data, author, view)
       Notify.create({ message: t('Связи нет. Заявка сохранена на телефоне и отправится сама'), position: 'bottom' })
       void router.replace({ name: 'pwa-requests' })
       return
     }
-    error.value = isNetworkError(e) ? t('Для действия нужна связь') : e instanceof Error ? t(e.message) : String(e)
+    error.value = e instanceof Error ? t(e.message) : String(e)
   } finally {
     running.value = false
   }
+}
+
+// черновик исправления: из заявки в очереди или из заявки с сервера (без связи — из копии на телефоне) с учётом
+// исправления, которое уже ждёт отправки; фото в черновике — только новые, остальные живут сами по себе
+async function fillDraft() {
+  const queued = isQueued.value ? outboxItem(props.id) : queuedEdit(Number(props.id))
+  if (isQueued.value && !queued) {
+    error.value = t('Заявка уже ушла на сервер — откройте её в списке заявок')
+    return
+  }
+  const r = isQueued.value ? null : withQueuedEdit((await loadOffline(Number(props.id))).data)
+  Object.assign(draft, {
+    wagon: queued?.draft.wagon ?? r!.wagon.id,
+    trip: queued ? queued.draft.trip : (r!.trip?.id ?? null),
+    faultType: queued?.draft.faultType ?? r!.faultType,
+    severityType: queued?.draft.severityType ?? r!.severityType,
+    description: queued?.draft.description ?? r!.description,
+    executorUsr: queued?.draft.executorUsr ?? null,
+  })
+  wagonNumber.value = queued?.wagonNumber ?? r!.wagon.number
+  wagonType.value = queued?.wagonType ?? r!.wagon.wagonType
+  requestTrip.value = queued ? toRaw(queued.trip) : r!.trip
 }
 
 // загрузка — сразу в setup и в счёт ожидания страницы: спиннер виден с первой отрисовки
@@ -386,16 +477,7 @@ void busy
     if (frequentGroup !== null) openGroups.value = [frequentGroup]
     if (props.id) {
       try {
-        const r = (await loadCached(`request:${props.id}`, () => fetchRequest(Number(props.id)))).data
-        Object.assign(draft, {
-          wagon: r.wagon,
-          trip: r.trip?.id ?? null,
-          faultType: r.faultType,
-          severityType: r.severityType,
-          description: r.description,
-        })
-        wagonNumber.value = r.wagonNumber
-        requestTrip.value = r.trip
+        await fillDraft()
       } catch (e) {
         error.value = e instanceof Error ? t(e.message) : String(e)
       }
@@ -415,12 +497,12 @@ if (!props.id) {
 .wizard__bars {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.25rem;
+  gap: 0.3rem;
 }
 
 .wizard__bar {
   height: 0.3rem;
-  border-radius: 0.125rem;
+  border-radius: 0.1rem;
   background: $zs-border;
 
   &--on {
@@ -433,7 +515,7 @@ if (!props.id) {
 .wizard__textarea {
   width: 100%;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
@@ -448,23 +530,21 @@ if (!props.id) {
 .wizard__input,
 .wizard__select {
   height: 3.3rem;
-  padding: 0 0.875rem;
 }
 
 .wizard__input--number {
-  font-size: 1.0625rem;
+  font-size: 1.1rem;
 }
 
 .wizard__textarea {
-  padding: 0.75rem 0.875rem;
   resize: none;
 }
 
 .wizard__caption {
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -482,19 +562,18 @@ div.wizard__caption {
 
 .wizard__chip {
   min-height: 2.8rem;
-  padding: 0 0.875rem;
   border: 0.0625rem solid $zs-border;
   border-radius: 62.5rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   text-align: left;
   cursor: pointer;
 
   &--small {
     min-height: 2.1rem;
-    font-size: 0.8125rem;
+    font-size: 0.8rem;
   }
 
   &--on {
@@ -514,7 +593,7 @@ div.wizard__caption {
   flex-direction: column;
   overflow: hidden;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
 }
 
@@ -536,9 +615,8 @@ div.wizard__caption {
 
 .wizard__cat {
   min-height: 2.8rem;
-  padding: 0 0.75rem;
   background: $zs-bg-header;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   font-weight: 700;
 
   &:first-child {
@@ -550,20 +628,18 @@ div.wizard__caption {
   flex: none;
   width: 0.5rem;
   height: 0.5rem;
-  border-radius: 0.125rem;
+  border-radius: 0.1rem;
 }
 
 .wizard__group {
   min-height: 2.5rem;
-  padding: 0 0.75rem 0 1.75rem;
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
 .wizard__fault {
   min-height: 2.4rem;
-  padding: 0.375rem 0.75rem 0.375rem 2.75rem;
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
   line-height: 1.3;
 
   &--on {
@@ -583,7 +659,7 @@ div.wizard__caption {
 
 .wizard__count {
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 400;
 }
 
@@ -594,9 +670,8 @@ div.wizard__caption {
 }
 
 .wizard__empty {
-  padding: 1.25rem 0.75rem;
   color: $zs-text-muted;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 
 .wizard__field {
@@ -606,7 +681,7 @@ div.wizard__caption {
 }
 
 .wizard__label {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   font-weight: 600;
 }
 
@@ -618,10 +693,9 @@ div.wizard__label {
 .wizard__mine {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
-  padding: 1rem;
-  border: 0.125rem solid $zs-border;
-  border-radius: 0.375rem;
+  gap: 0.9rem;
+  border: 0.1rem solid $zs-border;
+  border-radius: 0.4rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
@@ -638,22 +712,21 @@ div.wizard__label {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 0.1rem;
 }
 
 .wizard__mine-number {
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   font-weight: 700;
 }
 
 .wizard__muted {
   color: $zs-text-muted;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 
 .wizard__wagon {
   min-height: 3.3rem;
-  padding: 0 1rem;
 
   &:first-child {
     border-top: 0;
@@ -672,35 +745,32 @@ div.wizard__label {
 .wizard__goes {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.875rem 1rem;
-  border-radius: 0.375rem;
+  gap: 0.3rem;
+  border-radius: 0.4rem;
   background: $zs-row-selected-bg;
 }
 
 .wizard__goes-to {
-  font-size: 1.0625rem;
+  font-size: 1.1rem;
   font-weight: 700;
 }
 
 .wizard__error {
-  padding: 0.625rem 0.875rem;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: $zs-error-bg;
   color: $zs-error-fg;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 
 .wizard__nav {
   display: flex;
-  gap: 0.625rem;
+  gap: 0.6rem;
 }
 
 .wizard__btn {
   min-height: 3.5rem;
-  padding: 0 1.125rem;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.375rem;
+  border-radius: 0.4rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
@@ -713,7 +783,7 @@ div.wizard__label {
     border: 0;
     background: $primary;
     color: #fff;
-    font-size: 1.0625rem;
+    font-size: 1.1rem;
     font-weight: 700;
   }
 

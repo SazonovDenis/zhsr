@@ -1,15 +1,16 @@
 package kz.zhsr.app.service.admin;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtDb;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.constants.SystemDicts;
-import kz.zhsr.app.dto.AdminColumn;
-import kz.zhsr.app.dto.AdminOption;
-import kz.zhsr.app.dto.AdminPage;
-import kz.zhsr.app.dto.AdminQuery;
-import kz.zhsr.app.dto.AdminTable;
+import kz.zhsr.app.dto.admin.AdminColumn;
+import kz.zhsr.app.dto.admin.AdminOption;
+import kz.zhsr.app.dto.admin.AdminPage;
+import kz.zhsr.app.dto.admin.AdminQuery;
+import kz.zhsr.app.dto.admin.AdminTable;
 import kz.zhsr.app.service.ApiException;
 import kz.zhsr.app.service.DbErrors;
 import kz.zhsr.app.service.SqlQuery;
@@ -144,8 +145,8 @@ public class AdminService {
         }
         return db.loadList(refTable, params).stream()
                 .map(r -> new AdminOption(r.getLong("id"), r.getString(textColumn)))
-                .sorted(Comparator.comparing(AdminOption::text, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(AdminOption::id))
+                .sorted(Comparator.comparing(AdminOption::getText, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(AdminOption::getId))
                 .toList();
     }
 
@@ -194,13 +195,8 @@ public class AdminService {
                     ids.add(n.longValue());
                 }
             }
-            Map<Long, String> texts = new HashMap<>();
-            if (!ids.isEmpty()) {
-                String textColumn = AdminTables.textColumn(c.ref());
-                for (DbRec ref : db.loadList(c.ref(), Map.of("id", ids))) {
-                    texts.put(ref.getLong("id"), ref.getString(textColumn));
-                }
-            }
+            Map<Long, Object> texts = ids.isEmpty() ? Map.of()
+                    : UtDb.flatLong(db.loadList(c.ref(), Map.of("id", ids)), "id", AdminTables.textColumn(c.ref()));
             for (Map<String, Object> row : rows) {
                 Object value = row.get(c.name());
                 row.put(c.name() + "_text", value instanceof Number n ? texts.get(n.longValue()) : null);

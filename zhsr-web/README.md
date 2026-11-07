@@ -163,7 +163,7 @@ npm run e2e        # e2e-тесты (Playwright)
 | `src/shared/db/db.ts`                | локальная база IndexedDB (Dexie)                                                                         |
 | `src/shared/user.ts`                 | текущий пользователь: роли, депо, текущий рейс; загружается один раз, без сети — из копии                |
 | `src/shared/network.ts`              | есть ли связь (`isOnline`)                                                                               |
-| `src/shared/offline/`                | мобильная часть без сети: копии последних данных (`cache.ts`) и очередь заявок (`outbox.ts`)             |
+| `src/shared/offline/`                | мобильная часть без сети: копии последних данных (`cache.ts`) и очередь заявок, исправлений и примечаний (`outbox.ts`) |
 | `src/shared/requests/`               | заявки на ремонт для обеих частей: права (`rights.ts`), показ, карточка, выбор вагона и неисправности    |
 | `src/desktop/menu/`                  | левое меню десктопной части, пункты — в `menu.json`                                                      |
 | `src/desktop/frame/DesktopFrame.vue` | фрейм страницы: слоты `header`, тело и `right` (правая панель)                                           |

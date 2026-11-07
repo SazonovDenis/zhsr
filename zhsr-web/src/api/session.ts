@@ -1,3 +1,4 @@
+import type { DictName } from '@/shared/dict/dicts'
 import { http } from './http'
 
 /**
@@ -22,6 +23,16 @@ export interface UserTrip {
   crewDutyType: number
   /** номера вагонов, за которыми закреплён проводник; у остальных должностей пусто */
   wagons: string[]
+  /** плановое отправление, ISO с часовым поясом */
+  plannedDt: string
+  /** фактическое отправление, ISO с часовым поясом; null — рейс не отправлен */
+  departedDt: string | null
+  /** фактическое прибытие, ISO с часовым поясом; null — рейс не прибыл */
+  arrivedDt: string | null
+  /** когда отмечено отправление, ISO: 10 минут после этого отметку можно исправить или отменить; null — не отмечено */
+  departureMarkedDt: string | null
+  /** когда отмечено прибытие, ISO; null — не отмечено */
+  arrivalMarkedDt: string | null
 }
 
 export interface CurrentUser {
@@ -40,21 +51,27 @@ export interface CurrentUser {
   depotStation: number | null
   /** текущий рейс; null — пользователь сейчас не в бригаде рейса */
   trip: UserTrip | null
+  /** соседний рейс: предыдущий или следующий относительно текущего, показывается по ссылке; null — нет */
+  otherTrip: UserTrip | null
+  /** идентификатор серверной БД: с ним сверяется локальная БД браузера */
+  dbGuid: string
+  /** текущие версии справочников */
+  dictVersions: Partial<Record<DictName, string>>
 }
 
 /**
  * Войти: проверить логин и пароль и открыть сеанс. Неверные данные — ошибка с текстом для пользователя. Пароль задан
  * администратором — ответ 406 (isPasswordChangeRequired): сеанс открыт, нужно сменить пароль.
  */
-export async function login(username: string, password: string): Promise<CurrentUser> {
-  return (await http.post<CurrentUser>('/session/login', { username, password })).data
+export async function login(username: string, password: string): Promise<void> {
+  await http.post('/session/login', { username, password })
 }
 
 /**
  * Сменить пароль вошедшему пользователю. Неверный текущий пароль, короткий новый — ошибка с текстом для пользователя.
  */
-export async function changePassword(oldPassword: string, newPassword: string): Promise<CurrentUser> {
-  return (await http.post<CurrentUser>('/session/password', { oldPassword, newPassword })).data
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  await http.post('/session/password', { oldPassword, newPassword })
 }
 
 /** Завершить сеанс пользователя на сервере. */
@@ -62,7 +79,7 @@ export async function logout(): Promise<void> {
   await http.post('/session/logout')
 }
 
-/** Текущий пользователь: роли, депо, текущий рейс. */
+/** Текущий пользователь: роли, депо, текущий рейс; и контекст сервера: идентификатор БД, версии справочников. */
 export async function fetchCurrentUser(): Promise<CurrentUser> {
   return (await http.get<CurrentUser>('/getUserInfo')).data
 }

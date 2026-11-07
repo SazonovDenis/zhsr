@@ -1,31 +1,31 @@
 package kz.zhsr.app.service;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUserService;
-import kz.zhsr.app.dto.ListSort;
-import kz.zhsr.app.dto.RouteOption;
-import kz.zhsr.app.dto.RouteFilter;
-import kz.zhsr.app.dto.RouteRow;
-import kz.zhsr.app.dto.TripOption;
-import kz.zhsr.app.dto.TripFilter;
-import kz.zhsr.app.dto.TripRow;
-import kz.zhsr.app.dto.WagonOption;
-import kz.zhsr.app.dto.WagonFilter;
-import kz.zhsr.app.dto.WagonRow;
+import kz.zhsr.app.dto.common.ListSort;
+import kz.zhsr.app.dto.route.RouteFilter;
+import kz.zhsr.app.dto.route.RouteOption;
+import kz.zhsr.app.dto.route.RouteRow;
+import kz.zhsr.app.dto.trip.TripFilter;
+import kz.zhsr.app.dto.trip.TripOption;
+import kz.zhsr.app.dto.trip.TripRow;
+import kz.zhsr.app.dto.wagon.WagonFilter;
+import kz.zhsr.app.dto.wagon.WagonOption;
+import kz.zhsr.app.dto.wagon.WagonRow;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Чтение списков для страниц «Вагоны», «Рейсы» и «Маршруты» и вариантов выбора для комбо. Вариант выбора - общая
  * часть строки: строка таблицы - вариант выбора и поля таблицы; оба собираются из одного запроса.
  * <p>
- * Методы только читают. Строка списка собирается одним SQL-запросом ({@link ListSql}): фильтр и сортировка - в БД. Значения
+ * Методы только читают. Строка списка читается одним SQL-запросом ({@link ListSql}): фильтр и сортировка - в БД. Значения
  * справочников отдаются id справочника, текст подставляет фронт (DictManager). Пустой список в строке - пустой
  * список, не null.
  * <p>
@@ -45,150 +45,95 @@ public class ListService {
     private final CurrentUserService currentUserService;
     private final Visibility visibility;
     private final RouteService routeService;
+    private final RefResolver refResolver;
 
-    public ListService(Db db, CurrentUserService currentUserService, Visibility visibility, RouteService routeService) {
+    public ListService(Db db, CurrentUserService currentUserService, Visibility visibility, RouteService routeService,
+                       RefResolver refResolver) {
         this.db = db;
         this.currentUserService = currentUserService;
         this.visibility = visibility;
         this.routeService = routeService;
+        this.refResolver = refResolver;
     }
 
     /**
      * Список вагонов (GET /wagons). По умолчанию - по номеру вагона.
      */
     public List<WagonRow> wagons(WagonFilter filter, ListSort sort) throws Exception {
-        List<WagonRow> res = new ArrayList<>();
-        for (DbRec r : wagonRecs(filter, sort)) {
-            WagonRow row = fillWagonOption(new WagonRow(), r);
-            row.setModelType(r.getLong("model_type", null));
-            row.setDepot(r.getLong("depot", null));
-            row.setDbegLocation(r.getDateTimeTZ("dbeg_location"));
-            row.setWagonStatusType(r.getLong("wagon_status_type"));
-            row.setDbegStatus(r.getDateTimeTZ("dbeg_status"));
-            res.add(row);
-        }
-        return res;
+        return wagonRows(filter, sort, WagonRow.class);
     }
 
     /**
      * Вагоны как варианты выбора (GET /wagons/options): фильтр и видимость - как у списка вагонов.
      */
     public List<WagonOption> wagonOptions(WagonFilter filter, ListSort sort) throws Exception {
-        return wagonRecs(filter, sort).stream().map(r -> fillWagonOption(new WagonOption(), r)).toList();
+        return wagonRows(filter, sort, WagonOption.class);
     }
 
     /**
      * Список рейсов (GET /trips). По умолчанию - по плановому отправлению.
      */
     public List<TripRow> trips(TripFilter filter, ListSort sort) throws Exception {
-        // готовность рейса сервер пока не считает - пусто
-        return tripRecs(filter, sort, r -> {
-            TripRow row = new TripRow();
-            row.setTransportType(r.getLong("transport_type"));
-            row.setDepartedDt(r.getDateTimeTZ("departed_dt"));
-            return row;
-        });
+        return tripRows(filter, sort, TripRow.class);
     }
 
     /**
      * Рейсы как варианты выбора (GET /trips/options): фильтр и видимость - как у списка рейсов.
      */
     public List<TripOption> tripOptions(TripFilter filter, ListSort sort) throws Exception {
-        return tripRecs(filter, sort, r -> new TripOption());
+        return tripRows(filter, sort, TripOption.class);
     }
 
     /**
      * Список маршрутов (GET /routes). По умолчанию - по номеру поезда.
      */
     public List<RouteRow> routes(RouteFilter filter, ListSort sort) throws Exception {
-        return routeRecs(filter, sort, r -> {
-            RouteRow row = new RouteRow();
-            row.setTransportType(r.getLong("transport_type"));
-            row.setDbeg(RouteService.localDate(r, "dbeg"));
-            row.setDend(RouteService.localDate(r, "dend"));
-            row.setConductorHours(RouteService.integer(r, "conductor_hours"));
-            row.setLnpHours(RouteService.integer(r, "lnp_hours"));
-            row.setPemHours(RouteService.integer(r, "pem_hours"));
-            return row;
-        });
+        return routeRows(filter, sort, RouteRow.class);
     }
 
     /**
      * Маршруты как варианты выбора (GET /routes/options): фильтр и видимость - как у списка маршрутов.
      */
     public List<RouteOption> routeOptions(RouteFilter filter, ListSort sort) throws Exception {
-        return routeRecs(filter, sort, r -> new RouteOption());
+        return routeRows(filter, sort, RouteOption.class);
     }
 
     // --- общее для списка и вариантов выбора
 
-    /**
-     * Новый объект для строки запроса: вариант выбора или строка таблицы с её собственными полями; поля варианта выбора
-     * заполняет вызывающий.
-     */
-    @FunctionalInterface
-    private interface RowFactory<T> {
-        T create(DbRec rec) throws Exception;
-    }
-
-    private List<DbRec> wagonRecs(WagonFilter filter, ListSort sort) throws Exception {
+    private <T extends WagonOption> List<T> wagonRows(WagonFilter filter, ListSort sort, Class<T> clazz) throws Exception {
         Visibility.Access access = visibility.access(currentUserService.get(), filter.depot());
         SqlQuery q = ListSql.wagons(filter, access, sort);
-        return db.loadSql(q.sql(), q.params());
-    }
-
-    private static <T extends WagonOption> T fillWagonOption(T option, DbRec r) {
-        option.setId(r.getLong("id"));
-        option.setNumber(r.getString("number"));
-        option.setWagonType(r.getLong("wagon_type"));
-        option.setLocationType(r.getLong("location_type"));
-        option.setPlace(r.getLong("place"));
-        option.setTrainNumber(r.getString("train_number"));
-        option.setName(r.getString("name"));
-        return option;
+        List<T> res = db.loadSql(q.sql(), q.params(), clazz);
+        refResolver.resolve(res);
+        return res;
     }
 
     /**
      * Рейсы по фильтру и видимости; у каждого - вид, длина и остановки маршрута. Станции маршрутов - одним запросом на
      * все маршруты.
      */
-    private <T extends TripOption> List<T> tripRecs(TripFilter filter, ListSort sort, RowFactory<T> factory)
-            throws Exception {
+    private <T extends TripOption> List<T> tripRows(TripFilter filter, ListSort sort, Class<T> clazz) throws Exception {
         Visibility.Access access = visibility.access(currentUserService.get(), filter.depot());
         SqlQuery q = ListSql.trips(filter, access, sort);
-        List<DbRec> trips = db.loadSql(q.sql(), q.params());
+        List<T> trips = db.loadSql(q.sql(), q.params(), clazz);
         if (trips.isEmpty()) {
-            return List.of();
+            return trips;
         }
-        Set<Long> routes = new HashSet<>();
-        for (DbRec trip : trips) {
-            routes.add(trip.getLong("route"));
-        }
+        Set<Long> routes = trips.stream().map(TripOption::getRoute).collect(Collectors.toSet());
         Map<Long, List<DbRec>> stations = routeService.stations(routes);
-        List<T> res = new ArrayList<>(trips.size());
-        for (DbRec trip : trips) {
-            List<DbRec> points = stations.getOrDefault(trip.getLong("route"), List.of());
-            T option = factory.create(trip);
-            option.setId(trip.getLong("id"));
-            option.setTrainNumber(trip.getString("train_number"));
-            option.setRoute(trip.getLong("route"));
-            option.setName(trip.getString("name"));
-            option.setRouteKind(trip.getInt("route_kind"));
-            option.setDuration(trip.getInt("duration"));
-            option.setTripStatusType(trip.getLong("trip_status_type"));
-            option.setPlannedDt(trip.getDateTimeTZ("planned_dt"));
-            option.setKm(RouteService.km(points));
-            option.setStops(RouteService.stops(points));
-            res.add(option);
+        for (T trip : trips) {
+            List<DbRec> points = stations.getOrDefault(trip.getRoute(), List.of());
+            trip.setKm(RouteService.km(points));
+            trip.setStops(RouteService.stops(points));
         }
-        return res;
+        return trips;
     }
 
     /**
      * Маршруты по фильтру и видимости; у каждого - длина и остановки. Станции маршрутов - одним запросом на все
      * маршруты.
      */
-    private <T extends RouteOption> List<T> routeRecs(RouteFilter filter, ListSort sort, RowFactory<T> factory)
+    private <T extends RouteOption> List<T> routeRows(RouteFilter filter, ListSort sort, Class<T> clazz)
             throws Exception {
         Visibility.Access access = visibility.access(currentUserService.get(), filter.depot());
 
@@ -202,29 +147,18 @@ public class ListService {
         Boolean active = states.contains("active") == states.contains("closed") ? null : states.contains("active");
 
         SqlQuery q = ListSql.routes(filter, active, access, sort);
-        List<DbRec> routes = db.loadSql(q.sql(), q.params());
+        List<T> routes = db.loadSql(q.sql(), q.params(), clazz);
         if (routes.isEmpty()) {
-            return List.of();
+            return routes;
         }
-        Set<Long> ids = new HashSet<>();
-        for (DbRec r : routes) {
-            ids.add(r.getLong("id"));
-        }
+        Set<Long> ids = routes.stream().map(RouteOption::getId).collect(Collectors.toSet());
         Map<Long, List<DbRec>> stations = routeService.stations(ids);
-        List<T> res = new ArrayList<>(routes.size());
-        for (DbRec r : routes) {
-            List<DbRec> points = stations.getOrDefault(r.getLong("id"), List.of());
-            T option = factory.create(r);
-            option.setId(r.getLong("id"));
-            option.setTrainNumber(r.getString("train_number"));
-            option.setName(r.getString("name"));
-            option.setRouteKind(r.getInt("route_kind"));
-            option.setDuration(r.getInt("duration"));
-            option.setKm(RouteService.km(points));
-            option.setStops(RouteService.stops(points));
-            res.add(option);
+        for (T route : routes) {
+            List<DbRec> points = stations.getOrDefault(route.getId(), List.of());
+            route.setKm(RouteService.km(points));
+            route.setStops(RouteService.stops(points));
         }
-        return res;
+        return routes;
     }
 
 }

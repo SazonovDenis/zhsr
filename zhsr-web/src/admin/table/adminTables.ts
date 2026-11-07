@@ -3,6 +3,7 @@ import { fetchAdminOptions, fetchAdminTables } from '@/api/admin'
 import { t } from '@/boot/i18n'
 import type { Column } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
+import { onSessionReset } from '@/shared/sessionState'
 import { sortFields } from '../shared/adminFieldOrder'
 
 /**
@@ -11,6 +12,12 @@ import { sortFields } from '../shared/adminFieldOrder'
 
 let tables: Promise<AdminTable[]> | null = null
 const options = new Map<string, Promise<AdminOption[]>>()
+
+// выход: описания и варианты загружал прежний пользователь — у следующего могут быть другие права
+onSessionReset(() => {
+  tables = null
+  options.clear()
+})
 
 /** Описание таблицы; null — таблица не редактируется в администрировании. */
 export async function adminTable(name: string): Promise<AdminTable | null> {

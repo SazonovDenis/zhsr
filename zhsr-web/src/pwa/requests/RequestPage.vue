@@ -1,92 +1,113 @@
 <template>
-  <PwaPage :back="goBack" :title="r ? faultName(r.faultType) : t('Заявка')" :subtitle="subtitle">
+  <PwaPage
+    white
+    :back="goBack"
+    :title="r ? faultName(r.faultType) : t('Заявка')"
+    :subtitle="subtitle"
+    :stale="card.stale.value"
+  >
     <LoadSpinner v-if="busy.active.value && !r" />
-    <ErrorBox v-if="card.error.value" :error="card.error.value" :retry="r ? null : card.load" class="card__error" />
+    <ErrorBox
+      v-if="card.error.value"
+      :error="card.error.value"
+      :retry="r ? null : card.load"
+      class="card__error q-py-sm q-px-md"
+    />
     <div v-if="!queuedItem && !r && !card.loading.value && !card.error.value" class="card__muted">
       {{ t('Заявка не найдена') }}
     </div>
 
     <template v-if="r">
-      <div v-if="card.stale.value" class="card__stale">{{ t('Нет связи — показаны сохранённые данные') }}</div>
-      <div v-if="r.tor" class="card__tor">{{ t('ТОР: вагон отцеплен, ремонт в депо') }}</div>
-      <div v-if="r.description" class="card__desc">{{ r.description }}</div>
+      <div v-if="r.tor" class="card__tor q-py-sm q-px-md">{{ t('ТОР: вагон отцеплен, ремонт в депо') }}</div>
 
       <div class="card__badges">
-        <span v-if="queuedItem" class="zs-badge card__queued">{{ t('Ожидает отправки') }}</span>
+        <QueuedRefusal v-if="queuedItem?.refused" :item="queuedItem" />
+        <span v-else-if="queuedItem" class="zs-badge card__queued">{{ t('Ожидает отправки') }}</span>
         <DictBadge v-else :id="r.requestStatusType" dict="RequestStatus" />
         <span :style="severityStyle(r.severityType)">{{ dictManager.getValue('Severity', r.severityType) }}</span>
         <span v-if="r.forwarded" class="card__muted">{{ t('передана в депо') }}</span>
+        <SoftLink
+          v-if="queuedItem || card.editable.value"
+          text="Редактировать заявку"
+          class="q-ml-auto"
+          :disabled="card.running.value"
+          @click="edit"
+        />
       </div>
 
-      <RequestSteps :status="r.requestStatusType" :queued="!!queuedItem" large />
-      <div class="card__next">
-        <span class="card__section-title">{{ t('Что дальше') }}</span>
-        <span class="card__next-text">{{ nextText(r, !!queuedItem) }}</span>
-      </div>
+      <!-- как запись истории: описание слева, фото заявки столбиком справа; ждущие отправки — там же -->
+      <!-- без описания и фото блока нет: иначе пустое место над атрибутами -->
+      <TextPhotos
+        v-if="r.description || tree.photos.length > 0 || tree.own.length > 0"
+        :photos="tree.photos"
+        :pending="pendingOwn"
+        :caption="{ meta: subtitle, text: r.description }"
+      >
+        <div class="card__top-main">
+          <div v-if="r.description" class="card__desc">{{ r.description }}</div>
+        </div>
+        <template v-if="tree.own.length > 0" #photos="{ all, caption }">
+          <QueuedPhoto v-for="item in tree.own" :key="item.id" :item="item" :all="all" :caption="caption" />
+        </template>
+      </TextPhotos>
 
-      <section class="card__section">
+      <section class="card__section q-pt-md q-px-sm q-pb-none">
         <div class="card__section-title">{{ t('Атрибуты заявки') }}</div>
         <div class="card__attrs">
           <span>{{ t('Вагон') }}</span>
           <span>
-            <span class="zs-mono">{{ r.wagonNumber }}</span>
-            <template v-if="r.wagonType"> • {{ dictManager.getValue('WagonType', r.wagonType) }}</template>
+            <span class="zs-mono">{{ r.wagon.number }}</span>
+            <template v-if="r.wagon.wagonType"> • {{ dictManager.getValue('WagonType', r.wagon.wagonType) }}</template>
           </span>
           <span>{{ t('Рейс') }}</span>
-          <span>{{ r.trip?.name ?? '—' }}</span>
+          <span>{{ r.trip ? tripRefDatedText(r.trip) : '—' }}</span>
           <span>{{ t('Служба') }}</span>
           <span>{{ dictManager.getValue('Service', r.service) }}</span>
           <span>{{ t('Автор') }}</span>
           <span>{{ r.createdByUsr.name }}</span>
+          <template v-if="receivedLate(r.createdDt, r.receivedDt)">
+            <span>{{ t('Поступила на сервер') }}</span>
+            <span>{{ formatDateTime(r.receivedDt) }}</span>
+          </template>
           <span>{{ t('Исполнитель') }}</span>
           <span>
-            <select
-              v-if="card.assignable.value"
-              class="card__select"
-              :value="r.executorUsr?.id ?? ''"
-              :disabled="card.blocked.value"
-              @change="onAssign"
-            >
-              <option value="">{{ t('Не назначен') }}</option>
-              <option v-for="u in staffOptions" :key="u.id" :value="u.id">{{ u.name }}</option>
-            </select>
-            <template v-else>{{ r.executorUsr?.name ?? t('не назначен') }}</template>
+            {{ r.executorUsr?.name ?? t('не назначен') }}
+            <SoftLink v-if="card.assignable.value" text="Назначить" class="card__assign q-ml-sm" @click="openAssign" />
           </span>
         </div>
-        <PhotoStrip v-if="photos.length > 0" :photos="photos" />
+        <div v-if="card.stale.value" class="card__stale">{{ t('Фото недоступны без связи') }}</div>
       </section>
 
-      <section v-if="detail" class="card__section">
+      <section class="card__section q-pt-md q-px-sm q-pb-none">
         <div class="card__section-head">
           <span class="card__section-title">{{ t('История') }}</span>
-          <button type="button" class="card__link" :disabled="card.blocked.value" @click="noteOpen = true">
-            {{ t('Добавить пояснение') }}
-          </button>
+          <SoftLink text="Добавить примечание" :disabled="card.noteBlocked.value" @click="noteOpen = true" />
         </div>
-        <RequestHistory :events="detail.events" :status="detail.requestStatusType" large />
+        <div v-if="card.stale.value" class="card__stale">{{ t('История недоступна без связи') }}</div>
+        <RequestHistory :nodes="tree.nodes" :status="historyStatus" :pending="pendingPhotos" large>
+          <template #pending="{ node, all, caption }">
+            <QueuedPhoto v-for="item in node.queued" :key="item.id" :item="item" :all="all" :caption="caption" />
+          </template>
+          <template #queued="{ node, line }">
+            <QueuedItem :items="node.queued" :line="line" />
+          </template>
+        </RequestHistory>
       </section>
     </template>
 
     <template v-if="hasBar" #bar>
-      <div v-if="!isOnline" class="card__need-net">{{ t('Для действия нужна связь') }}</div>
+      <div v-if="!isOnline" class="card__need-net">
+        {{ t('Для действия нужна связь') }}
+      </div>
       <div class="card__buttons">
         <button
-          v-if="card.editable.value"
-          type="button"
-          class="card__btn card__btn--wide"
-          :disabled="card.blocked.value"
-          @click="edit"
-        >
-          {{ t('Исправить') }}
-        </button>
-        <button
-          v-for="a in card.actions.value"
+          v-for="a in actions"
           :key="a.action"
           type="button"
-          class="card__btn"
+          class="card__btn q-py-none q-px-md"
           :class="[`card__btn--${a.kind}`, { 'card__btn--wide': a.kind !== 'secondary' }]"
           :disabled="card.blocked.value"
-          @click="card.start(a.action)"
+          @click="onAction(a.action)"
         >
           {{ a.title }}
         </button>
@@ -102,15 +123,16 @@
   >
     <textarea
       v-model="card.comment.value"
-      class="card__textarea"
+      class="card__textarea q-pa-md"
       rows="4"
       :placeholder="card.pendingDef.value?.comment ? t(card.pendingDef.value.comment) : ''"
     />
+    <PhotoPicker v-if="card.pendingDef.value?.photos" v-model="card.actionPhotos.value" large compress />
     <template #buttons>
-      <button type="button" class="card__btn" @click="card.cancel">{{ t('Отмена') }}</button>
+      <button type="button" class="card__btn q-py-none q-px-md" @click="card.cancel">{{ t('Отмена') }}</button>
       <button
         type="button"
-        class="card__btn card__btn--grow"
+        class="card__btn card__btn--grow q-py-none q-px-md"
         :class="card.pendingDef.value?.kind === 'danger' ? 'card__btn--danger' : 'card__btn--primary'"
         :disabled="!card.comment.value.trim() || card.blocked.value"
         @click="card.confirm"
@@ -120,16 +142,41 @@
     </template>
   </BottomSheet>
 
-  <!-- пояснение к заявке: текст и фото -->
-  <BottomSheet v-model:show="noteOpen" :title="t('Пояснение к заявке')">
-    <textarea v-model="noteText" class="card__textarea" rows="4" :placeholder="t('Текст пояснения')" />
-    <PhotoPicker v-model="notePhotos" large />
+  <!-- взять в работу заявку, назначенную другому -->
+  <BottomSheet v-model:show="takeOpen" :title="t('Заявка назначена другому')">
+    <div>
+      {{ t('Исполнитель заявки — {name}. Взять её в работу вместо него?', { name: card.foreignExecutor.value }) }}
+    </div>
     <template #buttons>
-      <button type="button" class="card__btn" @click="closeNote">{{ t('Отмена') }}</button>
+      <button type="button" class="card__btn q-py-none q-px-md" @click="takeOpen = false">{{ t('Отмена') }}</button>
+      <button type="button" class="card__btn card__btn--grow card__btn--primary q-py-none q-px-md" @click="confirmTake">
+        {{ t('Взять в работу') }}
+      </button>
+    </template>
+  </BottomSheet>
+
+  <!-- назначение исполнителя -->
+  <PickSheet
+    v-model:show="assignOpen"
+    :title="t('Назначить исполнителя')"
+    :options="assignOptions"
+    :selected="detail?.executorUsr?.id ?? null"
+    :error="assignError"
+    :retry="loadAssign"
+    :disabled="card.blocked.value"
+    @pick="card.assign($event)"
+  />
+
+  <!-- примечание к заявке: текст и фото -->
+  <BottomSheet v-model:show="noteOpen" :title="t('Примечание к заявке')">
+    <textarea v-model="noteText" class="card__textarea q-pa-md" rows="4" :placeholder="t('Текст примечания')" />
+    <PhotoPicker v-model="notePhotos" large compress />
+    <template #buttons>
+      <button type="button" class="card__btn q-py-none q-px-md" @click="closeNote">{{ t('Отмена') }}</button>
       <button
         type="button"
-        class="card__btn card__btn--grow card__btn--primary"
-        :disabled="(!noteText.trim() && notePhotos.length === 0) || card.blocked.value"
+        class="card__btn card__btn--grow card__btn--primary q-py-none q-px-md"
+        :disabled="(!noteText.trim() && notePhotos.length === 0) || card.noteBlocked.value"
         @click="saveNote"
       >
         {{ t('Добавить') }}
@@ -142,34 +189,46 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import type { RepairRequest, RequestPhoto } from '@/api/requests'
+import type { RepairRequest, RequestAction } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import DictBadge from '@/shared/components/DictBadge.vue'
+import { bus } from '@/shared/bus'
 import { provideBusy } from '@/shared/busy'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
+import SoftLink from '@/shared/components/form/SoftLink.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictManager } from '@/shared/dict/DictManager'
+import type { ShownError } from '@/shared/errors'
+import { shownError } from '@/shared/errors'
 import { formatDateTime } from '@/shared/format'
 import { isOnline } from '@/shared/network'
 import type { QueuedRequest } from '@/shared/offline/outbox'
-import { outboxAsRequest, outboxItem } from '@/shared/offline/outbox'
+import PickSheet from '../components/PickSheet.vue'
+import QueuedItem from '../components/QueuedItem.vue'
+import QueuedPhoto from '../components/QueuedPhoto.vue'
+import QueuedRefusal from '../components/QueuedRefusal.vue'
+import { useQueuedPhotos } from '../components/useQueuedPhotos'
+import { outboxAsRequest, outboxItem, queuedFor, queueNote, withQueuedEdit } from '@/shared/offline/outbox'
 import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
-import PhotoStrip from '@/shared/requests/PhotoStrip.vue'
+import TextPhotos from '@/shared/requests/TextPhotos.vue'
+import { historyTree } from '@/shared/requests/historyTree'
 import RequestHistory from '@/shared/requests/RequestHistory.vue'
-import RequestSteps from '@/shared/requests/RequestSteps.vue'
-import { faultName, nextText, severityStyle } from '@/shared/requests/requestView'
+import { faultName, receivedLate, severityStyle } from '@/shared/requests/requestView'
 import { useRequestCard } from '@/shared/requests/useRequestCard'
 import { currentUser } from '@/shared/user'
 import BottomSheet from '../components/BottomSheet.vue'
 import PwaPage from '../components/PwaPage.vue'
+import { tripRefDatedText } from '@/shared/trips/tripRefText'
 
 /**
- * Карточка заявки на телефоне: неисправность, статус, путь заявки, что дальше, атрибуты, фото и история; внизу —
+ * Карточка заявки на телефоне: неисправность, статус, атрибуты, фото и история; внизу —
  * кнопки действий по правам пользователя. Действие с комментарием открывает лист ввода комментария снизу. Мастер
  * депо выбирает исполнителя прямо в карточке. Без связи карточка показывается из копии на телефоне, а действия
- * недоступны.
+ * недоступны; исправить заявку и добавить примечание можно: они ждут на телефоне и показаны в истории, а исправление
+ * сразу видно в полях заявки.
  *
- * Заявка из очереди на телефоне (id «local-…») показывается по черновику: номера ещё нет, действий нет.
+ * Заявка из очереди на телефоне (id «local-…») показывается по черновику: номера ещё нет, действий нет, исправить
+ * можно.
  */
 const props = defineProps<{ id: string }>()
 
@@ -182,41 +241,68 @@ const serverId = computed(() => (props.id.startsWith('local-') ? null : Number(p
 const busy = provideBusy()
 const card = useRequestCard(serverId, true, busy)
 
+// связь вернулась — вместо строки сохранённого списка показываем карточку с сервера
+const onRestored = () => {
+  if (card.stale.value) void card.load()
+}
+bus.on('connection-restored', onRestored)
+onBeforeUnmount(() => bus.off('connection-restored', onRestored))
+
 // заявка из очереди ушла на сервер, пока открыта её карточка, — номер присвоен, возвращаемся в список
 watch(queuedItem, (now, before) => {
   if (before && !now) void router.replace({ name: 'pwa-requests' })
 })
 
+// исправление, примечания и фото этой заявки, которые ждут отправки
+const waiting = computed(() => queuedFor(serverId.value ?? queuedItem.value?.guid ?? ''))
+// дерево истории: записи сервера и очередь; что с чем показывать, решается здесь, а не в вёрстке
+const tree = computed(() =>
+  historyTree(card.stale.value ? null : detail.value, waiting.value, r.value?.createdDt ?? null),
+)
+const pendingPhotos = useQueuedPhotos(() => waiting.value)
+const pendingOwn = computed(() => {
+  const ids = tree.value.own.map((x) => x.id)
+  return pendingPhotos.value.filter((p) => ids.includes(p.id))
+})
+// ушли на сервер или удалены — показываем карточку с сервера
+watch(
+  () => waiting.value.length,
+  (now, before) => {
+    if (now < before) void card.load()
+  },
+)
+
 const detail = computed(() => card.request.value)
+
+// история с сервера; без связи её нет, остаются только записи, ожидающие отправки
+const historyStatus = computed(() => (detail.value && !card.stale.value ? detail.value.requestStatusType : null))
 const r = computed<RepairRequest | QueuedRequest | null>(() => {
   const q = queuedItem.value
   if (q) return outboxAsRequest(q, currentUser.value?.name ?? '')
-  return detail.value
+  return detail.value && withQueuedEdit(detail.value)
 })
-
-// фото черновика из очереди — адреса файлов в памяти
-const queuedUrls = ref<string[]>([])
-watch(
-  queuedItem,
-  (q) => {
-    queuedUrls.value.forEach((url) => URL.revokeObjectURL(url))
-    queuedUrls.value = q ? q.photos.map((p) => URL.createObjectURL(p)) : []
-  },
-  { immediate: true },
-)
-onBeforeUnmount(() => queuedUrls.value.forEach((url) => URL.revokeObjectURL(url)))
-
-const photos = computed<RequestPhoto[]>(() =>
-  queuedItem.value ? queuedUrls.value.map((url, i) => ({ id: String(i), url })) : (detail.value?.photos ?? []),
-)
 
 const subtitle = computed(() => {
   if (!r.value) return ''
-  const number = queuedItem.value ? t('номер присвоят при отправке') : r.value.number
+  const number = queuedItem.value ? t('Новая') : r.value.number
   return `${number} • ${formatDateTime(r.value.createdDt)}`
 })
 
-const hasBar = computed(() => !queuedItem.value && (card.actions.value.length > 0 || card.editable.value))
+// отцепка ТОР и передача в депо на телефоне не выполняются
+const actions = computed(() => card.actions.value.filter((a) => a.action !== 'DETACH' && a.action !== 'FORWARD'))
+const hasBar = computed(() => actions.value.length > 0)
+
+const takeOpen = ref(false)
+
+function onAction(action: RequestAction) {
+  if (action === 'TAKE' && card.foreignExecutor.value) takeOpen.value = true
+  else card.start(action)
+}
+
+function confirmTake() {
+  takeOpen.value = false
+  card.start('TAKE')
+}
 
 // исполнитель — из сотрудников службы заявки; текущий исполнитель есть в списке всегда
 const staffOptions = computed(() => {
@@ -225,12 +311,28 @@ const staffOptions = computed(() => {
   return current && !list.some((u) => u.id === current.id) ? [current, ...list] : list
 })
 
-function onAssign(e: Event) {
-  const value = (e.target as HTMLSelectElement).value
-  void card.assign(value ? Number(value) : null)
+// выбор исполнителя в листе снизу; null — не назначен
+const assignOpen = ref(false)
+const assignOptions = computed(() => [{ id: null, name: t('Не назначен') }, ...staffOptions.value])
+
+const assignError = ref<ShownError | null>(null)
+
+// список сотрудников — с сервера: ошибка показывается прямо в листе
+async function loadAssign() {
+  assignError.value = null
+  try {
+    await card.loadStaff()
+  } catch (e) {
+    assignError.value = shownError(e)
+  }
 }
 
-// пояснение
+function openAssign() {
+  assignOpen.value = true
+  void loadAssign()
+}
+
+// примечание
 const noteOpen = ref(false)
 const noteText = ref('')
 const notePhotos = ref<Blob[]>([])
@@ -242,6 +344,13 @@ function closeNote() {
 }
 
 async function saveNote() {
+  // заявка из очереди: примечание уйдёт следом за ней
+  const q = queuedItem.value
+  if (q) {
+    await queueNote({ parent: q.guid }, noteText.value.trim(), notePhotos.value, q.author)
+    closeNote()
+    return
+  }
   if (await card.addNote(noteText.value, notePhotos.value)) closeNote()
 }
 
@@ -259,13 +368,13 @@ function goBack() {
 <style scoped lang="scss">
 .card__muted {
   color: $zs-text-muted;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 
 .card__stale,
 .card__need-net {
   color: #7a5200;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
@@ -274,24 +383,31 @@ function goBack() {
 }
 
 .card__error {
-  padding: 0.625rem 0.875rem;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: $zs-error-bg;
   color: $zs-error-fg;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 
 .card__tor {
-  padding: 0.625rem 0.875rem;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fbe1de;
   color: $zs-error-fg;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
+.card__top-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 .card__desc {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   line-height: 1.45;
   white-space: pre-line;
 }
@@ -300,8 +416,8 @@ function goBack() {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.625rem;
-  font-size: 0.8125rem;
+  gap: 0.6rem;
+  font-size: 0.8rem;
 }
 
 .card__queued {
@@ -309,38 +425,18 @@ function goBack() {
   color: #6b4700;
 }
 
-.card__next {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.875rem 1rem;
-  border-radius: 0.375rem;
-  background: $zs-row-selected-bg;
-}
-
-.card__next-text {
-  font-size: 1rem;
-  font-weight: 600;
-}
-
 .card__section {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin: 0 -1rem;
-  padding: 1rem 1rem 0;
+  gap: 0.8rem;
+  margin: 0 -0.5rem;
   border-top: 0.0625rem solid $zs-border;
 }
 
 .card__section > .card__section-title,
 .card__section-head {
-  // отступ под подписью группы — на треть меньше промежутка между блоками (0.75rem)
-  margin-bottom: calc(-0.75rem / 3);
-}
-
-.card__next > .card__section-title {
-  // отступ под подписью группы — на треть меньше промежутка между блоками (0.25rem)
-  margin-bottom: calc(-0.25rem / 3);
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.8rem)
+  margin-bottom: calc(-0.8rem / 3);
 }
 
 .card__section-head {
@@ -351,9 +447,9 @@ function goBack() {
 
 .card__section-title {
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -361,37 +457,10 @@ function goBack() {
   display: grid;
   grid-template-columns: 7.5rem minmax(0, 1fr);
   gap: 0.5rem 1rem;
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
 
   > :nth-child(odd) {
     color: $zs-text-muted;
-  }
-}
-
-.card__select {
-  width: 100%;
-  height: 2.8rem;
-  padding: 0 0.625rem;
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.9375rem;
-}
-
-.card__link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: $primary;
-  font: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.45;
   }
 }
 
@@ -404,13 +473,12 @@ function goBack() {
 .card__btn {
   flex: 1 1 40%;
   min-height: 3.3rem;
-  padding: 0 0.875rem;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.375rem;
+  border-radius: 0.4rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
-  font-size: 0.9375rem;
+  font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
 
@@ -448,9 +516,8 @@ function goBack() {
 }
 
 .card__textarea {
-  padding: 0.75rem 0.875rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: $zs-bg-header;
   color: $zs-text;
   font: inherit;

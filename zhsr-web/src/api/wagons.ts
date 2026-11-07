@@ -17,10 +17,8 @@ export interface WagonOption {
   locationType: number
   /** место расположения по виду: id справочника Station, Depot, Yard или id рейса */
   place: number
-  /** номер поезда рейса, в составе которого вагон; null — вагон не в рейсе */
-  trainNumber: string | null
-  /** маршрут рейса, в составе которого вагон: «Алматы — Астана»; null — вагон не в рейсе */
-  name: string | null
+  /** рейс, в составе которого вагон; null — вагон не в рейсе */
+  trip: TripRef | null
 }
 
 /** Строка таблицы вагонов: вариант выбора вагона и поля таблицы. */
@@ -92,11 +90,15 @@ export function createWagon(draft: WagonDraft): Promise<WagonRow> {
   return Promise.reject(new Error('Ввод вагона пока не поддерживается сервером'))
 }
 
-/** Рейс в данных: id — для запросов, name — для показа. */
+/** Рейс в данных. */
 export interface TripRef {
   id: number
-  /** номер поезда и маршрут: «002 Алматы — Астана» */
+  /** номер поезда маршрута */
+  trainNumber: string
+  /** название маршрута */
   name: string
+  /** плановое отправление */
+  plannedDt: string
 }
 
 /** Вагон для выбора в заявке на ремонт: вагон, тип, рейс и где вагон сейчас. */
@@ -138,7 +140,7 @@ export function requestWagon(w: WagonOption): RequestWagon {
     id: w.id,
     number: w.number,
     wagonType: w.wagonType,
-    trip: inTrip ? { id: w.place, name: `${w.trainNumber ?? ''} ${w.name ?? ''}`.trim() } : null,
+    trip: w.trip,
     locationType: w.locationType,
     place: inTrip ? null : w.place,
     station: w.locationType === LocationType.STATION ? w.place : null,

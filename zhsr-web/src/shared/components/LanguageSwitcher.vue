@@ -1,6 +1,6 @@
 <template>
   <!-- как LanguageSwitcher в kis-web: иконка языка с кратким кодом текущего языка, по клику — список языков -->
-  <button type="button" class="language-switcher" :title="t('Язык')" @click.stop>
+  <button type="button" class="language-switcher q-py-xs q-px-sm" :title="t('Язык')" @click.stop>
     <q-icon name="language" :size="iconSize" />
     <span v-if="!iconOnly" class="language-switcher__short">{{ current?.short }}</span>
 
@@ -52,10 +52,9 @@ const current = computed(() => LOCALES.find((l) => l.value === locale.value))
 .language-switcher {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.375rem;
+  gap: 0.3rem;
   border: 0;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -67,7 +66,7 @@ const current = computed(() => LOCALES.find((l) => l.value === locale.value))
 }
 
 .language-switcher__short {
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 

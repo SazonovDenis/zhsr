@@ -5,8 +5,8 @@ import kz.zhsr.app.constants.FaultCategory;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.constants.ServiceType;
 import kz.zhsr.app.constants.Severity;
-import kz.zhsr.app.dto.AdminColumn;
-import kz.zhsr.app.dto.AdminTable;
+import kz.zhsr.app.dto.admin.AdminColumn;
+import kz.zhsr.app.dto.admin.AdminTable;
 
 import java.util.LinkedHashMap;
 import java.util.List;

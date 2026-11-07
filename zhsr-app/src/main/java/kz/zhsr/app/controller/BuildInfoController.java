@@ -1,6 +1,6 @@
 package kz.zhsr.app.controller;
 
-import kz.zhsr.app.dto.BuildInfo;
+import kz.zhsr.app.dto.common.BuildInfo;
 import kz.zhsr.app.service.BuildInfoService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

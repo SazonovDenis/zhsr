@@ -1,8 +1,8 @@
 package kz.zhsr.app.service.request;
 
 import kz.zhsr.app.constants.LocationType;
-import kz.zhsr.app.dto.ListSort;
-import kz.zhsr.app.dto.RequestFilter;
+import kz.zhsr.app.dto.common.ListSort;
+import kz.zhsr.app.dto.request.RequestFilter;
 import kz.zhsr.app.service.SqlQuery;
 import kz.zhsr.app.service.SqlWhere;
 
@@ -60,19 +60,19 @@ final class RequestSql {
                           and coalesce(wagon_info.station, depot.station, yard.station) = :myDepotStation))))""";
 
     /**
-     * Строка заявки: поля заявки, текущие статус, служба и исполнитель (repair_request_info), тип вагона, где вагон сейчас и
-     * число фото. Где вагон: wagon_place - станция, депо или парк отстоя; wagon_station - станция места (станция,
+     * Строка заявки: поля заявки, текущие статус, служба и исполнитель (repair_request_info), где вагон сейчас и
+     * число фото. Где вагон: place - станция, депо или парк отстоя; wagon_station - станция места (станция,
      * станция депо или парка отстоя); wagon_trip - рейс, если вагон в рейсе. Параметр tripLocation -
      * LocationType.TRIP.
      */
     private static final String SELECT = """
             select repair_request.id, repair_request.number, repair_request.wagon, repair_request.trip,
-                   repair_request.created_by_usr, repair_request.created_dt, repair_request.fault_type,
-                   repair_request.severity_type, repair_request.description,
+                   repair_request.created_by_usr, repair_request.created_dt, repair_request.received_dt,
+                   repair_request.fault_type, repair_request.severity_type, repair_request.description,
                    repair_request_info.request_status_type, repair_request_info.service,
                    repair_request_info.executor_usr,
-                   wagon.wagon_type, wagon_info.location_type,
-                   coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard) as wagon_place,
+                   wagon_info.location_type,
+                   coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard) as place,
                    coalesce(wagon_info.station, depot.station, yard.station) as wagon_station,
                    case when wagon_info.location_type = :tripLocation then wagon_info.trip end as wagon_trip,
                    (select count(*) from repair_request_photo
@@ -163,6 +163,42 @@ final class RequestSql {
     }
 
     /**
+     * Журнал статусов заявки. Параметр: id.
+     */
+    static String statuses() {
+        return "select dbeg, request_status_type, created_by_usr from repair_request_status where repair_request = :id";
+    }
+
+    /**
+     * Журнал исполнителей заявки. Параметр: id.
+     */
+    static String executors() {
+        return "select dbeg, executor_usr, created_by_usr from repair_request_executor where repair_request = :id";
+    }
+
+    /**
+     * Примечания заявки. Параметр: id.
+     */
+    static String notes() {
+        return """
+                select created_dt, received_dt, created_by_usr, note
+                from repair_request_note
+                where repair_request = :id
+                """;
+    }
+
+    /**
+     * Фото заявки. Параметр: id.
+     */
+    static String photos() {
+        return """
+                select id, created_dt, received_dt, created_by_usr
+                from repair_request_photo
+                where repair_request = :id
+                """;
+    }
+
+    /**
      * Текущее состояние новой заявки (repair_request_info): в таблице нет колонки id, поэтому не Db.insertRec.
      * Параметры: repairRequest, dbegStatus, status, service, dbegExecutor, executorUsr.
      */
@@ -179,7 +215,7 @@ final class RequestSql {
      */
     static String serviceStaff() {
         return """
-                select usr.id, usr.full_name
+                select usr.id
                 from usr
                 where usr.disabled = false
                   and usr.id in (select usr_role.usr from usr_role

@@ -1,8 +1,8 @@
 <template>
   <!-- Единый корень — без него группа кнопок и кнопка «...» попадают в DOM родителя как два независимых узла, и любой
        внешний flex/grid растягивает и позиционирует их порознь -->
-  <div class="period-picker">
-    <span v-if="label" class="period-picker__label">{{ t(label) }}</span>
+  <div class="period-picker q-pa-none">
+    <span v-if="label" class="period-picker__label q-my-none q-mr-sm q-ml-md">{{ t(label) }}</span>
 
     <!-- поля ввода нет — ряд как переключатель: одна остановка Tab, внутри стрелки, пробел и Backspace
          (v-roving-buttons); «...» Tab пропускает -->
@@ -19,7 +19,7 @@
       @update:model-value="onPeriodUpdateShort"
     />
 
-    <q-btn flat dense icon="more_horiz" class="period-picker__more" :tabindex="-1" @click="onClick">
+    <q-btn flat dense icon="more_horiz" class="period-picker__more q-py-none q-px-sm" :tabindex="-1" @click="onClick">
       <!-- anchor/self по центру: при нехватке места справа Quasar не обрезает окно по ширине, оставшейся от кнопки
            (с горизонтальным скроллом внутри), а целиком сдвигает его, чтобы вписать в экран -->
       <q-popup-proxy
@@ -95,7 +95,9 @@
                   >
                     <!-- Слот рисуется в .q-date__actions (внизу), поэтому строку с подписью и кнопкой «Очистить»
                          вытягиваем абсолютом в шапку — место под неё зарезервировано отступом .q-date__header -->
-                    <div class="date-header-line row items-center justify-between no-wrap">
+                    <div
+                      class="date-header-line row items-center justify-between no-wrap q-pt-xs q-pb-none q-pr-sm q-pl-md"
+                    >
                       <div class="date-header-line__text">{{ startDateTextResolved }}</div>
                       <q-btn
                         v-if="nullableStartDate && startDateInner"
@@ -124,7 +126,9 @@
                     flat
                     @update:model-value="(e: string | null) => onEndUpdate(e, true)"
                   >
-                    <div class="date-header-line row items-center justify-between no-wrap">
+                    <div
+                      class="date-header-line row items-center justify-between no-wrap q-pt-xs q-pb-none q-pr-sm q-pl-md"
+                    >
                       <div class="date-header-line__text">{{ endDateTextResolved }}</div>
                       <q-btn
                         v-if="nullableEndDate && endDateInner"
@@ -766,9 +770,8 @@ function formatDateHeader(dateStr: string | null): string {
   display: inline-flex;
   flex-wrap: nowrap;
   align-items: stretch;
-  gap: 0.125rem;
+  gap: 0.1rem;
   height: var(--zs-control-height);
-  padding: 0;
   border: var(--period-picker-border) solid $zs-border-input;
   border-radius: var(--period-picker-radius);
   background: #fff;
@@ -777,9 +780,8 @@ function formatDateHeader(dateStr: string | null): string {
 .period-picker__label {
   display: flex;
   align-items: center;
-  margin: 0 0.375rem 0 0.75rem;
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   white-space: nowrap;
 }
 
@@ -788,15 +790,15 @@ function formatDateHeader(dateStr: string | null): string {
   height: 100%;
   border-radius: 0;
   box-shadow: none;
-  gap: 0.125rem;
+  gap: 0.1rem;
 
   :deep(.q-btn) {
     min-height: 0;
     height: 100%;
-    padding: 0 0.75rem;
+    padding: 0 0.8rem;
     border-radius: calc(var(--period-picker-radius) - var(--period-picker-border));
     color: $zs-text;
-    font-size: 0.8125rem;
+    font-size: 0.8rem;
     font-weight: 400;
   }
 
@@ -816,7 +818,6 @@ function formatDateHeader(dateStr: string | null): string {
   min-width: 0;
   min-height: 0;
   height: 100%;
-  padding: 0 0.5rem;
   border-radius: calc(var(--period-picker-radius) - var(--period-picker-border));
   color: $zs-text-muted;
 }
@@ -826,12 +827,12 @@ function formatDateHeader(dateStr: string | null): string {
 }
 
 .period-picker__calendars {
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
 }
 
 .period-picker__error {
   color: $zs-error-fg;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 
 .q-btn-toggle.column .q-btn:first-child {
@@ -862,7 +863,7 @@ function formatDateHeader(dateStr: string | null): string {
 
 // Обычная раскладка: календари стоят рядом, между ними — разделитель
 .custom-date--start:not(.custom-date-mobile) {
-  border-right: 0.125rem solid $zs-border-row;
+  border-right: 0.1rem solid $zs-border-row;
 }
 
 .custom-date :deep(.q-date__header) {
@@ -933,7 +934,7 @@ function formatDateHeader(dateStr: string | null): string {
   align-items: baseline;
   height: 4.5rem;
   padding-top: 2.3rem;
-  padding-bottom: 0.375rem;
+  padding-bottom: 0.4rem;
 }
 
 .custom-date-mobile :deep(.date-header-line) {
@@ -944,7 +945,7 @@ function formatDateHeader(dateStr: string | null): string {
 // вместо отступа — небольшой
 .custom-date-mobile :deep(.q-date__view) {
   min-height: 0;
-  padding: 0.25rem;
+  padding: 0.3rem;
 }
 
 .custom-date-mobile :deep(.q-date__calendar-days-container) {
@@ -983,12 +984,11 @@ function formatDateHeader(dateStr: string | null): string {
   left: 0;
   z-index: 10;
   height: 2.5rem;
-  padding: 0.25rem 0.5rem 0 1rem;
 }
 
 .date-header-line__text {
   color: $zs-text;
-  font-size: 0.9375rem;
+  font-size: 0.9rem;
   font-weight: 600;
 }
 

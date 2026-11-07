@@ -74,7 +74,7 @@ $zs-route-pass-bg: #fff;
 $zs-route-line: $zs-border-input;
 $zs-route-line-width: 0.1rem;
 // названия станций: остановка — жирным, станция следования — бледным
-$zs-route-name-size: 0.875rem;
+$zs-route-name-size: 0.9rem;
 $zs-route-stop-name: $zs-text;
 $zs-route-stop-weight: 700;
 $zs-route-pass-name: $zs-text-faint;
@@ -82,3 +82,17 @@ $zs-route-pass-name: $zs-text-faint;
 // шрифты
 $zs-font: 'IBM Plex Sans', system-ui, sans-serif;
 $zs-font-mono: 'IBM Plex Mono', monospace;
+
+// шаги отступов Quasar (q-pa-*, q-ma-*, q-gutter-*, q-col-gutter-*) — в rem, не точнее десятых: свои отступы
+// в стилях не пишутся, только этими классами
+$space-none: (x: 0, y: 0);
+$space-xs: (x: 0.3rem, y: 0.3rem);
+$space-sm: (x: 0.5rem, y: 0.5rem);
+$space-md: (x: 1rem, y: 1rem);
+$space-lg: (x: 1.5rem, y: 1.5rem);
+$space-xl: (x: 3rem, y: 3rem);
+$flex-gutter-xs: 0.3rem;
+$flex-gutter-sm: 0.5rem;
+$flex-gutter-md: 1rem;
+$flex-gutter-lg: 1.5rem;
+$flex-gutter-xl: 3rem;

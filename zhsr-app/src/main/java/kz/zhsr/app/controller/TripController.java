@@ -1,13 +1,15 @@
 package kz.zhsr.app.controller;
 
-import kz.zhsr.app.dto.ConductorCandidate;
-import kz.zhsr.app.dto.CouplingWagon;
-import kz.zhsr.app.dto.StaffCandidate;
-import kz.zhsr.app.dto.TripCrew;
-import kz.zhsr.app.dto.TripRow;
-import kz.zhsr.app.dto.WagonCandidate;
+import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.trip.ConductorCandidate;
+import kz.zhsr.app.dto.trip.StaffCandidate;
+import kz.zhsr.app.dto.trip.CouplingWagon;
+import kz.zhsr.app.dto.trip.TripCrew;
+import kz.zhsr.app.dto.trip.TripRow;
+import kz.zhsr.app.dto.trip.WagonCandidate;
 import kz.zhsr.app.service.CouplingService;
 import kz.zhsr.app.service.TripService;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -109,6 +111,26 @@ public class TripController {
     @PostMapping("/trips/{id}/arrive")
     public TripCrew arrive(@PathVariable long id, @RequestBody TripService.MarkBody body) throws Exception {
         return tripService.arrive(id, body);
+    }
+
+    @PutMapping("/trips/{id}/depart")
+    public TripCrew retimeDeparture(@PathVariable long id, @RequestBody TripService.MarkBody body) throws Exception {
+        return tripService.retimeDeparture(id, body);
+    }
+
+    @DeleteMapping("/trips/{id}/depart")
+    public TripCrew cancelDeparture(@PathVariable long id) throws Exception {
+        return tripService.cancelDeparture(id);
+    }
+
+    @PutMapping("/trips/{id}/arrive")
+    public TripCrew retimeArrival(@PathVariable long id, @RequestBody TripService.MarkBody body) throws Exception {
+        return tripService.retimeArrival(id, body);
+    }
+
+    @DeleteMapping("/trips/{id}/arrive")
+    public TripCrew cancelArrival(@PathVariable long id) throws Exception {
+        return tripService.cancelArrival(id);
     }
 
 }

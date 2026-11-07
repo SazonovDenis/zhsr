@@ -1,6 +1,6 @@
 package kz.zhsr.app.controller;
 
-import kz.zhsr.app.dto.StageLines;
+import kz.zhsr.app.dto.route.StageLines;
 import kz.zhsr.app.service.StageService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;

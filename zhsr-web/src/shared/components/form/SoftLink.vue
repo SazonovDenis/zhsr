@@ -1,5 +1,5 @@
 <template>
-  <button type="button" class="soft-link zs-focusable" @click="emit('click')">{{ t(text) }}</button>
+  <button type="button" class="soft-link zs-focusable q-pa-none" @click="emit('click')">{{ t(text) }}</button>
 </template>
 
 <script setup lang="ts">
@@ -18,27 +18,35 @@ const emit = defineEmits<{ click: [] }>()
 
 <style scoped lang="scss">
 .soft-link {
-  padding: 0;
   border: 0;
   background: none;
   color: $primary;
   font: inherit;
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
   font-weight: 500;
   text-decoration: underline dashed;
-  text-decoration-thickness: 0.0625rem;
+  text-decoration-thickness: 0.1rem;
   text-underline-offset: 0.2em;
   white-space: nowrap;
   cursor: pointer;
 
-  &:hover {
-    text-decoration-style: solid;
+  // под мышью — сплошная. Только там, где есть наведение: на телефоне после нажатия :hover «залипает», и ссылка
+  // оставалась бы сплошной
+  @media (hover: hover) {
+    &:hover {
+      text-decoration-style: solid;
+    }
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
 
   &:focus-visible {
-    border-radius: 0.125rem;
-    outline: 0.125rem solid $primary;
-    outline-offset: 0.125rem;
+    border-radius: 0.1rem;
+    outline: 0.1rem solid $primary;
+    outline-offset: 0.1rem;
   }
 }
 </style>

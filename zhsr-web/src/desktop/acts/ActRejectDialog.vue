@@ -8,7 +8,7 @@
     @ok="save"
   >
     <FormField label="Причина">
-      <textarea v-model="reason" class="act-reject__input" rows="4" />
+      <textarea v-model="reason" class="act-reject__input q-pa-sm" rows="4" />
     </FormField>
   </FormDialog>
 </template>
@@ -54,12 +54,11 @@ async function save() {
 <style scoped lang="scss">
 .act-reject__input {
   width: 100%;
-  padding: 0.375rem 0.625rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   color: $zs-text;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   resize: none;
 }
 </style>

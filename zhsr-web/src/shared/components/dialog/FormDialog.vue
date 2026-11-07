@@ -76,12 +76,12 @@ function onAction(name: string) {
 
 <style scoped lang="scss">
 .form-dialog__error {
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 
 .form-dialog__hint {
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   line-height: 1.45;
 }
 </style>

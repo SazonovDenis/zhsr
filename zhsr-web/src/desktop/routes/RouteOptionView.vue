@@ -3,7 +3,9 @@
     <div class="route-option__main">
       <div class="route-option__title">
         <span class="route-option__name">№ {{ route.trainNumber }} • {{ route.name }}</span>
-        <span class="route-option__kind">{{ dictManager.getValue('RouteKind', route.routeKind) }}</span>
+        <span class="route-option__kind q-py-none q-px-sm">{{
+          dictManager.getValue('RouteKind', route.routeKind)
+        }}</span>
       </div>
       <div class="route-option__path">{{ path }}</div>
     </div>
@@ -41,7 +43,7 @@ const km = computed(() => (props.route.km > 0 ? t('{km} км', { km: props.route
 .route-option {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.8rem;
   min-width: 0;
 }
 
@@ -60,7 +62,7 @@ const km = computed(() => (props.route.km > 0 ? t('{km} км', { km: props.route
 
 .route-option__name {
   overflow: hidden;
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -75,18 +77,17 @@ const km = computed(() => (props.route.km > 0 ? t('{km} км', { km: props.route
 
 .route-option__kind {
   flex: none;
-  padding: 0 0.375rem;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: $zs-bg-button-soft;
   color: $zs-text-muted;
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
 }
 
 // цепочка остановок бывает длинной: переносится по ширине, а не растягивает выпадающий список
 .route-option__path {
   max-width: 37.3rem;
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   line-height: 1.35;
 }
 
@@ -96,7 +97,7 @@ const km = computed(() => (props.route.km > 0 ? t('{km} км', { km: props.route
   flex-direction: column;
   align-items: flex-end;
   color: $zs-text-muted;
-  font-size: 0.78125rem;
+  font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

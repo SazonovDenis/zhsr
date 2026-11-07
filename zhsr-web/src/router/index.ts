@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter, createWebHashHistory, createWebHisto
 
 import { onLoginRequired, onPasswordChangeRequired } from '@/api/http'
 import { isMobile } from '@/shared/device'
-import { currentUser } from '@/shared/user'
+import { forgetUser } from '@/shared/user'
 import routes from './routes'
 
 /**
@@ -41,9 +41,10 @@ export default defineRouter(() => {
     if (router.currentRoute.value.name !== 'change-password') void router.push({ name: 'change-password' })
   })
 
-  // нет входа (ответ 401: сеанс не открыт или истёк) — на страницу входа; пользователь забывается: войти может другой
+  // нет входа (ответ 401: сеанс не открыт или истёк) — на страницу входа; пользователь и копии его данных забываются:
+  // войти может другой
   onLoginRequired(() => {
-    currentUser.value = null
+    void forgetUser()
     if (router.currentRoute.value.name !== 'login') void router.push({ name: 'login' })
   })
 

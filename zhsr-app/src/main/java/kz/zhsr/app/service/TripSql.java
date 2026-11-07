@@ -19,12 +19,38 @@ final class TripSql {
     }
 
     /**
+     * Первое изменение вагонов рейса после отметки отправления или прибытия, кроме записей, которые открыла сама
+     * отметка: номер вагона и время. mark - колонки trip_wagon с этими записями: "depart" или "arrive". Параметры:
+     * trip, since - время отметки.
+     */
+    static String changesAfter(String mark) {
+        return """
+                select wagon.number, wagon_location.dbeg
+                from trip_wagon
+                join wagon_location on wagon_location.wagon = trip_wagon.wagon
+                join wagon on wagon.id = trip_wagon.wagon
+                where trip_wagon.trip = :trip and wagon_location.dbeg > :since
+                  and wagon_location.id is distinct from trip_wagon.%1$s_wagon_location
+                union all
+                select wagon.number, wagon_status.dbeg
+                from trip_wagon
+                join wagon_status on wagon_status.wagon = trip_wagon.wagon
+                join wagon on wagon.id = trip_wagon.wagon
+                where trip_wagon.trip = :trip and wagon_status.dbeg > :since
+                  and wagon_status.id is distinct from trip_wagon.%1$s_wagon_status
+                order by dbeg
+                limit 1
+                """.formatted(mark);
+    }
+
+    /**
      * Рейс с маршрутом. Параметр: id.
      */
     static String trip() {
         return """
                 select trip.id, trip.route, route.train_number, route.name, trip.trip_status_type,
-                       route.transport_type, route.duration, trip.planned_dt, trip.departed_dt,
+                       route.transport_type, route.duration, trip.planned_dt, trip.departed_dt, trip.arrived_dt,
+                       trip.departure_marked_dt, trip.arrival_marked_dt,
                        coalesce(trip.departed_dt, trip.planned_dt) as departure,
                        %s
                 from trip
@@ -42,7 +68,6 @@ final class TripSql {
                 select trip_wagon.id, trip_wagon.wagon, trip_wagon.seq, wagon.number, wagon.wagon_type, wagon_type.code,
                        wagon_info.location_type, wagon_info.station, wagon_info.trip, wagon_info.wagon_status_type,
                        coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard, wagon_info.trip) as place,
-                       route.train_number, route.name,
                        (select coupling_act.coupling_type
                         from coupling_act_wagon
                         join coupling_act on coupling_act.id = coupling_act_wagon.coupling_act
@@ -54,8 +79,6 @@ final class TripSql {
                 join wagon on wagon.id = trip_wagon.wagon
                 join wagon_type on wagon_type.id = wagon.wagon_type
                 join wagon_info on wagon_info.wagon = wagon.id
-                left join trip on trip.id = wagon_info.trip
-                left join route on route.id = trip.route
                 where trip_wagon.trip = :trip
                 order by trip_wagon.seq, trip_wagon.id
                 """;
@@ -67,7 +90,6 @@ final class TripSql {
     static String crew() {
         return """
                 select trip_crew.id, trip_crew.usr, trip_crew.crew_duty_type, trip_crew.wagon, trip_crew.wagon2,
-                       usr.full_name,
                        %s
                 from trip_crew
                 join usr on usr.id = trip_crew.usr
@@ -82,7 +104,7 @@ final class TripSql {
      */
     static String conductorCandidates() {
         return """
-                select usr.id, usr.full_name,
+                select usr.id,
                        %s
                 from usr
                 where usr.id in (select trip_crew.usr from trip_crew
@@ -103,7 +125,7 @@ final class TripSql {
      */
     static String staffCandidates() {
         return """
-                select usr.id, usr.full_name
+                select usr.id
                 from usr
                 join usr_role on usr_role.usr = usr.id
                 where usr_role.role_type = :role and not usr.disabled
@@ -112,18 +134,19 @@ final class TripSql {
     }
 
     /**
-     * Другие рейсы, в бригадах которых состоят сотрудники. Параметры: usrs, trip - кроме этого рейса, states.
+     * Другие рейсы, в бригадах которых состоят сотрудники. Параметры: usrs, trip - кроме этого рейса, states. arrival -
+     * до какого времени рейс занимает сотрудника: фактическое прибытие, а если его нет - плановое.
      */
     static String otherTrips() {
         return """
-                select trip_crew.usr, route.train_number, route.name, trip.planned_dt,
-                       %s
+                select trip_crew.usr, trip_crew.trip, route.train_number, route.name, trip.planned_dt,
+                       coalesce(trip.arrived_dt, trip.planned_dt + make_interval(mins => route.duration)) as arrival
                 from trip_crew
                 join trip on trip.id = trip_crew.trip
                 join route on route.id = trip.route
                 where trip_crew.usr = any(:usrs) and trip_crew.trip <> :trip
                   and trip.trip_status_type = any(:states)
-                """.formatted(ARRIVAL);
+                """;
     }
 
     /**
@@ -150,7 +173,7 @@ final class TripSql {
     }
 
     /**
-     * Вагоны станции, её депо и парка отстоя для прицепки; other_train - другой активный рейс, в составе которого
+     * Вагоны станции, её депо и парка отстоя для прицепки; other_trip - другой активный рейс, в составе которого
      * вагон. Параметры: trip, station, states.
      */
     static String attachCandidates() {
@@ -158,13 +181,12 @@ final class TripSql {
                 select wagon.number, wagon.wagon_type, wagon_info.location_type,
                        coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard) as place,
                        wagon_info.wagon_status_type,
-                       (select route.train_number
+                       (select trip.id
                         from trip_wagon
                         join trip on trip.id = trip_wagon.trip
-                        join route on route.id = trip.route
                         where trip_wagon.wagon = wagon.id and trip.id <> :trip
                           and trip.trip_status_type = any(:states)
-                        limit 1) as other_train
+                        limit 1) as other_trip
                 from wagon
                 join wagon_info on wagon_info.wagon = wagon.id
                 left join depot on depot.id = wagon_info.depot

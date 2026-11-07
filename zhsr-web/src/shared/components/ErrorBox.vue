@@ -1,20 +1,20 @@
 <template>
-  <div class="error-box" role="alert">
+  <div class="error-box q-pa-md" role="alert">
     <div class="error-box__body">
       <div>{{ error.text }}</div>
-      <div v-if="error.request" class="error-box__request">{{ error.request }}</div>
+      <div v-if="error.request" class="error-box__request q-mt-xs">{{ error.request }}</div>
     </div>
     <!-- повтор есть — справа кнопка «повторить»; повтор — только по ней, не по всей ошибке -->
     <button
       v-if="retry"
       type="button"
       tabindex="-1"
-      class="error-box__reload"
+      class="error-box__reload q-ml-md q-pa-xs"
       :title="t('Повторить')"
       @mousedown.prevent
       @click.stop="retry()"
     >
-      <q-icon name="refresh" size="1.25rem" />
+      <q-icon name="refresh" size="1.3rem" />
     </button>
   </div>
 </template>
@@ -34,12 +34,11 @@ withDefaults(defineProps<{ error: ShownError; retry?: (() => void) | null }>(), 
 .error-box {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.25rem;
+  gap: 0.8rem;
+  border-radius: 0.3rem;
   background: $zs-error-bg;
   color: $zs-error-fg;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 
 .error-box__body {
@@ -51,8 +50,6 @@ withDefaults(defineProps<{ error: ShownError; retry?: (() => void) | null }>(), 
   display: flex;
   flex: none;
   align-items: center;
-  margin-left: 1rem;
-  padding: 0.25rem;
   border: 0;
   border-radius: 50%;
   background: none;
@@ -65,10 +62,9 @@ withDefaults(defineProps<{ error: ShownError; retry?: (() => void) | null }>(), 
 }
 
 .error-box__request {
-  margin-top: 0.25rem;
   color: $zs-error-fg;
   font-family: $zs-font-mono;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   opacity: 0.65;
   word-break: break-all;
 }

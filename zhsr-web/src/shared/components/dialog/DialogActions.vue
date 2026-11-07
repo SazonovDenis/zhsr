@@ -1,5 +1,5 @@
 <template>
-  <div class="dialog-actions">
+  <div class="dialog-actions q-py-md q-px-lg">
     <slot name="left" />
     <q-space />
     <template v-for="(action, index) in visible" :key="index">
@@ -46,7 +46,6 @@ const visible = computed(() => props.actions.filter(isActionVisible))
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.875rem 1.375rem;
   border-top: 0.0625rem solid $zs-border;
 }
 

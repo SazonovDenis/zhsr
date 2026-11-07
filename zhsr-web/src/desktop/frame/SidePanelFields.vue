@@ -19,7 +19,7 @@
   display: grid;
   grid-template-columns: 7.5rem 1fr;
   gap: 0.5rem 1rem;
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
 
   // подписи — нечётные элементы
   > :nth-child(odd) {

@@ -32,8 +32,16 @@ let listening = false
 function remove(dialog: HistoryDialog) {
   const index = stack.indexOf(dialog)
   if (index !== -1) stack.splice(index, 1)
+  stopListening()
+}
 
-  if (stack.length === 0 && listening) {
+/**
+ * Слушатель снимается, только когда слушать нечего: диалогов нет и свой history.back уже пришёл. Снять его раньше —
+ * свой popstate придёт без слушателя, ignoreCount останется больше нуля, и первое настоящее «назад» в следующем
+ * диалоге было бы принято за своё и ничего не закрыло бы.
+ */
+function stopListening() {
+  if (stack.length === 0 && ignoreCount === 0 && listening) {
     window.removeEventListener('popstate', onPopStateListener)
     listening = false
   }
@@ -45,6 +53,7 @@ async function onPopState() {
   // это наш же history.back при обычном закрытии, а не нажатие «назад»
   if (ignoreCount > 0) {
     ignoreCount--
+    stopListening()
     return
   }
 

@@ -67,6 +67,16 @@ http.interceptors.response.use(undefined, (e: unknown) => {
   return Promise.reject(error)
 })
 
+/**
+ * Сервер ответил по существу и отказал (400, 403, 404 и другие 4xx): повтор даст то же самое. Не отказ — сбой сервера
+ * (5xx), нет входа (401), нужна смена пароля (406), тайм-аут и перегрузка (408, 429): это проходит, запрос надо
+ * повторить.
+ */
+export function isRefusal(e: unknown): boolean {
+  if (!(e instanceof ApiError) || e.status < 400 || e.status >= 500) return false
+  return ![401, 406, 408, 429].includes(e.status)
+}
+
 /** Ошибка связи, а не ответ сервера: мобильная часть по ней берёт данные из копии на телефоне или ставит ввод в очередь. */
 export function isNetworkError(e: unknown): boolean {
   return (e instanceof ApiError && e.status === 0) || (axios.isAxiosError(e) && !e.response)

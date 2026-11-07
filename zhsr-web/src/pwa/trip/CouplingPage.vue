@@ -12,7 +12,7 @@
       <label class="coupling__field">
         <span class="coupling__label">{{ attach ? t('Станция прицепки') : t('Станция отцепки') }}</span>
         <select
-          class="coupling__input"
+          class="coupling__input q-py-none q-px-md"
           :value="card.station.value ?? ''"
           @change="card.setStation(Number(($event.target as HTMLSelectElement).value) || null)"
         >
@@ -25,7 +25,7 @@
         <label
           v-for="w in card.wagons.value"
           :key="w.number"
-          class="coupling__wagon"
+          class="coupling__wagon q-py-sm q-px-md"
           :class="{ 'coupling__wagon--off': !w.available }"
         >
           <input v-model="card.selected.value" type="checkbox" :value="w.number" :disabled="!w.available" />
@@ -36,22 +36,22 @@
             </span>
           </span>
         </label>
-        <div v-if="!busy.active.value && card.wagons.value.length === 0" class="coupling__empty">
+        <div v-if="!busy.active.value && card.wagons.value.length === 0" class="coupling__empty q-py-lg q-px-md">
           {{ attach && !card.station.value ? t('Выберите остановку') : t('Вагонов нет') }}
         </div>
       </div>
 
       <label class="coupling__field">
         <span class="coupling__label">{{ t('Время акта') }}</span>
-        <input v-model="card.time.value" type="datetime-local" class="coupling__input" />
+        <DatePicker v-model="card.time.value" with-time date-text="Время акта" />
       </label>
       <label class="coupling__field">
         <span class="coupling__label">{{ t('Приказ') }}</span>
-        <input v-model="card.order.value" class="coupling__input" maxlength="100" />
+        <input v-model="card.order.value" class="coupling__input q-py-none q-px-md" maxlength="100" />
       </label>
       <label class="coupling__field">
         <span class="coupling__label">{{ t('Причина') }}</span>
-        <textarea v-model="card.reason.value" class="coupling__textarea" rows="3" />
+        <textarea v-model="card.reason.value" class="coupling__textarea q-pa-md" rows="3" />
       </label>
     </template>
 
@@ -69,6 +69,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { t } from '@/boot/i18n'
+import DatePicker from '@/shared/components/period/DatePicker.vue'
 import { provideBusy } from '@/shared/busy'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
@@ -113,7 +114,7 @@ async function submit() {
 }
 
 .coupling__label {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   font-weight: 600;
 }
 
@@ -121,7 +122,7 @@ async function submit() {
 .coupling__textarea {
   width: 100%;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
@@ -130,27 +131,24 @@ async function submit() {
 
 .coupling__input {
   height: 3.3rem;
-  padding: 0 0.875rem;
 }
 
 .coupling__textarea {
-  padding: 0.75rem 0.875rem;
   resize: none;
 }
 
 .coupling__list {
   overflow: hidden;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
 }
 
 .coupling__wagon {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.8rem;
   min-height: 3.3rem;
-  padding: 0.5rem 1rem;
   border-top: 0.0625rem solid $zs-border-row;
 
   &:first-child {
@@ -165,7 +163,7 @@ async function submit() {
 .coupling__wagon-text {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 0.1rem;
   min-width: 0;
 }
 
@@ -176,24 +174,23 @@ async function submit() {
 
 .coupling__muted {
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 
 .coupling__empty {
-  padding: 1.25rem 1rem;
   color: $zs-text-muted;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 
 .coupling__btn {
   width: 100%;
   min-height: 3.5rem;
   border: 0;
-  border-radius: 0.375rem;
+  border-radius: 0.4rem;
   background: $primary;
   color: #fff;
   font: inherit;
-  font-size: 1.0625rem;
+  font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
 

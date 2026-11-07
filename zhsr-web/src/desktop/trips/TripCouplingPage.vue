@@ -21,13 +21,13 @@
           />
         </FormField>
         <FormField label="Время акта">
-          <DatePicker v-model="card.time.value" with-time />
+          <DatePicker v-model="card.time.value" with-time date-text="Время акта" />
         </FormField>
         <FormField label="Приказ">
-          <input v-model="card.order.value" class="trip-coupling__input" maxlength="100" />
+          <input v-model="card.order.value" class="trip-coupling__input q-pa-sm" maxlength="100" />
         </FormField>
         <FormField label="Причина">
-          <textarea v-model="card.reason.value" class="trip-coupling__input" rows="4" />
+          <textarea v-model="card.reason.value" class="trip-coupling__input q-pa-sm" rows="4" />
         </FormField>
         <button type="button" class="zs-btn-primary" :disabled="!card.canSubmit.value" @click="submit">
           {{ attach ? t('Прицепить') : t('Отцепить') }}
@@ -35,7 +35,7 @@
         <button
           v-if="attach"
           type="button"
-          class="trip-coupling__btn"
+          class="trip-coupling__btn q-py-none q-px-md"
           :disabled="!card.returnFrom.value"
           :title="card.returnFrom.value ? '' : t('Все отмеченные вагоны должны быть в одном депо или парке отстоя')"
           @click="returnToStation"
@@ -49,7 +49,7 @@
           {{ attach ? t('Вагоны на станции, в депо и парке отстоя') : t('Вагоны в составе') }}
         </div>
         <div class="trip-coupling__table">
-          <label v-for="w in card.wagons.value" :key="w.number" class="trip-coupling__row">
+          <label v-for="w in card.wagons.value" :key="w.number" class="trip-coupling__row q-py-sm q-px-md">
             <q-checkbox
               v-model="card.selected.value"
               :val="w.number"
@@ -61,7 +61,7 @@
             <span class="zs-sub">{{ card.whereText(w) }}</span>
             <DictBadge :id="w.wagonStatusType" dict="WagonState" />
           </label>
-          <div v-if="!busy.active.value && card.wagons.value.length === 0" class="trip-coupling__empty">
+          <div v-if="!busy.active.value && card.wagons.value.length === 0" class="trip-coupling__empty q-pa-md">
             {{ attach && !card.station.value ? t('Выберите остановку') : t('Вагонов нет') }}
           </div>
         </div>
@@ -76,10 +76,12 @@
         :closable="false"
       >
         <SidePanelFields v-if="card.crew.value">
-          <span>{{ t('Отправление') }}</span>
-          <span>{{ formatDateTime(card.crew.value.trip.departure) }}</span>
-          <span>{{ t('Прибытие') }}</span>
-          <span>{{ formatDateTime(card.crew.value.trip.arrival) }}</span>
+          <TripTimes
+            :planned-dt="card.crew.value.trip.plannedDt"
+            :departed-dt="card.crew.value.trip.departedDt"
+            :arrived-dt="card.crew.value.trip.arrivedDt"
+            :duration="card.crew.value.trip.duration"
+          />
           <span>{{ t('Состояние') }}</span>
           <span><DictBadge :id="card.crew.value.trip.tripStatusType" dict="TripState" /></span>
         </SidePanelFields>
@@ -103,11 +105,11 @@ import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
 import { TransferDirection } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
-import { formatDateTime } from '@/shared/format'
 import { useCoupling } from '@/shared/trips/useCoupling'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
+import TripTimes from './TripTimes.vue'
 
 /**
  * Экран акта отцепки или прицепки (Ф-АКТ-01): слева станция, приказ и причина, рядом вагоны с галочками, справа рейс.
@@ -153,45 +155,43 @@ async function submit() {
 .trip-coupling {
   display: grid;
   grid-template-columns: 20rem minmax(0, 1fr);
-  gap: 1.25rem;
+  gap: 1.3rem;
   min-height: 0;
 }
 
 .trip-coupling__act {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.8rem;
 }
 
 .trip-coupling__caption {
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .trip-coupling__input {
   width: 100%;
-  padding: 0.375rem 0.625rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   resize: none;
 }
 
 .trip-coupling__btn {
   height: var(--zs-control-height);
-  padding: 0 0.875rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
   color: $primary;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
 
@@ -204,14 +204,14 @@ async function submit() {
 .trip-coupling__list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.8rem;
   min-width: 0;
 }
 
 .trip-coupling__table {
   overflow-y: auto;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
 }
 
@@ -219,10 +219,9 @@ async function submit() {
   display: grid;
   grid-template-columns: auto 5rem 9rem 1fr auto;
   align-items: center;
-  gap: 0.625rem;
-  padding: 0.375rem 0.75rem;
+  gap: 0.6rem;
   border-top: 0.0625rem solid $zs-border-row;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   cursor: pointer;
 
   &:first-child {
@@ -231,8 +230,7 @@ async function submit() {
 }
 
 .trip-coupling__empty {
-  padding: 1rem 0.75rem;
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 </style>

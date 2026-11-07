@@ -2,10 +2,10 @@
   <div class="route-map">
     <div ref="mapEl" class="route-map__map" />
     <!-- своя загрузка компонента: в ожидание фрейма не входит, спиннер и ошибка — поверх карты -->
-    <div v-if="load.loading" class="route-map__overlay">
+    <div v-if="load.loading" class="route-map__overlay q-pa-md">
       <LoadSpinner />
     </div>
-    <div v-else-if="load.error" class="route-map__overlay">
+    <div v-else-if="load.error" class="route-map__overlay q-pa-md">
       <ErrorBox :error="load.error" :retry="load.retry" class="route-map__error" />
     </div>
   </div>
@@ -439,7 +439,7 @@ void load.run()
   min-height: 10em;
   overflow: hidden;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: $zs-bg-header;
 }
 
@@ -457,7 +457,6 @@ void load.run()
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
   background: rgb(255 255 255 / 70%);
 }
 
@@ -493,9 +492,9 @@ $route-pass-size: 0.4rem;
   --route-pass-ring: #{$zs-route-pass-ring};
   --route-selected-size: #{$route-selected-size};
   // промежуток между точкой и названием — как в строке схемы маршрута
-  --route-name-gap: 0.375rem;
+  --route-name-gap: 0.4rem;
   // поля вокруг маршрута, когда карта вписывает его
-  --route-fit-padding: 0.75rem;
+  --route-fit-padding: 0.8rem;
 }
 
 // линии и кружки — SVG-элементы Leaflet: стили важнее атрибутов, которые ставит Leaflet
@@ -569,11 +568,11 @@ $route-pass-size: 0.4rem;
 // подсказка при наведении: плашка, строки обычным цветом текста
 .route-map :deep(.route-map__label--hint) {
   z-index: 1;
-  padding: 0.375rem 0.5rem;
+  padding: 0.4rem 0.5rem;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
-  box-shadow: 0 0.125rem 0.5rem rgb(0 0 0 / 15%);
+  box-shadow: 0 0.1rem 0.5rem rgb(0 0 0 / 15%);
   color: $zs-text;
   font-weight: 400;
   line-height: 1.35;
@@ -590,6 +589,6 @@ $route-pass-size: 0.4rem;
 
 .route-map :deep(.route-map__hint-line) {
   color: $zs-text;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 </style>

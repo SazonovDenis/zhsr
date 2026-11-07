@@ -56,7 +56,7 @@ final class TransferSql {
      */
     static String stationStaff() {
         return """
-                select usr.id, usr.full_name
+                select usr.id
                 from usr
                 join usr_role on usr_role.usr = usr.id
                 join usr_depot on usr_depot.usr = usr.id and usr_depot.dend is null
@@ -78,9 +78,7 @@ final class TransferSql {
                 select transfer_act.id, transfer_act.number, transfer_act.transfer_direction_type,
                        transfer_act.station, transfer_act.depot, transfer_act.yard, transfer_act.work_type,
                        transfer_act.act_status_type, transfer_act.transferred_dt, transfer_act.received_dt,
-                       transfer_act.reject_reason, transfer_act.transferred_by_usr, transfer_act.received_by_usr,
-                       (select usr.full_name from usr where usr.id = transfer_act.transferred_by_usr) as transferred_by,
-                       (select usr.full_name from usr where usr.id = transfer_act.received_by_usr) as received_by
+                       transfer_act.reject_reason, transfer_act.transferred_by_usr, transfer_act.received_by_usr
                 from transfer_act
                 where true
                 """

@@ -68,7 +68,7 @@ export function crewNorm(crew: TripCrew): CrewNorm {
       group.flatMap((n) =>
         serving(n)
           .filter(adjacent)
-          .map((m) => m.usr),
+          .map((m) => m.usr.id),
       ),
     )
     const n = group.length === 2 ? 3 : 2
@@ -131,11 +131,11 @@ export function slotOptions(
   const all = crew.crew.filter((m) => m.crewDutyType === CrewDuty.CONDUCTOR)
   return [
     ...(current
-      ? [{ user: current.usr, label: label(current) + (current.wagons.length === 2 ? ` • ${t('2 вагона')}` : '') }]
+      ? [{ user: current.usr.id, label: label(current) + (current.wagons.length === 2 ? ` • ${t('2 вагона')}` : '') }]
       : []),
-    ...all.filter((m) => m.wagons.length === 0).map((m) => ({ user: m.usr, label: label(m) })),
+    ...all.filter((m) => m.wagons.length === 0).map((m) => ({ user: m.usr.id, label: label(m) })),
     ...all
       .filter((m) => m.wagons.length === 1 && neighbours.includes(m.wagons[0]!) && !m.wagons.includes(w.number))
-      .map((m) => ({ user: m.usr, label: `${label(m)} • ${t('с вагона {n}', { n: m.wagons[0]! })}` })),
+      .map((m) => ({ user: m.usr.id, label: `${label(m)} • ${t('с вагона {n}', { n: m.wagons[0]! })}` })),
   ]
 }

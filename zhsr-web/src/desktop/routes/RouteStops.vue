@@ -3,7 +3,7 @@
        в пути по перегону -->
   <div
     v-if="layout === 'horizontal'"
-    class="route-stops route-stops--horizontal"
+    class="route-stops route-stops--horizontal q-pt-md"
     :class="{ 'route-stops--toggle': hasPassing }"
     :title="hasPassing ? t('Показать или скрыть станции следования') : undefined"
     @click="hasPassing && (collapsed = !collapsed)"
@@ -46,7 +46,7 @@
     <div v-if="items.length > 0" class="route-stops__columns">
       <span class="route-stops__columns-space" />
       <span class="route-stops__time">{{ t('в пути, мин') }}</span>
-      <span class="route-stops__stop">{{ t('стоянка') }}</span>
+      <span class="route-stops__stop q-pa-none">{{ t('стоянка') }}</span>
     </div>
 
     <div v-for="(item, index) in items" :key="index" class="route-stops__row" :class="`route-stops__row--${item.kind}`">
@@ -60,15 +60,15 @@
         <span class="route-stops__gap-text">{{ t('{n} станций следования', item.count) }}</span>
         <!-- время свёрнутых перегонов складывается -->
         <span class="route-stops__time">{{ formatDuration(item.passDuration) }}</span>
-        <span class="route-stops__stop" />
+        <span class="route-stops__stop q-pa-none" />
       </template>
       <template v-else>
-        <span class="route-stops__title">
+        <span class="route-stops__title q-pa-none">
           <span class="route-stops__name">{{ stationName(item.point) }}</span>
           <span class="route-stops__sub route-stops__km">{{ kmText(item.point, index) }}</span>
         </span>
         <span class="route-stops__time">{{ formatDuration(item.runDuration) }}</span>
-        <span class="route-stops__stop">
+        <span class="route-stops__stop q-pa-none">
           {{ item.point.stopDuration > 0 ? t('{m} мин', { m: item.point.stopDuration }) : '' }}
         </span>
       </template>
@@ -209,7 +209,7 @@ function formatDuration(min: number): string {
 
 .route-stops__sub {
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   white-space: nowrap;
 }
 
@@ -221,7 +221,6 @@ function formatDuration(min: number): string {
   align-items: flex-start;
   row-gap: 1.1rem;
   // место над первой строкой под время в пути над стрелками
-  padding-top: 1.1rem;
 }
 
 .route-stops__station {
@@ -232,17 +231,17 @@ function formatDuration(min: number): string {
 .route-stops__head {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.4rem;
   height: 1.3rem;
 }
 
 // подписи под названием начинаются от названия, а не от точки
 .route-stops__station--stop .route-stops__sub {
-  padding-left: 1.175rem;
+  padding-left: 1.2rem;
 }
 
 .route-stops__station--pass .route-stops__sub {
-  padding-left: 0.875rem;
+  padding-left: 0.9rem;
 }
 
 .route-stops__link {
@@ -257,11 +256,11 @@ function formatDuration(min: number): string {
 .route-stops__arrow {
   display: flex;
   align-items: center;
-  gap: 0.1875rem;
+  gap: 0.2rem;
 }
 
 .route-stops__gap-count {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
@@ -271,7 +270,7 @@ function formatDuration(min: number): string {
   bottom: 100%;
   left: 50%;
   color: $zs-text-muted;
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   white-space: nowrap;
   transform: translateX(-50%);
 }
@@ -286,7 +285,7 @@ function formatDuration(min: number): string {
 .route-stops__row {
   display: flex;
   align-items: stretch;
-  gap: 0.75rem;
+  gap: 0.8rem;
   min-height: 2rem;
 }
 
@@ -324,7 +323,6 @@ function formatDuration(min: number): string {
   flex-direction: column;
   justify-content: flex-start;
   min-width: 0;
-  padding: 0.125rem 0;
   // расстояние под названием — вплотную
   line-height: 1.2;
 }
@@ -337,7 +335,6 @@ function formatDuration(min: number): string {
   flex: none;
   align-items: flex-start;
   justify-content: flex-end;
-  padding: 0.125rem 0;
   color: $zs-text-muted;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
@@ -354,16 +351,16 @@ function formatDuration(min: number): string {
 
 // километраж — мельче названия и прочих подписей
 .route-stops__km {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .route-stops__columns {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding-bottom: 0.375rem;
+  gap: 0.8rem;
+  padding-bottom: 0.4rem;
   color: $zs-text-faint;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   line-height: 1.2;
 
   .route-stops__time,
@@ -382,7 +379,7 @@ function formatDuration(min: number): string {
   flex: 1;
   align-items: center;
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 
 .route-stops__empty {

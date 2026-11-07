@@ -1,6 +1,6 @@
 <template>
   <div class="cb-segment">
-    <span v-if="label" class="cb-segment__label">{{ t(label) }}</span>
+    <span v-if="label" class="cb-segment__label q-my-none q-mr-sm q-ml-md">{{ t(label) }}</span>
 
     <!-- варианты грузятся или не загрузились — на месте кнопок -->
     <ChoiceSourceState v-if="source && (source.loading || source.error)" :source="source" />
@@ -12,7 +12,7 @@
         type="button"
         :data-index="index"
         :tabindex="item.id === tabStopId ? 0 : -1"
-        class="cb-segment__item zs-focusable"
+        class="cb-segment__item zs-focusable q-py-none q-px-md"
         :class="{ 'cb-segment__item--active bg-selected text-selected': isSelected(item) }"
         :disabled="isDisabled(item)"
         :title="displayOf(item)"
@@ -83,7 +83,7 @@ const { visibleValues, hiddenValues, isSelected, onButtonClick, onMenuPick, tabS
   display: inline-flex;
   flex-wrap: nowrap;
   align-items: stretch;
-  gap: 0.125rem;
+  gap: 0.1rem;
   height: var(--zs-control-height);
   border: var(--cb-segment-border) solid $zs-border-input;
   border-radius: var(--cb-segment-radius);
@@ -93,21 +93,19 @@ const { visibleValues, hiddenValues, isSelected, onButtonClick, onMenuPick, tabS
 .cb-segment__label {
   display: flex;
   align-items: center;
-  margin: 0 0.375rem 0 0.75rem;
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   white-space: nowrap;
 }
 
 .cb-segment__item {
   flex: none;
-  padding: 0 0.75rem;
   border: 0;
   border-radius: calc(var(--cb-segment-radius) - var(--cb-segment-border));
   background: transparent;
   color: $zs-text;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   white-space: nowrap;
   cursor: pointer;
 

@@ -1,0 +1,15 @@
+#!/bin/bash
+# Подготовить образы окружения разработки (docker/docker-compose.env.yml): собрать образ сервиса db и скачать образ
+# сервиса s3. Запускать при первой установке и после изменения образов; env-start использует уже готовые образы.
+# Параметры - в .env; нет .env - копируется из .env.sample.
+#
+#   ./env-build         - образы всех сервисов окружения
+#   ./env-build db      - только указанных (db, s3)
+set -euo pipefail
+cd "$(dirname "$0")"
+
+[ -f .env ] || { cp .env.sample .env; echo '.env создан из .env.sample'; }
+
+compose=(docker compose --env-file .env -f docker/docker-compose.env.yml)
+"${compose[@]}" pull --ignore-buildable "$@"
+"${compose[@]}" build "$@"

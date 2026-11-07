@@ -1,9 +1,11 @@
 package kz.zhsr.app.service.dict;
 
 import kz.kis.kiscore.model.*;
+import kz.kis.kiscore.utils.UtDb;
 import kz.kis.kisdbtools.repository.*;
 import kz.zhsr.app.auth.*;
-import kz.zhsr.app.dto.*;
+import kz.zhsr.app.dto.dict.DictData;
+import kz.zhsr.app.dto.dict.DictValue;
 import kz.zhsr.app.service.*;
 import org.springframework.messaging.simp.*;
 import org.springframework.stereotype.*;
@@ -98,15 +100,16 @@ public class DictService {
     }
 
     /**
-     * Версии справочников (POST /dict/versions): только известных сервису, остальные имена пропускаются.
+     * Версии всех справочников: уходят фронту вместе с текущим пользователем. Справочник, который ни разу не менялся, -
+     * версия "0".
      */
-    public Map<String, String> versions(List<String> names) throws Exception {
-        currentUserService.get();
+    public Map<String, String> versions() throws Exception {
         Map<String, String> res = new LinkedHashMap<>();
-        for (String name : names == null ? List.<String>of() : names) {
-            if (DICTS.containsKey(name)) {
-                res.put(name, version(name));
-            }
+        for (String name : DICTS.keySet()) {
+            res.put(name, "0");
+        }
+        for (DbRec rec : db.loadList("dict_version", null)) {
+            res.computeIfPresent(rec.getString("name"), (name, version) -> String.valueOf(rec.getLong("version")));
         }
         return res;
     }
@@ -147,12 +150,7 @@ public class DictService {
      * заканчиваться маршрут.
      */
     private List<Map<String, Object>> records(String name, Def def, List<DbRec> rows) throws Exception {
-        Set<Long> hubs = new HashSet<>();
-        if (name.equals("Station")) {
-            for (DbRec depot : db.loadList("depot", null)) {
-                hubs.add(depot.getLong("station"));
-            }
-        }
+        Set<Long> hubs = name.equals("Station") ? UtDb.uniqueValues(db.loadList("depot", null), "station") : Set.of();
         List<Map<String, Object>> res = new ArrayList<>(rows.size());
         for (DbRec row : rows) {
             Map<String, Object> rec = def.record().apply(row);

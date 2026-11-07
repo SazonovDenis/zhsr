@@ -19,10 +19,10 @@ defineProps<CellProps<RepairRequest>>()
 <style scoped lang="scss">
 // как у состояния вагона: плашка выступает влево на свой отступ
 .cell-request-status {
-  margin: 0 0 0.1875rem -0.5rem;
+  margin: 0 0 0.2rem -0.5rem;
 }
 
 .cell-request-status__sev {
-  font-size: 0.78125rem;
+  font-size: 0.8rem;
 }
 </style>

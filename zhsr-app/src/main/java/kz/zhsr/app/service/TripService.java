@@ -1,7 +1,10 @@
 package kz.zhsr.app.service;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtDb;
+import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
+import kz.kis.kisdbtools.repository.DbRecMapper;
 import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.ActStatus;
@@ -12,24 +15,31 @@ import kz.zhsr.app.constants.LocationType;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.constants.TripStatus;
 import kz.zhsr.app.constants.WagonStatus;
-import kz.zhsr.app.dto.ConductorCandidate;
-import kz.zhsr.app.dto.ListSort;
-import kz.zhsr.app.dto.StaffCandidate;
-import kz.zhsr.app.dto.TripCrew;
-import kz.zhsr.app.dto.TripFilter;
-import kz.zhsr.app.dto.TripRow;
-import kz.zhsr.app.dto.WagonCandidate;
+import kz.zhsr.app.dto.common.ListSort;
+import kz.zhsr.app.dto.ref.TripRef;
+import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.trip.ConductorCandidate;
+import kz.zhsr.app.dto.trip.StaffCandidate;
+import kz.zhsr.app.dto.trip.TripCrew;
+import kz.zhsr.app.dto.trip.TripFilter;
+import kz.zhsr.app.dto.trip.TripRow;
+import kz.zhsr.app.dto.trip.WagonCandidate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -51,6 +61,13 @@ public class TripService {
     private static final Set<String> NOT_PASSENGER = Set.of("RESTAURANT", "STAFF");
 
     static final List<Long> ACTIVE = List.of(TripStatus.PLANNED, TripStatus.IN_PROGRESS);
+
+    /** Время в сообщении о занятости сотрудника. */
+    private static final DateTimeFormatter BUSY_UNTIL =
+            DateTimeFormatter.ofPattern("dd.MM HH:mm");
+
+    /** Рейсы, которые занимают сотрудника: ещё не прибывшие и прибывшие - до фактического прибытия. */
+    private static final List<Long> BUSY = List.of(TripStatus.PLANNED, TripStatus.IN_PROGRESS, TripStatus.DONE);
 
     /**
      * Атрибуты рейса.
@@ -83,15 +100,17 @@ public class TripService {
     private final RouteService routeService;
     private final ListService listService;
     private final WagonJournal wagonJournal;
+    private final RefResolver refResolver;
 
     public TripService(Db db, CurrentUserService currentUserService, Visibility visibility, RouteService routeService,
-                       ListService listService, WagonJournal wagonJournal) {
+                       ListService listService, WagonJournal wagonJournal, RefResolver refResolver) {
         this.db = db;
         this.currentUserService = currentUserService;
         this.visibility = visibility;
         this.routeService = routeService;
         this.listService = listService;
         this.wagonJournal = wagonJournal;
+        this.refResolver = refResolver;
     }
 
     /**
@@ -167,22 +186,23 @@ public class TripService {
         DbRec trip = tripRec(id);
         Map<String, Object> params = new HashMap<>();
         params.put("trip", id);
-        params.put("station", crew.trip().departureStation());
+        params.put("station", crew.getTrip().getDepartureStation());
         params.put("duty", CrewDuty.CONDUCTOR);
         params.put("role", RoleType.CONDUCTOR);
         params.put("senior", ConductorCategory.SENIOR);
-        List<DbRec> recs = db.loadSql(TripSql.conductorCandidates(), params);
-        if (recs.isEmpty()) {
+        List<ConductorCandidate> candidates = db.loadSql(TripSql.conductorCandidates(), params,
+                ConductorCandidate.class);
+        if (candidates.isEmpty()) {
             return List.of();
         }
-        Map<Long, List<DbRec>> others = otherTrips(recs.stream().map(r -> r.getLong("id")).toList(), id);
+        Map<Long, List<DbRec>> others = otherTrips(candidates.stream().map(ConductorCandidate::getId).toList(), id);
         OffsetDateTime start = trip.getDateTimeTZ("planned_dt");
         OffsetDateTime end = trip.getDateTimeTZ("arrival");
 
         List<ConductorCandidate> res = new ArrayList<>();
-        for (DbRec r : recs) {
-            long usr = r.getLong("id");
-            boolean assigned = crew.crew().stream().anyMatch(m -> m.usr() == usr);
+        for (ConductorCandidate c : candidates) {
+            long usr = c.getId();
+            boolean assigned = crew.getCrew().stream().anyMatch(m -> m.getUsr().getId() == usr);
             List<DbRec> busy = others.getOrDefault(usr, List.of());
             if (!assigned && busy.stream().anyMatch(o -> overlaps(o, start, end))) {
                 continue;
@@ -195,33 +215,47 @@ public class TripService {
                     before = o;
                 }
             }
-            res.add(new ConductorCandidate(usr, shortName(r), r.getBoolean("senior"), assigned,
-                    before == null ? null : before.getString("train_number"),
-                    before == null ? null : before.getString("name"),
-                    before == null ? null : before.getDateTimeTZ("arrival")));
+            c.setAssigned(assigned);
+            if (before != null) {
+                c.setBusyTrip(new TripRef(before.getLong("trip")));
+                c.setBusyUntil(before.getDateTimeTZ("arrival"));
+            }
+            res.add(c);
         }
+        refResolver.resolve(res);
+        // кандидат сам является ссылкой, поэтому resolve не заходит в него: рейсы заполняются отдельно
+        refResolver.resolve(res.stream().map(ConductorCandidate::getBusyTrip).filter(Objects::nonNull).toList());
         return res;
     }
 
     /**
-     * Сотрудники для должности начальника поезда или ПЭМ: включённые, с такой ролью, не занятые в пересекающемся по
-     * времени рейсе.
+     * Сотрудники для должности начальника поезда или ПЭМ: включённые, с такой ролью. Занятые в пересекающемся по
+     * времени рейсе тоже в списке - с этим рейсом и временем, до которого заняты; назначить их не даст requireFree.
      */
     public List<StaffCandidate> staffCandidates(long id, long duty) throws Exception {
         requireVisible(id);
-        List<DbRec> recs = db.loadSql(TripSql.staffCandidates(), Map.of("role", roleOf(duty)));
-        if (recs.isEmpty()) {
+        List<StaffCandidate> staff = db.loadSql(TripSql.staffCandidates(), Map.of("role", roleOf(duty)),
+                StaffCandidate.class);
+        if (staff.isEmpty()) {
             return List.of();
         }
         DbRec trip = tripRec(id);
         OffsetDateTime start = trip.getDateTimeTZ("planned_dt");
         OffsetDateTime end = trip.getDateTimeTZ("arrival");
-        Map<Long, List<DbRec>> others = otherTrips(recs.stream().map(r -> r.getLong("id")).toList(), id);
-        return recs.stream()
-                .filter(r -> others.getOrDefault(r.getLong("id"), List.of()).stream()
-                        .noneMatch(o -> overlaps(o, start, end)))
-                .map(r -> new StaffCandidate(r.getLong("id"), shortName(r)))
-                .toList();
+        Map<Long, List<DbRec>> others = otherTrips(staff.stream().map(UserRef::getId).toList(), id);
+        for (StaffCandidate c : staff) {
+            others.getOrDefault(c.getId(), List.of()).stream()
+                    .filter(o -> overlaps(o, start, end))
+                    .max(Comparator.comparing(o -> o.getDateTimeTZ("arrival")))
+                    .ifPresent(o -> {
+                        c.setBusyTrip(new TripRef(o.getLong("trip")));
+                        c.setBusyUntil(o.getDateTimeTZ("arrival"));
+                    });
+        }
+        refResolver.resolve(staff);
+        // кандидат сам является ссылкой, поэтому resolve не заходит в него: рейсы заполняются отдельно
+        refResolver.resolve(staff.stream().map(StaffCandidate::getBusyTrip).filter(Objects::nonNull).toList());
+        return staff;
     }
 
     /**
@@ -229,14 +263,12 @@ public class TripService {
      */
     public List<WagonCandidate> wagonCandidates(long id) throws Exception {
         requireVisible(id);
-        Long station = load(id).trip().departureStation();
+        Long station = load(id).getTrip().getDepartureStation();
         if (station == null) {
             return List.of();
         }
-        return db.loadSql(TripSql.wagonCandidates(), Map.of("trip", id, "station", station, "states", ACTIVE)).stream()
-                .map(r -> new WagonCandidate(r.getString("number"), r.getLong("wagon_type"),
-                        r.getLong("location_type"), r.getLong("place"), r.getLong("wagon_status_type")))
-                .toList();
+        return db.loadSql(TripSql.wagonCandidates(), Map.of("trip", id, "station", station, "states", ACTIVE),
+                WagonCandidate.class);
     }
 
     /**
@@ -370,10 +402,7 @@ public class TripService {
             }
             wagonIds.put(number, w.getLong("id"));
         }
-        Map<Long, DbRec> existing = new HashMap<>();
-        for (DbRec r : db.loadList("trip_wagon", Map.of("trip", id))) {
-            existing.put(r.getLong("wagon"), r);
-        }
+        Map<Long, DbRec> existing = UtDb.collectGroupBy_record(db.loadList("trip_wagon", Map.of("trip", id)), "wagon");
         List<Long> added = wagonIds.values().stream().filter(w -> !existing.containsKey(w)).toList();
         if (!added.isEmpty()) {
             List<String> busy = db.loadSql(TripSql.busyWagons(), Map.of("wagons", added, "trip", id, "states", ACTIVE))
@@ -423,8 +452,11 @@ public class TripService {
         requireReady(crew);
 
         OffsetDateTime time = body.time() == null ? OffsetDateTime.now() : body.time();
+        if (time.isAfter(OffsetDateTime.now())) {
+            throw ApiException.badRequest("Укажите время не позже текущего");
+        }
         db.updateRec("trip", Map.of("id", id, "trip_status_type", TripStatus.IN_PROGRESS, "departed_dt", time,
-                "departed_by_usr", me.id()));
+                "departed_by_usr", me.id(), "departure_marked_dt", OffsetDateTime.now()));
         for (DbRec row : composition(id)) {
             WagonJournal.Opened j = wagonJournal.move(row.getLong("wagon"), time, LocationType.TRIP, null, id,
                     WagonStatus.IN_TRIP);
@@ -448,18 +480,21 @@ public class TripService {
             throw ApiException.conflict("Прибытие отмечается только у рейса в статусе «Выполняется»");
         }
         OffsetDateTime time = body.time() == null ? OffsetDateTime.now() : body.time();
+        if (time.isAfter(OffsetDateTime.now())) {
+            throw ApiException.badRequest("Укажите время не позже текущего");
+        }
         OffsetDateTime departed = trip.getDateTimeTZ("departed_dt");
         if (departed != null && !time.isAfter(departed)) {
             throw ApiException.badRequest("Прибытие должно быть позже отправления");
         }
         TripCrew crew = load(id);
-        Long station = crew.trip().arrivalStation();
+        Long station = crew.getTrip().getArrivalStation();
         if (station == null) {
             throw ApiException.conflict("У маршрута рейса нет станции прибытия");
         }
 
         db.updateRec("trip", Map.of("id", id, "trip_status_type", TripStatus.DONE, "arrived_dt", time,
-                "arrived_by_usr", me.id()));
+                "arrived_by_usr", me.id(), "arrival_marked_dt", OffsetDateTime.now()));
         for (DbRec row : composition(id)) {
             if (row.getLong("location_type") != LocationType.TRIP || row.getLong("trip", null) == null
                     || row.getLong("trip") != id) {
@@ -472,6 +507,155 @@ public class TripService {
         }
         evictCrew(crew);
         return load(id);
+    }
+
+    /** Сколько после отметки отправления или прибытия её можно исправить или отменить. */
+    public static final Duration MARK_EDIT_PERIOD = Duration.ofMinutes(10);
+
+    /** Отметка отправления или прибытия: колонки рейса и строки состава, статус рейса с отметкой и без неё. */
+    private enum Mark {
+        DEPART("departed_dt", "departed_by_usr", "departure_marked_dt", "depart", TripStatus.IN_PROGRESS,
+                TripStatus.PLANNED, "отправления"),
+        ARRIVE("arrived_dt", "arrived_by_usr", "arrival_marked_dt", "arrive", TripStatus.DONE,
+                TripStatus.IN_PROGRESS, "прибытия");
+
+        final String time;
+        final String by;
+        final String marked;
+        final String wagonColumns;
+        final long status;
+        final long statusBefore;
+        final String text;
+
+        Mark(String time, String by, String marked, String wagonColumns, long status, long statusBefore,
+             String text) {
+            this.time = time;
+            this.by = by;
+            this.marked = marked;
+            this.wagonColumns = wagonColumns;
+            this.status = status;
+            this.statusBefore = statusBefore;
+            this.text = text;
+        }
+    }
+
+    /**
+     * Исправить время отправления (Ф-РЕЙ-03): в течение {@link #MARK_EDIT_PERIOD} после отметки, начальник поезда
+     * рейса. Новое время - раньше первого изменения вагонов после отправления (отцепки, прицепки, передачи).
+     */
+    @Transactional
+    public TripCrew retimeDeparture(long id, MarkBody body) throws Exception {
+        return retime(id, body, Mark.DEPART);
+    }
+
+    /** Исправить время прибытия (Ф-РЕЙ-04): как {@link #retimeDeparture}; прибытие - позже отправления. */
+    @Transactional
+    public TripCrew retimeArrival(long id, MarkBody body) throws Exception {
+        return retime(id, body, Mark.ARRIVE);
+    }
+
+    /**
+     * Отменить отправление (Ф-РЕЙ-03): в течение {@link #MARK_EDIT_PERIOD} после отметки, начальник поезда рейса.
+     * Рейс - снова «план», записи журналов вагонов, открытые отправлением, удаляются. Если после отправления у вагонов
+     * были изменения (отцепка, прицепка, передача), отмены нет.
+     */
+    @Transactional
+    public TripCrew cancelDeparture(long id) throws Exception {
+        return cancel(id, Mark.DEPART);
+    }
+
+    /** Отменить прибытие (Ф-РЕЙ-04): как {@link #cancelDeparture}; рейс - снова «выполняется». */
+    @Transactional
+    public TripCrew cancelArrival(long id) throws Exception {
+        return cancel(id, Mark.ARRIVE);
+    }
+
+    private TripCrew retime(long id, MarkBody body, Mark mark) throws Exception {
+        DbRec trip = requireMarkEditable(id, mark);
+        OffsetDateTime time = body.time();
+        if (time == null || time.isAfter(OffsetDateTime.now())) {
+            throw ApiException.badRequest("Укажите время не позже текущего");
+        }
+        OffsetDateTime departed = trip.getDateTimeTZ("departed_dt");
+        if (mark == Mark.ARRIVE && !time.isAfter(departed)) {
+            throw ApiException.badRequest("Прибытие должно быть позже отправления");
+        }
+        DbRec change = changeAfter(id, trip, mark);
+        if (change != null && !time.isBefore(change.getDateTimeTZ("dbeg"))) {
+            throw ApiException.badRequest("Время должно быть раньше изменения вагона " + change.getString("number")
+                    + " после отметки");
+        }
+        for (DbRec row : db.loadList("trip_wagon", Map.of("trip", id))) {
+            WagonJournal.Opened opened = opened(row, mark);
+            if (opened != null) {
+                wagonJournal.retime(opened, time);
+            }
+        }
+        db.updateRec("trip", Map.of("id", id, mark.time, time));
+        evictCrew(load(id));
+        return load(id);
+    }
+
+    private TripCrew cancel(long id, Mark mark) throws Exception {
+        DbRec trip = requireMarkEditable(id, mark);
+        DbRec change = changeAfter(id, trip, mark);
+        if (change != null) {
+            throw ApiException.conflict("После отметки " + mark.text + " у вагона " + change.getString("number")
+                    + " были изменения (отцепка, прицепка или передача) - сначала отмените их");
+        }
+        for (DbRec row : db.loadList("trip_wagon", Map.of("trip", id))) {
+            WagonJournal.Opened opened = opened(row, mark);
+            if (opened == null) {
+                continue;
+            }
+            // сначала ссылки строки состава: на удаляемые записи журналов стоит внешний ключ
+            Map<String, Object> values = new HashMap<>();
+            values.put("id", row.getLong("id"));
+            values.put(mark.wagonColumns + "_wagon_location", null);
+            values.put(mark.wagonColumns + "_wagon_status", null);
+            db.updateRec("trip_wagon", values);
+            wagonJournal.undo(opened);
+        }
+        Map<String, Object> values = new HashMap<>();
+        values.put("id", id);
+        values.put("trip_status_type", mark.statusBefore);
+        values.put(mark.time, null);
+        values.put(mark.by, null);
+        values.put(mark.marked, null);
+        db.updateRec("trip", values);
+        evictCrew(load(id));
+        return load(id);
+    }
+
+    /**
+     * Рейс, отметку которого можно исправить или отменить: начальник поезда рейса (или администратор), отметка есть и
+     * внесена не раньше {@link #MARK_EDIT_PERIOD} назад.
+     */
+    private DbRec requireMarkEditable(long id, Mark mark) throws Exception {
+        CurrentUser me = currentUserService.get();
+        DbRec trip = requireTrip(id);
+        requireChief(id, me, "Исправляет и отменяет отметку " + mark.text + " начальник поезда этого рейса");
+        OffsetDateTime marked = trip.getDateTimeTZ(mark.marked);
+        if (trip.getLong("trip_status_type") != mark.status || marked == null) {
+            throw ApiException.conflict("Отметки " + mark.text + " нет");
+        }
+        if (OffsetDateTime.now().isAfter(marked.plus(MARK_EDIT_PERIOD))) {
+            throw ApiException.conflict("Исправить или отменить отметку можно в течение 10 минут после неё");
+        }
+        return trip;
+    }
+
+    /** Первое изменение вагонов рейса после отметки; нет - null. */
+    private DbRec changeAfter(long id, DbRec trip, Mark mark) throws Exception {
+        return db.loadSqlRec(TripSql.changesAfter(mark.wagonColumns),
+                Map.of("trip", id, "since", trip.getDateTimeTZ(mark.time)));
+    }
+
+    /** Записи журналов вагона, открытые отметкой; отметка вагон не переводила - null. */
+    private static WagonJournal.Opened opened(DbRec row, Mark mark) {
+        Long location = row.getLong(mark.wagonColumns + "_wagon_location", null);
+        Long status = row.getLong(mark.wagonColumns + "_wagon_status", null);
+        return location == null || status == null ? null : new WagonJournal.Opened(location, status);
     }
 
     // --- внутреннее
@@ -500,40 +684,45 @@ public class TripService {
      * выполнена. Рабочий парк вагона (правило Ф-РЕЙ-03) не проверяется: в БД нет парка вагона.
      */
     private void requireReady(TripCrew crew) {
-        if (crew.wagons().isEmpty()) {
+        if (crew.getWagons().isEmpty()) {
             throw ApiException.conflict("Состав рейса не сформирован");
         }
-        Long station = crew.trip().departureStation();
-        List<String> away = crew.wagons().stream()
-                .filter(w -> w.locationType() != LocationType.STATION || station == null || w.place() != station)
-                .map(TripCrew.Wagon::number)
+        Long station = crew.getTrip().getDepartureStation();
+        List<String> away = crew.getWagons().stream()
+                .filter(w -> w.getLocationType() != LocationType.STATION || station == null || w.getPlace() != station)
+                .map(TripCrew.Wagon::getNumber)
                 .toList();
         if (!away.isEmpty()) {
             throw ApiException.conflict("Вагоны не на станции отправления: " + String.join(", ", away));
         }
-        boolean chief = crew.crew().stream().anyMatch(m -> m.crewDutyType() == CrewDuty.LNP);
-        boolean pem = crew.crew().stream().anyMatch(m -> m.crewDutyType() == CrewDuty.PEM);
+        boolean chief = crew.getCrew().stream().anyMatch(m -> m.getCrewDutyType() == CrewDuty.LNP);
+        boolean pem = crew.getCrew().stream().anyMatch(m -> m.getCrewDutyType() == CrewDuty.PEM);
         if (!chief || !pem) {
             throw ApiException.conflict("Не назначены начальник поезда и ПЭМ");
         }
-        List<String> notOk = TripNorm.notOk(crew.wagons(), crew.crew());
+        List<String> notOk = TripNorm.notOk(crew.getWagons(), crew.getCrew());
         if (!notOk.isEmpty()) {
             throw ApiException.conflict("Не выполнена норма проводников: " + String.join(", ", notOk));
         }
     }
 
     TripCrew load(long id) throws Exception {
-        DbRec trip = tripRec(id);
+        DbRec tripRec = tripRec(id);
+        TripCrew.Trip trip = DbRecMapper.toObject(tripRec, TripCrew.Trip.class);
         List<Long> stops = RouteService.stops(
-                routeService.stations(List.of(trip.getLong("route"))).getOrDefault(trip.getLong("route"), List.of()));
+                routeService.stations(List.of(trip.getRoute())).getOrDefault(trip.getRoute(), List.of()));
+        trip.setStops(stops);
+        trip.setDepartureStation(stops.isEmpty() ? null : stops.get(0));
+        trip.setArrivalStation(stops.isEmpty() ? null : stops.get(stops.size() - 1));
 
         Map<Long, String> numbers = new HashMap<>();
         List<TripCrew.Wagon> wagons = new ArrayList<>();
         for (DbRec r : composition(id)) {
             numbers.put(r.getLong("wagon"), r.getString("number"));
-            wagons.add(new TripCrew.Wagon(r.getString("number"), r.getLong("wagon_type"),
-                    !NOT_PASSENGER.contains(r.getString("code")), r.getLong("location_type"), r.getLong("place"),
-                    r.getString("train_number"), r.getString("name"), detached(r)));
+            TripCrew.Wagon wagon = DbRecMapper.toObject(r, TripCrew.Wagon.class);
+            wagon.setPassenger(!NOT_PASSENGER.contains(r.getString("code")));
+            wagon.setDetached(detached(r));
+            wagons.add(wagon);
         }
 
         List<TripCrew.Member> crew = new ArrayList<>();
@@ -545,15 +734,18 @@ public class TripService {
                     memberWagons.add(numbers.get(wagon));
                 }
             }
-            crew.add(new TripCrew.Member(r.getLong("usr"), shortName(r), r.getLong("crew_duty_type"),
-                    r.getBoolean("senior"), memberWagons));
+            TripCrew.Member member = DbRecMapper.toObject(r, TripCrew.Member.class);
+            member.setWagons(memberWagons);
+            crew.add(member);
         }
 
-        return new TripCrew(new TripCrew.Trip(id, trip.getLong("route"), trip.getString("train_number"), trip.getString("name"),
-                trip.getLong("trip_status_type"), trip.getLong("transport_type"), trip.getInt("duration"),
-                trip.getDateTimeTZ("planned_dt"), trip.getDateTimeTZ("departed_dt"), trip.getDateTimeTZ("departure"),
-                trip.getDateTimeTZ("arrival"), stops.isEmpty() ? null : stops.get(0),
-                stops.isEmpty() ? null : stops.get(stops.size() - 1), stops), wagons, crew, acts(id));
+        TripCrew res = new TripCrew();
+        res.setTrip(trip);
+        res.setWagons(wagons);
+        res.setCrew(crew);
+        res.setActs(acts(id));
+        refResolver.resolve(res);
+        return res;
     }
 
     private List<TripCrew.Act> acts(long id) throws Exception {
@@ -561,10 +753,9 @@ public class TripService {
         for (DbRec r : db.loadSql(TripSql.actWagons(), Map.of("trip", id))) {
             wagons.computeIfAbsent(r.getLong("coupling_act"), k -> new ArrayList<>()).add(r.getString("number"));
         }
-        return db.loadSql(TripSql.acts(), Map.of("trip", id)).stream()
-                .map(r -> new TripCrew.Act(r.getString("number"), r.getLong("coupling_type"), r.getLong("station"),
-                        wagons.get(r.getLong("id")), r.getDateTimeTZ("act_dt"), r.getLong("act_status_type")))
-                .toList();
+        List<TripCrew.Act> res = db.loadSql(TripSql.acts(), Map.of("trip", id), TripCrew.Act.class);
+        res.forEach(act -> act.setWagons(wagons.getOrDefault(act.getId(), List.of())));
+        return res;
     }
 
     private static boolean detached(DbRec row) {
@@ -668,17 +859,15 @@ public class TripService {
         for (DbRec other : otherTrips(List.of(usr), trip.getLong("id")).getOrDefault(usr, List.of())) {
             if (overlaps(other, start, end)) {
                 throw ApiException.conflict("Сотрудник занят в рейсе " + other.getString("train_number") + " "
-                        + other.getString("name"));
+                        + other.getString("name") + " до " + other.getDateTimeTZ("arrival")
+                        .atZoneSameInstant(ZoneId.systemDefault()).format(BUSY_UNTIL));
             }
         }
     }
 
     private Map<Long, List<DbRec>> otherTrips(List<Long> usrs, long trip) throws Exception {
-        Map<Long, List<DbRec>> res = new HashMap<>();
-        for (DbRec r : db.loadSql(TripSql.otherTrips(), Map.of("usrs", usrs, "trip", trip, "states", ACTIVE))) {
-            res.computeIfAbsent(r.getLong("usr"), k -> new ArrayList<>()).add(r);
-        }
-        return res;
+        return UtDb.collectGroupBy_records(
+                db.loadSql(TripSql.otherTrips(), Map.of("usrs", usrs, "trip", trip, "states", BUSY)), "usr");
     }
 
     private static boolean overlaps(DbRec other, OffsetDateTime start, OffsetDateTime end) {
@@ -695,12 +884,8 @@ public class TripService {
         throw ApiException.badRequest("Назначается начальник поезда или ПЭМ");
     }
 
-    private static String shortName(DbRec usr) {
-        return CurrentUser.shortName(usr.getString("full_name"));
-    }
-
     private void evictCrew(TripCrew crew) {
-        crew.crew().forEach(m -> currentUserService.evict(m.usr()));
+        crew.getCrew().forEach(m -> currentUserService.evict(m.getUsr().getId()));
     }
 
 }

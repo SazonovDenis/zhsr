@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 
-import { loadDict, loadDictValue, loadDictVersions } from '@/api/dict'
+import { loadDict, loadDictValue } from '@/api/dict'
 import { isNetworkError } from '@/api/http'
 import { i18n, t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
@@ -9,6 +9,7 @@ import { shownError } from '@/shared/errors'
 import { db } from '@/shared/db/db'
 import { ROUTE_KIND_RECORDS } from '@/shared/constants/RouteKind'
 import { SYSTEM_DICT_RECORDS } from '@/shared/constants/systemDicts'
+import { loadCurrentUser } from '@/shared/user'
 import { subscribe } from '@/shared/ws'
 import { DICT_COLORS } from './dictColors'
 import type { DictData, DictDef, DictId, DictName, DictRec, MultiText } from './dicts'
@@ -26,10 +27,10 @@ import { dictDefs } from './dicts'
  *
  * Обновление:
  * - refreshDict(name) — перезагрузить справочник целиком, refreshValue(name, id) — одну запись,
- *   refreshAll() — все загруженные, refreshStale() — сверить версии с сервером и перезагрузить только изменившиеся;
+ *   refreshAll() — все загруженные;
  * - сервер шлёт эти команды в канал WebSocket `dict-manager` (например, после правки в администрировании);
- * - после разрыва связи (событие шины `connection-restored`) менеджер сам вызывает refreshStale: команды сервера за
- *   время разрыва могли пропасть;
+ * - версии всех справочников приходят вместе с текущим пользователем (событие шины `dict-versions`): менеджер
+ *   перезагружает только изменившиеся, так подхватываются и команды сервера, пропавшие за время разрыва связи;
  * - после обновления в шину уходит `dict-refresh`.
  *
  * Реактивность: getValue, getRec и getList читают реактивный счётчик справочника, поэтому компоненты, которые
@@ -37,7 +38,8 @@ import { dictDefs } from './dicts'
  * нужно для логики, не связанной с отрисовкой.
  *
  * Справочники с признаком offline хранятся и в IndexedDB: без связи они берутся оттуда, при связи копия сверяется
- * с сервером по версии до показа. Ошибка сервера не прячется за копией.
+ * с сервером по версии до показа. Ошибка сервера не прячется за копией. Версии — простая нумерация внутри одной
+ * серверной БД: копии от другой БД не доходят до сверки, их стирает checkServerDb.
  *
  * Системные справочники (system в dicts.ts) с сервера не загружаются и не обновляются: записи — из кода
  * (shared/constants), оформление — из dictColors.ts.
@@ -51,10 +53,7 @@ export interface DictLoadState {
 
 /** Команда сервера в канале `dict-manager`. */
 type DictCommand =
-  | { cmd: 'refreshDict'; dict: DictName }
-  | { cmd: 'refreshValue'; dict: DictName; id: DictId }
-  | { cmd: 'refreshAll' }
-  | { cmd: 'refreshStale' }
+  { cmd: 'refreshDict'; dict: DictName } | { cmd: 'refreshValue'; dict: DictName; id: DictId } | { cmd: 'refreshAll' }
 
 class Dict {
   readonly map = new Map<DictId, DictRec>()
@@ -89,15 +88,13 @@ class DictManager {
   // счётчик изменений справочника: его читают getValue, getRec и getList, поэтому компоненты перерисовываются
   private readonly ticks = reactive<Partial<Record<DictName, number>>>({})
 
-  private staleCheck: Promise<void> | null = null
-
   // состояние загрузки справочников: для показа в выпадающих списках
   private readonly states = reactive<Partial<Record<DictName, DictLoadState>>>({})
 
   /** Подписка на команды сервера и загрузка справочников, нужных без сети. Вызывается один раз (src/boot/ws.ts). */
   start() {
     subscribe('dict-manager', (body) => void this.onCommand(body as DictCommand))
-    bus.on('connection-restored', () => void this.refreshStale())
+    bus.on('dict-versions', (versions) => void this.refreshChanged(versions))
 
     for (const name of Object.keys(dictDefs) as DictName[]) {
       if (this.isOffline(name) && !this.isSystem(name)) void this.prepareDict(name)
@@ -199,23 +196,13 @@ class DictManager {
     await Promise.all([...this.dicts.keys()].map((name) => this.refreshDict(name)))
   }
 
-  /** Сверить версии загруженных справочников с сервером и перезагрузить изменившиеся. */
-  refreshStale(): Promise<void> {
-    // связь восстановилась сразу по двум признакам — сверка всё равно одна
-    if (!this.staleCheck) {
-      this.staleCheck = this.checkStale().finally(() => (this.staleCheck = null))
-    }
-    return this.staleCheck
-  }
-
   // --- внутреннее ---
 
-  private async checkStale() {
-    const names = [...this.dicts.keys()].filter((name) => !this.isSystem(name))
-    if (names.length === 0) return
-    const versions = await loadDictVersions(names)
-    const stale = names.filter(
-      (name) => versions[name] !== undefined && versions[name] !== this.dicts.get(name)?.version,
+  /** Перезагрузить загруженные справочники, версия которых отличается от версии на сервере. */
+  private async refreshChanged(versions: Partial<Record<DictName, string>>) {
+    const stale = [...this.dicts.keys()].filter(
+      (name) =>
+        !this.isSystem(name) && versions[name] !== undefined && versions[name] !== this.dicts.get(name)?.version,
     )
     await Promise.all(stale.map((name) => this.refreshDict(name)))
   }
@@ -228,12 +215,9 @@ class DictManager {
         return this.refreshValue(command.dict, command.id)
       case 'refreshAll':
         return this.refreshAll()
-      case 'refreshStale':
-        return this.refreshStale()
     }
   }
 
-  /** Первая загрузка: справочник offline берётся из IndexedDB и сверяется с сервером, остальные — с сервера. */
   /**
    * Первая загрузка. Справочник offline: копия из IndexedDB берётся, только если связи нет; при связи версия копии
    * сверяется с сервером (совпала — копия, нет — справочник с сервера). Ошибка сервера не прячется за копией: она
@@ -245,8 +229,8 @@ class DictManager {
       if (stored) {
         if (!navigator.onLine) return stored
         try {
-          const versions = await loadDictVersions([name])
-          if (versions[name] === stored.version) return stored
+          const { dictVersions } = await loadCurrentUser()
+          if (dictVersions[name] === stored.version) return stored
         } catch (e) {
           if (isNetworkError(e)) return stored
           throw e
@@ -255,8 +239,6 @@ class DictManager {
     }
     return this.save(name, await loadDict(name))
   }
-
-  /** Сверка версии справочника, взятого из IndexedDB. */
 
   /** Загрузка с общим ожиданием: параллельные запросы получают один промис. */
   private async load(name: DictName, loader: () => Promise<Dict>): Promise<Dict> {

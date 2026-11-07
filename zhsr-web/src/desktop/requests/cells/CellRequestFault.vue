@@ -1,7 +1,7 @@
 <template>
   <div class="cell-request-fault">
     <span class="cell-request-fault__name">{{ faultName(row.faultType) }}</span>
-    <span v-if="row.tor" class="cell-request-fault__tor">{{ t('ТОР') }}</span>
+    <span v-if="row.tor" class="cell-request-fault__tor q-py-none q-px-sm">{{ t('ТОР') }}</span>
   </div>
   <div v-if="row.description" class="zs-sub cell-request-fault__desc">{{ row.description }}</div>
 </template>
@@ -29,11 +29,10 @@ defineProps<CellProps<RepairRequest>>()
 }
 
 .cell-request-fault__tor {
-  padding: 0 0.375rem;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fbe1de;
   color: #a3261b;
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   font-weight: 700;
 }
 

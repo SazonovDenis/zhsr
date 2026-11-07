@@ -51,6 +51,7 @@ public final class SqlWhere {
         }
         if (access.trip() != null) {
             params.put("visTrip", access.trip());
+            params.put("visTrips", access.trips());
         }
         if (!access.wagons().isEmpty()) {
             params.put("visWagons", access.wagons());

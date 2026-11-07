@@ -1,6 +1,8 @@
 import type { TableSort } from '@/shared/components/table/types'
 import { dayStart, isoDateTime } from '@/shared/format'
 import { http } from './http'
+import type { UserRef } from './requests'
+import type { TripRef } from './wagons'
 
 /**
  * API рейсов: список, создание, правка и отмена, формирование рейса (состав и бригада), отправление и прибытие,
@@ -19,6 +21,12 @@ export interface TripRow extends TripOption {
   transportType: number
   /** фактическое отправление, ISO с часовым поясом */
   departedDt: string | null
+  /** фактическое прибытие, ISO с часовым поясом; null — рейс не прибыл */
+  arrivedDt: string | null
+  /** когда отмечено отправление, ISO; null — не отмечено */
+  departureMarkedDt: string | null
+  /** когда отмечено прибытие, ISO; null — не отмечено */
+  arrivalMarkedDt: string | null
   /** готовность рейса; сервер её пока не считает — пусто */
   readiness: TripReadiness[]
 }
@@ -118,10 +126,7 @@ export async function cancelTrip(tripId: number): Promise<TripRow> {
 
 /** Сотрудник бригады рейса. */
 export interface CrewMember {
-  /** id сотрудника */
-  usr: number
-  /** фамилия и инициалы */
-  name: string
+  usr: UserRef
   /** должность — id справочника CrewDuty (константы CrewDuty) */
   crewDutyType: number
   /** категория «старший проводник» — нужна для хвостовых вагонов */
@@ -141,16 +146,15 @@ export interface CrewWagon {
   locationType: number
   /** место расположения по виду: станция, депо, парк отстоя или рейс */
   place: number
-  /** номер поезда рейса, в составе которого вагон сейчас; null — вагон не в рейсе */
-  trainNumber: string | null
-  /** маршрут рейса, в составе которого вагон сейчас; null — вагон не в рейсе */
-  tripName: string | null
+  /** рейс, в составе которого вагон сейчас; null — вагон не в рейсе */
+  trip: TripRef | null
   /** вагон отцеплен актом и в составе не едет */
   detached: boolean
 }
 
 /** Акт отцепки или прицепки по рейсу. */
 export interface CouplingAct {
+  id: number
   number: string
   /** вид акта — константы CouplingType */
   couplingType: number
@@ -159,7 +163,7 @@ export interface CouplingAct {
   /** номера вагонов */
   wagons: string[]
   /** когда составлен, ISO с часовым поясом */
-  createdDt: string
+  actDt: string
   /** состояние акта — константы ActStatus */
   actStatusType: number
 }
@@ -174,8 +178,8 @@ export interface CouplingWagon {
   place: number
   /** состояние вагона — id справочника WagonState */
   wagonStatusType: number
-  /** номер поезда другого активного рейса, в составе которого вагон; null — такого рейса нет */
-  otherTrain: string | null
+  /** другой активный рейс, в составе которого вагон; null — такого рейса нет */
+  otherTrip: TripRef | null
   /** можно отцепить или прицепить; иначе показан, но отметить нельзя */
   available: boolean
 }
@@ -203,6 +207,12 @@ export interface TripCrew {
     plannedDt: string
     /** фактическое отправление, ISO с часовым поясом; null — рейс не отправлен */
     departedDt: string | null
+    /** фактическое прибытие, ISO с часовым поясом; null — рейс не прибыл */
+    arrivedDt: string | null
+    /** когда отмечено отправление, ISO; null — не отмечено */
+    departureMarkedDt: string | null
+    /** когда отмечено прибытие, ISO; null — не отмечено */
+    arrivalMarkedDt: string | null
     /** станция отправления — id справочника Station; null — у маршрута нет остановок */
     departureStation: number | null
     /** станция прибытия — id справочника Station; null — у маршрута нет остановок */
@@ -217,22 +227,22 @@ export interface TripCrew {
 }
 
 /** Проводник для набора в бригаду рейса (диалог «Проводники…»). */
-export interface ConductorCandidate {
-  usr: number
-  name: string
+export interface ConductorCandidate extends UserRef {
   senior: boolean
   /** уже в бригаде этого рейса */
   assigned: boolean
-  /** рейс, из которого проводник освободится к отправлению: номер поезда, маршрут и когда; null — свободен */
-  busyTrain: string | null
-  busyName: string | null
+  /** рейс, из которого проводник освободится к отправлению; null — свободен */
+  busyTrip: TripRef | null
+  /** когда этот рейс прибудет */
   busyUntil: string | null
 }
 
-/** Сотрудник для назначения начальником поезда или ПЭМ. */
-export interface StaffCandidate {
-  usr: number
-  name: string
+/** Сотрудник для должности начальника поезда или ПЭМ; занятый тоже в списке, назначить его не даст сервер. */
+export interface StaffCandidate extends UserRef {
+  /** рейс, на котором сотрудник занят во время этого рейса; null — свободен */
+  busyTrip: TripRef | null
+  /** до какого времени занят: фактическое прибытие того рейса, а если его нет — плановое; ISO */
+  busyUntil: string | null
 }
 
 /** Вагон для добавления в состав: на станции отправления, в депо или в парке отстоя при ней. */
@@ -301,6 +311,26 @@ export async function markDeparture(tripId: number, time: string): Promise<TripC
 /** Отметить прибытие рейса. time — ISO с часовым поясом. */
 export async function markArrival(tripId: number, time: string): Promise<TripCrew> {
   return (await http.post<TripCrew>(`/trips/${tripId}/arrive`, { time })).data
+}
+
+/** Исправить время отправления (10 минут после отметки). time — ISO с часовым поясом. */
+export async function retimeDeparture(tripId: number, time: string): Promise<TripCrew> {
+  return (await http.put<TripCrew>(`/trips/${tripId}/depart`, { time })).data
+}
+
+/** Отменить отправление (10 минут после отметки): рейс снова «план». */
+export async function cancelDeparture(tripId: number): Promise<TripCrew> {
+  return (await http.delete<TripCrew>(`/trips/${tripId}/depart`)).data
+}
+
+/** Исправить время прибытия (10 минут после отметки). time — ISO с часовым поясом. */
+export async function retimeArrival(tripId: number, time: string): Promise<TripCrew> {
+  return (await http.put<TripCrew>(`/trips/${tripId}/arrive`, { time })).data
+}
+
+/** Отменить прибытие (10 минут после отметки): рейс снова «выполняется». */
+export async function cancelArrival(tripId: number): Promise<TripCrew> {
+  return (await http.delete<TripCrew>(`/trips/${tripId}/arrive`)).data
 }
 
 /** Вагоны для акта: для отцепки — едущие в составе, для прицепки — станции, её депо и парка отстоя. */

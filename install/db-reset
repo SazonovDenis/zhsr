@@ -3,7 +3,8 @@
 #   1. удалить БД DB_NAME и создать пустую с владельцем DB_USER (пользователь создаётся, если его нет);
 #   2. накатить структуру и системные справочники (zhsr-database, db/dict) - миграции Liquibase (zhsr-database);
 #   3. загрузить начальные данные db-data/default: станции, перегоны, типы и модели вагонов, пользователь admin;
-#   4. с ключом --demo - ещё и демо-данные db-data/demo.
+#   4. с ключом --demo - ещё и демо-данные db-data/demo;
+#   5. записать новый идентификатор БД (db_info): zhsr-<TENANT_NAME>-<8 случайных hex-символов>.
 # Файлы данных загружаются по порядку имён: <nn>-<таблица>.tsv - в таблицу, *.sql - выполняются. Столбцы tsv, которых
 # нет в таблице (description - пояснение к строке), не загружаются. Все данные - одной транзакцией.
 # Параметры подключения - в .env; нет .env - копируется из .env.sample.
@@ -25,6 +26,8 @@ done
 
 [ -f .env ] || { cp .env.sample .env; echo '.env создан из .env.sample'; }
 set -a; . ./.env; set +a
+[[ ${TENANT_NAME:-} =~ ^[a-z0-9-]+$ ]] || { echo 'в .env задайте TENANT_NAME: строчные латинские буквы, цифры, дефис' >&2; exit 1; }
+db_guid="zhsr-$TENANT_NAME-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
 
 admin() { PGPASSWORD=$DB_ADMIN_PASSWORD psql -X -q -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN_USER" "$@"; }
 app() { PGPASSWORD=$DB_PASSWORD psql -X -q -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" "$@"; }
@@ -100,6 +103,8 @@ where table_schema = current_schema()
 \o
 \echo 'счётчики id: обновлены'
 SQL
+  echo "insert into db_info (db_guid) values ('$db_guid');"
+  echo "\\echo 'идентификатор БД: $db_guid'"
   echo 'commit;'
 } | app
 

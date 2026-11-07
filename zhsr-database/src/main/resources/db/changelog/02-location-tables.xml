@@ -95,8 +95,12 @@
             </column>
             <column name="departed_dt" type="timestamptz"/>
             <column name="departed_by_usr" type="bigint"/>
+            <!-- когда отметку отправления внесли: от него считается срок исправления и отмены -->
+            <column name="departure_marked_dt" type="timestamptz"/>
             <column name="arrived_dt" type="timestamptz"/>
             <column name="arrived_by_usr" type="bigint"/>
+            <!-- когда отметку прибытия внесли: от него считается срок исправления и отмены -->
+            <column name="arrival_marked_dt" type="timestamptz"/>
         </createTable>
     </changeSet>
 

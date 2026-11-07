@@ -6,7 +6,7 @@
         <div
           v-for="col in columns"
           :key="col.field"
-          class="data-table__head-cell"
+          class="data-table__head-cell q-py-sm q-px-md"
           :class="[alignClass(col), { 'data-table__head-cell--sortable': col.sortable }]"
           role="columnheader"
           :aria-sort="ariaSort(col)"
@@ -50,7 +50,7 @@
                 <div
                   v-for="col in columns"
                   :key="col.field"
-                  class="data-table__cell"
+                  class="data-table__cell q-py-sm q-px-md"
                   :class="[alignClass(col), col.cellClass]"
                   role="cell"
                 >
@@ -65,12 +65,17 @@
       <!-- строк ещё нет и идёт загрузка — спиннер на месте строк: у пустой таблицы высота — только шапка -->
       <LoadSpinner v-if="loading && rows.length === 0" />
       <!-- ошибка загрузки — на месте строк, а не «нет данных» -->
-      <ErrorBox v-else-if="error && !loading" :error="error" :retry="retry" class="data-table__error" />
-      <div v-else-if="rows.length === 0 && !loading" class="data-table__empty">{{ emptyText }}</div>
+      <ErrorBox v-else-if="error && !loading" :error="error" :retry="retry" class="data-table__error q-ma-md" />
+      <div v-else-if="rows.length === 0 && !loading" class="data-table__empty q-pa-lg">{{ emptyText }}</div>
 
       <!-- подвал по колонкам: есть, если подвал задан хотя бы у одной колонки -->
       <div v-if="hasColumnFooter" class="data-table__foot data-table__grid" :style="gridStyle" role="row">
-        <div v-for="col in columns" :key="col.field" class="data-table__foot-cell" :class="alignClass(col)">
+        <div
+          v-for="col in columns"
+          :key="col.field"
+          class="data-table__foot-cell q-py-sm q-px-md"
+          :class="alignClass(col)"
+        >
           <template v-if="typeof col.footer === 'string'">{{ col.footer }}</template>
           <component :is="col.footer" v-else-if="col.footer" :rows="rows" :column="col" />
         </div>
@@ -78,7 +83,7 @@
     </div>
 
     <!-- свободный подвал под таблицей -->
-    <div v-if="$slots.footer" class="data-table__footer">
+    <div v-if="$slots.footer" class="data-table__footer q-py-sm q-px-md">
       <slot name="footer" :rows="rows" />
     </div>
 
@@ -233,9 +238,9 @@ watch(
   min-height: 0;
   overflow: auto;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
 }
 
 .data-table__inner {
@@ -257,10 +262,9 @@ watch(
 .data-table__head-cell {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.5625rem 0.875rem;
+  gap: 0.3rem;
   color: $zs-table-head-fg;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
 
@@ -296,13 +300,12 @@ watch(
   &--selected,
   &--selected:hover {
     background: $zs-row-selected-bg;
-    box-shadow: inset 0.125rem 0 0 $zs-row-selected-bar;
+    box-shadow: inset 0.1rem 0 0 $zs-row-selected-bar;
   }
 }
 
 .data-table__cell {
   min-width: 0;
-  padding: 0.625rem 0.875rem;
   border-bottom: 0.0625rem solid $zs-border-row;
 }
 
@@ -319,23 +322,13 @@ watch(
   font-weight: 600;
 }
 
-.data-table__foot-cell {
-  padding: 0.5625rem 0.875rem;
-}
-
 .data-table__footer {
-  padding: 0.5625rem 0.875rem;
   border-top: 0.0625rem solid $zs-border;
 }
 
 .data-table__empty {
-  padding: 2rem;
   color: $zs-text-muted;
   text-align: center;
-}
-
-.data-table__error {
-  margin: 1rem;
 }
 
 .data-table--align-left {

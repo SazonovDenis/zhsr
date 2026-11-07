@@ -17,6 +17,6 @@ defineProps<CellProps<WagonRow>>()
 <style scoped lang="scss">
 // по макету плашка выступает влево на свой отступ: текст плашки стоит ровно по краю колонки
 .cell-wagon-state {
-  margin: 0 0 0.1875rem -0.5rem;
+  margin: 0 0 0.2rem -0.5rem;
 }
 </style>

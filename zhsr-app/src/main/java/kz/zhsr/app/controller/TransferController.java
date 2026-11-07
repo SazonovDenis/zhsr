@@ -1,8 +1,8 @@
 package kz.zhsr.app.controller;
 
-import kz.zhsr.app.dto.StaffCandidate;
-import kz.zhsr.app.dto.TransferRow;
-import kz.zhsr.app.dto.TransferWagon;
+import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.wagon.TransferRow;
+import kz.zhsr.app.dto.wagon.TransferWagon;
 import kz.zhsr.app.service.TransferService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,7 +38,7 @@ public class TransferController {
     }
 
     @GetMapping("/transfers/givers")
-    public List<StaffCandidate> givers(@RequestParam long direction, @RequestParam long station) throws Exception {
+    public List<UserRef> givers(@RequestParam long direction, @RequestParam long station) throws Exception {
         return transferService.givers(direction, station);
     }
 

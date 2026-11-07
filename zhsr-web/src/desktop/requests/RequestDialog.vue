@@ -30,12 +30,12 @@
         </template>
       </CbList>
       <div class="request-dialog__frequent">
-        <span class="request-dialog__frequent-label">{{ t('Частые') }}</span>
+        <span class="request-dialog__frequent-label q-mr-xs">{{ t('Частые') }}</span>
         <button
           v-for="f in frequent"
           :key="f.id"
           type="button"
-          class="request-dialog__chip zs-focusable"
+          class="request-dialog__chip zs-focusable q-py-none q-px-sm"
           :class="{ 'request-dialog__chip--on bg-selected text-selected': draft.faultType === f.id }"
           @click="pickFault(f.id)"
         >
@@ -68,7 +68,7 @@
       <FormField label="Описание">
         <textarea
           v-model="draft.description"
-          class="request-dialog__textarea zs-focusable"
+          class="request-dialog__textarea zs-focusable q-pa-sm"
           rows="3"
           :placeholder="t('Например: в 3-м купе не закрывается окно')"
         />
@@ -107,6 +107,7 @@ import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
 import { canAssignOnCreate } from '@/shared/requests/rights'
 import { currentUser, loadCurrentUser } from '@/shared/user'
 import WagonPickField from './WagonPickField.vue'
+import { tripRefText } from '@/shared/trips/tripRefText'
 
 /**
  * Диалог «Новая заявка» (Ф-ЗАЯ-01) и «Исправление заявки» (Ф-ЗАЯ-07, задан request): вагон, неисправность,
@@ -129,7 +130,7 @@ const draft = reactive<
     faultType: number | null
   }
 >({
-  wagon: r?.wagon ?? null,
+  wagon: r?.wagon.id ?? null,
   trip: r?.trip?.id ?? null,
   faultType: r?.faultType ?? null,
   severityType: r?.severityType ?? Severity.MEDIUM,
@@ -138,7 +139,7 @@ const draft = reactive<
   executorUsr: null,
 })
 // номер вагона в поле выбора; вагон заявки (draft.wagon) — выбранный из списка: номер исправлен вручную — не выбран
-const wagonNumber = ref(r?.wagonNumber ?? '')
+const wagonNumber = ref(r?.wagon.number ?? '')
 let pickedNumber = wagonNumber.value
 watch(wagonNumber, (number) => {
   if (number !== pickedNumber) draft.wagon = null
@@ -168,7 +169,7 @@ const serviceName = computed(() => (service.value ? dictManager.getValue('Servic
 const trips = shallowRef<TripOption[]>([])
 const tripChoices = computed<ChoiceItem[]>(() => {
   const list: ChoiceItem[] = trips.value.map((trip) => ({ id: trip.id, text: `${trip.trainNumber} ${trip.name}` }))
-  if (r?.trip && !list.some((c) => c.id === r.trip!.id)) list.unshift({ id: r.trip.id, text: r.trip.name })
+  if (r?.trip && !list.some((c) => c.id === r.trip!.id)) list.unshift({ id: r.trip.id, text: tripRefText(r.trip) })
   return list
 })
 
@@ -267,24 +268,22 @@ async function save() {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.4rem;
 }
 
 .request-dialog__frequent-label {
-  margin-right: 0.25rem;
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .request-dialog__chip {
   height: 1.9rem;
-  padding: 0 0.625rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.9375rem;
+  border-radius: 0.9rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   cursor: pointer;
 
   &:hover:not(.request-dialog__chip--on) {
@@ -297,12 +296,11 @@ async function save() {
 }
 
 .request-dialog__textarea {
-  padding: 0.5rem 0.625rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   color: $zs-text;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   resize: vertical;
 
   &:focus {

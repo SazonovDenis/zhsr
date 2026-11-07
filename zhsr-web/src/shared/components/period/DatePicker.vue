@@ -1,13 +1,13 @@
 <template>
   <!-- Единый корень — без него группа кнопок и «...» попадают в DOM родителя как независимые узлы -->
   <div class="date-picker">
-    <span v-if="label" class="date-picker__label">{{ t(label) }}</span>
+    <span v-if="label" class="date-picker__label q-my-none q-mr-sm q-ml-md">{{ t(label) }}</span>
 
     <!-- дата — первой: всегда видна и вводится вручную: дд.мм.гггг (с временем — дд.мм.гггг чч:мм).
          Ширина поля постоянная: при наборе не меняется -->
     <input
       :value="typed"
-      class="date-picker__input zs-focusable"
+      class="date-picker__input zs-focusable q-py-none q-pr-sm q-pl-md"
       :class="{ 'date-picker__input--time': withTime }"
       :placeholder="placeholder"
       inputmode="numeric"
@@ -34,7 +34,14 @@
       />
     </div>
 
-    <q-btn flat dense icon="more_horiz" class="date-picker__more" :tabindex="-1" @click="open" />
+    <q-btn
+      flat
+      dense
+      icon="more_horiz"
+      class="date-picker__more q-ml-auto q-py-none q-px-sm"
+      :tabindex="-1"
+      @click="open"
+    />
 
     <!-- anchor/self по центру: при нехватке места Quasar не обрезает окно, а сдвигает его, чтобы вписать в экран.
          max-height: меню Quasar по умолчанию не выше 65vh, и календарь с двумя циферблатами времени в него не
@@ -43,8 +50,9 @@
       ref="popup"
       no-parent-event
       max-height="calc(100vh - 1rem)"
-      class="period-picker-popup"
+      :class="['period-picker-popup', { 'period-picker-popup--placing': placing }]"
       :breakpoint="SCALE0_MAX_PX"
+      :transition-show="isFullScreen() ? 'scale' : 'none'"
       anchor="bottom middle"
       self="top middle"
       @show="onPopupShow"
@@ -85,82 +93,20 @@
           <div
             v-if="calendarShown"
             class="date-picker__calendar"
-            :class="{ 'date-picker__calendar--bottom': !applyImmediately && !isFullScreen() }"
+            :class="{
+              'date-picker__calendar--bottom': !applyImmediately && !isFullScreen() && !(withTime && !isCompact()),
+            }"
           >
             <!-- Мобильный: возврат от календаря к быстрым вариантам -->
             <div v-if="isFullScreen() && quick.length > 0" class="period-back">
               <q-icon class="q-px-xs q-pt-sm" name="arrow_back" size="md" color="grey-7" @click.stop="hideCalendar" />
             </div>
-            <div v-else-if="isFullScreen()" class="row justify-end full-width q-mb-sm">
+            <!-- с временем крестика нет: закрывает «Ок» или кнопка «назад» -->
+            <div v-else-if="isFullScreen() && !withTime" class="row justify-end full-width q-mb-sm">
               <q-btn dense flat icon="close" color="grey-7" @click="close" />
             </div>
 
-            <!-- общая шапка календаря и времени: подпись поля и «Очистить», год, дата со временем -->
-            <div class="date-picker__header" :class="{ 'date-picker__header--empty': dateInner === null }">
-              <div class="row items-center justify-between no-wrap">
-                <div class="date-picker__header-text">{{ t(dateText) }}</div>
-                <q-btn
-                  v-if="nullable && dateInner"
-                  dense
-                  flat
-                  no-caps
-                  icon-right="close"
-                  color="grey-6"
-                  :label="t('Очистить')"
-                  @click="onDateUpdate(null)"
-                />
-              </div>
-              <div class="date-picker__header-year">{{ formatYearHeader(dateInner) }}</div>
-              <div class="date-picker__header-title">{{ headerTitle }}</div>
-            </div>
-
-            <div class="row date-picker__panels" :class="{ 'no-wrap': !isCompact() }">
-              <!-- собственную шапку календаря не показываем: шапка общая (minimal) -->
-              <q-date
-                class="custom-date relative-position"
-                :class="{ 'custom-date-mobile': isCompact() }"
-                :model-value="dateInner"
-                :mask="DATE_FORMAT"
-                :no-unset="!nullable"
-                minimal
-                flat
-                @update:model-value="onDateUpdate"
-              />
-
-              <!-- время — двумя циферблатами в цветах календаря: часы (0–11 снаружи, 12–23 внутри) и минуты -->
-              <div v-if="withTime" class="time-grid" :class="{ 'time-grid--disabled': dateInner === null }">
-                <!-- два циферблата одного размера рядом: часы, справа минуты (с точностью до минуты) -->
-                <div class="time-grid__body">
-                  <div
-                    v-for="dial in TIME_DIALS"
-                    :key="dial.kind"
-                    class="time-dial"
-                    @pointerdown="onDialDown($event, dial.cells)"
-                    @pointermove="onDialMove($event, dial.cells)"
-                    @pointerup="onDialUp"
-                    @pointercancel="onDialUp"
-                  >
-                    <span v-if="hand(dial.kind)" class="time-dial__hand" :style="hand(dial.kind)!" />
-                    <span class="time-dial__center" />
-                    <button
-                      v-for="cell in dial.cells"
-                      :key="cell.value"
-                      type="button"
-                      class="time-dial__cell"
-                      :class="{
-                        'time-dial__cell--active': isTimeActive(cell),
-                        'time-dial__cell--inner': cell.inner,
-                      }"
-                      :style="cellStyle(cell)"
-                      :disabled="dateInner === null"
-                      tabindex="-1"
-                    >
-                      {{ cell.label }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <DateCalendar v-model="inner" :with-time="withTime" :nullable="nullable" :label="dateText" />
           </div>
         </div>
 
@@ -176,13 +122,15 @@
 <script setup lang="ts">
 import type { QPopupProxy } from 'quasar'
 import { date } from 'quasar'
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
-import { i18n, t } from '@/boot/i18n'
+import { t } from '@/boot/i18n'
 import type { HistoryDialog } from '@/shared/components/dialog/dialogHistory'
 import { dialogHistory } from '@/shared/components/dialog/dialogHistory'
 import { SCALE0_MAX_PX, screenScale, screenScaleMin } from '@/shared/screen'
 import type { QuickDate } from './quickDates'
+import DateCalendar from './DateCalendar.vue'
+import { DATE_FORMAT, joinIso, splitIso } from './dateValue'
 import { QUICK_DATE_LABELS, quickDateValue } from './quickDates'
 
 /**
@@ -199,14 +147,11 @@ import { QUICK_DATE_LABELS, quickDateValue } from './quickDates'
  * - quick — быстрые варианты (см. quickDates.ts); их набор задаёт место применения. Первые shortCount вариантов
  *   стоят кнопками в рамке и применяются сразу. Выбранная кнопка подсвечена: вариант выводится из самой даты.
  * - С временем быстрый вариант меняет только дату, время сохраняется.
- * - В окне выбор применяется кнопкой «Ок» (или сразу при applyImmediately). На мобильном окно — одна панель: быстрые
+ * - В окне — календарь DateCalendar; выбор применяется кнопкой «Ок» (или сразу при applyImmediately). На мобильном окно — одна панель: быстрые
  *   варианты применяются сразу, «Указать дату...» переходит к календарю.
  * - На телефоне окно раскрыто во весь экран, со своими крестиком и стрелкой возврата; кнопка «назад» сворачивает
  *   выбор по шагам (общий стек dialogHistory).
  */
-
-const DATE_FORMAT = 'DD.MM.YYYY'
-const ISO_DATE = 'YYYY-MM-DD'
 
 const props = withDefaults(
   defineProps<{
@@ -242,24 +187,22 @@ const model = defineModel<string | null>({ default: null })
 const popup = ref<QPopupProxy | null>(null)
 
 // внутреннее значение окна: дата DD.MM.YYYY и время HH:mm; наружу уходит только по «Ок»
-const dateInner = ref<string | null>(null)
-const timeInner = ref<string | null>(null)
+const inner = ref<string | null>(null)
+// выбор в окне с applyImmediately применяется сразу
+watch(inner, (value) => {
+  if (props.applyImmediately && value !== model.value) model.value = value
+})
 
 // только для мобильного: какая из двух панелей сейчас видна
 const calendarsShown = ref(false)
 
-/** ISO → внутренние дата и время. */
+/** ISO → дата DD.MM.YYYY и время HH:mm. */
 function split(iso: string | null): [string | null, string | null] {
-  if (!iso) return [null, null]
-  const day = date.formatDate(date.extractDate(iso.slice(0, 10), ISO_DATE), DATE_FORMAT)
-  return [day, iso.length > 10 ? iso.slice(11, 16) : null]
+  return splitIso(iso)
 }
 
-/** Внутренние дата и время → ISO. Дата без часового пояса: toISOString сдвинул бы её. */
 function join(day: string | null, time: string | null): string | null {
-  if (!day) return null
-  const iso = date.formatDate(date.extractDate(day, DATE_FORMAT), ISO_DATE)
-  return props.withTime ? `${iso}T${time ?? '00:00'}` : iso
+  return joinIso(day, time, props.withTime)
 }
 
 // --- раскладка, как у PeriodPicker ---
@@ -273,7 +216,7 @@ function isFullScreen(): boolean {
 }
 
 const cardClass = computed(() =>
-  isFullScreen() ? 'relative-position' : 'q-pa-md relative-position period-card-padded',
+  isFullScreen() ? 'relative-position' : 'q-pa-sm relative-position period-card-padded',
 )
 
 // На мобильном помещается одна панель: быстрые варианты или календарь. Без быстрых вариантов — сразу календарь
@@ -309,7 +252,7 @@ const shortOptions = computed(() =>
   shortCodes.value.map((code) => ({ label: t(QUICK_DATE_LABELS[code]), value: code })),
 )
 
-const innerCode = computed(() => codeOf(dateInner.value))
+const innerCode = computed(() => codeOf(split(inner.value)[0]))
 
 // --- значение в рамке ---
 
@@ -485,11 +428,16 @@ function onShortClick(value: string) {
 // --- окно ---
 
 function open() {
-  ;[dateInner.value, timeInner.value] = split(model.value)
+  inner.value = model.value
   // каждое открытие на мобильном начинается с быстрых вариантов
   calendarsShown.value = false
+  // на десктопе окно сначала невидимо: Quasar ставит его у поля, а нужное место — у поля или по центру — выбирается
+  // по готовому окну в onPopupShow; иначе оно мелькнуло бы у поля и прыгнуло
+  placing.value = !isFullScreen()
   popup.value?.show()
 }
+
+const placing = ref(false)
 
 function close() {
   // окно считается закрытым сразу, а не после анимации: dialogHistory сразу после шага «назад» спрашивает isShown
@@ -523,7 +471,37 @@ function stepBack() {
 
 function onPopupShow() {
   popupShown = true
-  if (isFullScreen()) dialogHistory.push(historyEntry)
+  if (isFullScreen()) {
+    dialogHistory.push(historyEntry)
+    return
+  }
+  centerIfTight()
+  placing.value = false
+}
+
+/** Зазор окна от краёв экрана, пикселей: меньше — окно открывается по центру. */
+const SCREEN_GAP = 8
+
+/**
+ * Окно у поля упёрлось в край экрана или не поместилось целиком (появилась прокрутка) — переставить его в центр
+ * экрана: там ему доступна вся высота окна браузера. Позицию у поля считает Quasar, здесь она только заменяется.
+ */
+function centerIfTight() {
+  const menus = document.querySelectorAll<HTMLElement>('.q-menu.period-picker-popup')
+  const el = menus[menus.length - 1]
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const tight =
+    el.scrollHeight > el.clientHeight ||
+    rect.top < SCREEN_GAP ||
+    rect.left < SCREEN_GAP ||
+    rect.bottom > window.innerHeight - SCREEN_GAP ||
+    rect.right > window.innerWidth - SCREEN_GAP
+  if (!tight) return
+  el.style.maxHeight = `${window.innerHeight - 2 * SCREEN_GAP}px`
+  const height = Math.min(el.scrollHeight, window.innerHeight - 2 * SCREEN_GAP)
+  el.style.top = `${Math.max(SCREEN_GAP, (window.innerHeight - height) / 2)}px`
+  el.style.left = `${Math.max(SCREEN_GAP, (window.innerWidth - el.offsetWidth) / 2)}px`
 }
 
 function onPopupHide() {
@@ -534,183 +512,13 @@ function onPopupHide() {
 onBeforeUnmount(() => dialogHistory.forget(historyEntry))
 
 function onQuickUpdate(code: QuickDate) {
-  onDateUpdate(date.formatDate(quickDateValue(code), DATE_FORMAT))
+  inner.value = join(date.formatDate(quickDateValue(code), DATE_FORMAT), split(inner.value)[1])
   if (quickPanelApplies.value) apply()
 }
 
-function onDateUpdate(value: string | null) {
-  dateInner.value = value
-  // «Очистить» сбрасывает и время: время без даты не имеет смысла
-  if (value === null) timeInner.value = null
-  if (value && props.withTime && !timeInner.value) timeInner.value = '00:00'
-  if (props.applyImmediately) model.value = join(dateInner.value, timeInner.value)
-}
-
-// --- время ---
-
-/** Деление циферблата: значение, подпись, позиция (0–11 по кругу, 0 — вверху) и кольцо. */
-interface TimeCell {
-  kind: 'hour' | 'minute'
-  value: number
-  label: string
-  position: number
-  inner: boolean
-}
-
-const pad2 = (n: number) => String(n).padStart(2, '0')
-
-// часы: внешнее кольцо 0–11, внутреннее 12–23; минуты: 00–55 с шагом 5
-const TIME_DIALS: { kind: 'hour' | 'minute'; cells: TimeCell[] }[] = [
-  {
-    kind: 'hour',
-    cells: Array.from({ length: 24 }, (_, h) => ({
-      kind: 'hour',
-      value: h,
-      label: String(h),
-      position: h % 12,
-      inner: h >= 12,
-    })),
-  },
-  {
-    kind: 'minute',
-    cells: Array.from({ length: 12 }, (_, i) => ({
-      kind: 'minute',
-      value: i * 5,
-      label: pad2(i * 5),
-      position: i,
-      inner: false,
-    })),
-  },
-]
-
-// радиус колец — доля радиуса циферблата
-const OUTER_RADIUS = 0.8
-const INNER_RADIUS = 0.52
-
-function radiusOf(cell: TimeCell): number {
-  return cell.inner ? INNER_RADIUS : OUTER_RADIUS
-}
-
-/** Положение деления на круге: центр циферблата — 50%, 0 — вверху, по часовой стрелке. */
-function cellStyle(cell: TimeCell): Record<string, string> {
-  const angle = (cell.position * Math.PI) / 6
-  const r = radiusOf(cell) * 50
-  return { left: `${50 + r * Math.sin(angle)}%`, top: `${50 - r * Math.cos(angle)}%` }
-}
-
-/**
- * Стрелка от центра к выбранному значению: у часов — к выбранному делению (с учётом кольца), у минут — к точной
- * минуте (6° на минуту), даже если она не кратна пяти и деления для неё нет.
- */
-function hand(kind: 'hour' | 'minute'): Record<string, string> | null {
-  if (!timeInner.value) return null
-  const [h, m] = timeInner.value.split(':').map(Number)
-  if (kind === 'minute') return { height: `${OUTER_RADIUS * 50}%`, transform: `rotate(${(m ?? 0) * 6}deg)` }
-  const cell = TIME_DIALS[0]!.cells.find((c) => c.value === h)
-  return cell ? { height: `${radiusOf(cell) * 50}%`, transform: `rotate(${cell.position * 30}deg)` } : null
-}
-
-/**
- * Деление под указателем: по углу от центра — ближайшая позиция, по расстоянию от центра — кольцо (у часов: ближе к
- * центру — внутреннее, 12–23). Для минут — ближайшая с шагом 5.
- */
-function cellAt(e: PointerEvent, cells: TimeCell[]): TimeCell | undefined {
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  const x = e.clientX - (rect.left + rect.width / 2)
-  const y = e.clientY - (rect.top + rect.height / 2)
-  const angle = (Math.atan2(x, -y) * 180) / Math.PI
-  const position = Math.round((((angle % 360) + 360) % 360) / 30) % 12
-  const distance = Math.hypot(x, y) / (rect.width / 2)
-  const inner = distance < (OUTER_RADIUS + INNER_RADIUS) / 2
-  return cells.find((c) => c.position === position && c.inner === inner) ?? cells.find((c) => c.position === position)
-}
-
-// перетаскивание по циферблату: нажали — выбирается деление под указателем, двигают с нажатой кнопкой — оно меняется
-let dragging = false
-
-function onDialDown(e: PointerEvent, cells: TimeCell[]) {
-  if (dateInner.value === null) return
-  dragging = true
-  // указатель захвачен: перетаскивание продолжается и за пределами циферблата
-  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-  pick(e, cells)
-}
-
-function onDialMove(e: PointerEvent, cells: TimeCell[]) {
-  if (dragging) pick(e, cells)
-}
-
-function onDialUp() {
-  dragging = false
-}
-
-function pick(e: PointerEvent, cells: TimeCell[]) {
-  // минуты — с точностью до одной: ближайшая минута по углу
-  if (cells[0]?.kind === 'minute') {
-    const minute = minuteAt(e)
-    const [h] = (timeInner.value ?? '00:00').split(':')
-    const value = `${h}:${pad2(minute)}`
-    if (value !== timeInner.value) onTimeUpdate(value)
-    return
-  }
-  const cell = cellAt(e, cells)
-  if (cell && !isTimeActive(cell)) onTimeCell(cell)
-}
-
-/** Минута под указателем: по углу от центра, 6° на минуту. */
-function minuteAt(e: PointerEvent): number {
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  const x = e.clientX - (rect.left + rect.width / 2)
-  const y = e.clientY - (rect.top + rect.height / 2)
-  const angle = ((((Math.atan2(x, -y) * 180) / Math.PI) % 360) + 360) % 360
-  return Math.round(angle / 6) % 60
-}
-
-function isTimeActive(cell: TimeCell): boolean {
-  if (!timeInner.value) return false
-  const [h, m] = timeInner.value.split(':').map(Number)
-  return cell.kind === 'hour' ? cell.value === h : cell.value === m
-}
-
-/** Час меняет только часы, минута — только минуты; второе берётся из текущего времени (или 00). */
-function onTimeCell(cell: TimeCell) {
-  const [h, m] = (timeInner.value ?? '00:00').split(':')
-  onTimeUpdate(cell.kind === 'hour' ? `${pad2(cell.value)}:${m}` : `${h}:${pad2(cell.value)}`)
-}
-
-function onTimeUpdate(value: string | null) {
-  timeInner.value = value
-  if (props.applyImmediately) model.value = join(dateInner.value, timeInner.value)
-}
-
 function apply() {
-  model.value = join(dateInner.value, timeInner.value)
+  model.value = inner.value
   close()
-}
-
-// --- шапка календаря, как у PeriodPicker ---
-
-function formatYearHeader(day: string | null): string {
-  if (day === null) return ' '
-  return String(date.extractDate(day, DATE_FORMAT).getFullYear())
-}
-
-/** Заголовок общей шапки: «1 ноября, воскресенье», со временем — «1 ноября, воскресенье, 23:09». */
-const headerTitle = computed(() => {
-  const title = formatDateHeader(dateInner.value)
-  return props.withTime && dateInner.value && timeInner.value ? `${title}, ${timeInner.value}` : title
-})
-
-function formatDateHeader(day: string | null): string {
-  if (day === null) return t('не выбрана')
-  const formatter = new Intl.DateTimeFormat(i18n.global.locale.value, {
-    day: 'numeric',
-    month: 'long',
-    weekday: 'long',
-  })
-  const parts = formatter.formatToParts(date.extractDate(day, DATE_FORMAT))
-  const part = (type: string) => parts.find((p) => p.type === type)?.value
-  return `${part('day')} ${part('month')}, ${part('weekday')}`
 }
 </script>
 
@@ -723,7 +531,7 @@ function formatDateHeader(day: string | null): string {
   display: inline-flex;
   flex-wrap: nowrap;
   align-items: stretch;
-  gap: 0.125rem;
+  gap: 0.1rem;
   // рамка растёт по содержимому: выбранная дата никогда не обрезается
   width: max-content;
   max-width: none;
@@ -736,9 +544,8 @@ function formatDateHeader(day: string | null): string {
 .date-picker__label {
   display: flex;
   align-items: center;
-  margin: 0 0.375rem 0 0.75rem;
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   white-space: nowrap;
 }
 
@@ -746,14 +553,14 @@ function formatDateHeader(day: string | null): string {
 .date-picker__short {
   display: flex;
   height: 100%;
-  gap: 0.125rem;
+  gap: 0.1rem;
 
   :deep(.q-btn) {
     min-height: 0;
     height: 100%;
-    padding: 0 0.75rem;
+    padding: 0 0.8rem;
     border-radius: calc(var(--date-picker-radius) - var(--date-picker-border));
-    font-size: 0.8125rem;
+    font-size: 0.8rem;
     font-weight: 400;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -775,12 +582,11 @@ function formatDateHeader(day: string | null): string {
   flex: none;
   box-sizing: content-box;
   width: 5.8em;
-  padding: 0 0.5rem 0 1rem;
   border: 0;
   background: transparent;
   color: $zs-text;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   // обычный шрифт явно: подпись поля формы (FormField) задаёт полужирный, и поле его наследовало бы
   font-weight: 400;
   font-variant-numeric: tabular-nums;
@@ -799,8 +605,6 @@ function formatDateHeader(day: string | null): string {
   min-width: 0;
   min-height: 0;
   height: 100%;
-  margin-left: auto;
-  padding: 0 0.375rem;
   border-radius: calc(var(--date-picker-radius) - var(--date-picker-border));
   color: $zs-text-muted;
 }
@@ -825,7 +629,8 @@ function formatDateHeader(day: string | null): string {
   min-width: 15rem;
 }
 
-// календарь со временем и общей шапкой; снизу — место под плавающую кнопку «Ок» (высота обычной кнопки)
+// календарь с общей шапкой; снизу — место под плавающую кнопку «Ок» (высота обычной кнопки). Со временем на широком
+// экране места не нужно: «Ок» встаёт под циферблатами, они ниже календаря
 .date-picker__calendar {
   display: flex;
   flex-direction: column;
@@ -833,144 +638,6 @@ function formatDateHeader(day: string | null): string {
   &--bottom {
     padding-bottom: 2.3rem;
   }
-}
-
-// общая шапка календаря и времени — в цветах шапки календаря Quasar
-.date-picker__header {
-  padding: 0.5rem 0.5rem 1rem 1rem;
-  border-radius: 0.25rem 0.25rem 0 0;
-  background: $zs-bg-header;
-}
-
-.date-picker__header-text {
-  color: $zs-text;
-  font-size: 0.9375rem;
-  font-weight: 600;
-}
-
-.date-picker__header-year {
-  margin-top: 0.25rem;
-  color: $primary;
-  font-size: 0.875rem;
-}
-
-.date-picker__header-title {
-  color: $primary;
-  font-size: 1.2rem;
-
-  .date-picker__header--empty & {
-    color: $zs-text-faint;
-  }
-}
-
-.date-picker__panels {
-  gap: 1rem;
-}
-
-// Время — в цветах календаря (q-date): шапка той же высоты и того же фона, выбранное — синей заливкой
-.time-grid {
-  display: flex;
-  flex-direction: column;
-  min-width: 9rem;
-
-  &--disabled {
-    opacity: 0.5;
-  }
-}
-
-// циферблаты рядом: часы, справа минуты; на узком экране, где рядом не помещаются, — друг под другом
-.time-grid__body {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-}
-
-.time-dial {
-  position: relative;
-  // перетаскивание пальцем не прокручивает страницу
-  touch-action: none;
-  user-select: none;
-  cursor: pointer;
-  width: 10rem;
-  height: 10rem;
-  border-radius: 50%;
-  background: $zs-bg-header;
-}
-
-.time-dial__center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0.3rem;
-  height: 0.3rem;
-  border-radius: 50%;
-  background: $primary;
-  transform: translate(-50%, -50%);
-}
-
-// стрелка растёт от центра вверх и поворачивается к выбранному делению
-.time-dial__hand {
-  position: absolute;
-  bottom: 50%;
-  left: calc(50% - 0.05rem);
-  width: 0.1rem;
-  background: $primary;
-  transform-origin: bottom center;
-
-  // конец стрелки — точка: видна, когда минута не кратна пяти и подсвеченного деления нет
-  &::after {
-    content: '';
-    position: absolute;
-    top: -0.2rem;
-    left: -0.2rem;
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    background: $primary;
-  }
-}
-
-.time-dial__cell {
-  position: absolute;
-  width: 1.8rem;
-  height: 1.8rem;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.875rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-
-  &--inner {
-    color: $zs-text-muted;
-    font-size: 0.75rem;
-  }
-
-  &:hover:not(:disabled):not(.time-dial__cell--active) {
-    background: rgba($primary, 0.1);
-  }
-
-  &--active {
-    background: $primary;
-    color: #fff;
-  }
-
-  &:disabled {
-    cursor: default;
-  }
-}
-
-.custom-date-mobile {
-  width: auto;
-  min-width: 18rem;
 }
 
 .period-back {
@@ -989,7 +656,7 @@ function formatDateHeader(day: string | null): string {
 }
 
 .period-card-padded .period-apply {
-  right: 1rem;
-  bottom: 1rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
 }
 </style>

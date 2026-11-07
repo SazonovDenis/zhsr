@@ -30,20 +30,22 @@ export interface ActionDef {
   kind: 'primary' | 'secondary' | 'danger'
   /** подсказка поля комментария на русском; null — комментарий не нужен */
   comment: string | null
+  /** к действию можно приложить фото */
+  photos?: boolean
 }
 
 /** Действия над заявкой в порядке показа кнопок. */
 export const ACTIONS: Record<RequestAction, ActionDef> = {
   TAKE: { title: 'Взять в работу', kind: 'primary', comment: null },
-  COMPLETE: { title: 'Выполнено', kind: 'primary', comment: 'Что сделано — попадёт в журнал ВУ-8' },
+  COMPLETE: { title: 'Выполнено', kind: 'primary', comment: 'Что сделано — попадёт в журнал ВУ-8', photos: true },
   ACCEPT: { title: 'Принять работу', kind: 'primary', comment: null },
-  RETURN: { title: 'Вернуть на доработку', kind: 'secondary', comment: 'Укажите причину' },
-  NOT_DONE: { title: 'Не выполнено', kind: 'secondary', comment: 'Укажите причину' },
+  RETURN: { title: 'Вернуть на доработку', kind: 'secondary', comment: 'Укажите причину', photos: true },
+  NOT_DONE: { title: 'Не выполнено', kind: 'secondary', comment: 'Укажите причину', photos: true },
   RELEASE: { title: 'Снять себя', kind: 'secondary', comment: null },
-  FORWARD: { title: 'Передать в депо', kind: 'secondary', comment: 'Укажите причину' },
+  FORWARD: { title: 'Передать в депо', kind: 'secondary', comment: 'Укажите причину', photos: true },
   DEFER: { title: 'Отложить до ТО', kind: 'secondary', comment: 'Укажите причину' },
-  REJECT: { title: 'Отклонить', kind: 'secondary', comment: 'Укажите причину' },
-  CANCEL: { title: 'Отменить', kind: 'secondary', comment: 'Укажите причину' },
+  REJECT: { title: 'Отклонить', kind: 'secondary', comment: 'Укажите причину', photos: true },
+  CANCEL: { title: 'Отменить', kind: 'secondary', comment: 'Укажите причину', photos: true },
   DETACH: { title: 'ТОР — отцепить вагон', kind: 'danger', comment: 'Укажите причину' },
 }
 
@@ -53,7 +55,7 @@ const isAdmin = (user: CurrentUser) => has(user, RoleType.ADMIN)
 
 /** Вагон заявки едет в текущем рейсе пользователя. */
 function inMyTrip(user: CurrentUser, r: RepairRequest): boolean {
-  return !!user.trip && r.wagonTrip === user.trip.id
+  return !!user.trip && r.wagonTrip?.id === user.trip.id
 }
 
 /** Вагон заявки не в рейсе и стоит на станции депо пользователя. */
@@ -88,7 +90,7 @@ export function canAccept(user: CurrentUser, r: RepairRequest): boolean {
     const trip = user.trip!
     return (
       trip.crewDutyType === CrewDuty.LNP ||
-      (trip.crewDutyType === CrewDuty.CONDUCTOR && trip.wagons.includes(r.wagonNumber))
+      (trip.crewDutyType === CrewDuty.CONDUCTOR && trip.wagons.includes(r.wagon.number))
     )
   }
   return (has(user, RoleType.INSTRUCTOR) || has(user, RoleType.OPERATOR)) && atMyDepot(user, r)
@@ -137,7 +139,8 @@ export function canAssign(user: CurrentUser, r: RepairRequest): boolean {
  * Проверка только для показа кнопки: окончательно её делает сервер.
  */
 export function canEdit(user: CurrentUser, r: RepairRequest, now = Date.now()): boolean {
-  if (r.createdByUsr.id !== user.id || r.requestStatusType !== RequestStatus.NEW || r.executorUsr || r.forwarded) return false
+  if (r.createdByUsr.id !== user.id || r.requestStatusType !== RequestStatus.NEW || r.executorUsr || r.forwarded)
+    return false
   return now - new Date(r.createdDt).getTime() <= EDIT_MINUTES * 60_000
 }
 

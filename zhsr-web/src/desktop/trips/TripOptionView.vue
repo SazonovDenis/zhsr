@@ -42,7 +42,7 @@ const sub = computed(() => {
 .trip-option {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.6rem;
   min-width: 0;
 }
 
@@ -54,7 +54,7 @@ const sub = computed(() => {
 .trip-option__code {
   flex: none;
   min-width: 3rem;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
@@ -67,14 +67,14 @@ const sub = computed(() => {
 }
 
 .trip-option__label {
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .trip-option__sub {
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .trip-option__state {

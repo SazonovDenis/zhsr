@@ -45,14 +45,15 @@ export const dictDefs = {
   // категория неисправности; service — служба-исполнитель категории
   FaultCategory: { translate: 'i18n', system: true },
   // пополняемые
-  WagonType: { translate: 'none' },
+  // WagonType, Depot, Yard, Station нужны мобильной части без сети — строки выбора вагона при подаче заявки
+  WagonType: { translate: 'none', offline: true },
   WagonModel: { translate: 'none' },
   // station — станция депо
-  Depot: { translate: 'multilang' },
+  Depot: { translate: 'multilang', offline: true },
   // hub — узловая станция (со своим депо): с неё может начинаться и на ней заканчиваться маршрут
   Station: { translate: 'none', offline: true },
   // station — станция парка отстоя
-  Yard: { translate: 'none' },
+  Yard: { translate: 'none', offline: true },
   // группа неисправностей; sortOrder — порядок показа; нужна мобильной части без сети — подача заявки
   FaultGroup: { translate: 'multilang', offline: true },
   // вид неисправности: faultGroupType, faultCategoryType, severityType — критичность по умолчанию, service — служба-исполнитель (может не

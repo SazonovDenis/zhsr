@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="menu-item"
+    class="menu-item q-py-none q-px-md"
     :class="{
       'menu-item--active': active,
       'menu-item--indent': item.sub || indent,
@@ -50,13 +50,12 @@ defineProps<{
   justify-content: space-between;
   gap: 0.5rem;
   height: 2.4rem;
-  padding: 0 0.75rem;
   border: 0;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: transparent;
   color: $zs-menu-fg;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
@@ -69,14 +68,14 @@ defineProps<{
 
   &--indent {
     height: 2rem;
-    padding-left: 2.4375rem;
-    font-size: 0.84375rem;
+    padding-left: 2.4rem;
+    font-size: 0.8rem;
     font-weight: 400;
   }
 
   &--collapsed {
     justify-content: center;
-    padding-left: 0.75rem;
+    padding-left: 0.8rem;
   }
 
   &:disabled {
@@ -88,14 +87,14 @@ defineProps<{
 .menu-item__body {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.6rem;
   min-width: 0;
 }
 
 .menu-item__count {
   flex: none;
   color: inherit;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 
@@ -108,7 +107,7 @@ defineProps<{
 }
 
 .menu-item__short {
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 400;
 }
 

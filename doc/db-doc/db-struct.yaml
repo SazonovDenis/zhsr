@@ -66,6 +66,11 @@ tables:
       text: {type: varchar(255), required: true}
       code: {type: varchar(20), required: true}
 
+  db_info:
+    primary_key: [db_guid]
+    columns:
+      db_guid: {type: varchar(100), required: true}
+
   depot:
     primary_key: [id]
     columns:
@@ -125,6 +130,13 @@ tables:
       text: {type: varchar(255), required: true}
       code: {type: varchar(20), required: true}
 
+  offline_receipt:
+    primary_key: [client_guid]
+    columns:
+      client_guid: {type: varchar(36), required: true}
+      repair_request: {type: bigint, references: repair_request}
+      received_dt: {type: timestamptz, required: true}
+
   repair_request:
     primary_key: [id]
     columns:
@@ -134,6 +146,7 @@ tables:
       trip: {type: bigint, references: trip}
       created_by_usr: {type: bigint, required: true, references: usr}
       created_dt: {type: timestamptz, required: true}
+      received_dt: {type: timestamptz, required: true}
       fault_type: {type: bigint, required: true, references: fault_type}
       severity_type: {type: bigint, required: true, references: severity_type}
       description: {type: text}
@@ -164,6 +177,7 @@ tables:
       id: {type: bigint, required: true}
       repair_request: {type: bigint, required: true, references: repair_request}
       created_dt: {type: timestamptz, required: true}
+      received_dt: {type: timestamptz, required: true}
       created_by_usr: {type: bigint, required: true, references: usr}
       note: {type: text, required: true}
 
@@ -176,6 +190,7 @@ tables:
       size_bytes: {type: integer, required: true}
       created_by_usr: {type: bigint, required: true, references: usr}
       created_dt: {type: timestamptz, required: true}
+      received_dt: {type: timestamptz, required: true}
 
   repair_request_status:
     primary_key: [id]
@@ -320,8 +335,10 @@ tables:
       trip_status_type: {type: bigint, required: true, references: trip_status_type}
       departed_dt: {type: timestamptz}
       departed_by_usr: {type: bigint, references: usr}
+      departure_marked_dt: {type: timestamptz}
       arrived_dt: {type: timestamptz}
       arrived_by_usr: {type: bigint, references: usr}
+      arrival_marked_dt: {type: timestamptz}
 
   trip_crew:
     primary_key: [id]

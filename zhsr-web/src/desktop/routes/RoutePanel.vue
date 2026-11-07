@@ -24,18 +24,20 @@
       </SidePanelFields>
 
       <div class="route-panel__actions">
-        <button type="button" class="route-panel__edit" @click="emit('edit')">{{ t('Редактировать') }}</button>
+        <button type="button" class="route-panel__edit q-py-none q-px-md" @click="emit('edit')">
+          {{ t('Редактировать') }}
+        </button>
       </div>
 
       <!-- остановки — списком или на карте (переключатель); прокручиваются только они, атрибуты над ними на месте -->
-      <section class="route-panel__stops">
+      <section class="route-panel__stops q-pt-md q-px-lg q-pb-none">
         <div class="route-panel__tabs" role="tablist">
           <button
             v-for="tab in TABS"
             :key="tab.id"
             type="button"
             role="tab"
-            class="route-panel__tab"
+            class="route-panel__tab q-pt-none q-px-none q-pb-xs"
             :class="{ 'route-panel__tab--active': view === tab.id }"
             :aria-selected="view === tab.id"
             @click="view = tab.id"
@@ -47,7 +49,7 @@
         <LoadSpinner v-if="loading" />
         <ErrorBox v-else-if="error" :error="error" :retry="load" />
         <template v-else-if="full">
-          <div v-if="view === 'list'" class="route-panel__scroll">
+          <div v-if="view === 'list'" class="route-panel__scroll q-py-none q-px-lg">
             <RouteStops v-model:collapsed="collapsed" :points="full.points" layout="vertical" />
           </div>
           <!-- карта — во всё место под переключателем; станции следования — как в списке: развёрнуты — видны всегда,
@@ -136,18 +138,17 @@ const period = computed(() => {
 .route-panel__actions {
   display: flex;
   justify-content: flex-end;
-  margin: -0.25rem 0 -0.875rem;
+  margin: -0.3rem 0 -0.9rem;
 }
 
 .route-panel__edit {
   height: 2rem;
-  padding: 0 0.75rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -157,10 +158,9 @@ const period = computed(() => {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0.6rem;
   min-height: 0;
   margin: 0 -1.5rem;
-  padding: 1.125rem 1.5rem 0;
   border-top: 0.0625rem solid $zs-border;
 }
 
@@ -168,21 +168,20 @@ const period = computed(() => {
 .route-panel__tabs {
   display: flex;
   flex: none;
-  gap: 1.25rem;
-  // отступ под подписью группы — на треть меньше промежутка между блоками (0.625rem)
-  margin-bottom: calc(-0.625rem / 3);
+  gap: 1.3rem;
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.6rem)
+  margin-bottom: calc(-0.6rem / 3);
 }
 
 .route-panel__tab {
-  padding: 0 0 0.25rem;
   border: 0;
-  border-bottom: 0.125rem solid transparent;
+  border-bottom: 0.1rem solid transparent;
   background: none;
   color: $zs-text-muted;
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
 
@@ -197,7 +196,6 @@ const period = computed(() => {
   flex: 1;
   min-height: 0;
   margin: 0 -1.5rem;
-  padding: 0 1.5rem;
   overflow-y: auto;
 }
 

@@ -3,7 +3,7 @@
     <span
       v-for="item in row.readiness"
       :key="item.text"
-      class="cell-trip-readiness__chip"
+      class="cell-trip-readiness__chip q-py-none q-px-sm"
       :class="`cell-trip-readiness__chip--${item.level}`"
     >
       {{ t(item.text) }}
@@ -24,13 +24,12 @@ defineProps<CellProps<TripRow>>()
 .cell-trip-readiness {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.375rem;
+  gap: 0.4rem;
 }
 
 .cell-trip-readiness__chip {
-  padding: 0.125rem 0.4375rem;
   border-radius: 62.5rem;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.35;
 

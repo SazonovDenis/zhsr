@@ -2,6 +2,7 @@ import type { WagonRow } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import { LocationType } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
+import { tripRefText } from '@/shared/trips/tripRefText'
 
 /**
  * Название места расположения вагона для показа: станция, депо, парк отстоя или рейс. Справочники Station, Depot и Yard
@@ -29,5 +30,5 @@ export function placeText(kind: number, ref: number | null, trip: string | null 
 /** Где вагон из списка вагонов сейчас. */
 export function wagonPlace(w: WagonRow): string {
   const inTrip = w.locationType === LocationType.TRIP
-  return placeText(w.locationType, inTrip ? null : w.place, `${w.trainNumber ?? ''} ${w.name ?? ''}`.trim())
+  return placeText(w.locationType, inTrip ? null : w.place, w.trip ? tripRefText(w.trip) : null)
 }

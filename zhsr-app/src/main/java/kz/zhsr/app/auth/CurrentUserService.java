@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -138,24 +139,50 @@ public class CurrentUserService {
             Map<String, Object> byUsr = Map.of("usr", usrId);
             List<CurrentUser.Role> roles = db.loadSql(CurrentUserSql.roles(), byUsr, CurrentUser.Role.class);
             DbRec depot = db.loadSqlRec(CurrentUserSql.currentDepot(), byUsr);
+            CurrentUser.Trip[] trips = loadTrips(usrId);
             return new CurrentUser(usrId, usr.getString("login"), usr.getString("full_name"), roles,
                     depot == null ? null : depot.getLong("id"), depot == null ? null : depot.getLong("station", null),
-                    loadTrip(usrId), usr.getBoolean("change_password"));
+                    trips[0], usr.getBoolean("change_password"), trips[1]);
         } catch (Exception e) {
             throw new IllegalStateException("Не удалось загрузить сотрудника " + usrId, e);
         }
     }
 
     /**
-     * Текущий рейс сотрудника: рейс, в бригаде которого он состоит, - выполняется; если такого нет - ближайший
-     * по плановому отправлению из запланированных. У сотрудника на рейсе одна строка бригады: вагоны проводника - из неё.
+     * Текущий и соседний рейсы сотрудника из рейсов, в бригаде которых он состоит. Выполняется рейс - он текущий,
+     * соседнего нет. Иначе из последнего выполненного и ближайшего запланированного текущий - тот, что ближе к
+     * сейчас: выполненный - по прибытию, запланированный - по плановому отправлению; второй - соседний.
+     *
+     * @return текущий и соседний; null вместо рейса - его нет
      */
-    private CurrentUser.Trip loadTrip(long usrId) throws Exception {
-        DbRec trip = db.loadSqlRec(CurrentUserSql.currentTrip(),
-                Map.of("usr", usrId, "inProgress", TripStatus.IN_PROGRESS, "planned", TripStatus.PLANNED));
-        if (trip == null) {
-            return null;
+    private CurrentUser.Trip[] loadTrips(long usrId) throws Exception {
+        DbRec active = loadTripRec(usrId, TripStatus.IN_PROGRESS, "trip.planned_dt");
+        if (active != null) {
+            return new CurrentUser.Trip[]{trip(active), null};
         }
+        DbRec next = loadTripRec(usrId, TripStatus.PLANNED, "trip.planned_dt");
+        DbRec last = loadTripRec(usrId, TripStatus.DONE, "trip.arrived_dt desc nulls last");
+        if (next == null || last == null) {
+            DbRec only = next != null ? next : last;
+            return new CurrentUser.Trip[]{only == null ? null : trip(only), null};
+        }
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime arrived = last.getDateTimeTZ("arrived_dt");
+        long toNext = Math.max(0, Duration.between(now, next.getDateTimeTZ("planned_dt")).toMinutes());
+        long fromLast = arrived == null ? Long.MAX_VALUE : Math.max(0, Duration.between(arrived, now).toMinutes());
+        return fromLast < toNext
+                ? new CurrentUser.Trip[]{trip(last), trip(next)}
+                : new CurrentUser.Trip[]{trip(next), trip(last)};
+    }
+
+    private DbRec loadTripRec(long usrId, long status, String order) throws Exception {
+        return db.loadSqlRec(CurrentUserSql.trip(order), Map.of("usr", usrId, "status", status));
+    }
+
+    /**
+     * Рейс из строки запроса. У сотрудника на рейсе одна строка бригады: вагоны проводника - из неё.
+     */
+    private static CurrentUser.Trip trip(DbRec trip) {
         List<Long> wagons = new ArrayList<>();
         List<String> numbers = new ArrayList<>();
         Long wagon = trip.getLong("wagon", null);
@@ -170,7 +197,9 @@ public class CurrentUserService {
         }
         return new CurrentUser.Trip(trip.getLong("id"), trip.getString("train_number"), trip.getString("name"),
                 trip.getLong("trip_status_type"), trip.getDateTimeTZ("departure"), trip.getDateTimeTZ("arrival"),
-                trip.getLong("crew_duty_type"), wagons, numbers);
+                trip.getLong("crew_duty_type"), wagons, numbers, trip.getDateTimeTZ("planned_dt"),
+                trip.getDateTimeTZ("departed_dt"), trip.getDateTimeTZ("arrived_dt"),
+                trip.getDateTimeTZ("departure_marked_dt"), trip.getDateTimeTZ("arrival_marked_dt"));
     }
 
 }

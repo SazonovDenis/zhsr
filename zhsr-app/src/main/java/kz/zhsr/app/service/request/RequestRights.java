@@ -4,7 +4,7 @@ import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.constants.CrewDuty;
 import kz.zhsr.app.constants.RequestStatus;
 import kz.zhsr.app.constants.RoleType;
-import kz.zhsr.app.dto.RequestRow;
+import kz.zhsr.app.dto.request.RequestRow;
 import kz.zhsr.app.service.ApiException;
 import org.springframework.stereotype.Service;
 
@@ -133,7 +133,7 @@ public class RequestRights {
      * @throws ApiException 403 - не может
      */
     public void checkEdit(CurrentUser user, RequestRow r, OffsetDateTime now) {
-        if (r.getCreatedByUsr().id() != user.id()) {
+        if (r.getCreatedByUsr().getId() != user.id()) {
             throw ApiException.forbidden("Исправить может только автор заявки");
         }
         if (r.getRequestStatusType() != RequestStatus.NEW || r.getExecutorUsr() != null || r.isForwarded()
@@ -154,7 +154,7 @@ public class RequestRights {
         if (inMyTrip(user, r)) {
             CurrentUser.Trip trip = user.trip();
             return trip.duty() == CrewDuty.LNP
-                    || (trip.duty() == CrewDuty.CONDUCTOR && trip.wagons().contains(r.getWagon()));
+                    || (trip.duty() == CrewDuty.CONDUCTOR && trip.wagons().contains(r.getWagon().getId()));
         }
         return (user.hasRole(RoleType.INSTRUCTOR) || user.hasRole(RoleType.OPERATOR)) && atMyDepot(user, r);
     }
@@ -164,14 +164,14 @@ public class RequestRights {
     }
 
     private static boolean isExecutor(CurrentUser user, RequestRow r) {
-        return r.getExecutorUsr() != null && r.getExecutorUsr().id() == user.id();
+        return r.getExecutorUsr() != null && r.getExecutorUsr().getId() == user.id();
     }
 
     /**
      * Вагон заявки едет в текущем рейсе сотрудника.
      */
     private static boolean inMyTrip(CurrentUser user, RequestRow r) {
-        return user.trip() != null && r.getWagonTrip() != null && r.getWagonTrip() == user.trip().id();
+        return user.trip() != null && r.getWagonTrip() != null && r.getWagonTrip().getId() == user.trip().id();
     }
 
     /**

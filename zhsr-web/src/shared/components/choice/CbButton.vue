@@ -1,6 +1,6 @@
 <template>
   <div class="cb-button">
-    <span v-if="label" class="cb-button__label">{{ t(label) }}</span>
+    <span v-if="label" class="cb-button__label q-mr-xs">{{ t(label) }}</span>
 
     <!-- варианты грузятся или не загрузились — на месте кнопок -->
     <ChoiceSourceState v-if="source && (source.loading || source.error)" :source="source" />
@@ -12,7 +12,7 @@
         type="button"
         :data-index="index"
         :tabindex="item.id === tabStopId ? 0 : -1"
-        class="cb-button__btn zs-focusable"
+        class="cb-button__btn zs-focusable q-py-none q-px-sm"
         :class="{ 'cb-button__btn--selected bg-selected text-selected': isSelected(item) }"
         :disabled="isDisabled(item)"
         :title="displayOf(item)"
@@ -80,28 +80,26 @@ const { visibleValues, hiddenValues, isSelected, onButtonClick, onMenuPick, tabS
   display: inline-flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.3rem;
 }
 
 .cb-button__label {
-  margin-right: 0.25rem;
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   white-space: nowrap;
 }
 
 .cb-button__btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.4rem;
   height: 1.9rem;
-  padding: 0 0.625rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.9375rem;
+  border-radius: 0.9rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   white-space: nowrap;
   cursor: pointer;
 
@@ -133,6 +131,6 @@ const { visibleValues, hiddenValues, isSelected, onButtonClick, onMenuPick, tabS
 .cb-button__more {
   width: 1.9rem;
   height: 1.9rem;
-  border-radius: 0.9375rem;
+  border-radius: 0.9rem;
 }
 </style>

@@ -1,18 +1,19 @@
 package kz.zhsr.app.controller;
 
-import kz.zhsr.app.dto.ListSort;
-import kz.zhsr.app.dto.RequestActionBody;
-import kz.zhsr.app.dto.RequestCounts;
-import kz.zhsr.app.dto.RequestDetail;
-import kz.zhsr.app.dto.RequestDraft;
-import kz.zhsr.app.dto.RequestExecutorBody;
-import kz.zhsr.app.dto.RequestFilter;
-import kz.zhsr.app.dto.RequestRow;
-import kz.zhsr.app.dto.UserRef;
+import kz.zhsr.app.dto.common.ListSort;
+import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.request.RequestActionBody;
+import kz.zhsr.app.dto.request.RequestCounts;
+import kz.zhsr.app.dto.request.RequestDetail;
+import kz.zhsr.app.dto.request.RequestDraft;
+import kz.zhsr.app.dto.request.RequestExecutorBody;
+import kz.zhsr.app.dto.request.RequestFilter;
+import kz.zhsr.app.dto.request.RequestRow;
 import kz.zhsr.app.service.request.RequestAction;
 import kz.zhsr.app.service.request.RequestService;
 import kz.zhsr.app.service.storage.FileStorage;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,11 +28,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
  * Заявки на ремонт: только вызовы {@link RequestService}. Пути - как в zhsr-web (api/requests.ts). Подача,
- * исправление и пояснение - multipart: черновик (часть draft, JSON) или текст (text) и фото (части photos).
+ * исправление и примечание - multipart: черновик (часть draft, JSON) или текст (text) и фото (части photos).
  */
 @RestController
 public class RequestController {
@@ -84,9 +86,20 @@ public class RequestController {
 
     @PostMapping("/requests/{id}/notes")
     public RequestDetail addNote(@PathVariable long id, @RequestParam(value = "text", required = false) String text,
+                                 @RequestParam(value = "clientDt", required = false)
+                                 @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime clientDt,
+                                 @RequestParam(value = "clientGuid", required = false) String clientGuid,
                                  @RequestPart(value = "photos", required = false) List<MultipartFile> photos)
             throws Exception {
-        return requestService.addNote(id, text, photos);
+        return requestService.addNote(id, text, clientDt, clientGuid, photos);
+    }
+
+    @PostMapping("/requests/{id}/photos")
+    public void addPhoto(@PathVariable long id, @RequestPart("photo") MultipartFile photo,
+                         @RequestParam(value = "clientDt", required = false)
+                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime clientDt,
+                         @RequestParam(value = "clientGuid", required = false) String clientGuid) throws Exception {
+        requestService.addPhoto(id, photo, clientDt, clientGuid);
     }
 
     @GetMapping("/requests/photos/{id}")

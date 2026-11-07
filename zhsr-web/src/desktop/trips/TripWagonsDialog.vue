@@ -8,16 +8,16 @@
     :error="error"
     @ok="save"
   >
-    <div class="trip-wagons__note">{{ t('Вагоны станции отправления {station}', { station }) }}</div>
+    <div class="trip-wagons__note q-mb-sm">{{ t('Вагоны станции отправления {station}', { station }) }}</div>
     <div class="trip-wagons__table">
-      <label v-for="w in wagons" :key="w.number" class="trip-wagons__row">
+      <label v-for="w in wagons" :key="w.number" class="trip-wagons__row q-py-sm q-px-md">
         <q-checkbox v-model="selected" :val="w.number" dense />
         <span class="zs-mono">{{ w.number }}</span>
         <span>{{ dictManager.getValue('WagonType', w.wagonType) }}</span>
         <span class="zs-sub">{{ placeText(w.locationType, w.place) }}</span>
         <DictBadge :id="w.wagonStatusType" dict="WagonState" />
       </label>
-      <div v-if="!busy.active.value && wagons.length === 0" class="trip-wagons__empty">
+      <div v-if="!busy.active.value && wagons.length === 0" class="trip-wagons__empty q-pa-md">
         {{ t('Свободных вагонов на станции нет') }}
       </div>
     </div>
@@ -76,26 +76,24 @@ function save() {
 
 <style scoped lang="scss">
 .trip-wagons__note {
-  margin-bottom: 0.625rem;
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 
 .trip-wagons__table {
   max-height: 24rem;
   overflow-y: auto;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
 }
 
 .trip-wagons__row {
   display: grid;
   grid-template-columns: auto 5rem 1fr 1fr auto;
   align-items: center;
-  gap: 0.625rem;
-  padding: 0.375rem 0.75rem;
+  gap: 0.6rem;
   border-top: 0.0625rem solid $zs-border-row;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   cursor: pointer;
 
   &:first-child {
@@ -104,8 +102,7 @@ function save() {
 }
 
 .trip-wagons__empty {
-  padding: 1rem 0.75rem;
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 </style>

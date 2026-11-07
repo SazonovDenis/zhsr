@@ -4,10 +4,10 @@ import kz.kis.kiscore.model.DbRec;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.RoleType;
-import kz.zhsr.app.dto.AdminPage;
-import kz.zhsr.app.dto.AdminQuery;
-import kz.zhsr.app.dto.AdminUserDraft;
-import kz.zhsr.app.dto.AdminUserRow;
+import kz.zhsr.app.dto.admin.AdminPage;
+import kz.zhsr.app.dto.admin.AdminQuery;
+import kz.zhsr.app.dto.admin.AdminUserDraft;
+import kz.zhsr.app.dto.admin.AdminUserRow;
 import kz.zhsr.app.service.ApiException;
 import kz.zhsr.app.service.DbErrors;
 import kz.zhsr.app.service.PasswordPolicy;
@@ -68,7 +68,7 @@ public class AdminUserService {
         long total = db.loadSqlRec(count.sql(), count.params()).getLong("total");
         SqlQuery page = AdminUserSql.page(query.search(), orderBy, query.desc(), size,
                 query.pageOrZero() * size);
-        return new AdminPage<>(total, withRoles(db.loadSql(page.sql(), page.params())));
+        return new AdminPage<>(total, withRoles(db.loadSql(page.sql(), page.params(), AdminUserRow.class)));
     }
 
     public AdminUserRow get(long id) throws Exception {
@@ -123,32 +123,28 @@ public class AdminUserService {
     // --- внутреннее
 
     private AdminUserRow row(long id) throws Exception {
-        DbRec rec = db.loadSqlRec(AdminUserSql.row(), Map.of("id", id));
-        if (rec == null) {
+        AdminUserRow row = db.loadSqlRec(AdminUserSql.row(), Map.of("id", id), AdminUserRow.class);
+        if (row == null) {
             throw ApiException.notFound("Сотрудник не найден");
         }
-        return withRoles(List.of(rec)).get(0);
+        return withRoles(List.of(row)).get(0);
     }
 
-    private List<AdminUserRow> withRoles(List<DbRec> recs) throws Exception {
-        if (recs.isEmpty()) {
-            return List.of();
+    private List<AdminUserRow> withRoles(List<AdminUserRow> rows) throws Exception {
+        if (rows.isEmpty()) {
+            return rows;
         }
-        List<Long> ids = recs.stream().map(r -> r.getLong("id")).toList();
+        List<Long> ids = rows.stream().map(AdminUserRow::getId).toList();
         Map<Long, List<Long>> roles = new HashMap<>();
         for (DbRec r : db.loadList("usr_role", Map.of("usr", ids))) {
             roles.computeIfAbsent(r.getLong("usr"), k -> new ArrayList<>()).add(r.getLong("role_type"));
         }
-        List<AdminUserRow> res = new ArrayList<>(recs.size());
-        for (DbRec r : recs) {
-            long id = r.getLong("id");
-            List<Long> userRoles = roles.getOrDefault(id, new ArrayList<>());
+        for (AdminUserRow row : rows) {
+            List<Long> userRoles = roles.getOrDefault(row.getId(), new ArrayList<>());
             userRoles.sort(null);
-            res.add(new AdminUserRow(id, r.getString("login"), r.getString("full_name"), r.getString("phone"),
-                    userRoles, r.getLong("depot", null), r.getLong("category_type", null), r.getBoolean("disabled"),
-                    r.getBoolean("change_password")));
+            row.setRoles(userRoles);
         }
-        return res;
+        return rows;
     }
 
     /**

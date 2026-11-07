@@ -1,133 +1,86 @@
 <template>
   <div class="request-history" :class="{ 'request-history--large': large }">
-    <div v-for="(item, i) in items" :key="i" class="request-history__item">
-      <div class="request-history__rail">
-        <span class="request-history__dot" :class="{ 'request-history__dot--future': item.future }" />
-        <span
-          v-if="i < items.length - 1"
-          class="request-history__line"
-          :class="{ 'request-history__line--future': items[i + 1]!.future }"
-        />
-      </div>
-      <div class="request-history__body" :class="{ 'request-history__body--future': item.future }">
-        <span class="request-history__title">{{ item.title }}</span>
-        <span class="request-history__meta">{{ item.meta }}</span>
-        <span v-if="item.text" class="request-history__text">«{{ item.text }}»</span>
-        <PhotoStrip v-if="item.photos.length > 0" :photos="item.photos" small />
-      </div>
-    </div>
+    <template v-for="(node, i) in nodes" :key="node.key">
+      <RequestHistoryItem
+        v-if="node.event"
+        :title="eventTitle(node.event)"
+        :meta="metaOf(node.event)"
+        :text="textOf(node.event)"
+        :photos="node.event.photos ?? []"
+        :pending="pendingOf(node)"
+        inline
+        :line="lineOf(i)"
+      >
+        <template v-if="node.queued.length > 0" #photos="scope">
+          <slot name="pending" v-bind="scope" :node="node" />
+        </template>
+      </RequestHistoryItem>
+      <slot v-else name="queued" :node="node" :line="lineOf(i)" />
+    </template>
+    <RequestHistoryItem
+      v-for="(step, i) in future"
+      :key="step.title"
+      :title="step.title"
+      :meta="step.meta"
+      future
+      :line="i < future.length - 1 ? 'future' : 'none'"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { RequestEvent, RequestPhoto } from '@/api/requests'
+import type { RequestPhoto } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { formatDateTime } from '@/shared/format'
-import PhotoStrip from './PhotoStrip.vue'
-import { eventTitle, futureSteps } from './requestView'
+import type { HistoryNode, RequestEvent } from './historyTree'
+import RequestHistoryItem from './RequestHistoryItem.vue'
+import { eventTitle, futureSteps, receivedLate } from './requestView'
 
 /**
- * История заявки лентой: подача, смены статуса с комментариями, назначения, пояснения с фото; в конце серым — шаги,
- * которые заявке ещё предстоят. large — крупнее, для телефона.
+ * История заявки лентой по готовому дереву (historyTree); в конце серым — шаги, которые заявке ещё предстоят (status =
+ * null — их нет). Группировки здесь нет: что с чем показывать, решает дерево. Узел только из очереди выводится слотом
+ * queued; ожидающие фото записи сервера — слотом pending, их адреса — в pending. large — крупнее, для телефона.
  */
-const props = withDefaults(defineProps<{ events: RequestEvent[]; status: number; large?: boolean }>(), {
-  large: false,
-})
+const props = withDefaults(
+  defineProps<{ nodes: HistoryNode[]; status: number | null; large?: boolean; pending?: RequestPhoto[] }>(),
+  { large: false, pending: () => [] },
+)
 
-interface Item {
-  title: string
-  meta: string
-  text: string
-  photos: RequestPhoto[]
-  future: boolean
+const future = computed(() => (props.status === null ? [] : futureSteps(props.status)))
+
+/** Дата и кем; поступило на сервер заметно позже — и когда поступило. */
+function metaOf(e: RequestEvent): string {
+  const meta = `${formatDateTime(e.at)} • ${e.by?.name ?? t('Система')}`
+  if (!receivedLate(e.at, e.receivedAt)) return meta
+  return `${meta}, ${t('поступило: {at}', { at: formatDateTime(e.receivedAt) })}`
 }
 
-const items = computed<Item[]>(() => [
-  ...props.events.map((e) => ({
-    title: eventTitle(e),
-    meta: `${e.by?.name ?? t('Система')} • ${formatDateTime(e.at)}`,
-    text: e.text ?? '',
-    photos: e.photos ?? [],
-    future: false,
-  })),
-  ...futureSteps(props.status).map((s) => ({ title: s.title, meta: s.meta, text: '', photos: [], future: true })),
-])
+function textOf(e: RequestEvent): string {
+  return e.executor ? t('Исполнитель: {name}', { name: e.executor.name }) : (e.text ?? '')
+}
+
+function pendingOf(node: HistoryNode): RequestPhoto[] {
+  const ids = node.queued.map((x) => x.id)
+  return props.pending.filter((p) => ids.includes(p.id))
+}
+
+// линия от узла: к следующему, к предстоящим шагам или никуда
+function lineOf(i: number): 'none' | 'solid' | 'future' {
+  if (i < props.nodes.length - 1) return 'solid'
+  return future.value.length > 0 ? 'future' : 'none'
+}
 </script>
 
 <style scoped lang="scss">
 .request-history {
   display: flex;
   flex-direction: column;
-  font-size: 0.8125rem;
-}
-
-.request-history__item {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.request-history__rail {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  width: 0.6rem;
-}
-
-.request-history__dot {
-  flex: none;
-  width: 0.6rem;
-  height: 0.6rem;
-  margin-top: 0.25rem;
-  border: 0.125rem solid $primary;
-  border-radius: 50%;
-  background: $primary;
-
-  &--future {
-    border-color: $zs-border;
-    background: #fff;
-  }
-}
-
-.request-history__line {
-  flex: 1;
-  width: 0.125rem;
-  background: $primary;
-
-  &--future {
-    background: $zs-border;
-  }
-}
-
-.request-history__body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 0.125rem;
-  min-width: 0;
-  padding-bottom: 0.75rem;
-
-  &--future {
-    color: $zs-text-muted;
-  }
-}
-
-.request-history__title {
-  font-weight: 600;
-}
-
-.request-history__meta {
-  color: $zs-text-muted;
-  font-size: 0.75rem;
-}
-
-.request-history__text {
-  line-height: 1.4;
+  font-size: 0.8rem;
 }
 
 .request-history--large {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 </style>

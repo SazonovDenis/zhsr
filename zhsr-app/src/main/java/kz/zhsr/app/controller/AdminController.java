@@ -1,11 +1,11 @@
 package kz.zhsr.app.controller;
 
-import kz.zhsr.app.dto.AdminOption;
-import kz.zhsr.app.dto.AdminPage;
-import kz.zhsr.app.dto.AdminQuery;
-import kz.zhsr.app.dto.AdminTable;
-import kz.zhsr.app.dto.AdminUserDraft;
-import kz.zhsr.app.dto.AdminUserRow;
+import kz.zhsr.app.dto.admin.AdminOption;
+import kz.zhsr.app.dto.admin.AdminPage;
+import kz.zhsr.app.dto.admin.AdminQuery;
+import kz.zhsr.app.dto.admin.AdminTable;
+import kz.zhsr.app.dto.admin.AdminUserDraft;
+import kz.zhsr.app.dto.admin.AdminUserRow;
 import kz.zhsr.app.service.admin.AdminService;
 import kz.zhsr.app.service.admin.AdminUserService;
 import org.springframework.web.bind.annotation.DeleteMapping;

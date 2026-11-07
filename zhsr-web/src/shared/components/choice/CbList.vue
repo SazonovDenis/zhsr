@@ -3,7 +3,7 @@
   <div ref="rootEl" class="cb-list" :class="{ 'cb-list--no-search': noSearch }" @focusout="onFocusOut">
     <!-- поле отображения; mousedown мимо поля ввода не забирает у него фокус — иначе список закрылся бы -->
     <div
-      class="cb-list__field"
+      class="cb-list__field q-py-none q-px-sm"
       :class="{ 'cb-list__field--focused': isOpen && !noSearch }"
       @mousedown="keepFocus"
       @click="onFieldClick"
@@ -33,7 +33,7 @@
         <button
           type="button"
           tabindex="-1"
-          class="cb-list__clear"
+          class="cb-list__clear q-pa-none"
           :class="{ 'cb-list__clear--hidden': !(selected.length > 0 && !isDisabled(selected[0])) }"
           :title="t('Очистить')"
           @click.stop="clearAll"
@@ -45,13 +45,13 @@
       <!-- multi: выбранные значения чипами -->
       <div v-else class="cb-list__chips">
         <template v-if="selected.length > 0">
-          <span v-for="item in selected" :key="item.id" class="cb-list__chip">
+          <span v-for="item in selected" :key="item.id" class="cb-list__chip q-py-none q-pr-none q-pl-sm">
             <span class="cb-list__chip-text">{{ displayOf(item) }}</span>
             <button
               v-if="!isDisabled(item)"
               type="button"
               tabindex="-1"
-              class="cb-list__clear"
+              class="cb-list__clear q-pa-none"
               @click.stop="removeItem(item)"
             >
               ✕
@@ -81,7 +81,7 @@
         @mousedown.stop="keepFocus"
         @focusout="onFocusOut"
       >
-        <div v-if="showSearch" class="cb-list__search">
+        <div v-if="showSearch" class="cb-list__search q-pa-xs">
           <q-input
             ref="multiInput"
             v-model="query"
@@ -105,13 +105,13 @@
         </div>
 
         <!-- варианты грузятся или не загрузились — спиннер или ошибка вместо вариантов -->
-        <div v-if="source?.loading" class="cb-list__state"><q-spinner color="primary" size="1.5rem" /></div>
-        <ErrorBox v-else-if="source?.error" :error="source.error" :retry="retrySource" class="cb-list__error" />
+        <div v-if="source?.loading" class="cb-list__state q-ma-sm"><q-spinner color="primary" size="1.5rem" /></div>
+        <ErrorBox v-else-if="source?.error" :error="source.error" :retry="retrySource" class="cb-list__error q-ma-sm" />
         <div v-else ref="optionsEl" class="cb-list__options">
           <div
             v-for="(item, index) in filtered"
             :key="item.id"
-            class="cb-list__option"
+            class="cb-list__option q-py-sm q-px-md"
             :class="{
               'cb-list__option--selected bg-selected': single && isSelected(item),
               'cb-list__option--highlighted': index === highlighted,
@@ -132,12 +132,12 @@
               <slot name="option" :item="item"><CbOption :item="item" /></slot>
             </span>
           </div>
-          <div v-if="filtered.length === 0 && customCandidates.length === 0" class="cb-list__no-options">
+          <div v-if="filtered.length === 0 && customCandidates.length === 0" class="cb-list__no-options q-pa-sm">
             {{ t('Нет вариантов') }}
           </div>
         </div>
 
-        <div v-if="!single" class="cb-list__footer">
+        <div v-if="!single" class="cb-list__footer q-pa-xs">
           <q-btn no-caps dense color="primary" class="q-px-md" :label="t('Ок')" @click.stop="closeDropdown" />
         </div>
       </div>
@@ -682,13 +682,12 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.4rem;
   min-height: var(--zs-control-height);
-  padding: 0.125rem 0.625rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   cursor: pointer;
 
   // фокус в поле виден и при закрытом списке: под слотом value курсора ввода нет
@@ -759,18 +758,17 @@ onBeforeUnmount(() => {
   flex: 1;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.125rem 0.25rem;
+  gap: 0.1rem 0.3rem;
   min-width: 0;
 }
 
 .cb-list__chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.0625rem 0.125rem 0.0625rem 0.5rem;
-  border-radius: 0.75rem;
+  gap: 0.3rem;
+  border-radius: 0.8rem;
   background: $zs-bg-button-soft;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   white-space: nowrap;
 }
 
@@ -788,12 +786,11 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 1.1rem;
   height: 1.1rem;
-  padding: 0;
   border: 0;
   border-radius: 50%;
   background: $zs-bg-button-soft;
   color: $zs-text-faint;
-  font-size: 0.5625rem;
+  font-size: 0.6rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -828,13 +825,12 @@ onBeforeUnmount(() => {
   width: max-content;
   overflow: hidden;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
-  box-shadow: 0 0.75rem 1.875rem rgba(0, 0, 0, 0.14);
+  box-shadow: 0 0.8rem 1.9rem rgba(0, 0, 0, 0.14);
 }
 
 .cb-list__search {
-  padding: 0.25rem;
   border-bottom: 0.0625rem solid $zs-border-row;
 }
 
@@ -847,9 +843,8 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.4375rem 0.75rem;
-  font-size: 0.875rem;
+  gap: 0.3rem;
+  font-size: 0.9rem;
   cursor: pointer;
 
   // выбранная строка — общим фоном bg-selected (app.scss), строка под курсором — фоном hover
@@ -883,15 +878,9 @@ onBeforeUnmount(() => {
 .cb-list__state {
   display: flex;
   justify-content: center;
-  margin: 0.5rem;
-}
-
-.cb-list__error {
-  margin: 0.5rem;
 }
 
 .cb-list__no-options {
-  padding: 0.5rem;
   color: $zs-text-faint;
   text-align: center;
 }
@@ -899,7 +888,6 @@ onBeforeUnmount(() => {
 .cb-list__footer {
   display: flex;
   justify-content: flex-end;
-  padding: 0.25rem;
   border-top: 0.0625rem solid $zs-border-row;
 }
 </style>

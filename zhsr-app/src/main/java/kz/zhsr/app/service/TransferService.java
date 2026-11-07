@@ -1,27 +1,29 @@
 package kz.zhsr.app.service;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtDb;
+import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
+import kz.kis.kisdbtools.repository.DbRecMapper;
 import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.ActStatus;
 import kz.zhsr.app.constants.LocationType;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.constants.TransferDirection;
-import kz.zhsr.app.dto.StaffCandidate;
-import kz.zhsr.app.dto.TransferRow;
-import kz.zhsr.app.dto.UserRef;
-import kz.zhsr.app.dto.TransferWagon;
+import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.wagon.TransferRow;
+import kz.zhsr.app.dto.wagon.TransferWagon;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Передача вагонов в депо и парк отстоя и приём из них (Ф-АКТ-02).
@@ -71,13 +73,15 @@ public class TransferService {
     private final CurrentUserService currentUserService;
     private final Visibility visibility;
     private final WagonJournal wagonJournal;
+    private final RefResolver refResolver;
 
     public TransferService(Db db, CurrentUserService currentUserService, Visibility visibility,
-                           WagonJournal wagonJournal) {
+                           WagonJournal wagonJournal, RefResolver refResolver) {
         this.db = db;
         this.currentUserService = currentUserService;
         this.visibility = visibility;
         this.wagonJournal = wagonJournal;
+        this.refResolver = refResolver;
     }
 
     /**
@@ -100,7 +104,7 @@ public class TransferService {
         if (byStates) {
             params.put("states", states);
         }
-        return rows(db.loadSql(TransferSql.acts(!all, byStates, false), params), me);
+        return rows(db.loadSql(TransferSql.acts(!all, byStates, false), params, TransferRow.class), me);
     }
 
     /**
@@ -108,20 +112,18 @@ public class TransferService {
      */
     public List<TransferWagon> wagons(long direction, Long station, Long depot, Long yard) throws Exception {
         currentUserService.get();
-        return candidates(direction, station, depot, yard).stream()
-                .map(r -> new TransferWagon(r.getString("number"), r.getLong("wagon_type"), r.getLong("location_type"),
-                        r.getLong("place"), r.getLong("wagon_status_type"), r.getString("pending_act")))
-                .toList();
+        return DbRecMapper.toList(candidates(direction, station, depot, yard), TransferWagon.class);
     }
 
     /**
      * Кто может сдать вагоны на станции в этом направлении - для акта, проведённого сразу.
      */
-    public List<StaffCandidate> givers(long direction, long station) throws Exception {
+    public List<UserRef> givers(long direction, long station) throws Exception {
         currentUserService.get();
-        return db.loadSql(TransferSql.stationStaff(), Map.of("role", giverRole(direction), "station", station)).stream()
-                .map(r -> new StaffCandidate(r.getLong("id"), CurrentUser.shortName(r.getString("full_name"))))
-                .toList();
+        List<UserRef> res = db.loadSql(TransferSql.stationStaff(),
+                Map.of("role", giverRole(direction), "station", station), UserRef.class);
+        refResolver.resolve(res);
+        return res;
     }
 
     /**
@@ -143,10 +145,8 @@ public class TransferService {
         if (items.isEmpty()) {
             throw ApiException.badRequest("Отметьте вагоны");
         }
-        Map<String, DbRec> available = new HashMap<>();
-        for (DbRec r : candidates(direction, body.station(), body.depot(), body.yard())) {
-            available.put(r.getString("number"), r);
-        }
+        Map<String, DbRec> available = UtDb.collectGroupBy_record(
+                candidates(direction, body.station(), body.depot(), body.yard()), "number");
         for (WagonItem item : items) {
             DbRec w = available.get(item.number());
             if (w == null) {
@@ -309,37 +309,26 @@ public class TransferService {
     }
 
     private TransferRow row(long id, CurrentUser me) throws Exception {
-        return rows(db.loadSql(TransferSql.acts(false, false, true), Map.of("id", id)), me).get(0);
+        return rows(db.loadSql(TransferSql.acts(false, false, true), Map.of("id", id), TransferRow.class), me).get(0);
     }
 
-    private List<TransferRow> rows(List<DbRec> acts, CurrentUser me) throws Exception {
+    private List<TransferRow> rows(List<TransferRow> acts, CurrentUser me) throws Exception {
         if (acts.isEmpty()) {
-            return List.of();
+            return acts;
         }
-        Set<Long> ids = new HashSet<>();
-        for (DbRec a : acts) {
-            ids.add(a.getLong("id"));
-        }
+        Set<Long> ids = acts.stream().map(TransferRow::getId).collect(Collectors.toSet());
         Map<Long, List<TransferRow.Wagon>> wagons = new HashMap<>();
         for (DbRec r : db.loadSql(TransferSql.actWagons(), Map.of("acts", ids))) {
             wagons.computeIfAbsent(r.getLong("transfer_act"), k -> new ArrayList<>())
-                    .add(new TransferRow.Wagon(r.getString("number"), r.getBoolean("with_property")));
+                    .add(DbRecMapper.toObject(r, TransferRow.Wagon.class));
         }
-        List<TransferRow> res = new ArrayList<>(acts.size());
-        for (DbRec a : acts) {
-            long status = a.getLong("act_status_type");
-            long direction = a.getLong("transfer_direction_type");
-            Long receivedBy = a.getLong("received_by_usr");
-            res.add(new TransferRow(a.getLong("id"), a.getString("number"), direction, a.getLong("station"),
-                    a.getLong("depot", null), a.getLong("yard", null), a.getLong("work_type"), status,
-                    new UserRef(a.getLong("transferred_by_usr"), CurrentUser.shortName(a.getString("transferred_by"))),
-                    a.getDateTimeTZ("transferred_dt"),
-                    receivedBy == null ? null : new UserRef(receivedBy, CurrentUser.shortName(a.getString("received_by"))),
-                    a.getDateTimeTZ("received_dt"),
-                    a.getString("reject_reason"), wagons.get(a.getLong("id")),
-                    status == ActStatus.PENDING && canTake(me, direction, a.getLong("station"))));
+        for (TransferRow a : acts) {
+            a.setWagons(wagons.getOrDefault(a.getId(), List.of()));
+            a.setCanReceive(a.getActStatusType() == ActStatus.PENDING
+                    && canTake(me, a.getTransferDirectionType(), a.getStation()));
         }
-        return res;
+        refResolver.resolve(acts);
+        return acts;
     }
 
 }

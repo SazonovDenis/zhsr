@@ -20,10 +20,10 @@ withDefaults(defineProps<{ label?: string }>(), { label: '' })
 .form-field {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.4rem;
   min-width: 0;
   color: $zs-text-muted;
-  font-size: 0.78125rem;
+  font-size: 0.8rem;
   font-weight: 500;
 }
 </style>

@@ -1,5 +1,4 @@
 import { isoDateTime } from '@/shared/format'
-import type { StaffCandidate } from './trips'
 import type { UserRef } from './requests'
 import { http } from './http'
 
@@ -77,8 +76,8 @@ export async function fetchTransferWagons(
 }
 
 /** Кто может сдать вагоны на станции — для акта, проведённого сразу. */
-export async function fetchTransferGivers(direction: number, station: number): Promise<StaffCandidate[]> {
-  return (await http.get<StaffCandidate[]>('/transfers/givers', { params: { direction, station } })).data
+export async function fetchTransferGivers(direction: number, station: number): Promise<UserRef[]> {
+  return (await http.get<UserRef[]>('/transfers/givers', { params: { direction, station } })).data
 }
 
 /** Оформить акт. */

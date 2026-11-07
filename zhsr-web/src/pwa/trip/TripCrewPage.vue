@@ -1,31 +1,21 @@
 <template>
   <PwaPage
     :back="goBack"
-    :title="t('Формирование рейса')"
-    :subtitle="crew ? `${crew.trip.trainNumber} • ${crew.trip.name}` : ''"
+    :title="crew ? `${crew.trip.trainNumber} • ${crew.trip.name}` : ''"
+    :subtitle="crew ? times(crew.trip) : ''"
+    :stale="stale"
   >
-    <ErrorBox v-if="error" :error="error" :retry="crew ? null : loadCrew" class="crew__error" />
+    <ErrorBox v-if="error" :error="error" :retry="crew ? null : loadCrew" class="crew__error q-py-sm q-px-md" />
     <LoadSpinner v-if="frameBusy.active.value" />
 
     <template v-if="crew && norm">
-      <div class="crew__state">
-        <DictBadge :id="crew.trip.tripStatusType" dict="TripState" />
-        <span class="crew__muted">
-          {{
-            t('отпр. {from} • приб. {to}', {
-              from: formatDateTime(crew.trip.departure),
-              to: formatDateTime(crew.trip.arrival),
-            })
-          }}
-        </span>
-      </div>
-      <div v-if="stale" class="crew__stale">{{ t('Нет связи — показаны сохранённые данные') }}</div>
-      <div v-else-if="!editable" class="crew__muted">{{ readOnlyReason }}</div>
+      <div class="crew__badges"><DictBadge :id="crew.trip.tripStatusType" dict="TripState" /></div>
+      <div v-if="!stale && !editable" class="crew__muted">{{ readOnlyReason }}</div>
 
       <!-- готовность бригады -->
       <div class="crew__card">
         <div class="crew__caption crew__caption--card">{{ t('Готовность') }}</div>
-        <div v-for="c in readiness" :key="c.title" class="crew__ready">
+        <div v-for="c in readiness" :key="c.title" class="crew__ready q-py-sm q-px-md">
           <span class="crew__ready-icon" :class="{ 'crew__ready-icon--ok': c.ok }">{{ c.ok ? '✓' : '!' }}</span>
           <span class="crew__ready-text">
             <span class="crew__ready-title">{{ c.title }}</span>
@@ -43,9 +33,9 @@
         <div v-if="norm.pool.length > 0" class="crew__chips">
           <button
             v-for="m in norm.pool"
-            :key="m.usr"
+            :key="m.usr.id"
             type="button"
-            class="crew__chip"
+            class="crew__chip q-py-none q-px-md"
             :disabled="!editable || busy"
             @click="poolPick = m"
           >
@@ -60,7 +50,7 @@
       <div
         v-for="w in norm.wagons"
         :key="w.number"
-        class="crew__wagon"
+        class="crew__wagon q-pa-md"
         :class="{ 'crew__wagon--bad': w.passenger && !w.ok }"
       >
         <div class="crew__wagon-head">
@@ -68,33 +58,21 @@
           <span class="crew__number zs-mono">{{ w.number }}</span>
           <span class="crew__muted">{{ dictManager.getValue('WagonType', w.type) }}</span>
           <span class="crew__grow" />
-          <span v-if="w.tail" class="crew__tail">{{ t('хвостовой') }}</span>
+          <span v-if="w.tail" class="crew__tail q-py-none q-px-sm">{{ t('хвостовой') }}</span>
           <span class="crew__status" :class="{ 'crew__status--ok': w.ok }">{{ wagonStatus(w) }}</span>
         </div>
         <template v-if="w.passenger">
           <div v-for="slot in [0, 1]" :key="slot" class="crew__slot">
-            <select
+            <span class="crew__slot-text q-py-xs q-px-none" :class="{ 'crew__slot-text--bad': slotBad(w, slot) }">
+              {{ w.conductors[slot] ? label(w.conductors[slot]!) : t('не назначен') }}
+            </span>
+            <SoftLink
               v-if="editable"
-              class="crew__select"
-              :class="{ 'crew__select--empty': !w.conductors[slot], 'crew__select--bad': slotBad(w, slot) }"
-              :value="w.conductors[slot]?.usr ?? ''"
+              text="Назначить"
+              class="crew__assign"
               :disabled="busy"
-              @change="onSlot(w, slot, $event)"
-            >
-              <option value="" disabled>{{ t('Назначить проводника') }}</option>
-              <option v-for="o in slotChoices(w, slot)" :key="o.user" :value="o.user">{{ o.label }}</option>
-            </select>
-            <span v-else class="crew__slot-text">{{ w.conductors[slot] ? label(w.conductors[slot]!) : '—' }}</span>
-            <button
-              v-if="editable && w.conductors[slot]"
-              type="button"
-              class="crew__clear"
-              :title="t('Снять с вагона')"
-              :disabled="busy"
-              @click="unassign(w.conductors[slot]!, w.number)"
-            >
-              ✕
-            </button>
+              @click="slotPick = { wagon: w, slot }"
+            />
           </div>
         </template>
       </div>
@@ -111,42 +89,34 @@
     <template v-if="norm" #bar>
       <div class="crew__bar">
         <span class="crew__bar-text" :class="{ 'crew__bar-text--ok': normDone(norm) }">{{ normText }}</span>
-        <button type="button" class="crew__done" @click="goBack">{{ t('Готово') }}</button>
+        <button type="button" class="crew__done q-py-none q-px-lg" @click="goBack">{{ t('Готово') }}</button>
       </div>
     </template>
   </PwaPage>
 
+  <!-- проводник на место в вагоне -->
+  <PickSheet
+    :show="!!slotPick"
+    :title="t('Назначить проводника')"
+    :subtitle="slotPick ? t('Вагон {n}', { n: slotPick.wagon.number }) : ''"
+    :options="slotPickOptions"
+    :selected="slotPick?.wagon.conductors[slotPick.slot]?.usr.id ?? null"
+    :disabled="busy"
+    @update:show="(v) => !v && (slotPick = null)"
+    @pick="onSlot"
+  />
+
   <!-- проводник из нераспределённых — на вагон -->
-  <BottomSheet
+  <PickSheet
     :show="!!poolPick"
     :title="t('Назначить на вагон')"
     :subtitle="poolPick ? label(poolPick) : ''"
+    :options="sheetWagons"
+    :selected="null"
+    :disabled="busy"
     @update:show="(v) => !v && (poolPick = null)"
-  >
-    <div class="crew__sheet">
-      <button
-        v-for="w in sheetWagons"
-        :key="w.number"
-        type="button"
-        class="crew__sheet-row"
-        :disabled="w.full || busy"
-        @click="assignFromPool(w.number)"
-      >
-        <span class="crew__pos">{{ w.pos }}</span>
-        <span class="crew__grow crew__sheet-text">
-          <span>
-            <span class="crew__number zs-mono">{{ w.number }}</span>
-            <span class="crew__muted">{{ dictManager.getValue('WagonType', w.type) }}</span>
-          </span>
-          <span class="crew__sheet-info" :class="{ 'crew__sheet-info--warn': w.warn }">{{ w.info }}</span>
-        </span>
-        <span class="crew__muted">{{ w.full ? t('занят') : '›' }}</span>
-      </button>
-    </div>
-    <template #buttons>
-      <button type="button" class="crew__cancel" @click="poolPick = null">{{ t('Отмена') }}</button>
-    </template>
-  </BottomSheet>
+    @pick="assignFromPool"
+  />
 </template>
 
 <script setup lang="ts">
@@ -159,6 +129,7 @@ import { t } from '@/boot/i18n'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import { provideBusy } from '@/shared/busy'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
+import SoftLink from '@/shared/components/form/SoftLink.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { CrewDuty, TripStatus } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -170,7 +141,8 @@ import { loadCached } from '@/shared/offline/cache'
 import type { WagonNorm } from '@/shared/trips/crewNorm'
 import { crewNorm, normDone, slotOptions } from '@/shared/trips/crewNorm'
 import { currentUser, loadCurrentUser } from '@/shared/user'
-import BottomSheet from '../components/BottomSheet.vue'
+import type { PickOption } from '../components/PickSheet.vue'
+import PickSheet from '../components/PickSheet.vue'
 import PwaPage from '../components/PwaPage.vue'
 
 /**
@@ -185,6 +157,9 @@ const router = useRouter()
 
 const crew = shallowRef<TripCrew | null>(null)
 const stale = ref(false)
+
+const times = (trip: { departure: string; arrival: string }) =>
+  t('отпр. {from} • приб. {to}', { from: formatDateTime(trip.departure), to: formatDateTime(trip.arrival) })
 const error = ref<ShownError | null>(null)
 // общее ожидание страницы: спиннер на месте содержимого — на всю цепочку загрузок
 const frameBusy = provideBusy()
@@ -208,7 +183,7 @@ const readOnlyReason = computed(() => {
   return t('Для действия нужна связь')
 })
 
-const label = (m: CrewMember) => (m.senior ? `${m.name} • ${t('ст.')}` : m.name)
+const label = (m: CrewMember) => (m.senior ? `${m.usr.name} • ${t('ст.')}` : m.usr.name)
 
 const readiness = computed(() => {
   const n = norm.value!
@@ -218,7 +193,7 @@ const readiness = computed(() => {
     {
       ok: n.chiefAndPem,
       title: t('Начальник поезда и ПЭМ'),
-      detail: `${t('ЛНП')} ${chief?.name ?? '—'} • ${t('ПЭМ')} ${pem?.name ?? '—'}`,
+      detail: `${t('ЛНП')} ${chief?.usr.name ?? '—'} • ${t('ПЭМ')} ${pem?.usr.name ?? '—'}`,
     },
     {
       ok: n.full && n.notOk.length === 0,
@@ -259,15 +234,13 @@ function slotBad(w: WagonNorm, slot: number): boolean {
   return w.notAdjacent || (w.tail && !m.senior)
 }
 
-const slotChoices = (w: WagonNorm, slot: number) => slotOptions(crew.value!, w, slot, label)
-
 async function save(changes: [CrewMember, string[]][]) {
   if (!crew.value || !editable.value) return
   busy.value = true
   error.value = null
   try {
     let result = crew.value
-    for (const [m, wagons] of changes) result = await setConductorWagons(result.trip.id, m.usr, wagons)
+    for (const [m, wagons] of changes) result = await setConductorWagons(result.trip.id, m.usr.id, wagons)
     crew.value = result
   } catch (e) {
     error.value = shownError(e)
@@ -276,46 +249,55 @@ async function save(changes: [CrewMember, string[]][]) {
   }
 }
 
-function onSlot(w: WagonNorm, slot: number, e: Event) {
-  const user = Number((e.target as HTMLSelectElement).value)
-  const prev = w.conductors[slot]
-  if (prev?.usr === user) return
-  const next = crew.value!.crew.find((m) => m.usr === user)
+// место в вагоне, на которое выбирается проводник; null — лист закрыт
+const slotPick = shallowRef<{ wagon: WagonNorm; slot: number } | null>(null)
+
+const slotPickOptions = computed<PickOption<number | null>[]>(() => {
+  const pick = slotPick.value
+  if (!pick) return []
+  const choices = slotOptions(crew.value!, pick.wagon, pick.slot, label)
+  return [{ id: null, name: t('Не назначен') }, ...choices.map((o) => ({ id: o.user, name: o.label }))]
+})
+
+// null — снять проводника с места
+function onSlot(user: number | null) {
+  const pick = slotPick.value
+  if (!pick) return
+  const wagon = pick.wagon.number
+  const prev = pick.wagon.conductors[pick.slot]
+  slotPick.value = null
+  if ((prev?.usr.id ?? null) === user) return
+  const next = crew.value!.crew.find((m) => m.usr.id === user)
   const changes: [CrewMember, string[]][] = []
   // прежний проводник места уходит с этого вагона
-  if (prev) changes.push([prev, prev.wagons.filter((x) => x !== w.number)])
+  if (prev) changes.push([prev, prev.wagons.filter((x) => x !== wagon)])
   // новый — на этот вагон; если у него уже есть соседний вагон, вагонов становится два
-  if (next) changes.push([next, [...next.wagons, w.number]])
+  if (next) changes.push([next, [...next.wagons, wagon]])
   void save(changes)
 }
 
-function unassign(m: CrewMember, wagon: string) {
-  void save([[m, m.wagons.filter((x) => x !== wagon)]])
-}
-
 // лист «Назначить на вагон»: пассажирские вагоны, занятые (2 проводника) недоступны
-const sheetWagons = computed(() => {
+const sheetWagons = computed<PickOption<string | null>[]>(() => {
   const pick = poolPick.value
   return (norm.value?.wagons ?? [])
     .filter((w) => w.passenger)
     .map((w) => {
       const n = w.conductors.length
-      const warn = w.tail && !!pick && !pick.senior
+      const type = dictManager.getValue('WagonType', w.type)
       return {
-        number: w.number,
-        pos: w.pos,
-        type: w.type,
-        full: n >= 2,
-        warn,
-        info: t('{n} из 2', { n }) + (w.tail ? ` • ${t('хвостовой, нужен старший')}` : ''),
+        id: w.number,
+        name: `${w.pos}. ${w.number} • ${type}`,
+        hint: t('{n} из 2', { n }) + (w.tail ? ` • ${t('хвостовой, нужен старший')}` : ''),
+        warn: w.tail && !!pick && !pick.senior,
+        disabled: n >= 2,
       }
     })
 })
 
-function assignFromPool(wagon: string) {
+function assignFromPool(wagon: string | null) {
   const m = poolPick.value
   poolPick.value = null
-  if (m) void save([[m, [wagon]]])
+  if (m && wagon) void save([[m, [wagon]]])
 }
 
 function goBack() {
@@ -350,46 +332,37 @@ void loadCrew()
 <style scoped lang="scss">
 .crew__muted {
   color: $zs-text-muted;
-  font-size: 0.8125rem;
-}
-
-.crew__stale {
-  color: #7a5200;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.8rem;
 }
 
 .crew__error {
-  padding: 0.625rem 0.875rem;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: $zs-error-bg;
   color: $zs-error-fg;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 
-.crew__state {
+.crew__badges {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
+  font-size: 0.8rem;
 }
 
 .crew__caption {
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 
   // отступ под подписью группы — на треть меньше
   &--card {
-    padding: 0.75rem 0.875rem calc(0.25rem * 2 / 3);
+    padding: 0.8rem 0.9rem calc(0.3rem * 2 / 3);
   }
 
   &--line {
     // отступ под подписью группы — на треть меньше промежутка между блоками (1rem)
     margin-bottom: calc(-1rem / 3);
-    padding-top: 0.875rem;
+    padding-top: 0.9rem;
     border-top: 0.0625rem solid $zs-border;
   }
 }
@@ -398,15 +371,14 @@ void loadCrew()
   display: flex;
   flex-direction: column;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.375rem;
+  border-radius: 0.4rem;
   background: #fff;
 }
 
 .crew__ready {
   display: flex;
   align-items: flex-start;
-  gap: 0.625rem;
-  padding: 0.625rem 0.875rem;
+  gap: 0.6rem;
   border-top: 0.0625rem solid $zs-border-row;
 }
 
@@ -420,7 +392,7 @@ void loadCrew()
   border-radius: 50%;
   background: #fbe9cf;
   color: #8a4b05;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 700;
 
   &--ok {
@@ -432,7 +404,7 @@ void loadCrew()
 .crew__ready-text {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 0.1rem;
   min-width: 0;
 }
 
@@ -443,12 +415,12 @@ void loadCrew()
 .crew__pool {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0.6rem;
 }
 
 .crew__pool-head {
-  // отступ под подписью группы — на треть меньше промежутка между блоками (0.625rem)
-  margin-bottom: calc(-0.625rem / 3);
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.6rem)
+  margin-bottom: calc(-0.6rem / 3);
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -466,7 +438,6 @@ void loadCrew()
   align-items: center;
   gap: 0.5rem;
   min-height: 2.8rem;
-  padding: 0 0.875rem;
   border: 0.0625rem solid $primary;
   border-radius: 1.4rem;
   background: $zs-selected-bg;
@@ -488,17 +459,16 @@ void loadCrew()
 
 .crew__all {
   color: #1d5e2c;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   font-weight: 600;
 }
 
 .crew__wagon {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
-  padding: 0.75rem 0.875rem;
+  gap: 0.6rem;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.375rem;
+  border-radius: 0.4rem;
   background: #fff;
 
   &--bad {
@@ -510,13 +480,13 @@ void loadCrew()
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.6rem;
 }
 
 .crew__pos {
   width: 1.1rem;
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 
 .crew__number {
@@ -529,16 +499,15 @@ void loadCrew()
 }
 
 .crew__tail {
-  padding: 0.125rem 0.5rem;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: $zs-selected-bg;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
 .crew__status {
   color: #8a4b05;
-  font-size: 0.78125rem;
+  font-size: 0.8rem;
   font-weight: 600;
 
   &--ok {
@@ -553,63 +522,35 @@ void loadCrew()
   gap: 0.5rem;
 }
 
-.crew__select {
+.crew__slot-text {
   flex: 1;
-  height: 2.8rem;
-  padding: 0 0.625rem;
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.9375rem;
-
-  &--empty {
-    border-color: #e0b070;
-    color: $zs-text-muted;
-  }
 
   &--bad {
-    border-color: #c62828;
+    color: $zs-error-fg;
   }
 }
 
-.crew__slot-text {
-  padding: 0.25rem 0;
-}
-
-.crew__clear {
-  display: flex;
+.crew__assign {
   flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 2.8rem;
-  height: 2.8rem;
-  padding: 0;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
-  background: #fff;
-  color: $zs-text-muted;
-  cursor: pointer;
 }
 
 .crew__note {
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   line-height: 1.45;
 }
 
 .crew__bar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.8rem;
 }
 
 .crew__bar-text {
   flex: 1;
   min-width: 0;
   color: #7a4f00;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   font-weight: 600;
 
   &--ok {
@@ -619,72 +560,13 @@ void loadCrew()
 
 .crew__done {
   min-height: 3.3rem;
-  padding: 0 1.5rem;
   border: 0;
-  border-radius: 0.375rem;
+  border-radius: 0.4rem;
   background: $primary;
   color: #fff;
   font: inherit;
   font-size: 1rem;
   font-weight: 700;
-  cursor: pointer;
-}
-
-.crew__sheet {
-  overflow: hidden;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.375rem;
-}
-
-.crew__sheet-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  min-height: 3.5rem;
-  padding: 0.5rem 0.875rem;
-  border: 0;
-  border-top: 0.0625rem solid $zs-border-row;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &:first-child {
-    border-top: 0;
-  }
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-}
-
-.crew__sheet-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.crew__sheet-info {
-  color: $zs-text-muted;
-  font-size: 0.78125rem;
-
-  &--warn {
-    color: #8a4b05;
-  }
-}
-
-.crew__cancel {
-  flex: 1;
-  min-height: 3.3rem;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.375rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-weight: 600;
   cursor: pointer;
 }
 </style>

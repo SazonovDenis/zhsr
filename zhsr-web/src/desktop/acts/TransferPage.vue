@@ -9,7 +9,7 @@
       </div>
     </template>
 
-    <ErrorBox v-if="error" :error="error" class="transfer__error" />
+    <ErrorBox v-if="error" :error="error" class="transfer__error q-mb-md" />
     <LoadSpinner v-if="busy.active.value" />
 
     <div v-if="ready" class="transfer">
@@ -46,7 +46,7 @@
           <CbList v-model="work" single no-search placeholder="Выберите…" :values="dictChoices('WorkType')" />
         </FormField>
         <FormField label="Время акта">
-          <DatePicker v-model="time" with-time />
+          <DatePicker v-model="time" with-time date-text="Время акта" />
         </FormField>
         <FormField v-if="immediate" label="Кто сдал вагоны">
           <CbList v-model="giver" single no-search placeholder="Выберите…" :values="giverChoices" :source="giverLoad" />
@@ -63,7 +63,7 @@
       <div class="transfer__list">
         <div class="transfer__caption">{{ t('Вагоны') }}</div>
         <div class="transfer__table">
-          <div v-for="w in wagons" :key="w.number" class="transfer__row">
+          <div v-for="w in wagons" :key="w.number" class="transfer__row q-py-sm q-px-md">
             <q-checkbox v-model="selected" :val="w.number" :disable="!!w.pendingAct" dense />
             <span class="zs-mono">{{ w.number }}</span>
             <span>{{ dictManager.getValue('WagonType', w.wagonType) }}</span>
@@ -77,7 +77,7 @@
               {{ t('с имуществом') }}
             </q-checkbox>
           </div>
-          <div v-if="!wagonsBusy && wagons.length === 0" class="transfer__empty">{{ emptyText }}</div>
+          <div v-if="!wagonsBusy && wagons.length === 0" class="transfer__empty q-pa-md">{{ emptyText }}</div>
         </div>
       </div>
     </div>
@@ -91,7 +91,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import type { TransferWagon } from '@/api/transfers'
 import { createTransfer, fetchTransferGivers, fetchTransferWagons } from '@/api/transfers'
-import type { StaffCandidate } from '@/api/trips'
+import type { UserRef } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
 import CbList from '@/shared/components/choice/CbList.vue'
@@ -208,8 +208,8 @@ const back = () => {
 }
 
 // кто сдал — свой выпадающий список, страница его не ждёт; ошибка — в самом списке
-const givers = shallowRef<StaffCandidate[]>([])
-const giverChoices = computed(() => givers.value.map((g) => ({ id: g.usr, text: g.name })))
+const givers = shallowRef<UserRef[]>([])
+const giverChoices = computed(() => givers.value.map((g) => ({ id: g.id, text: g.name })))
 const giverLoad = useLoad(async () => {
   givers.value = station.value ? await fetchTransferGivers(direction.value, station.value) : []
 })
@@ -303,39 +303,35 @@ async function save() {
 .transfer {
   display: grid;
   grid-template-columns: 20rem minmax(0, 1fr);
-  gap: 1.25rem;
+  gap: 1.3rem;
   min-height: 0;
-}
-
-.transfer__error {
-  margin-bottom: 0.75rem;
 }
 
 .transfer__act,
 .transfer__list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.8rem;
   min-width: 0;
 }
 
 .transfer__caption {
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .transfer__muted {
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 
 .transfer__table {
   overflow-y: auto;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
 }
 
@@ -343,10 +339,9 @@ async function save() {
   display: grid;
   grid-template-columns: auto 5rem 8rem 1fr auto auto;
   align-items: center;
-  gap: 0.625rem;
-  padding: 0.375rem 0.75rem;
+  gap: 0.6rem;
   border-top: 0.0625rem solid $zs-border-row;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 
   &:first-child {
     border-top: 0;
@@ -354,8 +349,7 @@ async function save() {
 }
 
 .transfer__empty {
-  padding: 1rem 0.75rem;
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 </style>

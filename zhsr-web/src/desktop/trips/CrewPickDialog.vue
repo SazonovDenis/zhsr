@@ -22,15 +22,15 @@
         <span>{{ t('Проводник') }}</span>
         <span>{{ t('Сейчас') }}</span>
       </div>
-      <label v-for="c in candidates" :key="c.usr" class="crew-pick__row">
-        <q-checkbox v-model="selected" :val="c.usr" dense />
+      <label v-for="c in candidates" :key="c.id" class="crew-pick__row q-py-sm q-px-md">
+        <q-checkbox v-model="selected" :val="c.id" dense />
         <span>
           {{ c.name }}
           <span v-if="c.senior" class="zs-sub">{{ t('ст.') }}</span>
         </span>
         <span class="zs-sub">{{ busyText(c) }}</span>
       </label>
-      <div v-if="!loading && candidates.length === 0" class="crew-pick__empty">{{ t('Проводников нет') }}</div>
+      <div v-if="!loading && candidates.length === 0" class="crew-pick__empty q-pa-md">{{ t('Проводников нет') }}</div>
     </div>
     <div class="crew-pick__count">{{ t('Отмечено: {n}', { n: selected.length }) }}</div>
   </FormDialog>
@@ -48,6 +48,7 @@ import { provideBusy } from '@/shared/busy'
 import FormDialog from '@/shared/components/dialog/FormDialog.vue'
 import { formatDateTime } from '@/shared/format'
 import SidePanelFields from '../frame/SidePanelFields.vue'
+import { tripRefText } from '@/shared/trips/tripRefText'
 
 /**
  * Диалог «Проводники…» (Ф-РЕЙ-06): планировщик набирает проводников рейса. Сверху — рейс и станция отправления, ниже
@@ -73,7 +74,7 @@ const error = ref<ShownError | null>(null)
 void busy.run(async () => {
   try {
     candidates.value = await fetchConductorCandidates(props.tripId)
-    selected.value = candidates.value.filter((c) => c.assigned).map((c) => c.usr)
+    selected.value = candidates.value.filter((c) => c.assigned).map((c) => c.id)
   } catch (e) {
     error.value = shownError(e)
   } finally {
@@ -84,7 +85,7 @@ void busy.run(async () => {
 function busyText(c: ConductorCandidate): string {
   if (!c.busyUntil) return t('свободен')
   return t('в рейсе {trip} • свободен с {until}', {
-    trip: `${c.busyTrain ?? ''} ${c.busyName ?? ''}`.trim(),
+    trip: c.busyTrip ? tripRefText(c.busyTrip) : '',
     until: formatDateTime(c.busyUntil),
   })
 }
@@ -112,8 +113,8 @@ async function save() {
   max-height: 22rem;
   overflow-y: auto;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
-  font-size: 0.84375rem;
+  border-radius: 0.3rem;
+  font-size: 0.8rem;
 }
 
 .crew-pick__head,
@@ -122,7 +123,6 @@ async function save() {
   grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1.4fr);
   gap: 0.5rem;
   align-items: center;
-  padding: 0.375rem 0.75rem;
 }
 
 .crew-pick__head {
@@ -132,7 +132,7 @@ async function save() {
   border-bottom: 0.0625rem solid $zs-table-head-border;
   background: $zs-table-head-bg;
   color: $zs-table-head-fg;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
@@ -146,12 +146,11 @@ async function save() {
 }
 
 .crew-pick__empty {
-  padding: 0.75rem;
   color: $zs-text-muted;
 }
 
 .crew-pick__count {
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 </style>

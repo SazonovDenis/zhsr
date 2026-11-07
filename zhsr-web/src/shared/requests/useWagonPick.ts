@@ -9,6 +9,21 @@ import { shownError } from '@/shared/errors'
 import { loadCached, readCached } from '@/shared/offline/cache'
 import { dictManager } from '@/shared/dict/DictManager'
 
+/** Ключ сохранённого на телефоне состава рейса. */
+const tripWagonsKey = (tripId: number | string) => `trip-wagons:${tripId}`
+
+/**
+ * Сохранить состав рейса на телефоне заранее: без связи он нужен для выбора вагона в заявке. Нет связи — остаётся
+ * прежняя копия, это не ошибка: сохранение идёт само, его никто не ждёт.
+ */
+export async function saveTripWagons(tripId: number): Promise<void> {
+  try {
+    await loadCached(tripWagonsKey(tripId), () => fetchTripWagons(tripId))
+  } catch (e) {
+    if (!isNetworkError(e)) throw e
+  }
+}
+
 /**
  * Выбор вагона в заявке (Ф-ЗАЯ-01) — общее для десктопной и мобильной частей.
  *
@@ -16,7 +31,8 @@ import { dictManager } from '@/shared/dict/DictManager'
  *   номер поезда и маршрут рейса из данных пользователя.
  * - Пользователь снял фильтр или ввёл цифры номера — поиск по номеру среди всех вагонов (findWagons); фильтр по рейсу
  *   при поиске по номеру не действует.
- * - offline — мобильная часть: состав рейса сохраняется на телефоне; без связи поиск идёт по сохранённому составу.
+ * - offline — мобильная часть: состав рейса берётся с телефона, если связи нет; поиск идёт по сохранённому составу.
+ *   Заранее состав сохраняет saveTripWagons.
  */
 export function useWagonPick(user: () => CurrentUser | null, offline = false) {
   /** фильтр по рейсу включён */
@@ -43,7 +59,7 @@ export function useWagonPick(user: () => CurrentUser | null, offline = false) {
     const id = trip.value?.id
     if (!id) return []
     if (!offline) return fetchTripWagons(id)
-    return (await loadCached(`trip-wagons:${id}`, () => fetchTripWagons(id))).data
+    return (await loadCached(tripWagonsKey(id), () => fetchTripWagons(id))).data
   }
 
   async function search(number: string): Promise<RequestWagon[]> {
@@ -52,7 +68,7 @@ export function useWagonPick(user: () => CurrentUser | null, offline = false) {
     } catch (e) {
       if (!offline || !isNetworkError(e)) throw e
       // без связи — поиск по сохранённому составу рейса
-      const saved = (await readCached<RequestWagon[]>(`trip-wagons:${trip.value?.id ?? ''}`)) ?? []
+      const saved = (await readCached<RequestWagon[]>(tripWagonsKey(trip.value?.id ?? ''))) ?? []
       return saved.filter((w) => w.number.includes(number))
     }
   }

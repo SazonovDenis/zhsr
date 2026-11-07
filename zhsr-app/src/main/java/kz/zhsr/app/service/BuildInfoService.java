@@ -1,6 +1,6 @@
 package kz.zhsr.app.service;
 
-import kz.zhsr.app.dto.BuildInfo;
+import kz.zhsr.app.dto.common.BuildInfo;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.boot.info.GitProperties;
 import org.springframework.stereotype.Service;

@@ -4,6 +4,7 @@ import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.constants.RoleType;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -69,10 +70,14 @@ public class Visibility {
      * @param trip         открыт текущий рейс сотрудника и его маршрут; null - нет
      * @param allTripWagons открыты все вагоны состава рейса trip
      * @param wagons       открыты эти вагоны; пусто - нет
+     * @param trips        открытые рейсы сотрудника для списка рейсов: текущий и соседний (предыдущий или следующий),
+     *                     если открыт текущий; пусто - нет
      */
-    public record Access(boolean byDepot, Long depot, Long trip, boolean allTripWagons, List<Long> wagons) {
+    public record Access(boolean byDepot, Long depot, Long trip, boolean allTripWagons, List<Long> wagons,
+                         List<Long> trips) {
         public Access {
             wagons = wagons == null ? List.of() : List.copyOf(wagons);
+            trips = trips == null ? List.of() : List.copyOf(trips);
         }
     }
 
@@ -106,7 +111,15 @@ public class Visibility {
         // проводник без закреплённого вагона не видит и рейса
         Long tripId = trip != null && (ownTrip || !wagons.isEmpty()) ? trip.id() : null;
 
-        return new Access(byDepot, byDepot ? depot : null, tripId, ownTrip && tripId != null, wagons);
+        // соседний рейс (предыдущий или следующий) виден так же, как текущий: его можно открыть на телефоне
+        List<Long> trips = new ArrayList<>();
+        if (tripId != null) {
+            trips.add(tripId);
+            if (user.otherTrip() != null) {
+                trips.add(user.otherTrip().id());
+            }
+        }
+        return new Access(byDepot, byDepot ? depot : null, tripId, ownTrip && tripId != null, wagons, trips);
     }
 
 }

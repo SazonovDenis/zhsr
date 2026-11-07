@@ -1,7 +1,9 @@
 package kz.zhsr.app.service;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
+import kz.kis.kisdbtools.repository.DbRecMapper;
 import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.ActStatus;
@@ -10,8 +12,8 @@ import kz.zhsr.app.constants.LocationType;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.constants.TripStatus;
 import kz.zhsr.app.constants.WagonStatus;
-import kz.zhsr.app.dto.CouplingWagon;
-import kz.zhsr.app.dto.TripCrew;
+import kz.zhsr.app.dto.trip.CouplingWagon;
+import kz.zhsr.app.dto.trip.TripCrew;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,13 +52,15 @@ public class CouplingService {
     private final CurrentUserService currentUserService;
     private final TripService tripService;
     private final WagonJournal wagonJournal;
+    private final RefResolver refResolver;
 
     public CouplingService(Db db, CurrentUserService currentUserService, TripService tripService,
-                           WagonJournal wagonJournal) {
+                           WagonJournal wagonJournal, RefResolver refResolver) {
         this.db = db;
         this.currentUserService = currentUserService;
         this.tripService = tripService;
         this.wagonJournal = wagonJournal;
+        this.refResolver = refResolver;
     }
 
     /**
@@ -68,11 +72,10 @@ public class CouplingService {
     public List<CouplingWagon> wagons(long id, long type, Long station) throws Exception {
         tripService.requireTrip(id);
         if (type == CouplingType.DETACH) {
-            return tripService.composition(id).stream()
-                    .filter(r -> inTrip(r, id))
-                    .map(r -> new CouplingWagon(r.getString("number"), r.getLong("wagon_type"),
-                            r.getLong("location_type"), r.getLong("place"), r.getLong("wagon_status_type"), null, true))
-                    .toList();
+            List<CouplingWagon> res = DbRecMapper.toList(
+                    tripService.composition(id).stream().filter(r -> inTrip(r, id)).toList(), CouplingWagon.class);
+            res.forEach(w -> w.setAvailable(true));
+            return res;
         }
         if (type != CouplingType.ATTACH) {
             throw ApiException.badRequest("Неизвестный вид акта");
@@ -80,16 +83,13 @@ public class CouplingService {
         if (station == null) {
             return List.of();
         }
-        return db.loadSql(TripSql.attachCandidates(), Map.of("trip", id, "station", station, "states", TripService.ACTIVE))
-                .stream()
-                .map(r -> {
-                    String other = r.getString("other_train");
-                    long location = r.getLong("location_type");
-                    return new CouplingWagon(r.getString("number"), r.getLong("wagon_type"), location,
-                            r.getLong("place"), r.getLong("wagon_status_type"), other,
-                            location == LocationType.STATION && other == null);
-                })
-                .toList();
+        List<CouplingWagon> res = db.loadSql(TripSql.attachCandidates(),
+                Map.of("trip", id, "station", station, "states", TripService.ACTIVE), CouplingWagon.class);
+        for (CouplingWagon w : res) {
+            w.setAvailable(w.getLocationType() == LocationType.STATION && w.getOtherTrip() == null);
+        }
+        refResolver.resolve(res);
+        return res;
     }
 
     /**
@@ -109,7 +109,7 @@ public class CouplingService {
         if (!detach && body.couplingType() != CouplingType.ATTACH) {
             throw ApiException.badRequest("Неизвестный вид акта");
         }
-        DbRec stop = stop(trip.getLong("route"), crew.trip().stops(), body.station());
+        DbRec stop = stop(trip.getLong("route"), crew.getTrip().getStops(), body.station());
         List<String> numbers = body.wagons() == null ? List.of() : new ArrayList<>(new LinkedHashSet<>(body.wagons()));
         if (numbers.isEmpty()) {
             throw ApiException.badRequest("Отметьте вагоны");
@@ -117,11 +117,11 @@ public class CouplingService {
 
         Map<String, CouplingWagon> available = new HashMap<>();
         for (CouplingWagon w : wagons(id, body.couplingType(), body.station())) {
-            available.put(w.number(), w);
+            available.put(w.getNumber(), w);
         }
         for (String number : numbers) {
             CouplingWagon w = available.get(number);
-            if (w == null || !w.available()) {
+            if (w == null || !w.isAvailable()) {
                 throw ApiException.conflict(detach ? "Вагон " + number + " не едет в составе рейса"
                         : "Вагон " + number + " должен стоять на станции и не входить в другой рейс");
             }
@@ -168,7 +168,7 @@ public class CouplingService {
 
     private void requireRight(long id, CurrentUser me, TripCrew crew) throws Exception {
         boolean master = me.hasRole(RoleType.MASTER) && me.depotStation() != null
-                && crew.trip().stops().contains(me.depotStation());
+                && crew.getTrip().getStops().contains(me.depotStation());
         if (!master && !me.hasRole(RoleType.ADMIN) && !tripService.isChief(id, me)) {
             throw ApiException.forbidden("Акт составляет начальник поезда рейса или мастер депо станции маршрута");
         }

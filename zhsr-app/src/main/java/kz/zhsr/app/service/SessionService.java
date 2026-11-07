@@ -7,17 +7,19 @@ import kz.kis.kiscore.model.DbRec;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
-import kz.zhsr.app.dto.ChangePasswordRequest;
-import kz.zhsr.app.dto.CurrentState;
-import kz.zhsr.app.dto.LoginRequest;
-import kz.zhsr.app.dto.UserInfo;
-import kz.zhsr.app.dto.UserTrip;
+import kz.zhsr.app.dto.user.ChangePasswordRequest;
+import kz.zhsr.app.dto.user.CurrentState;
+import kz.zhsr.app.dto.user.LoginRequest;
+import kz.zhsr.app.dto.user.UserInfo;
+import kz.zhsr.app.dto.user.UserTrip;
+import kz.zhsr.app.service.dict.DictService;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,13 +31,15 @@ public class SessionService {
     private final Db db;
     private final PasswordEncoder passwordEncoder;
     private final CurrentUserService currentUserService;
+    private final DictService dictService;
     private final SecurityContextRepository securityContextRepository;
 
     public SessionService(Db db, PasswordEncoder passwordEncoder, CurrentUserService currentUserService,
-                          SecurityContextRepository securityContextRepository) {
+                          DictService dictService, SecurityContextRepository securityContextRepository) {
         this.db = db;
         this.passwordEncoder = passwordEncoder;
         this.currentUserService = currentUserService;
+        this.dictService = dictService;
         this.securityContextRepository = securityContextRepository;
     }
 
@@ -45,7 +49,7 @@ public class SessionService {
      * @throws ApiException 401 - неверный логин или пароль, учётная запись отключена; 406 - вход выполнен, но сотрудник
      *                     должен сменить пароль: сеанс открыт, в нём разрешена только смена пароля
      */
-    public UserInfo login(LoginRequest req, HttpServletRequest request, HttpServletResponse response) throws Exception {
+    public void login(LoginRequest req, HttpServletRequest request, HttpServletResponse response) throws Exception {
         String login = req.username() == null ? "" : req.username().trim();
         DbRec usr = login.isEmpty() || req.password() == null ? null : db.loadRec("usr", Map.of("login", login));
         if (usr == null || !passwordEncoder.matches(req.password(), usr.getString("password_hash"))) {
@@ -72,7 +76,6 @@ public class SessionService {
         if (user.mustChangePassword()) {
             throw ApiException.passwordChangeRequired();
         }
-        return userInfo(user);
     }
 
     /**
@@ -82,7 +85,7 @@ public class SessionService {
      *                      совпадает с текущим
      */
     @Transactional
-    public UserInfo changePassword(ChangePasswordRequest req) throws Exception {
+    public void changePassword(ChangePasswordRequest req) throws Exception {
         CurrentUser user = currentUserService.get();
         DbRec usr = db.loadRec("usr", user.id(), true);
         if (req.oldPassword() == null || !passwordEncoder.matches(req.oldPassword(), usr.getString("password_hash"))) {
@@ -97,7 +100,6 @@ public class SessionService {
                 "change_password", false));
         currentUserService.evict(user.id());
         currentUserService.set(user.id());
-        return userInfo(currentUserService.get());
     }
 
     /**
@@ -111,8 +113,31 @@ public class SessionService {
         currentUserService.clear();
     }
 
-    public UserInfo user() {
-        return userInfo(currentUserService.get());
+    /**
+     * Кто вошёл и контекст сервера: идентификатор БД и версии справочников. Контекст в сеансе не хранится: версии
+     * меняются во время сеанса, поэтому читаются при каждом вызове.
+     */
+    public UserInfo user() throws Exception {
+        CurrentUser user = currentUserService.get();
+        CurrentUser.Trip t = user.trip();
+        return new UserInfo(
+                user.id(),
+                user.shortName(),
+                user.firstName(),
+                user.roles().stream().map(CurrentUser.Role::id).toList(),
+                user.roles().stream().map(CurrentUser.Role::service).filter(s -> s != null).distinct().toList(),
+                user.depot(),
+                user.depotStation(),
+                userTrip(t),
+                userTrip(user.otherTrip()),
+                dbGuid(),
+                dictService.versions());
+    }
+
+    private static UserTrip userTrip(CurrentUser.Trip t) {
+        return t == null ? null : new UserTrip(t.id(), t.train(), t.name(), t.state(), t.departure(), t.arrival(),
+                t.duty(), t.wagonNumbers(), t.plannedDt(), t.departedDt(), t.arrivedDt(), t.departureMarkedDt(),
+                t.arrivalMarkedDt());
     }
 
     /**
@@ -123,18 +148,15 @@ public class SessionService {
         return new CurrentState(Map.of());
     }
 
-    private static UserInfo userInfo(CurrentUser user) {
-        CurrentUser.Trip t = user.trip();
-        return new UserInfo(
-                user.id(),
-                user.shortName(),
-                user.firstName(),
-                user.roles().stream().map(CurrentUser.Role::id).toList(),
-                user.roles().stream().map(CurrentUser.Role::service).filter(s -> s != null).distinct().toList(),
-                user.depot(),
-                user.depotStation(),
-                t == null ? null : new UserTrip(t.id(), t.train(), t.name(), t.state(), t.departure(), t.arrival(),
-                        t.duty(), t.wagonNumbers()));
+    /**
+     * Идентификатор серверной БД. Его пишет install/db-reset; без него фронт не может сверить локальную БД.
+     */
+    private String dbGuid() throws Exception {
+        List<DbRec> rows = db.loadList("db_info", null);
+        if (rows.size() != 1) {
+            throw new IllegalStateException("В db_info должна быть одна строка: БД создаётся через install/db-reset");
+        }
+        return rows.get(0).getString("db_guid");
     }
 
 }

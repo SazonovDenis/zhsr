@@ -11,8 +11,10 @@ declare module 'vue-router' {
      * на него, а не на главную части
      */
     pair?: string
-    /** мобильная часть: страница с нижней панелью вкладок («Сегодня», «Заявки», «+ Заявка», «Профиль») */
+    /** мобильная часть: страница с нижней панелью вкладок («Рейс», «Заявки», «Профиль») */
     tabs?: boolean
+    /** мобильная часть: заголовок окна в шапке, на русском; нет — название системы */
+    title?: string
   }
 }
 
@@ -47,45 +49,45 @@ const routes: RouteRecordRaw[] = [
       {
         path: '',
         name: 'pwa-home',
-        meta: { tabs: true },
+        meta: { tabs: true, title: 'Текущий рейс' },
         component: () => pwa().then((m) => m.PwaHomePage),
       },
       {
         path: 'requests',
         name: 'pwa-requests',
-        meta: { tabs: true, pair: 'requests' },
+        meta: { tabs: true, pair: 'requests', title: 'Заявки' },
         component: () => pwa().then((m) => m.PwaRequestsPage),
       },
       {
         path: 'requests/new',
         name: 'pwa-request-new',
-        meta: { pair: 'requests' },
+        meta: { pair: 'requests', title: 'Новая заявка' },
         component: () => pwa().then((m) => m.PwaRequestWizardPage),
       },
       {
         path: 'requests/:id',
         name: 'pwa-request',
-        meta: { pair: 'requests' },
+        meta: { pair: 'requests', title: 'Заявка' },
         props: true,
         component: () => pwa().then((m) => m.PwaRequestPage),
       },
       {
         path: 'requests/:id/edit',
         name: 'pwa-request-edit',
-        meta: { pair: 'requests' },
+        meta: { pair: 'requests', title: 'Редактирование заявки' },
         props: true,
         component: () => pwa().then((m) => m.PwaRequestWizardPage),
       },
       {
         path: 'profile',
         name: 'pwa-profile',
-        meta: { tabs: true },
+        meta: { tabs: true, title: 'Профиль' },
         component: () => pwa().then((m) => m.PwaProfilePage),
       },
       {
         path: 'trip',
         name: 'pwa-trip',
-        meta: { pair: 'trips' },
+        meta: { pair: 'trips', title: 'Формирование рейса' },
         component: () => pwa().then((m) => m.PwaTripCrewPage),
       },
       {

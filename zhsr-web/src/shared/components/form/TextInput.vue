@@ -2,7 +2,7 @@
   <span class="text-input" :style="{ width }">
     <input
       v-model="model"
-      class="text-input__field zs-focusable"
+      class="text-input__field zs-focusable q-py-none q-pr-lg q-pl-sm"
       :class="{ 'text-input__field--mono': mono, 'text-input__field--password': password }"
       :type="password && !revealed ? 'password' : 'text'"
       :inputmode="inputmode"
@@ -12,7 +12,7 @@
       v-if="model"
       type="button"
       tabindex="-1"
-      class="text-input__clear"
+      class="text-input__clear q-pa-none"
       :title="t('Очистить')"
       @click="model = ''"
     >
@@ -23,7 +23,7 @@
       v-if="password"
       type="button"
       tabindex="-1"
-      class="text-input__reveal"
+      class="text-input__reveal q-pa-none"
       :title="t(revealed ? 'Скрыть пароль' : 'Показать пароль')"
       @mousedown.prevent
       @click="revealed = !revealed"
@@ -72,13 +72,12 @@ const revealed = ref(false)
 .text-input__field {
   width: 100%;
   height: var(--zs-control-height);
-  padding: 0 1.75rem 0 0.625rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 
   &::placeholder {
     color: $zs-text-faint;
@@ -107,11 +106,10 @@ const revealed = ref(false)
 .text-input__reveal {
   position: absolute;
   top: 50%;
-  right: 0.375rem;
+  right: 0.4rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
   border: 0;
   background: none;
   color: $zs-text-faint;
@@ -126,18 +124,17 @@ const revealed = ref(false)
 .text-input__clear {
   position: absolute;
   top: 50%;
-  right: 0.375rem;
+  right: 0.4rem;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 1.1rem;
   height: 1.1rem;
-  padding: 0;
   border: 0;
   border-radius: 50%;
   background: $zs-bg-button-soft;
   color: $zs-text-faint;
-  font-size: 0.5625rem;
+  font-size: 0.6rem;
   font-weight: 700;
   line-height: 1;
   transform: translateY(-50%);

@@ -39,7 +39,7 @@ diagrams:
 
   repair_request_data:
     title: "Заявки на ремонт: описание"
-    tables: [ repair_request, repair_request_photo, repair_request_note, fault_type, wagon, severity_type, trip ]
+    tables: [ repair_request, repair_request_photo, repair_request_note, offline_receipt, fault_type, wagon, severity_type, trip ]
     hide_fields: [ "fault_type", "wagon", "severity_type", "trip" ]
 
   repair_request_executor:
@@ -565,6 +565,16 @@ tables:
         title: "Стоянка, мин"
         description: "У станций следования, начальной и конечной станций 0"
 
+  db_info:
+    title: "Идентификатор БД"
+    description: |
+      Одна строка: идентификатор серверной БД, новый при каждом пересоздании БД. Локальная БД браузера сверяет его с
+      сервером: идентификатор другой - локальные данные стираются.
+    columns:
+      db_guid:
+        title: "Идентификатор БД"
+        description: "zhsr-<имя tenant>-<8 случайных hex-символов>"
+
   dict_version:
     title: "Версия справочника"
     description: |
@@ -601,6 +611,12 @@ tables:
         title: "Кто отметил отправление"
       arrived_by_usr:
         title: "Кто отметил прибытие"
+      departure_marked_dt:
+        title: "Когда отмечено отправление"
+        description: "Время внесения отметки. 10 минут после него отметку можно исправить или отменить"
+      arrival_marked_dt:
+        title: "Когда отмечено прибытие"
+        description: "Время внесения отметки. 10 минут после него отметку можно исправить или отменить"
 
   trip_wagon:
     title: "Состав вагонов рейса"
@@ -792,10 +808,6 @@ tables:
         title: "Вагон"
       trip:
         title: "Рейс"
-      created_by_usr:
-        title: "Автор"
-      created_dt:
-        title: "Время подачи"
       fault_type:
         title: "Неисправность"
       severity_type:
@@ -803,6 +815,14 @@ tables:
         constants_from: zhsr-database/src/main/resources/db/dict/severity_type.tsv
       description:
         title: "Описание от автора"
+      created_by_usr:
+        title: "Автор заявки"
+      created_dt:
+        title: "Время создания"
+        description: "Когда пользователь создал заявку, по часам телефона. Часы телефона спешат - проставляется время сервера"
+      received_dt:
+        title: "Время поступления"
+        description: "Когда заявка поступила на сервер. Заявка, созданная без связи, поступает позже создания"
 
   repair_request_photo:
     title: "Фото к заявке"
@@ -818,7 +838,43 @@ tables:
       created_by_usr:
         title: "Автор фото"
       created_dt:
-        title: "Когда загружено"
+        title: "Время создания"
+        description: "Когда пользователь сделал фото, по часам телефона. Часы телефона спешат - проставляется время сервера"
+      received_dt:
+        title: "Время поступления"
+        description: "Когда фото поступила на сервер. Фото, сделанное без связи, поступает позже создания"
+
+  repair_request_note:
+    title: "Примечание (комментарий) к заявке"
+    columns:
+      repair_request:
+        title: "Заявка"
+      note:
+        title: "Примечание"
+      created_by_usr:
+        title: "Автор примечания"
+      created_dt:
+        title: "Время создания"
+        description: "Когда пользователь написал примечание, по часам телефона. Часы телефона спешат - проставляется время сервера"
+      received_dt:
+        title: "Время поступления"
+        description: "Когда примечание поступило на сервер. Примечание, созданное без связи, поступает позже создания"
+
+  offline_receipt:
+    title: "Квитанция об отправке с телефона"
+    description: |
+      Защита от повторной отправки: телефон присваивает сообщению guid, и при обрыве связи повторяет его отправку; 
+      сервер принимает отправку с таким guid один раз.
+    columns:
+      client_guid:
+        title: "Guid отправки"
+        description: "Присвоен телефоном"
+      repair_request:
+        title: "Заявка"
+        description: "Только у отправки новой заявки. При повторе телефон узнаёт по нему id заявки"
+      received_dt:
+        title: "Время поступления"
+        description: "Нужна только чтобы удалять старые квитанции"
 
   repair_request_status:
     title: "Журнал статусов заявки"
@@ -886,18 +942,6 @@ tables:
       executor_usr:
         title: "Исполнитель"
         description: "Вычисляемое: из текущей записи repair_request_executor; пусто - исполнителя нет"
-
-  repair_request_note:
-    title: "Пояснение к заявке"
-    columns:
-      repair_request:
-        title: "Заявка"
-      created_dt:
-        title: "Дата"
-      created_by_usr:
-        title: "Автор пояснения"
-      note:
-        title: "Пояснение"
 
   wagon_location:
     title: "Журнал расположения вагона"

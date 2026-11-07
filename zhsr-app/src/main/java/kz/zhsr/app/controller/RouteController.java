@@ -1,11 +1,11 @@
 package kz.zhsr.app.controller;
 
-import kz.zhsr.app.dto.NextStation;
-import kz.zhsr.app.dto.RecalcStops;
-import kz.zhsr.app.dto.Route;
-import kz.zhsr.app.dto.RouteDraft;
-import kz.zhsr.app.dto.RouteSave;
-import kz.zhsr.app.dto.RouteStop;
+import kz.zhsr.app.dto.route.NextStation;
+import kz.zhsr.app.dto.route.RecalcStops;
+import kz.zhsr.app.dto.route.Route;
+import kz.zhsr.app.dto.route.RouteDraft;
+import kz.zhsr.app.dto.route.RouteSave;
+import kz.zhsr.app.dto.route.RouteStop;
 import kz.zhsr.app.service.RouteService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

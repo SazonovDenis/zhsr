@@ -4,7 +4,7 @@
       <div class="profile__name">{{ user.name }}</div>
       <div class="profile__roles">{{ roles }}</div>
     </div>
-    <div class="profile__stub">{{ t('Раздел в разработке. Язык и выход — в меню слева вверху.') }}</div>
+    <div class="profile__stub q-pa-md">{{ t('Раздел в разработке. Язык и выход — в меню слева вверху.') }}</div>
   </PwaPage>
 </template>
 
@@ -25,24 +25,23 @@ const roles = computed(() => user.value?.roles.map((r) => dictManager.getValue('
 .profile__head {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.3rem;
 }
 
 .profile__name {
-  font-size: 1.375rem;
+  font-size: 1.4rem;
   font-weight: 700;
 }
 
 .profile__roles {
   color: $zs-text-muted;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 
 .profile__stub {
-  padding: 1rem;
   border: 0.0625rem dashed $zs-border;
-  border-radius: 0.375rem;
+  border-radius: 0.4rem;
   color: $zs-text-muted;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 </style>

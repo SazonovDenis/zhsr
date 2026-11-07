@@ -595,4 +595,13 @@
         </createTable>
     </changeSet>
 
+    <!-- идентификатор серверной БД: одна строка, её пишет install/db-reset при пересоздании БД -->
+    <changeSet id="01-nsi-tables-db_info" author="zhsr">
+        <createTable tableName="db_info">
+            <column name="db_guid" type="varchar(100)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
 </databaseChangeLog>

@@ -6,10 +6,15 @@
     @close="emit('close')"
   >
     <LoadSpinner v-if="busy.active.value && !r" />
-    <ErrorBox v-if="card.error.value && !r" :error="card.error.value" :retry="card.load" class="request-panel__error" />
+    <ErrorBox
+      v-if="card.error.value && !r"
+      :error="card.error.value"
+      :retry="card.load"
+      class="request-panel__error q-py-sm q-px-md"
+    />
 
     <template v-if="r">
-      <div v-if="r.tor" class="request-panel__tor">{{ t('ТОР: вагон отцеплен, ремонт в депо') }}</div>
+      <div v-if="r.tor" class="request-panel__tor q-py-sm q-px-md">{{ t('ТОР: вагон отцеплен, ремонт в депо') }}</div>
 
       <div class="request-panel__badges">
         <DictBadge :id="r.requestStatusType" dict="RequestStatus" />
@@ -17,125 +22,80 @@
         <span v-if="r.forwarded" class="request-panel__mark">{{ t('передана в депо') }}</span>
       </div>
 
-      <RequestSteps :status="r.requestStatusType" />
-      <div class="request-panel__next">
-        <span class="request-panel__next-title">{{ t('Что дальше') }}</span>
-        <span>{{ nextText(r) }}</span>
-      </div>
-
-      <!-- действия по заявке; с комментарием — сначала ввод комментария -->
-      <div v-if="card.pending.value" class="request-panel__comment">
-        <div class="request-panel__comment-title">{{ t(card.pendingDef.value!.title) }}</div>
-        <textarea
-          v-model="card.comment.value"
-          class="request-panel__textarea"
-          rows="3"
-          :placeholder="t(card.pendingDef.value!.comment ?? '')"
-        />
-        <div class="request-panel__buttons">
-          <button type="button" class="request-panel__btn" @click="card.cancel">{{ t('Отмена') }}</button>
-          <button
-            type="button"
-            class="request-panel__btn"
-            :class="
-              card.pendingDef.value!.kind === 'danger' ? 'request-panel__btn--danger' : 'request-panel__btn--primary'
-            "
-            :disabled="!card.comment.value.trim() || card.running.value"
-            @click="card.confirm"
-          >
-            {{ t('Подтвердить') }}
-          </button>
-        </div>
-      </div>
-      <div v-else-if="card.actions.value.length > 0 || card.editable.value" class="request-panel__buttons">
+      <!-- действия по заявке; причина — во всплывающем окне -->
+      <div v-if="actions.length > 0 || card.editable.value" class="request-panel__buttons">
         <button
-          v-for="a in card.actions.value"
+          v-for="a in actions"
           :key="a.action"
           type="button"
-          class="request-panel__btn"
+          class="request-panel__btn q-py-none q-px-md"
           :class="`request-panel__btn--${a.kind}`"
           :disabled="card.blocked.value"
-          @click="card.start(a.action)"
+          @click="onAction(a.action)"
         >
           {{ a.title }}
         </button>
         <button
           v-if="card.editable.value"
           type="button"
-          class="request-panel__btn"
+          class="request-panel__btn q-py-none q-px-md"
           :title="card.editHint.value"
           @click="edit"
         >
           {{ t('Исправить') }}
         </button>
       </div>
-      <ErrorBox v-if="card.error.value" :error="card.error.value" class="request-panel__error" />
+      <ErrorBox v-if="card.error.value" :error="card.error.value" class="request-panel__error q-py-sm q-px-md" />
 
       <SidePanelFields>
         <span>{{ t('Вагон') }}</span>
         <span>
-          <span class="zs-mono">{{ r.wagonNumber }}</span> • {{ dictManager.getValue('WagonType', r.wagonType) }}
+          <span class="zs-mono">{{ r.wagon.number }}</span> • {{ dictManager.getValue('WagonType', r.wagon.wagonType) }}
           <span v-if="r.locationType" class="zs-sub request-panel__block">{{
-            placeText(r.locationType, r.place, r.wagonTripName)
+            placeText(r.locationType, r.place, r.wagonTrip ? tripRefText(r.wagonTrip) : null)
           }}</span>
         </span>
         <span>{{ t('Рейс') }}</span>
-        <span>{{ r.trip?.name ?? '—' }}</span>
+        <span>{{ r.trip ? tripRefDatedText(r.trip) : '—' }}</span>
         <span>{{ t('Служба') }}</span>
         <span>{{ dictManager.getValue('Service', r.service) }}</span>
         <span>{{ t('Автор') }}</span>
         <span>{{ r.createdByUsr.name }}</span>
+        <template v-if="receivedLate(r.createdDt, r.receivedDt)">
+          <span>{{ t('Поступила на сервер') }}</span>
+          <span>{{ formatDateTime(r.receivedDt) }}</span>
+        </template>
         <span>{{ t('Исполнитель') }}</span>
         <span>
-          <CbList
-            v-if="card.assignable.value"
-            :model-value="r.executorUsr?.id ?? null"
-            single
-            placeholder="Не назначен"
-            :values="staffChoices"
-            class="request-panel__executor"
-            @update:model-value="onAssign"
-          />
-          <template v-else>{{ r.executorUsr?.name ?? t('не назначен') }}</template>
+          {{ r.executorUsr?.name ?? t('не назначен') }}
+          <SoftLink v-if="card.assignable.value" text="Назначить" class="q-ml-sm" @click="assign" />
         </span>
       </SidePanelFields>
 
-      <div v-if="r.description" class="request-panel__desc">{{ r.description }}</div>
-      <PhotoStrip v-if="r.photos.length > 0" :photos="r.photos" />
+      <TextPhotos
+        v-if="r.description || tree.photos.length > 0"
+        :photos="tree.photos"
+        :caption="{ meta: `${r.number} • ${formatDateTime(r.createdDt)}`, text: r.description }"
+      >
+        <div class="request-panel__desc">{{ r.description }}</div>
+      </TextPhotos>
 
       <div class="request-panel__section">
         <div class="request-panel__section-head">
           <span class="request-panel__section-title">{{ t('История') }}</span>
-          <SoftLink v-if="!noteOpen" text="Добавить пояснение" @click="noteOpen = true" />
+          <SoftLink text="Добавить примечание" :disabled="card.blocked.value" @click="addNote" />
         </div>
-        <div v-if="noteOpen" class="request-panel__comment">
-          <textarea v-model="noteText" class="request-panel__textarea" rows="3" :placeholder="t('Текст пояснения')" />
-          <PhotoPicker v-model="notePhotos" />
-          <div class="request-panel__buttons">
-            <button type="button" class="request-panel__btn" @click="closeNote">{{ t('Отмена') }}</button>
-            <button
-              type="button"
-              class="request-panel__btn request-panel__btn--primary"
-              :disabled="(!noteText.trim() && notePhotos.length === 0) || card.running.value"
-              @click="saveNote"
-            >
-              {{ t('Добавить') }}
-            </button>
-          </div>
-        </div>
-        <RequestHistory :events="r.events" :status="r.requestStatusType" />
+        <RequestHistory :nodes="tree.nodes" :status="r.requestStatusType" />
       </div>
     </template>
   </SidePanel>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, watch } from 'vue'
+import { computed, toRef } from 'vue'
 
-import type { RepairRequest } from '@/api/requests'
+import type { RepairRequest, RequestAction } from '@/api/requests'
 import { t } from '@/boot/i18n'
-import CbList from '@/shared/components/choice/CbList.vue'
-import type { ChoiceModel } from '@/shared/components/choice/choice'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import { provideBusy } from '@/shared/busy'
@@ -145,19 +105,24 @@ import SoftLink from '@/shared/components/form/SoftLink.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { placeText } from '@/shared/wagonPlace'
 import { formatDateTime } from '@/shared/format'
-import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
-import PhotoStrip from '@/shared/requests/PhotoStrip.vue'
+import TextPhotos from '@/shared/requests/TextPhotos.vue'
+import { historyTree } from '@/shared/requests/historyTree'
 import RequestHistory from '@/shared/requests/RequestHistory.vue'
-import RequestSteps from '@/shared/requests/RequestSteps.vue'
-import { faultName, nextText, severityStyle } from '@/shared/requests/requestView'
+import { faultName, receivedLate, severityStyle } from '@/shared/requests/requestView'
+import { ACTIONS } from '@/shared/requests/rights'
 import { useRequestCard } from '@/shared/requests/useRequestCard'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import RequestDialog from './RequestDialog.vue'
+import { tripRefDatedText, tripRefText } from '@/shared/trips/tripRefText'
+import RequestAssignDialog from './RequestAssignDialog.vue'
+import RequestTextDialog from './RequestTextDialog.vue'
+import TakeForeignDialog from './TakeForeignDialog.vue'
 
 /**
- * Правая панель списка заявок: карточка выбранной заявки — статус, путь заявки, что дальше, кнопки действий по правам
- * пользователя, атрибуты, исполнитель (мастер депо выбирает его здесь), описание, фото, история и пояснения.
+ * Правая панель списка заявок: карточка выбранной заявки — статус, кнопки действий по правам пользователя, атрибуты,
+ * исполнитель, описание, фото, история и примечания. Всё, что вводится (причина действия, примечание, исполнитель), —
+ * во всплывающих окнах, в самой панели форм нет.
  * После изменения заявки в шину уходит requests-refresh — список за панелью загружается заново.
  */
 const props = defineProps<{ requestId: number | null }>()
@@ -167,38 +132,63 @@ const emit = defineEmits<{ close: [] }>()
 // правая панель — свой фрейм: своё ожидание, спиннер на месте карточки
 const busy = provideBusy()
 const card = useRequestCard(toRef(props, 'requestId'), false, busy)
+
+// история и фото — из плоских списков сервера
+const tree = computed(() => historyTree(card.request.value, [], card.request.value?.createdDt ?? null))
+
+// ТОР (отцепка вагона) на десктопе из карточки не выполняется
+const actions = computed(() => card.actions.value.filter((a) => a.action !== 'DETACH'))
+
+/**
+ * Действие по кнопке: взять в работу чужую заявку — после подтверждения; действие с причиной — после ввода причины
+ * (и фото, где можно) во всплывающем окне.
+ */
+async function onAction(action: RequestAction) {
+  const name = card.foreignExecutor.value
+  if (action === 'TAKE' && name && !(await openDialog(TakeForeignDialog, { name }))) return
+  const def = ACTIONS[action]
+  if (!def.comment) {
+    card.start(action)
+    return
+  }
+  const result = await openDialog<{ text: string; photos: Blob[] }>(RequestTextDialog, {
+    title: def.title,
+    placeholder: def.comment,
+    okText: 'Подтвердить',
+    photos: !!def.photos,
+    required: true,
+  })
+  if (!result) return
+  card.start(action)
+  card.comment.value = result.text
+  card.actionPhotos.value = result.photos
+  await card.confirm()
+}
+
 const r = computed(() => card.request.value)
 
-// исполнитель — из сотрудников службы заявки; текущий исполнитель есть в списке, даже если он из другой службы
-const staffChoices = computed(() => {
-  const list = card.staff.value.map((u) => ({ id: u.id, text: u.name }))
-  const current = r.value?.executorUsr
-  return current && !list.some((c) => c.id === current.id) ? [{ id: current.id, text: current.name }, ...list] : list
-})
-
-async function onAssign(value: ChoiceModel) {
-  await card.assign(typeof value === 'number' ? value : null)
+// исполнитель — во всплывающем окне, из сотрудников службы заявки
+async function assign() {
+  const result = await openDialog<{ executor: number | null }>(RequestAssignDialog, {
+    current: r.value?.executorUsr ?? null,
+    load: async () => {
+      await card.loadStaff()
+      return card.staff.value
+    },
+  })
+  if (result) await card.assign(result.executor)
 }
 
-// пояснение к заявке: текст и фото
-const noteOpen = ref(false)
-const noteText = ref('')
-const notePhotos = ref<Blob[]>([])
-
-function closeNote() {
-  noteOpen.value = false
-  noteText.value = ''
-  notePhotos.value = []
+// примечание к заявке: текст и фото — во всплывающем окне
+async function addNote() {
+  const result = await openDialog<{ text: string; photos: Blob[] }>(RequestTextDialog, {
+    title: 'Примечание к заявке',
+    placeholder: 'Текст примечания',
+    okText: 'Добавить',
+    photos: true,
+  })
+  if (result) await card.addNote(result.text, result.photos)
 }
-
-async function saveNote() {
-  if (await card.addNote(noteText.value, notePhotos.value)) closeNote()
-}
-
-watch(
-  () => props.requestId,
-  () => closeNote(),
-)
 
 async function edit() {
   if (!r.value) return
@@ -209,11 +199,10 @@ async function edit() {
 
 <style scoped lang="scss">
 .request-panel__tor {
-  padding: 0.625rem 0.875rem;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fbe1de;
   color: $zs-error-fg;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
@@ -221,36 +210,20 @@ async function edit() {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 0.8125rem;
+  gap: 0.8rem;
+  font-size: 0.8rem;
 }
 
 .request-panel__mark {
   color: $zs-text-muted;
 }
 
-.request-panel__next {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.75rem 0.875rem;
-  border-radius: 0.25rem;
-  background: $zs-row-selected-bg;
-  font-size: 0.875rem;
-}
-
-.request-panel__next-title,
 .request-panel__section-title {
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-}
-
-.request-panel__next-title {
-  // отступ под подписью группы — на треть меньше промежутка между блоками (0.25rem)
-  margin-bottom: calc(-0.25rem / 3);
 }
 
 .request-panel__buttons {
@@ -261,13 +234,12 @@ async function edit() {
 
 .request-panel__btn {
   height: var(--zs-control-height);
-  padding: 0 0.875rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -304,53 +276,23 @@ async function edit() {
   }
 }
 
-.request-panel__comment {
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-  padding: 0.75rem;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
-}
 
-.request-panel__comment-title {
-  font-weight: 700;
-}
 
-.request-panel__textarea {
-  padding: 0.5rem 0.625rem;
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.875rem;
-  resize: vertical;
-
-  &:focus {
-    border-color: $primary;
-    outline: none;
-    box-shadow: 0 0 0 0.0625rem $primary;
-  }
-}
 
 .request-panel__error {
-  padding: 0.625rem 0.875rem;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: $zs-error-bg;
   color: $zs-error-fg;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 }
 
 .request-panel__block {
   display: block;
 }
 
-.request-panel__executor {
-  width: 100%;
-}
 
 .request-panel__desc {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   line-height: 1.45;
   white-space: pre-line;
 }
@@ -358,12 +300,12 @@ async function edit() {
 .request-panel__section {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.8rem;
 }
 
 .request-panel__section-head {
-  // отступ под подписью группы — на треть меньше промежутка между блоками (0.75rem)
-  margin-bottom: calc(-0.75rem / 3);
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.8rem)
+  margin-bottom: calc(-0.8rem / 3);
   display: flex;
   align-items: center;
   justify-content: space-between;

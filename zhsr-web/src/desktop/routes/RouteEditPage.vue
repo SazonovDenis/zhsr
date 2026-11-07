@@ -25,7 +25,7 @@
       <div class="route-edit__columns">
         <div class="route-edit__column">
           <div class="route-edit__section-title">{{ t('Остановки по порядку') }}</div>
-          <div class="route-edit__card">
+          <div class="route-edit__card q-pa-md">
             <RouteStopsEditor v-model="stops" />
           </div>
           <div class="route-edit__note">
@@ -39,7 +39,7 @@
 
         <div class="route-edit__column">
           <div class="route-edit__section-title">{{ t('Атрибуты') }}</div>
-          <div class="route-edit__card route-edit__form">
+          <div class="route-edit__card route-edit__form q-pa-md">
             <FormSection columns="7rem minmax(0, 1fr)">
               <FormField label="Номер поезда">
                 <TextInput v-model="form.train" mono />
@@ -93,7 +93,7 @@
               </FormField>
             </FormSection>
 
-            <ErrorBox v-if="error" :error="error" class="route-edit__error" />
+            <ErrorBox v-if="error" :error="error" class="route-edit__error q-py-sm q-px-md" />
           </div>
           <div class="route-edit__save">
             <q-btn
@@ -112,7 +112,7 @@
 
     <!-- главное показывающее страницы — место маршрута: общий спиннер на всю цепочку, ошибка загрузки -->
     <LoadSpinner v-else-if="busy.active.value" />
-    <ErrorBox v-else-if="loadError" :error="loadError" :retry="init" class="route-edit__load-error" />
+    <ErrorBox v-else-if="loadError" :error="loadError" :retry="init" class="route-edit__load-error q-ma-md" />
   </DesktopFrame>
 </template>
 
@@ -401,7 +401,7 @@ void init()
 
 <style scoped lang="scss">
 .route-edit__h1 {
-  font-size: 1.25rem;
+  font-size: 1.3rem;
 }
 
 .route-edit__chain {
@@ -409,8 +409,8 @@ void init()
   align-items: flex-start;
   gap: 1rem;
   margin-bottom: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.25rem;
+  padding: 0.8rem 1rem;
+  border-radius: 0.3rem;
   background: #fff;
 }
 
@@ -426,7 +426,7 @@ void init()
   flex: none;
   align-self: stretch;
   width: 12rem;
-  margin: -0.75rem 0 -0.75rem -1rem;
+  margin: -0.8rem 0 -0.8rem -1rem;
 }
 
 .route-edit__map--wide {
@@ -436,31 +436,30 @@ void init()
 .route-edit__columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(21.3rem, 1fr));
-  gap: 1.25rem;
+  gap: 1.3rem;
   align-items: start;
 }
 
 .route-edit__column {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.8rem;
   min-width: 0;
 }
 
 .route-edit__section-title {
-  // отступ под подписью группы — на треть меньше промежутка между блоками (0.75rem)
-  margin-bottom: calc(-0.75rem / 3);
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.8rem)
+  margin-bottom: calc(-0.8rem / 3);
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .route-edit__card {
-  padding: 0.75rem 0.875rem;
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
 }
 
@@ -468,7 +467,6 @@ void init()
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 1rem 1.125rem;
 }
 
 .route-edit__kind {
@@ -477,21 +475,20 @@ void init()
 
 .route-edit__hint {
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .route-edit__note {
   color: $zs-text-muted;
-  font-size: 0.78125rem;
+  font-size: 0.8rem;
   line-height: 1.45;
 }
 
 .route-edit__error {
-  padding: 0.625rem 0.875rem;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #f7dcd8;
   color: $zs-error-fg;
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
 }
 
 .route-edit__save {
@@ -502,9 +499,5 @@ void init()
 .route-edit__save-btn {
   min-height: var(--zs-control-height);
   font-weight: 600;
-}
-
-.route-edit__load-error {
-  margin: 1rem;
 }
 </style>

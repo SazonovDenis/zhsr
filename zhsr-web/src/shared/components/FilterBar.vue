@@ -1,7 +1,7 @@
 <template>
-  <div class="filter-bar">
+  <div class="filter-bar q-mb-md">
     <slot />
-    <span v-if="$slots.right" class="filter-bar__right"><slot name="right" /></span>
+    <span v-if="$slots.right" class="filter-bar__right q-ml-auto"><slot name="right" /></span>
   </div>
 </template>
 
@@ -19,14 +19,12 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.875rem;
+  gap: 0.8rem;
 }
 
 .filter-bar__right {
-  margin-left: auto;
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

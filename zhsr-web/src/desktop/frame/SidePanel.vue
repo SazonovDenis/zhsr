@@ -1,9 +1,9 @@
 <template>
   <div class="side-panel">
-    <div v-if="empty" class="side-panel__empty">{{ t(empty) }}</div>
+    <div v-if="empty" class="side-panel__empty q-pa-lg">{{ t(empty) }}</div>
 
     <template v-else>
-      <div class="side-panel__header">
+      <div class="side-panel__header q-pt-lg q-px-lg q-pb-md">
         <div class="side-panel__titles">
           <div class="side-panel__title">{{ title }}</div>
           <div v-if="subtitle" class="side-panel__subtitle">{{ subtitle }}</div>
@@ -13,7 +13,7 @@
         </button>
       </div>
 
-      <div class="side-panel__body" :class="{ 'side-panel__body--fixed': !scroll }">
+      <div class="side-panel__body q-py-md q-px-lg" :class="{ 'side-panel__body--fixed': !scroll }">
         <slot />
       </div>
     </template>
@@ -55,17 +55,15 @@ const emit = defineEmits<{ close: [] }>()
 }
 
 .side-panel__empty {
-  padding: 2rem 1.5rem;
   color: $zs-text-muted;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 
 // шапка — своим цветом из палитры таблицы (quasar.variables.scss): в варианте А — цветом выбранной строки
 .side-panel__header {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 1.25rem 1.5rem 1rem;
+  gap: 0.8rem;
   background: $zs-panel-head-bg;
 }
 
@@ -73,17 +71,17 @@ const emit = defineEmits<{ close: [] }>()
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.4rem;
   min-width: 0;
 }
 
 .side-panel__title {
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   font-weight: 700;
 }
 
 .side-panel__subtitle {
-  font-size: 0.9375rem;
+  font-size: 0.9rem;
   line-height: 1.35;
 }
 
@@ -92,9 +90,9 @@ const emit = defineEmits<{ close: [] }>()
   width: 2rem;
   height: 2rem;
   border: 0;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: $zs-panel-close-bg;
-  font-size: 0.9375rem;
+  font-size: 0.9rem;
   cursor: pointer;
 }
 
@@ -102,9 +100,8 @@ const emit = defineEmits<{ close: [] }>()
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 1.375rem;
+  gap: 1.4rem;
   min-height: 0;
-  padding: 1.125rem 1.5rem;
   overflow-y: auto;
 
   &--fixed {

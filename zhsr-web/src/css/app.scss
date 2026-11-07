@@ -5,11 +5,15 @@
 // кнопки в одном ряду берут высоту отсюда, поэтому всегда одного роста.
 :root {
   --zs-control-height: 2.3rem;
+  // цифры дня в календаре Quasar (q-date рисует день кнопкой q-btn: 14px) и цифры барабанов времени — одного размера
+  --zs-calendar-font-size: 0.9rem;
+  // цвет заголовка: левое меню десктопа, верхняя строка телефона и выделенный пункт нижнего меню
+  --zs-header-bg: #{$zs-menu-bg};
 }
 
 body {
   font-family: $zs-font;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   color: $zs-text;
   -webkit-font-smoothing: antialiased;
 }
@@ -43,16 +47,16 @@ button {
 
 // второстепенная строка под основным значением: в ячейке таблицы, в поле карточки
 .zs-sub {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: $zs-text-muted;
 }
 
 // плашка состояния: цвета фона и текста задаются через style
 .zs-badge {
   display: inline-block;
-  padding: 0.125rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.78125rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.3rem;
+  font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -62,11 +66,11 @@ button {
   height: var(--zs-control-height);
   padding: 0 1rem;
   border: 0.0625rem solid $primary;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: $primary;
   color: #fff;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -80,6 +84,11 @@ button {
 // Окно выбора даты и периода (PeriodPicker, DatePicker). Не scoped: на телефоне q-popup-proxy подменяет меню на
 // q-dialog, а его обёртки (.q-dialog__inner) рисует сам QDialog вне DOM компонента — scoped-стили до них не достают.
 // Всё ограничено классом .period-picker-popup, который проброшен на q-popup-proxy
+// окно даты на десктопе, пока выбирается его место (у поля или по центру): невидимо, но размеры у него уже есть
+.period-picker-popup--placing {
+  visibility: hidden !important;
+}
+
 .period-picker-popup .q-dialog__inner--minimized {
   padding: 0;
 }
@@ -97,18 +106,26 @@ button {
   border-radius: 0;
 }
 
-// Выбранный день в календарях окна дат и периодов — тем же фоном, что и выбранное значение в переключателях
-// (bg-selected), и голубой рамкой, как у выбранной кнопки CbButton: обводка сегодняшнего дня (q-date__today) иначе
-// рисовалась бы цветом текста, чёрным. q-date рисует день кнопкой цвета color (по умолчанию primary) сам, классы на
-// неё не поставить
-.period-picker-popup .q-date__calendar-item .q-btn.bg-primary {
+// цифры дня в календарях DateCalendar — размером из общей переменной (её же берут барабаны времени)
+.date-calendar .q-date__calendar-item .q-btn {
+  font-size: var(--zs-calendar-font-size);
+}
+
+// Выбранный день в календарях окна дат и периодов и во всех календарях DateCalendar — тем же фоном, что и выбранное
+// значение в переключателях (bg-selected), и голубой рамкой, как у выбранной кнопки CbButton: обводка сегодняшнего
+// дня (q-date__today) иначе рисовалась бы цветом текста, чёрным. q-date рисует день кнопкой цвета color (по умолчанию
+// primary) сам, классы на неё не поставить
+.period-picker-popup .q-date__calendar-item .q-btn.bg-primary,
+.date-calendar .q-date__calendar-item .q-btn.bg-primary {
   background: $zs-selected-bg !important;
   color: $zs-selected-fg !important;
   box-shadow: inset 0 0 0 0.0625rem $zs-selected-border;
 }
 
-// Сегодняшний день в календарях окна дат и периодов — жирным, без кружка-обводки Quasar
-.period-picker-popup .q-date__today {
+// Сегодняшний день в календарях окна дат и периодов и во всех календарях DateCalendar — жирным, без кружка-обводки
+// Quasar
+.period-picker-popup .q-date__today,
+.date-calendar .q-date__today {
   box-shadow: none;
   font-weight: 700;
 }
@@ -124,12 +141,12 @@ button {
 }
 
 .q-notification.zs-error-notify {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   cursor: pointer;
 
   .q-notification__caption {
     font-family: $zs-font-mono;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     opacity: 0.65;
   }
 }

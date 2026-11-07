@@ -1,5 +1,5 @@
 <template>
-  <div class="dialog-header">
+  <div class="dialog-header q-py-md q-px-lg">
     <template v-for="(action, index) in leftActions" :key="index">
       <q-btn flat dense no-caps :icon="action.icon" :label="action.title && t(action.title)" @click="run(action)" />
     </template>
@@ -51,14 +51,13 @@ function run(action: DialogAction) {
 .dialog-header {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  padding: 1.125rem 1.375rem 0.875rem;
+  gap: 0.6rem;
   border-bottom: 0.0625rem solid $zs-border;
 }
 
 .dialog-header__title {
   flex: 1;
-  font-size: 1.0625rem;
+  font-size: 1.1rem;
   font-weight: 700;
 }
 
@@ -66,7 +65,7 @@ function run(action: DialogAction) {
   width: 1.9rem;
   height: 1.9rem;
   border: 0;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: $zs-bg-button-soft;
   cursor: pointer;
 }

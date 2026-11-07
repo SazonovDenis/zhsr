@@ -1,9 +1,14 @@
 <template>
-  <q-spinner v-if="source.loading" color="primary" size="1.25rem" class="choice-source-state__spinner" />
+  <q-spinner
+    v-if="source.loading"
+    color="primary"
+    size="1.3rem"
+    class="choice-source-state__spinner q-my-none q-mx-sm"
+  />
   <button
     v-else-if="source.error"
     type="button"
-    class="choice-source-state__error zs-focusable"
+    class="choice-source-state__error zs-focusable q-pa-none"
     :title="t('Загрузить заново')"
     @click="source.retry()"
   >
@@ -24,12 +29,7 @@ defineProps<{ source: Loadable }>()
 </script>
 
 <style scoped lang="scss">
-.choice-source-state__spinner {
-  margin: 0 0.5rem;
-}
-
 .choice-source-state__error {
-  padding: 0;
   border: 0;
   background: none;
   font: inherit;

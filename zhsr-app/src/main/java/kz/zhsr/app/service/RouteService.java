@@ -1,19 +1,21 @@
 package kz.zhsr.app.service;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtDb;
 import kz.kis.kisdbtools.repository.Db;
+import kz.kis.kisdbtools.repository.DbRecMapper;
 import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.constants.RouteKind;
 import kz.zhsr.app.constants.TransportType;
-import kz.zhsr.app.dto.NextStation;
-import kz.zhsr.app.dto.RecalcStops;
-import kz.zhsr.app.dto.Route;
-import kz.zhsr.app.dto.RouteDraft;
-import kz.zhsr.app.dto.RoutePoint;
-import kz.zhsr.app.dto.RouteSave;
-import kz.zhsr.app.dto.RouteStop;
+import kz.zhsr.app.dto.route.NextStation;
+import kz.zhsr.app.dto.route.RecalcStops;
+import kz.zhsr.app.dto.route.Route;
+import kz.zhsr.app.dto.route.RouteDraft;
+import kz.zhsr.app.dto.route.RoutePoint;
+import kz.zhsr.app.dto.route.RouteSave;
+import kz.zhsr.app.dto.route.RouteStop;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,18 +59,12 @@ public class RouteService {
      * @throws ApiException 404 - маршрута нет
      */
     public Route route(long id) throws Exception {
-        DbRec route = db.loadRec("route", id);
+        Route route = db.loadRec("route", id, Route.class);
         if (route == null) {
             throw ApiException.notFound("Маршрут не найден");
         }
-        List<RoutePoint> points = stations(List.of(id)).getOrDefault(id, List.of()).stream()
-                .map(rs -> new RoutePoint(rs.getLong("station"), rs.getInt("km"), rs.getBoolean("have_stop"),
-                        rs.getInt("run_duration"), rs.getInt("stop_duration")))
-                .toList();
-        return new Route(route.getLong("id"), route.getString("train_number"), route.getString("name"),
-                route.getInt("route_kind"), route.getLong("transport_type"), localDate(route, "dbeg"),
-                localDate(route, "dend"), route.getInt("duration"), integer(route, "conductor_hours"),
-                integer(route, "lnp_hours"), integer(route, "pem_hours"), points);
+        route.setPoints(DbRecMapper.toList(stations(List.of(id)).getOrDefault(id, List.of()), RoutePoint.class));
+        return route;
     }
 
     /**
@@ -159,8 +155,9 @@ public class RouteService {
         db.deleteRec("route_station", Map.of("route", id));
         int seq = 1;
         for (RoutePoint p : points) {
-            db.insertRec("route_station", Map.of("route", id, "seq", seq++, "station", p.station(), "km", p.km(),
-                    "have_stop", p.haveStop(), "run_duration", p.runDuration(), "stop_duration", p.stopDuration()));
+            db.insertRec("route_station", Map.of("route", id, "seq", seq++, "station", p.getStation(), "km", p.getKm(),
+                    "have_stop", p.isHaveStop(), "run_duration", p.getRunDuration(),
+                    "stop_duration", p.getStopDuration()));
         }
         return route(id);
     }
@@ -215,13 +212,11 @@ public class RouteService {
      * @return по id маршрута - его станции по порядку (seq); у маршрута без станций записи в карте нет
      */
     public Map<Long, List<DbRec>> stations(Collection<Long> routes) throws Exception {
-        Map<Long, List<DbRec>> res = new HashMap<>();
         if (routes.isEmpty()) {
-            return res;
+            return Map.of();
         }
-        for (DbRec rs : db.loadList("route_station", Map.of("route", routes))) {
-            res.computeIfAbsent(rs.getLong("route"), k -> new ArrayList<>()).add(rs);
-        }
+        Map<Long, List<DbRec>> res = UtDb.collectGroupBy_records(
+                db.loadList("route_station", Map.of("route", routes)), "route");
         for (List<DbRec> list : res.values()) {
             list.sort(Comparator.comparingInt(rs -> rs.getInt("seq")));
         }
@@ -254,14 +249,14 @@ public class RouteService {
      * @throws ApiException 400 - путь не проходит проверки
      */
     private List<RoutePoint> buildPath(List<RoutePoint> input) throws Exception {
-        if (input.stream().filter(RoutePoint::haveStop).count() < 2) {
+        if (input.stream().filter(RoutePoint::isHaveStop).count() < 2) {
             throw ApiException.badRequest("У маршрута должно быть не меньше двух остановок");
         }
         RoutePoint first = input.get(0);
         RoutePoint last = input.get(input.size() - 1);
         RouteNetwork.Graph graph = network.load();
-        if (!first.haveStop() || !last.haveStop() || !graph.hubs().contains(first.station())
-                || !graph.hubs().contains(last.station())) {
+        if (!first.isHaveStop() || !last.isHaveStop() || !graph.hubs().contains(first.getStation())
+                || !graph.hubs().contains(last.getStation())) {
             throw ApiException.badRequest("Начальная и конечная станции маршрута - только узловые");
         }
 
@@ -272,17 +267,17 @@ public class RouteService {
         for (int i = 0; i < input.size(); i++) {
             RoutePoint p = input.get(i);
             if (i == 0) {
-                path.add(new RoutePoint(p.station(), 0, true, 0, 0));
+                path.add(new RoutePoint(p.getStation(), 0, true, 0, 0));
                 added.add(false);
                 continue;
             }
-            long prev = input.get(i - 1).station();
-            if (prev == p.station()) {
+            long prev = input.get(i - 1).getStation();
+            if (prev == p.getStation()) {
                 throw ApiException.badRequest("Одна станция дважды подряд - между ними нужны станции следования");
             }
-            Integer stage = graph.stage(prev, p.station());
+            Integer stage = graph.stage(prev, p.getStation());
             if (stage == null) {
-                RouteNetwork.Path way = graph.paths(prev).get(p.station());
+                RouteNetwork.Path way = graph.paths(prev).get(p.getStation());
                 if (way == null) {
                     throw ApiException.badRequest("Станции маршрута не связаны маршрутной сетью");
                 }
@@ -293,12 +288,12 @@ public class RouteService {
                     added.add(true);
                     at = via;
                 }
-                stage = graph.stage(at, p.station());
+                stage = graph.stage(at, p.getStation());
             }
             km += stage;
             boolean lastPoint = i == input.size() - 1;
-            int stopDuration = p.haveStop() && !lastPoint ? p.stopDuration() : 0;
-            path.add(new RoutePoint(p.station(), km, p.haveStop(), p.runDuration(), stopDuration));
+            int stopDuration = p.isHaveStop() && !lastPoint ? p.getStopDuration() : 0;
+            path.add(new RoutePoint(p.getStation(), km, p.isHaveStop(), p.getRunDuration(), stopDuration));
             added.add(false);
         }
         return spreadRunDuration(path, added);
@@ -312,28 +307,28 @@ public class RouteService {
         List<RoutePoint> res = new ArrayList<>(path);
         int start = 0;
         for (int i = 1; i < path.size(); i++) {
-            if (!path.get(i).haveStop()) {
+            if (!path.get(i).isHaveStop()) {
                 continue;
             }
             boolean hasAdded = false;
             int total = 0;
             for (int j = start + 1; j <= i; j++) {
                 hasAdded |= added.get(j);
-                total += path.get(j).runDuration();
+                total += path.get(j).getRunDuration();
             }
             if (hasAdded) {
-                int length = path.get(i).km() - path.get(start).km();
+                int length = path.get(i).getKm() - path.get(start).getKm();
                 int used = 0;
                 for (int j = start + 1; j < i; j++) {
                     RoutePoint p = path.get(j);
-                    int segment = p.km() - path.get(j - 1).km();
+                    int segment = p.getKm() - path.get(j - 1).getKm();
                     int run = length > 0 ? Math.round((float) total * segment / length) : 0;
                     used += run;
-                    res.set(j, new RoutePoint(p.station(), p.km(), false, run, 0));
+                    res.set(j, new RoutePoint(p.getStation(), p.getKm(), false, run, 0));
                 }
                 RoutePoint stop = path.get(i);
-                res.set(i, new RoutePoint(stop.station(), stop.km(), true, Math.max(0, total - used),
-                        stop.stopDuration()));
+                res.set(i, new RoutePoint(stop.getStation(), stop.getKm(), true, Math.max(0, total - used),
+                        stop.getStopDuration()));
             }
             start = i;
         }
@@ -361,35 +356,33 @@ public class RouteService {
      * Сообщение из названий остановок через тире (station.name).
      */
     private String stopNames(List<RoutePoint> points) throws Exception {
-        List<Long> stops = points.stream().filter(RoutePoint::haveStop).map(RoutePoint::station).toList();
-        Map<Long, String> names = new HashMap<>();
-        for (DbRec s : db.loadList("station", Map.of("id", new HashSet<>(stops)))) {
-            names.put(s.getLong("id"), s.getString("name"));
-        }
-        return String.join(" — ", stops.stream().map(names::get).toList());
+        List<Long> stops = points.stream().filter(RoutePoint::isHaveStop).map(RoutePoint::getStation).toList();
+        Map<Long, Object> names = UtDb.flatLong(
+                db.loadList("station", Map.of("id", new HashSet<>(stops))), "id", "name");
+        return String.join(" — ", stops.stream().map(s -> (String) names.get(s)).toList());
     }
 
     /**
      * Атрибуты и остановки маршрута не изменились - изменилась разве что дата окончания.
      */
     private static boolean sameRoute(Route r, RouteSave body) {
-        return Objects.equals(trim(body.trainNumber()), r.trainNumber())
-                && Objects.equals(trim(body.name()), r.name())
-                && Objects.equals(body.routeKind(), r.routeKind())
-                && Objects.equals(body.dbeg(), r.dbeg())
-                && Objects.equals(body.duration(), r.duration())
-                && Objects.equals(body.conductorHours(), r.conductorHours())
-                && Objects.equals(body.lnpHours(), r.lnpHours())
-                && Objects.equals(body.pemHours(), r.pemHours())
-                && stopsOf(body.points()).equals(stopsOf(r.points()));
+        return Objects.equals(trim(body.trainNumber()), r.getTrainNumber())
+                && Objects.equals(trim(body.name()), r.getName())
+                && Objects.equals(body.routeKind(), r.getRouteKind())
+                && Objects.equals(body.dbeg(), r.getDbeg())
+                && Objects.equals(body.duration(), r.getDuration())
+                && Objects.equals(body.conductorHours(), r.getConductorHours())
+                && Objects.equals(body.lnpHours(), r.getLnpHours())
+                && Objects.equals(body.pemHours(), r.getPemHours())
+                && stopsOf(body.points()).equals(stopsOf(r.getPoints()));
     }
 
     /**
      * Остановки по порядку: станция, время в пути и стоянка - для сравнения маршрутов.
      */
     private static List<List<Long>> stopsOf(List<RoutePoint> points) {
-        return points.stream().filter(RoutePoint::haveStop)
-                .map(p -> List.of(p.station(), (long) p.stopDuration())).toList();
+        return points.stream().filter(RoutePoint::isHaveStop)
+                .map(p -> List.of(p.getStation(), (long) p.getStopDuration())).toList();
     }
 
     /**
@@ -416,10 +409,6 @@ public class RouteService {
 
     static LocalDate localDate(DbRec r, String field) {
         return r.get(field) instanceof LocalDate d ? d : null;
-    }
-
-    static Integer integer(DbRec r, String field) {
-        return r.get(field) instanceof Number n ? n.intValue() : null;
     }
 
 }

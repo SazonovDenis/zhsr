@@ -24,7 +24,7 @@
         >
           <!-- строка выбора: станция, под ней станции следования по пути, справа — расстояние от предыдущей остановки -->
           <template #option="{ item }">
-            <span class="stops-editor__option">
+            <span class="stops-editor__option q-pa-none">
               <span class="stops-editor__option-text">
                 <span>{{ item.text }}</span>
                 <span v-if="viaText(item)" class="stops-editor__via">{{ viaText(item) }}</span>
@@ -66,7 +66,7 @@
           </button>
           <button
             type="button"
-            class="stops-editor__insert"
+            class="stops-editor__insert q-py-none q-px-sm"
             :title="t('Добавить станцию после этой')"
             @click="insert(index)"
           >
@@ -76,11 +76,11 @@
       </template>
     </div>
 
-    <button v-if="stops.length === 0" type="button" class="stops-editor__insert" @click="insert(-1)">
+    <button v-if="stops.length === 0" type="button" class="stops-editor__insert q-py-none q-px-sm" @click="insert(-1)">
       {{ t('+ Начальная станция') }}
     </button>
 
-    <div v-if="problem" class="stops-editor__problem">{{ problem }}</div>
+    <div v-if="problem" class="stops-editor__problem q-pl-lg">{{ problem }}</div>
   </div>
 </template>
 
@@ -239,7 +239,7 @@ function remove(index: number) {
 
 .stops-editor__head {
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 500;
 }
 
@@ -249,7 +249,7 @@ function remove(index: number) {
 
 .stops-editor__n {
   color: $zs-text-muted;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -262,7 +262,6 @@ function remove(index: number) {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.125rem 0;
 }
 
 .stops-editor__option-text {
@@ -273,12 +272,12 @@ function remove(index: number) {
 
 .stops-editor__via {
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .stops-editor__km {
   color: $zs-text-muted;
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
@@ -294,7 +293,7 @@ function remove(index: number) {
   flex: none;
   height: var(--zs-control-height);
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
   font: inherit;
   cursor: pointer;
@@ -312,9 +311,8 @@ function remove(index: number) {
 
 .stops-editor__insert {
   align-self: flex-start;
-  padding: 0 0.625rem;
   color: $primary;
-  font-size: 0.84375rem;
+  font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -325,8 +323,7 @@ function remove(index: number) {
 }
 
 .stops-editor__problem {
-  padding-left: 1.8rem;
   color: $zs-text-muted;
-  font-size: 0.78125rem;
+  font-size: 0.8rem;
 }
 </style>

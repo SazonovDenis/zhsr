@@ -5,7 +5,7 @@
 
     <q-menu ref="menu" no-parent-event :auto-close="single" @before-show="onBeforeShow" @show="searchInput?.focus()">
       <div class="cb-more__panel">
-        <div class="cb-more__search">
+        <div class="cb-more__search q-pa-xs">
           <q-input
             ref="searchInput"
             v-model="query"
@@ -49,7 +49,7 @@
           </q-item>
         </q-list>
 
-        <div v-if="!single" class="cb-more__footer">
+        <div v-if="!single" class="cb-more__footer q-pa-xs">
           <q-btn no-caps dense color="primary" class="q-px-md" :label="t('Ок')" @click.stop="hide" />
         </div>
       </div>
@@ -181,14 +181,9 @@ function scrollHighlighted() {
   min-width: 16.7rem;
 }
 
-.cb-more__search {
-  padding: 0.25rem;
-}
-
 .cb-more__footer {
   display: flex;
   justify-content: flex-end;
-  padding: 0.25rem;
   border-top: 0.0625rem solid $zs-border-row;
 }
 

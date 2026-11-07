@@ -5,13 +5,12 @@
       :key="tab.name"
       :to="{ name: tab.name }"
       class="pwa-tabs__tab"
-      :class="{ 'pwa-tabs__tab--active': route.name === tab.name, 'pwa-tabs__tab--new': tab.add }"
+      :class="{ 'pwa-tabs__tab--active': route.name === tab.name }"
     >
       <span class="pwa-tabs__icon">
-        <q-icon v-if="tab.add" name="add" size="1.6rem" />
-        <SvgIcon v-else-if="tab.svg" :name="tab.svg" size="1.25rem" />
-        <q-icon v-else :name="tab.icon" size="1.35rem" />
-        <span v-if="tab.badge" class="pwa-tabs__badge">{{ tab.badge }}</span>
+        <SvgIcon v-if="tab.svg" :name="tab.svg" size="1.3rem" />
+        <q-icon v-else :name="tab.icon" size="1.4rem" />
+        <span v-if="tab.badge" class="pwa-tabs__badge q-py-none q-px-xs">{{ tab.badge }}</span>
       </span>
       <span class="pwa-tabs__label">{{ t(tab.label) }}</span>
     </router-link>
@@ -30,8 +29,7 @@ import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { loadCached } from '@/shared/offline/cache'
 
 /**
- * Нижняя панель вкладок мобильной части: «Сегодня», «Заявки» (число — заявки, ожидающие обработки), «+ Заявка» —
- * подача новой заявки, «Профиль».
+ * Нижняя панель вкладок мобильной части: «Рейс», «Заявки» (число — заявки, ожидающие обработки), «Профиль».
  */
 const route = useRoute()
 
@@ -45,14 +43,11 @@ async function loadState() {
   }
 }
 
-const tabs = computed<{ name: string; label: string; icon?: string; svg?: IconName; add?: boolean; badge?: number }[]>(
-  () => [
-    { name: 'pwa-home', label: 'Сегодня', icon: 'today' },
-    { name: 'pwa-requests', label: 'Заявки', svg: 'requests', badge: requests.value },
-    { name: 'pwa-request-new', label: 'Заявка', add: true },
-    { name: 'pwa-profile', label: 'Профиль', svg: 'user' },
-  ],
-)
+const tabs = computed<{ name: string; label: string; icon?: string; svg?: IconName; badge?: number }[]>(() => [
+  { name: 'pwa-home', label: 'Рейс', icon: 'today' },
+  { name: 'pwa-requests', label: 'Заявки', svg: 'requests', badge: requests.value },
+  { name: 'pwa-profile', label: 'Профиль', svg: 'user' },
+])
 
 const onRefresh = () => void loadState()
 bus.on('state-refresh', onRefresh)
@@ -69,8 +64,7 @@ onMounted(loadState)
 .pwa-tabs {
   display: grid;
   flex: none;
-  grid-template-columns: repeat(4, 1fr);
-  padding: 0.375rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom));
+  grid-template-columns: repeat(3, 1fr);
   border-top: 0.0625rem solid $zs-border;
   background: #fff;
 }
@@ -80,15 +74,18 @@ onMounted(loadState)
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
-  min-height: 3.3rem;
+  gap: 0.1rem;
+  min-height: 3.1rem;
+  padding: 0.3rem 0 calc(0.3rem + env(safe-area-inset-bottom));
   color: $zs-text-muted;
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   font-weight: 500;
   text-decoration: none;
 
+  // выделенный пункт — прямоугольник цвета верхней строки на всю ячейку, без зазоров
   &--active {
-    color: $primary;
+    background: var(--zs-header-bg);
+    color: #fff;
     font-weight: 700;
   }
 }
@@ -100,33 +97,19 @@ onMounted(loadState)
   justify-content: center;
   width: 1.6rem;
   height: 1.6rem;
-  border-radius: 0.375rem;
-
-  .pwa-tabs__tab--active & {
-    background: $zs-selected-bg;
-  }
-
-  // «+ Заявка» — крупная кнопка цвета акцента
-  .pwa-tabs__tab--new & {
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 0.5rem;
-    background: $primary;
-    color: #fff;
-  }
+  border-radius: 0.4rem;
 }
 
 .pwa-tabs__badge {
   position: absolute;
-  top: -0.375rem;
-  right: -0.625rem;
+  top: -0.4rem;
+  right: -0.6rem;
   min-width: 1.1rem;
   height: 1.1rem;
-  padding: 0 0.3125rem;
-  border-radius: 0.5625rem;
+  border-radius: 0.6rem;
   background: #c62828;
   color: #fff;
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   font-weight: 700;
   line-height: 1.1rem;
   text-align: center;

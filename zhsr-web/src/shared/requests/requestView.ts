@@ -1,11 +1,12 @@
-import type { RepairRequest, RequestEvent } from '@/api/requests'
+import type { RepairRequest } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { RequestStatus } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
+import type { RequestEvent } from './historyTree'
 
 /**
- * Показ заявки на ремонт — общее для десктопной и мобильной частей: название неисправности, исполнитель, шаги
- * «Подана → В работе → Выполнена → Закрыта», «что дальше» и тексты истории. Все тексты — уже переведённые.
+ * Показ заявки на ремонт — общее для десктопной и мобильной частей: название неисправности, исполнитель и тексты
+ * истории. Все тексты — уже переведённые.
  */
 
 /** Справочники, нужные для показа заявок. */
@@ -32,6 +33,17 @@ export function executorText(r: Omit<RepairRequest, 'id'>): string {
   return r.executorUsr?.name ?? dictManager.getValue('Service', r.service)
 }
 
+/** Текст поверх фото в просмотре: кто и когда — сверху, текст примечания или описание — снизу. */
+export interface PhotoCaption {
+  meta: string
+  text: string
+}
+
+/** Заявка, примечание или фото поступили на сервер более чем через минуту после создания: это показывается. */
+export function receivedLate(created: string, received: string | null | undefined): boolean {
+  return !!received && Math.abs(Date.parse(received) - Date.parse(created)) > 60_000
+}
+
 /** Цвет и насыщенность текста критичности — из справочника Severity. */
 export function severityStyle(severity: number): Record<string, string> {
   const rec = dictManager.getRec('Severity', severity)
@@ -41,54 +53,13 @@ export function severityStyle(severity: number): Record<string, string> {
   }
 }
 
-/** Шаг заявки на пути «Подана → В работе → Выполнена → Закрыта». */
-export interface RequestStep {
-  label: string
-  state: 'done' | 'current' | 'todo'
-}
-
+/** Номер шага заявки на пути «Подана → В работе → Выполнена → Закрыта» по статусу заявки. */
 const STEP_OF: Record<number, number> = {
   [RequestStatus.NEW]: 0,
   [RequestStatus.ASSIGNED]: 0,
   [RequestStatus.IN_PROGRESS]: 1,
   [RequestStatus.DONE]: 2,
   [RequestStatus.CLOSED]: 3,
-}
-
-/** Шаги заявки; queued — заявка ещё в очереди на телефоне: ни один шаг не пройден. */
-export function requestSteps(status: number, queued = false): RequestStep[] {
-  const current = queued ? -1 : (STEP_OF[status] ?? 0)
-  return ['Подана', 'В работе', 'Выполнена', 'Закрыта'].map((label, i) => ({
-    label: t(label),
-    state: i < current || (i === 3 && current === 3) ? 'done' : i === current ? 'current' : 'todo',
-  }))
-}
-
-/** Что будет с заявкой дальше — подсказка под шагами. */
-export function nextText(r: Omit<RepairRequest, 'id'>, queued = false): string {
-  if (queued) return t('Отправится, когда появится связь')
-  const who = executorText(r)
-  switch (r.requestStatusType) {
-    case RequestStatus.NEW:
-    case RequestStatus.ASSIGNED:
-      return t('{who} — взять в работу', { who })
-    case RequestStatus.IN_PROGRESS:
-      return t('{who} выполняет работу', { who })
-    case RequestStatus.DONE:
-      return r.wagonTrip
-        ? t('Проводник вагона или начальник поезда принимает работу')
-        : t('Инструктор поездных бригад или эксплуатационщик депо принимает работу')
-    case RequestStatus.CLOSED:
-      return t('Работа принята, запись внесена в журнал ВУ-8')
-    case RequestStatus.REJECTED:
-      return t('Заявка отклонена')
-    case RequestStatus.DEFERRED:
-      return t('Будет выполнена на следующем ТО')
-    case RequestStatus.CANCELLED:
-      return t('Заявка отменена')
-    default:
-      return ''
-  }
 }
 
 const ACTION_EVENTS: Record<string, string> = {
@@ -113,9 +84,9 @@ export function eventTitle(e: RequestEvent): string {
     case 'STATUS':
       return t(ACTION_EVENTS[e.action ?? ''] ?? 'Статус изменён')
     case 'ASSIGN':
-      return e.executor ? t('Назначен исполнитель: {name}', { name: e.executor.name }) : t('Назначение снято')
+      return t(e.executor ? 'Назначение' : 'Назначение снято')
     case 'NOTE':
-      return t('Пояснение')
+      return t(e.text ? 'Примечание' : 'Приложено фото')
   }
 }
 

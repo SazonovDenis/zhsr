@@ -1,15 +1,15 @@
 package kz.zhsr.app.controller;
 
-import kz.zhsr.app.dto.ListSort;
-import kz.zhsr.app.dto.RouteOption;
-import kz.zhsr.app.dto.RouteFilter;
-import kz.zhsr.app.dto.RouteRow;
-import kz.zhsr.app.dto.TripOption;
-import kz.zhsr.app.dto.TripFilter;
-import kz.zhsr.app.dto.TripRow;
-import kz.zhsr.app.dto.WagonOption;
-import kz.zhsr.app.dto.WagonFilter;
-import kz.zhsr.app.dto.WagonRow;
+import kz.zhsr.app.dto.common.ListSort;
+import kz.zhsr.app.dto.route.RouteFilter;
+import kz.zhsr.app.dto.route.RouteOption;
+import kz.zhsr.app.dto.route.RouteRow;
+import kz.zhsr.app.dto.trip.TripFilter;
+import kz.zhsr.app.dto.trip.TripOption;
+import kz.zhsr.app.dto.trip.TripRow;
+import kz.zhsr.app.dto.wagon.WagonFilter;
+import kz.zhsr.app.dto.wagon.WagonOption;
+import kz.zhsr.app.dto.wagon.WagonRow;
 import kz.zhsr.app.service.ListService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

@@ -1,7 +1,7 @@
 package kz.zhsr.app.service.admin;
 
-import kz.zhsr.app.dto.AdminColumn;
-import kz.zhsr.app.dto.AdminTable;
+import kz.zhsr.app.dto.admin.AdminColumn;
+import kz.zhsr.app.dto.admin.AdminTable;
 import kz.zhsr.app.service.SqlQuery;
 
 import java.util.ArrayList;

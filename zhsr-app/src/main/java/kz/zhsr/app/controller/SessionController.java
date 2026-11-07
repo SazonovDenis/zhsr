@@ -2,10 +2,10 @@ package kz.zhsr.app.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import kz.zhsr.app.dto.ChangePasswordRequest;
-import kz.zhsr.app.dto.CurrentState;
-import kz.zhsr.app.dto.LoginRequest;
-import kz.zhsr.app.dto.UserInfo;
+import kz.zhsr.app.dto.user.ChangePasswordRequest;
+import kz.zhsr.app.dto.user.CurrentState;
+import kz.zhsr.app.dto.user.LoginRequest;
+import kz.zhsr.app.dto.user.UserInfo;
 import kz.zhsr.app.service.SessionService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,14 +25,14 @@ public class SessionController {
     }
 
     @PostMapping("/session/login")
-    public UserInfo login(@RequestBody LoginRequest req,
-                                         HttpServletRequest request, HttpServletResponse response) throws Exception {
-        return sessionService.login(req, request, response);
+    public void login(@RequestBody LoginRequest req,
+                      HttpServletRequest request, HttpServletResponse response) throws Exception {
+        sessionService.login(req, request, response);
     }
 
     @PostMapping("/session/password")
-    public UserInfo changePassword(@RequestBody ChangePasswordRequest req) throws Exception {
-        return sessionService.changePassword(req);
+    public void changePassword(@RequestBody ChangePasswordRequest req) throws Exception {
+        sessionService.changePassword(req);
     }
 
     @PostMapping("/session/logout")
@@ -41,7 +41,7 @@ public class SessionController {
     }
 
     @GetMapping("/getUserInfo")
-    public UserInfo user() {
+    public UserInfo user() throws Exception {
         return sessionService.user();
     }
 

@@ -13,9 +13,12 @@ import java.util.List;
  * @param roles        роли сотрудника по порядку role_type.id; пусто - ролей нет
  * @param depot        депо сотрудника, действующее сейчас (usr_depot); null - депо нет
  * @param depotStation станция депо сотрудника; null - депо нет или у депо не задана станция
- * @param trip         текущий рейс сотрудника; null - сотрудник сейчас не в бригаде рейса
+ * @param trip         текущий рейс сотрудника: выполняется или ближайший к сейчас из последнего выполненного и
+ *                     ближайшего запланированного; null - рейсов нет. По нему считаются права и видимость
  * @param mustChangePassword сотрудник должен сменить пароль (usr.change_password): до смены пароля разрешена только
  *                     смена пароля
+ * @param otherTrip    соседний рейс: второй из последнего выполненного и ближайшего запланированного, его можно
+ *                     показать на телефоне ссылкой; null - нет
  */
 public record CurrentUser(
         long id,
@@ -25,7 +28,8 @@ public record CurrentUser(
         Long depot,
         Long depotStation,
         Trip trip,
-        boolean mustChangePassword
+        boolean mustChangePassword,
+        Trip otherTrip
 ) implements Serializable {
 
     /**
@@ -49,6 +53,11 @@ public record CurrentUser(
      * @param duty      должность сотрудника в бригаде рейса: crew_duty_type.id (константы CrewDuty)
      * @param wagons    вагоны, за которыми закреплён сотрудник в рейсе (trip_crew.wagon); пусто - не закреплён
      * @param wagonNumbers номера этих вагонов, по порядку wagons
+     * @param plannedDt   плановое отправление
+     * @param departedDt  фактическое отправление; null - рейс не отправлен
+     * @param arrivedDt   фактическое прибытие; null - рейс не прибыл
+     * @param departureMarkedDt когда отмечено отправление; null - не отмечено
+     * @param arrivalMarkedDt   когда отмечено прибытие; null - не отмечено
      */
     public record Trip(
             long id,
@@ -59,7 +68,12 @@ public record CurrentUser(
             OffsetDateTime arrival,
             long duty,
             List<Long> wagons,
-            List<String> wagonNumbers
+            List<String> wagonNumbers,
+            OffsetDateTime plannedDt,
+            OffsetDateTime departedDt,
+            OffsetDateTime arrivedDt,
+            OffsetDateTime departureMarkedDt,
+            OffsetDateTime arrivalMarkedDt
     ) implements Serializable {
         public Trip {
             wagons = wagons == null ? List.of() : List.copyOf(wagons);

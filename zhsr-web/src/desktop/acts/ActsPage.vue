@@ -57,7 +57,7 @@
             </template>
           </SidePanelFields>
           <div class="acts__wagons">
-            <div v-for="w in selected.wagons" :key="w.number" class="acts__wagon">
+            <div v-for="w in selected.wagons" :key="w.number" class="acts__wagon q-pa-sm">
               <span class="zs-mono">{{ w.number }}</span>
               <span class="zs-sub">{{ w.withProperty ? t('с имуществом') : t('без имущества') }}</span>
             </div>
@@ -67,7 +67,7 @@
             <button type="button" class="zs-btn-primary" :disabled="running" @click="accept">
               {{ t('Принять вагоны') }}
             </button>
-            <button type="button" class="acts__btn" :disabled="running" @click="reject">
+            <button type="button" class="acts__btn q-py-none q-px-md" :disabled="running" @click="reject">
               {{ t('Отказать в приёме') }}
             </button>
           </div>
@@ -199,16 +199,15 @@ async function reject() {
 <style scoped lang="scss">
 .acts__wagons {
   border: 0.0625rem solid $zs-border;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
 }
 
 .acts__wagon {
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.375rem 0.625rem;
   border-top: 0.0625rem solid $zs-border-row;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
 
   &:first-child {
     border-top: 0;
@@ -223,13 +222,12 @@ async function reject() {
 
 .acts__btn {
   height: var(--zs-control-height);
-  padding: 0 0.875rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
   color: $primary;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
 }

@@ -6,9 +6,10 @@
                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
         objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
 
-    <!-- Заявки на ремонт: заявка, фото, журнал статусов, движение по исполнителям, пояснения -->
+    <!-- Заявки на ремонт: заявка, фото, журнал статусов, движение по исполнителям, примечания -->
 
-    <!-- заявка на ремонт вагона; created_by_usr - автор, created_dt - время подачи;
+    <!-- заявка на ремонт вагона; created_by_usr - автор, created_dt - время создания заявки пользователем;
+         received_dt - время поступления заявки на сервер: заявка, поданная без связи, поступает позже создания;
          number - код компании, год (две цифры), порядковый номер в году -->
     <changeSet id="03-repair-tables-repair_request" author="zhsr">
         <createTable tableName="repair_request">
@@ -26,6 +27,9 @@
                 <constraints nullable="false"/>
             </column>
             <column name="created_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="received_dt" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
             <column name="fault_type" type="bigint">
@@ -57,6 +61,9 @@
                 <constraints nullable="false"/>
             </column>
             <column name="created_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="received_dt" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
         </createTable>
@@ -129,7 +136,26 @@
         </createTable>
     </changeSet>
 
-    <!-- пояснение к заявке; created_by_usr - автор -->
+    <!-- квитанции об отправках с телефона: защита от повторной отправки, отправка принимается один раз; одна запись -
+         одна отправка вместе с её фото; основные таблицы об отложенной отправке не знают; это не журнал изменений;
+         client_guid - guid отправки, присвоен телефоном;
+         repair_request - созданная заявка: только у отправки новой заявки, заполняется той же транзакцией; по нему при
+         повторе телефон узнаёт id заявки, без него нельзя отправить её фото и примечания;
+         received_dt - время поступления отправки: только чтобы удалять старые квитанции -->
+    <changeSet id="03-repair-tables-offline_receipt" author="zhsr">
+        <createTable tableName="offline_receipt">
+            <column name="client_guid" type="varchar(36)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="repair_request" type="bigint"/>
+            <column name="received_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- примечание к заявке; created_by_usr - автор; created_dt - когда пользователь написал примечание;
+         received_dt - время поступления на сервер: написанное без связи поступает позже -->
     <changeSet id="03-repair-tables-repair_request_note" author="zhsr">
         <createTable tableName="repair_request_note">
             <column name="id" type="bigint" autoIncrement="true">
@@ -139,6 +165,9 @@
                 <constraints nullable="false"/>
             </column>
             <column name="created_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="received_dt" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
             <column name="created_by_usr" type="bigint">

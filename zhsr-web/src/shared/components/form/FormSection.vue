@@ -25,7 +25,7 @@ withDefaults(defineProps<{ title?: string; columns?: string; divided?: boolean }
 .form-section {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.8rem;
 
   &--divided {
     padding-top: 1rem;
@@ -34,17 +34,17 @@ withDefaults(defineProps<{ title?: string; columns?: string; divided?: boolean }
 }
 
 .form-section__title {
-  // отступ под подписью группы — на треть меньше промежутка между блоками (0.75rem)
-  margin-bottom: calc(-0.75rem / 3);
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.8rem)
+  margin-bottom: calc(-0.8rem / 3);
   color: $zs-text-muted;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .form-section__body {
   display: grid;
-  gap: 0.875rem;
+  gap: 0.9rem;
 }
 </style>

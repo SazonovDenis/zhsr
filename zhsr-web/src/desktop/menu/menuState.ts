@@ -1,5 +1,7 @@
 import { reactive } from 'vue'
 
+import { onSessionReset } from '@/shared/sessionState'
+
 /** Ширина левого меню: развёрнутого и свёрнутого. */
 export const MENU_WIDTH = '14.5rem'
 export const MENU_COLLAPSED_WIDTH = '3.5rem'
@@ -22,4 +24,10 @@ export const menuState = reactive({
   userCollapsed: null as boolean | null,
   panelNeedsSpace: false,
   openGroup: null as string | null,
+})
+
+// выход: раскрытые группы и выбор свернуть меню — не для следующего пользователя
+onSessionReset(() => {
+  menuState.userCollapsed = null
+  menuState.openGroup = null
 })

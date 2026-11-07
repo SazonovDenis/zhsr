@@ -1,12 +1,12 @@
 <template>
   <div ref="frameEl" class="desktop-frame">
-    <div class="desktop-frame__content">
-      <header class="desktop-frame__header">
-        <button v-if="back" type="button" class="desktop-frame__back" :title="t('Назад')" @click="back">
+    <div class="desktop-frame__content q-pt-sm q-px-md q-pb-md">
+      <header class="desktop-frame__header q-mb-md">
+        <button v-if="back" type="button" class="desktop-frame__back q-pa-none" :title="t('Назад')" @click="back">
           <SvgIcon name="arrow-back" size="1.1rem" />
         </button>
         <slot name="header">
-          <h1 class="desktop-frame__title">{{ title }}</h1>
+          <h1 class="desktop-frame__title q-ma-none">{{ title }}</h1>
         </slot>
       </header>
 
@@ -141,7 +141,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   flex: 1;
   flex-direction: column;
   min-width: 0;
-  padding: 0.5rem 1.125rem 1rem;
   overflow-y: auto;
 }
 
@@ -150,7 +149,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   flex-wrap: wrap;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 0.875rem;
 
   :deep(.desktop-frame__actions) {
     display: flex;
@@ -167,11 +165,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   justify-content: center;
   width: 2rem;
   height: 2rem;
-  // до заголовка — 0.75rem, а не общий промежуток шапки
-  margin-right: -0.25rem;
-  padding: 0;
+  // до заголовка — 0.8rem, а не общий промежуток шапки
+  margin-right: -0.3rem;
   border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: #fff;
   color: $zs-text;
   cursor: pointer;
@@ -183,11 +180,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 .desktop-frame__header :deep(.desktop-frame__title),
 .desktop-frame__title {
-  margin: 0;
   font-size: 1.5rem;
   font-weight: 700;
   line-height: 1.3;
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
 }
 
 .desktop-frame__body {

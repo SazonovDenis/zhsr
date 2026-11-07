@@ -12,6 +12,7 @@ import { shownError } from '@/shared/errors'
 import { isoDateTime } from '@/shared/format'
 import { currentUser, loadCurrentUser } from '@/shared/user'
 import { placeText } from '@/shared/wagonPlace'
+import { tripRefText } from '@/shared/trips/tripRefText'
 
 /**
  * Акт отцепки или прицепки (Ф-АКТ-01) — общее для экранов десктопа и телефона: рейс, промежуточные остановки, приказ,
@@ -39,8 +40,8 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
   const whereText = (w: CouplingWagon) =>
     w.locationType === LocationType.TRIP
       ? t('в составе')
-      : w.otherTrain
-        ? `${placeText(w.locationType, w.place)} • ${t('в составе рейса {trip}', { trip: w.otherTrain })}`
+      : w.otherTrip
+        ? `${placeText(w.locationType, w.place)} • ${t('в составе рейса {trip}', { trip: tripRefText(w.otherTrip) })}`
         : w.available
           ? placeText(w.locationType, w.place)
           : `${placeText(w.locationType, w.place)} • ${t('сначала передача на станцию')}`
@@ -95,7 +96,7 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
 
   /** Вагон стоит в депо или парке отстоя: прицепить нельзя, можно вернуть на станцию актом приёма-передачи. */
   const returnable = (w: CouplingWagon) =>
-    attach && !w.otherTrain && (w.locationType === LocationType.DEPOT || w.locationType === LocationType.YARD)
+    attach && !w.otherTrip && (w.locationType === LocationType.DEPOT || w.locationType === LocationType.YARD)
 
   /** Все отмеченные вагоны стоят в одном депо или парке отстоя: откуда вернуть их на станцию; иначе null. */
   const returnFrom = computed(() => {

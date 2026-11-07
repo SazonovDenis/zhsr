@@ -1,12 +1,12 @@
 <template>
   <!-- клик по свободному месту меню сворачивает и разворачивает его; клики по пунктам до сюда не доходят -->
   <aside class="desktop-menu" :class="{ 'desktop-menu--collapsed': collapsed }" @click="onToggleClick">
-    <div class="desktop-menu__brand">
+    <div class="desktop-menu__brand q-pa-md">
       <SvgIcon name="logo" size="1.6rem" />
       <span v-if="!collapsed" class="desktop-menu__brand-name">{{ t('Жолсерік') }}</span>
     </div>
 
-    <nav class="desktop-menu__list">
+    <nav class="desktop-menu__list q-py-none q-px-sm">
       <DesktopMenuItem
         v-for="item in menu.items"
         :key="item.id"
@@ -20,7 +20,12 @@
       <!-- «Администрирование» — последним в верхней группе; пункты раскрываются вниз, под заголовком группы. Пункт без
            route — раздел пока не сделан: виден, но не выбирается -->
       <div class="desktop-menu__admin">
-        <button type="button" class="desktop-menu__group" :title="t(menu.admin.label)" @click.stop="onAdminClick">
+        <button
+          type="button"
+          class="desktop-menu__group q-py-none q-px-md"
+          :title="t(menu.admin.label)"
+          @click.stop="onAdminClick"
+        >
           <span class="desktop-menu__item-body">
             <SvgIcon v-if="menu.admin.icon" :name="menu.admin.icon" />
             <span v-if="!collapsed" class="desktop-menu__label">{{ t(menu.admin.label) }}</span>
@@ -51,7 +56,7 @@
 
     <div class="desktop-menu__space" />
 
-    <div v-if="user" class="desktop-menu__user">
+    <div v-if="user" class="desktop-menu__user q-pa-sm">
       <DesktopUserMenu :user="user" :collapsed="collapsed" />
     </div>
   </aside>
@@ -156,7 +161,7 @@ function isActive(item: MenuItem): boolean {
   width: v-bind(MENU_WIDTH);
   overflow-x: hidden;
   overflow-y: auto;
-  background: $zs-menu-bg;
+  background: var(--zs-header-bg);
   color: #fff;
   cursor: pointer;
   transition: width 0.15s;
@@ -169,28 +174,26 @@ function isActive(item: MenuItem): boolean {
 .desktop-menu__brand {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  padding: 1.025rem 0.9625rem 0.9rem;
+  gap: 0.6rem;
 }
 
 .desktop-menu__brand-name {
-  font-size: 1.125rem;
+  font-size: 1.1rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   white-space: nowrap;
 }
 
 .desktop-menu__list {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
-  padding: 0.125rem 0.375rem;
+  gap: 0.1rem;
 }
 
 .desktop-menu__admin {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 0.1rem;
 }
 
 .desktop-menu__space {
@@ -203,14 +206,13 @@ function isActive(item: MenuItem): boolean {
   justify-content: space-between;
   gap: 0.5rem;
   height: 2.4rem;
-  padding: 0 0.75rem;
   border: 0;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   background: transparent;
   // как соседние пункты меню (DesktopMenuItem)
   color: $zs-menu-fg;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
@@ -223,7 +225,7 @@ function isActive(item: MenuItem): boolean {
 .desktop-menu__item-body {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.6rem;
   min-width: 0;
 }
 
@@ -232,7 +234,6 @@ function isActive(item: MenuItem): boolean {
 }
 
 .desktop-menu__user {
-  padding: 0.375rem 0.375rem 0.5rem;
   border-top: 0.0625rem solid rgba(255, 255, 255, 0.15);
 }
 

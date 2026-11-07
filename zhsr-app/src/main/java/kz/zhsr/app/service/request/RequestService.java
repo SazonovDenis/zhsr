@@ -1,53 +1,49 @@
 package kz.zhsr.app.service.request;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.LocationType;
 import kz.zhsr.app.constants.RequestStatus;
 import kz.zhsr.app.constants.RoleType;
-import kz.zhsr.app.dto.ListSort;
-import kz.zhsr.app.dto.RequestCounts;
-import kz.zhsr.app.dto.RequestDetail;
-import kz.zhsr.app.dto.RequestDraft;
-import kz.zhsr.app.dto.RequestEvent;
-import kz.zhsr.app.dto.RequestFilter;
-import kz.zhsr.app.dto.RequestPhoto;
-import kz.zhsr.app.dto.RequestRow;
-import kz.zhsr.app.dto.TripRef;
-import kz.zhsr.app.dto.UserRef;
+import kz.zhsr.app.dto.common.ListSort;
+import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.request.RequestCounts;
+import kz.zhsr.app.dto.request.RequestDetail;
+import kz.zhsr.app.dto.request.RequestDraft;
+import kz.zhsr.app.dto.request.RequestExecutorRecord;
+import kz.zhsr.app.dto.request.RequestFilter;
+import kz.zhsr.app.dto.request.RequestNote;
+import kz.zhsr.app.dto.request.RequestPhoto;
+import kz.zhsr.app.dto.request.RequestRow;
+import kz.zhsr.app.dto.request.RequestStatusRecord;
 import kz.zhsr.app.service.ApiException;
+import kz.zhsr.app.service.OfflineReceiptService;
 import kz.zhsr.app.service.SqlQuery;
 import kz.zhsr.app.service.storage.FileStorage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * Заявки на ремонт (Ф-ЗАЯ-01 … Ф-ЗАЯ-07): список, карточка с историей, подача, исправление, действия, назначение
- * исполнителя, пояснения и фото. Права - только через {@link RequestRights}.
+ * исполнителя, примечания и фото. Права - только через {@link RequestRights}.
  * <p>
  * Статус заявки - журнал repair_request_status, исполнитель - журнал repair_request_executor (текущая запись - dend
  * пуст), их копия - repair_request_info; смена статуса, комментарий к ней и копия - в одной транзакции. Первая запись
  * журнала статусов вносится при подаче. Записи журналов одного действия - с одним временем. Служба заявки определяется
  * типом неисправности и запоминается в repair_request_info при подаче и при смене типа исправлением заявки. Фото - в
- * хранилище файлов ({@link FileStorage}), в БД - ключ файла; фото, сохранённое в один момент с пояснением того же
+ * хранилище файлов ({@link FileStorage}), в БД - ключ файла; фото, сохранённое в один момент с примечанием того же
  * сотрудника, показывается вместе с ним.
  * <p>
  * Отметки «передано в депо» и «ТОР» пока не хранятся: в строке заявки они всегда false.
@@ -69,12 +65,17 @@ public class RequestService {
     private final CurrentUserService currentUserService;
     private final RequestRights rights;
     private final FileStorage storage;
+    private final RefResolver refResolver;
+    private final OfflineReceiptService offlineReceipt;
 
-    public RequestService(Db db, CurrentUserService currentUserService, RequestRights rights, FileStorage storage) {
+    public RequestService(Db db, CurrentUserService currentUserService, RequestRights rights, FileStorage storage,
+                          RefResolver refResolver, OfflineReceiptService offlineReceipt) {
         this.db = db;
         this.currentUserService = currentUserService;
         this.rights = rights;
         this.storage = storage;
+        this.refResolver = refResolver;
+        this.offlineReceipt = offlineReceipt;
     }
 
     // --- чтение
@@ -83,7 +84,9 @@ public class RequestService {
      * Список заявок по фильтру (Ф-ЗАЯ-06). По умолчанию - сначала новые.
      */
     public List<RequestRow> list(RequestFilter filter, ListSort sort) throws Exception {
-        return load(filter, true, sort);
+        List<RequestRow> res = load(filter, true, sort);
+        refResolver.resolve(res);
+        return res;
     }
 
     /**
@@ -100,116 +103,22 @@ public class RequestService {
     }
 
     /**
-     * Карточка заявки: поля, история и фото.
+     * Карточка заявки: поля и плоские списки журналов, примечаний и фото.
      *
      * @throws ApiException 404 - заявки нет
      */
     public RequestDetail detail(long id) throws Exception {
-        RequestDetail row = row(id, RequestDetail::new);
+        RequestDetail row = row(id, RequestDetail.class);
 
-        Map<Instant, DbRec> statusAt = journalByTime("repair_request_status", id);
-        Map<Instant, DbRec> executorAt = journalByTime("repair_request_executor", id);
-        List<DbRec> notes = new ArrayList<>(db.loadList("repair_request_note", Map.of("repair_request", id)));
-        notes.sort(Comparator.comparing(rec -> rec.getDateTimeTZ("created_dt")));
-        List<DbRec> photos = db.loadList("repair_request_photo", Map.of("repair_request", id));
-
-        Set<Long> usrs = new HashSet<>();
-        for (DbRec rec : statusAt.values()) {
-            addNotNull(usrs, rec.getLong("created_by_usr", null));
-        }
-        for (DbRec rec : executorAt.values()) {
-            addNotNull(usrs, rec.getLong("executor_usr", null));
-            addNotNull(usrs, rec.getLong("created_by_usr", null));
-        }
-        for (DbRec rec : notes) {
-            usrs.add(rec.getLong("created_by_usr"));
-        }
-
-        // фото группами: один сотрудник в один момент; группа в момент подачи - фото заявки
-        Map<String, List<RequestPhoto>> photoGroups = new LinkedHashMap<>();
-        Map<String, OffsetDateTime> groupTime = new HashMap<>();
-        Map<String, Long> groupUsr = new HashMap<>();
-        List<RequestPhoto> requestPhotos = new ArrayList<>();
-        photos.sort(Comparator.comparing((DbRec rec) -> rec.getDateTimeTZ("created_dt"))
-                .thenComparing(rec -> rec.getLong("id")));
-        for (DbRec rec : photos) {
-            RequestPhoto photo = new RequestPhoto(rec.getLong("id"));
-            OffsetDateTime at = rec.getDateTimeTZ("created_dt");
-            long usr = rec.getLong("created_by_usr");
-            if (usr == row.getCreatedByUsr().id() && at.isEqual(row.getCreatedDt())) {
-                requestPhotos.add(photo);
-                continue;
-            }
-            String key = groupKey(usr, at);
-            photoGroups.computeIfAbsent(key, k -> new ArrayList<>()).add(photo);
-            groupTime.put(key, at);
-            groupUsr.put(key, usr);
-            usrs.add(usr);
-        }
-        Map<Long, UserRef> users = users(usrs);
-
-        List<RequestEvent> events = new ArrayList<>();
-        events.add(new RequestEvent(row.getCreatedDt(), row.getCreatedByUsr(), "CREATED", null, null, null, List.of()));
-
-        // комментарий к смене статуса - пояснение того же сотрудника в тот же момент (пишутся одной транзакцией)
-        Set<Long> usedNotes = new HashSet<>();
-        long prevStatus = RequestStatus.NEW;
-        Long prevExecutor = null;
-        Set<Instant> moments = new TreeSet<>(statusAt.keySet());
-        moments.addAll(executorAt.keySet());
-        for (Instant moment : moments) {
-            DbRec statusRec = statusAt.get(moment);
-            DbRec executorRec = executorAt.get(moment);
-            // запись журнала статусов при подаче: событие подачи уже есть; исполнитель при подаче - событие назначения
-            if (executorRec == null && moment.equals(row.getCreatedDt().toInstant())) {
-                continue;
-            }
-            DbRec rec = statusRec != null ? statusRec : executorRec;
-            OffsetDateTime at = rec.getDateTimeTZ("dbeg");
-            Long by = rec.getLong("created_by_usr", null);
-            long status = statusRec != null ? statusRec.getLong("request_status_type") : prevStatus;
-            Long executor = executorRec != null ? executorRec.getLong("executor_usr", null) : prevExecutor;
-            DbRec note = null;
-            for (DbRec n : notes) {
-                if (!usedNotes.contains(n.getLong("id")) && Objects.equals(n.getLong("created_by_usr"), by)
-                        && n.getDateTimeTZ("created_dt").isEqual(at)) {
-                    note = n;
-                    break;
-                }
-            }
-            UserRef byRef = by == null ? null : users.get(by);
-            UserRef executorRef = executor == null ? null : users.get(executor);
-            String action = historyAction(prevStatus, prevExecutor, status, executor, note != null);
-            if (action == null) {
-                events.add(new RequestEvent(at, byRef, "ASSIGN", null, executorRef, null, List.of()));
-            } else {
-                String text = note == null ? null : note.getString("note");
-                events.add(new RequestEvent(at, byRef, "STATUS", action, null, text, List.of()));
-            }
-            if (note != null) {
-                usedNotes.add(note.getLong("id"));
-            }
-            prevStatus = status;
-            prevExecutor = executor;
-        }
-        // пояснение и фото того же сотрудника в тот же момент - одной записью; иначе - отдельно
-        for (DbRec n : notes) {
-            if (!usedNotes.contains(n.getLong("id"))) {
-                String key = groupKey(n.getLong("created_by_usr"), n.getDateTimeTZ("created_dt"));
-                List<RequestPhoto> list = photoGroups.remove(key);
-                events.add(new RequestEvent(n.getDateTimeTZ("created_dt"), users.get(n.getLong("created_by_usr")), "NOTE", null,
-                        null, n.getString("note"), list == null ? List.of() : list));
-            }
-        }
-        for (Map.Entry<String, List<RequestPhoto>> g : photoGroups.entrySet()) {
-            events.add(new RequestEvent(groupTime.get(g.getKey()), users.get(groupUsr.get(g.getKey())), "NOTE", null,
-                    null, null, g.getValue()));
-        }
-        // подача - первой; остальное - по времени
-        events.subList(1, events.size()).sort(Comparator.comparing(RequestEvent::at));
-
-        row.setEvents(events);
-        row.setPhotos(requestPhotos);
+        Map<String, Object> params = Map.of("id", id);
+        row.setStatuses(db.loadSql(RequestSql.statuses(), params, RequestStatusRecord.class));
+        row.setExecutors(db.loadSql(RequestSql.executors(), params, RequestExecutorRecord.class));
+        row.setNotes(db.loadSql(RequestSql.notes(), params, RequestNote.class));
+        row.setPhotos(db.loadSql(RequestSql.photos(), params, RequestPhoto.class));
+        refResolver.resolve(row.getStatuses());
+        refResolver.resolve(row.getExecutors());
+        refResolver.resolve(row.getNotes());
+        refResolver.resolve(row.getPhotos());
         return row;
     }
 
@@ -217,9 +126,9 @@ public class RequestService {
      * Сотрудники службы - кому можно назначить заявку.
      */
     public List<UserRef> serviceStaff(long service) throws Exception {
-        return db.loadSql(RequestSql.serviceStaff(), Map.of("service", service)).stream()
-                .map(rec -> new UserRef(rec.getLong("id"), CurrentUser.shortName(rec.getString("full_name"))))
-                .toList();
+        List<UserRef> res = db.loadSql(RequestSql.serviceStaff(), Map.of("service", service), UserRef.class);
+        refResolver.resolve(res);
+        return res;
     }
 
     /**
@@ -239,12 +148,19 @@ public class RequestService {
 
     /**
      * Подать заявку (Ф-ЗАЯ-01): Система присваивает номер; заявка - «новая», а если мастер депо задал исполнителя -
-     * «назначена».
+     * «назначена». Время создания - когда пользователь создал заявку (она могла ждать связи на телефоне), им же
+     * начинаются журналы и помечаются фото заявки; время поступления - время сервера.
+     *
+     * @return созданная заявка; повтор уже принятой отправки - она же: из ответа телефон узнаёт id заявки
      */
     @Transactional
     public RequestRow create(RequestDraft draft, List<MultipartFile> photos) throws Exception {
+        if (!offlineReceipt.accept(draft.clientGuid())) {
+            return row(offlineReceipt.requestOf(draft.clientGuid()));
+        }
         CurrentUser user = currentUserService.get();
         OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime created = clientTime(draft.clientDt(), now);
         Map<String, Object> fields = draftFields(draft);
         long service = faultService(draft.faultType());
         if (draft.executorUsr() != null) {
@@ -254,36 +170,43 @@ public class RequestService {
 
         fields.put("number", nextNumber(now));
         fields.put("created_by_usr", user.id());
-        fields.put("created_dt", now);
+        fields.put("created_dt", created);
+        fields.put("received_dt", now);
         long id = db.insertRec("repair_request", fields);
+        offlineReceipt.link(draft.clientGuid(), id);
 
         long status = draft.executorUsr() == null ? RequestStatus.NEW : RequestStatus.ASSIGNED;
-        insertStatus(id, status, user.id(), now);
+        insertStatus(id, status, user.id(), created);
         if (draft.executorUsr() != null) {
-            insertExecutor(id, draft.executorUsr(), user.id(), now);
+            insertExecutor(id, draft.executorUsr(), user.id(), created);
         }
         Map<String, Object> info = new HashMap<>();
         info.put("repairRequest", id);
-        info.put("dbegStatus", now);
+        info.put("dbegStatus", created);
         info.put("status", status);
         info.put("service", service);
-        info.put("dbegExecutor", draft.executorUsr() == null ? null : now);
+        info.put("dbegExecutor", draft.executorUsr() == null ? null : created);
         info.put("executorUsr", draft.executorUsr());
         db.execSql(RequestSql.insertInfo(), info);
-        savePhotos(id, photos, user.id(), now);
+        savePhotos(id, photos, user.id(), created, now);
         return row(id);
     }
 
     /**
      * Исправить заявку (Ф-ЗАЯ-07): поля заявки меняются, прежние значения не хранятся; сменился тип неисправности -
-     * служба определяется заново; новые фото добавляются.
+     * служба определяется заново; новые фото добавляются. Срок исправления проверяется по времени, когда пользователь
+     * исправил заявку: исправление могло ждать связи на телефоне. Повтор уже принятого исправления ничего не меняет.
      */
     @Transactional
     public RequestRow update(long id, RequestDraft draft, List<MultipartFile> photos) throws Exception {
+        if (!offlineReceipt.accept(draft.clientGuid())) {
+            return row(id);
+        }
         CurrentUser user = currentUserService.get();
         OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime edited = clientTime(draft.clientDt(), now);
         RequestRow row = row(id);
-        rights.checkEdit(user, row, now);
+        rights.checkEdit(user, row, edited);
         Map<String, Object> fields = draftFields(draft);
         fields.put("id", id);
         db.updateRec("repair_request", fields);
@@ -291,12 +214,12 @@ public class RequestService {
             db.updateRec("repair_request_info", Map.of("service", faultService(draft.faultType())),
                     Map.of("repair_request", id));
         }
-        savePhotos(id, photos, user.id(), now);
+        savePhotos(id, photos, user.id(), edited, now);
         return row(id);
     }
 
     /**
-     * Выполнить действие над заявкой (Ф-ЗАЯ-03, Ф-ЗАЯ-07): запись в журнал и комментарий - пояснением к заявке.
+     * Выполнить действие над заявкой (Ф-ЗАЯ-03, Ф-ЗАЯ-07): запись в журнал и комментарий - примечанием к заявке.
      */
     @Transactional
     public RequestDetail action(long id, RequestAction action, String comment) throws Exception {
@@ -310,12 +233,12 @@ public class RequestService {
         Long executor = switch (action) {
             case TAKE, DETACH -> user.id();
             case RELEASE, FORWARD -> null;
-            default -> row.getExecutorUsr() == null ? null : row.getExecutorUsr().id();
+            default -> row.getExecutorUsr() == null ? null : row.getExecutorUsr().getId();
         };
         OffsetDateTime now = OffsetDateTime.now();
         move(row, action.status, executor, user.id(), now);
         if (!text.isEmpty()) {
-            insertNote(id, text, user.id(), now);
+            insertNote(id, text, user.id(), now, now);
         }
         return detail(id);
     }
@@ -330,7 +253,7 @@ public class RequestService {
         CurrentUser user = currentUserService.get();
         RequestRow row = row(id);
         rights.checkAssign(user, row);
-        Long current = row.getExecutorUsr() == null ? null : row.getExecutorUsr().id();
+        Long current = row.getExecutorUsr() == null ? null : row.getExecutorUsr().getId();
         if (Objects.equals(current, executor)) {
             return detail(id);
         }
@@ -350,32 +273,65 @@ public class RequestService {
     }
 
     /**
-     * Пояснение к заявке: текст и фото (Ф-ЗАЯ-05).
+     * Примечание к заявке: текст и фото (Ф-ЗАЯ-05).
+     *
+     * @param clientDt   когда пользователь написал примечание, по часам телефона: оно могло ждать связи на телефоне;
+     *                   null - время сервера
+     * @param clientGuid guid примечания, присвоен телефоном: повтор уже принятого примечания ничего не меняет
      */
     @Transactional
-    public RequestDetail addNote(long id, String text, List<MultipartFile> photos) throws Exception {
+    public RequestDetail addNote(long id, String text, OffsetDateTime clientDt, String clientGuid,
+                                 List<MultipartFile> photos) throws Exception {
+        if (!offlineReceipt.accept(clientGuid)) {
+            return detail(id);
+        }
         CurrentUser user = currentUserService.get();
         row(id);
         String note = text == null ? "" : text.trim();
         if (note.isEmpty() && (photos == null || photos.isEmpty())) {
-            throw ApiException.badRequest("Напишите пояснение или приложите фото");
+            throw ApiException.badRequest("Напишите примечание или приложите фото");
         }
-        // пояснение и фото - с одним временем: в истории они показываются вместе
+        // примечание и фото - с одним временем: в истории они показываются вместе
         OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime at = clientTime(clientDt, now);
         if (!note.isEmpty()) {
-            insertNote(id, note, user.id(), now);
+            insertNote(id, note, user.id(), at, now);
         }
-        savePhotos(id, photos, user.id(), now);
+        savePhotos(id, photos, user.id(), at, now);
         return detail(id);
     }
 
+    /**
+     * Одно фото к заявке с телефона: каждое фото - своя отправка, дошедшие фото не отправляются повторно.
+     *
+     * @param clientDt   время заявки, исправления или примечания, с которыми приложено фото; null - время сервера
+     * @param clientGuid guid фото, присвоен телефоном: повтор уже принятого фото ничего не меняет
+     */
+    @Transactional
+    public void addPhoto(long id, MultipartFile photo, OffsetDateTime clientDt, String clientGuid) throws Exception {
+        if (!offlineReceipt.accept(clientGuid)) {
+            return;
+        }
+        CurrentUser user = currentUserService.get();
+        row(id);
+        OffsetDateTime now = OffsetDateTime.now();
+        savePhotos(id, List.of(photo), user.id(), clientTime(clientDt, now), now);
+    }
+
     // --- внутреннее
+
+    /**
+     * Время действия пользователя. Не передано или позже времени сервера (часы телефона спешат) - время сервера.
+     */
+    private static OffsetDateTime clientTime(OffsetDateTime clientDt, OffsetDateTime now) {
+        return clientDt == null || clientDt.isAfter(now) ? now : clientDt;
+    }
 
     private List<RequestRow> load(RequestFilter filter, boolean byStatus, ListSort sort) throws Exception {
         CurrentUser user = currentUserService.get();
         SqlQuery q = RequestSql.list(filter, user.id(), visibility(user), List.copyOf(RequestRights.FINAL_STATUSES),
                 byStatus, sort);
-        return rows(db.loadSql(q.sql(), q.params()), RequestRow::new);
+        return db.loadSql(q.sql(), q.params(), RequestRow.class);
     }
 
     /**
@@ -407,116 +363,21 @@ public class RequestService {
      * @throws ApiException 404 - заявки нет
      */
     private RequestRow row(long id) throws Exception {
-        return row(id, RequestRow::new);
+        return row(id, RequestRow.class);
     }
 
     /**
-     * Строка заявки или карточка: объект создаёт create.
+     * Строка заявки или карточка.
      *
      * @throws ApiException 404 - заявки нет
      */
-    private <T extends RequestRow> T row(long id, Supplier<T> create) throws Exception {
-        DbRec rec = db.loadSqlRec(RequestSql.one(), Map.of("id", id, "tripLocation", LocationType.TRIP));
-        if (rec == null) {
+    private <T extends RequestRow> T row(long id, Class<T> clazz) throws Exception {
+        T row = db.loadSqlRec(RequestSql.one(), Map.of("id", id, "tripLocation", LocationType.TRIP), clazz);
+        if (row == null) {
             throw ApiException.notFound("Заявка не найдена");
         }
-        return rows(List.of(rec), create).get(0);
-    }
-
-    /**
-     * Строки заявок: номера вагонов, имена сотрудников и названия рейсов - одним запросом на все строки каждые.
-     */
-    private <T extends RequestRow> List<T> rows(List<DbRec> recs, Supplier<T> create) throws Exception {
-        if (recs.isEmpty()) {
-            return List.of();
-        }
-        Set<Long> wagonIds = new HashSet<>();
-        Set<Long> usrIds = new HashSet<>();
-        Set<Long> tripIds = new HashSet<>();
-        for (DbRec rec : recs) {
-            wagonIds.add(rec.getLong("wagon"));
-            usrIds.add(rec.getLong("created_by_usr"));
-            addNotNull(usrIds, rec.getLong("executor_usr", null));
-            addNotNull(tripIds, rec.getLong("trip", null));
-            addNotNull(tripIds, rec.getLong("wagon_trip", null));
-        }
-        Map<Long, String> wagons = new HashMap<>();
-        for (DbRec w : db.loadList("wagon", Map.of("id", wagonIds))) {
-            wagons.put(w.getLong("id"), w.getString("number"));
-        }
-        Map<Long, UserRef> users = users(usrIds);
-        Map<Long, String> trips = tripNames(tripIds);
-
-        List<T> res = new ArrayList<>(recs.size());
-        for (DbRec rec : recs) {
-            Long location = rec.getLong("location_type", null);
-            boolean inTrip = location != null && location == LocationType.TRIP;
-            Long wagonTrip = rec.getLong("wagon_trip", null);
-            Long trip = rec.getLong("trip", null);
-            Long executor = rec.getLong("executor_usr", null);
-            T row = create.get();
-            row.setId(rec.getLong("id"));
-            row.setNumber(rec.getString("number"));
-            row.setWagon(rec.getLong("wagon"));
-            row.setWagonNumber(wagons.get(rec.getLong("wagon")));
-            row.setWagonType(rec.getLong("wagon_type"));
-            row.setLocationType(location);
-            row.setPlace(inTrip ? null : rec.getLong("wagon_place", null));
-            row.setWagonTrip(wagonTrip);
-            row.setWagonTripName(wagonTrip == null ? null : trips.get(wagonTrip));
-            row.setWagonStation(inTrip ? null : rec.getLong("wagon_station", null));
-            row.setTrip(trip == null ? null : new TripRef(trip, trips.get(trip)));
-            row.setService(rec.getLong("service"));
-            row.setFaultType(rec.getLong("fault_type"));
-            row.setSeverityType(rec.getLong("severity_type"));
-            row.setCreatedByUsr(users.get(rec.getLong("created_by_usr")));
-            row.setCreatedDt(rec.getDateTimeTZ("created_dt"));
-            row.setDescription(rec.getString("description"));
-            row.setRequestStatusType(rec.getLong("request_status_type"));
-            row.setExecutorUsr(executor == null ? null : users.get(executor));
-            row.setPhotoCount(rec.getInt("photo_count"));
-            res.add(row);
-        }
-        return res;
-    }
-
-    /**
-     * Сотрудники по id: фамилия и инициалы.
-     */
-    private Map<Long, UserRef> users(Set<Long> ids) throws Exception {
-        Map<Long, UserRef> res = new HashMap<>();
-        if (ids.isEmpty()) {
-            return res;
-        }
-        for (DbRec u : db.loadList("usr", Map.of("id", ids))) {
-            long id = u.getLong("id");
-            res.put(id, new UserRef(id, CurrentUser.shortName(u.getString("full_name"))));
-        }
-        return res;
-    }
-
-    /**
-     * Рейсы по id для показа: номер поезда и название маршрута рейса.
-     */
-    private Map<Long, String> tripNames(Set<Long> ids) throws Exception {
-        Map<Long, String> res = new HashMap<>();
-        if (ids.isEmpty()) {
-            return res;
-        }
-        List<DbRec> trips = db.loadList("trip", Map.of("id", ids));
-        Set<Long> routeIds = new HashSet<>();
-        for (DbRec t : trips) {
-            routeIds.add(t.getLong("route"));
-        }
-        Map<Long, DbRec> routes = new HashMap<>();
-        for (DbRec r : db.loadList("route", Map.of("id", routeIds))) {
-            routes.put(r.getLong("id"), r);
-        }
-        for (DbRec t : trips) {
-            DbRec route = routes.get(t.getLong("route"));
-            res.put(t.getLong("id"), route.getString("train_number") + " " + route.getString("name"));
-        }
-        return res;
+        refResolver.resolve(row);
+        return row;
     }
 
     /**
@@ -565,7 +426,7 @@ public class RequestService {
      * @throws ApiException 400 - не сотрудник службы
      */
     private void checkStaff(long service, long executor) throws Exception {
-        if (serviceStaff(service).stream().noneMatch(u -> u.id() == executor)) {
+        if (serviceStaff(service).stream().noneMatch(u -> u.getId() == executor)) {
             throw ApiException.badRequest("Исполнитель - не сотрудник службы заявки");
         }
     }
@@ -583,17 +444,6 @@ public class RequestService {
     }
 
     /**
-     * Записи журналов заявки по времени начала.
-     */
-    private Map<Instant, DbRec> journalByTime(String table, long id) throws Exception {
-        Map<Instant, DbRec> res = new HashMap<>();
-        for (DbRec rec : db.loadList(table, Map.of("repair_request", id))) {
-            res.put(rec.getDateTimeTZ("dbeg").toInstant(), rec);
-        }
-        return res;
-    }
-
-    /**
      * Новые записи журналов заявки: запись журнала статусов - если статус сменился или исполнитель остался прежним
      * (действие без смены статуса и исполнителя - передача в депо новой заявки), запись журнала исполнителей - если
      * сменился исполнитель. Текущая запись журнала закрывается в момент now, новая действует с now; копия - в
@@ -601,7 +451,7 @@ public class RequestService {
      */
     private void move(RequestRow row, long status, Long executor, long by, OffsetDateTime now) throws Exception {
         long id = row.getId();
-        Long prevExecutor = row.getExecutorUsr() == null ? null : row.getExecutorUsr().id();
+        Long prevExecutor = row.getExecutorUsr() == null ? null : row.getExecutorUsr().getId();
         boolean executorChanged = !Objects.equals(prevExecutor, executor);
         Map<String, Object> info = new HashMap<>();
         if (status != row.getRequestStatusType() || !executorChanged) {
@@ -650,18 +500,21 @@ public class RequestService {
         db.insertRec("repair_request_executor", rec);
     }
 
-    private void insertNote(long id, String text, long usr, OffsetDateTime now) throws Exception {
-        db.insertRec("repair_request_note", Map.of("repair_request", id, "created_dt", now, "created_by_usr", usr,
-                "note", text));
+    private void insertNote(long id, String text, long usr, OffsetDateTime at, OffsetDateTime received)
+            throws Exception {
+        db.insertRec("repair_request_note", Map.of("repair_request", id, "created_dt", at, "received_dt", received,
+                "created_by_usr", usr, "note", text));
     }
 
     /**
      * Фото - в хранилище файлов, ключи - в repair_request_photo.
      *
-     * @param now время фото: с временем подачи - фото заявки, с временем пояснения - фото к пояснению
+     * @param at       когда фото приложено: время создания заявки - фото заявки, другое время - запись истории
+     * @param received время поступления на сервер
      * @throws ApiException 400 - файл не изображение
      */
-    private void savePhotos(long id, List<MultipartFile> photos, long usr, OffsetDateTime now) throws Exception {
+    private void savePhotos(long id, List<MultipartFile> photos, long usr, OffsetDateTime at, OffsetDateTime received)
+            throws Exception {
         if (photos == null) {
             return;
         }
@@ -679,69 +532,9 @@ public class RequestService {
             rec.put("storage_key", key);
             rec.put("size_bytes", (int) file.getSize());
             rec.put("created_by_usr", usr);
-            rec.put("created_dt", now);
+            rec.put("created_dt", at);
+            rec.put("received_dt", received);
             db.insertRec("repair_request_photo", rec);
-        }
-    }
-
-    /**
-     * Действие записи журналов для истории - по прежнему и новому статусу и исполнителю. Комментарий обязателен у
-     * «передать в депо» и «ТОР» и не вводится у «снять себя», «взять в работу» и снятия назначения - по нему их и
-     * различаем.
-     *
-     * @param hasNote у записи есть комментарий (пояснение того же сотрудника в тот же момент)
-     * @return действие (RequestAction); null - назначение исполнителя
-     */
-    private static String historyAction(long prev, Long prevExecutor, long status, Long executor, boolean hasNote) {
-        if (status == prev) {
-            if (status == RequestStatus.NEW && Objects.equals(executor, prevExecutor)) {
-                return RequestAction.FORWARD.name();
-            }
-            if (status == RequestStatus.IN_PROGRESS && hasNote) {
-                return RequestAction.DETACH.name();
-            }
-            return null;
-        }
-        if (status == RequestStatus.IN_PROGRESS) {
-            if (prev == RequestStatus.DONE) {
-                return RequestAction.RETURN.name();
-            }
-            return hasNote ? RequestAction.DETACH.name() : RequestAction.TAKE.name();
-        }
-        if (status == RequestStatus.DONE) {
-            return RequestAction.COMPLETE.name();
-        }
-        if (status == RequestStatus.CLOSED) {
-            return RequestAction.ACCEPT.name();
-        }
-        if (status == RequestStatus.NEW) {
-            if (hasNote) {
-                return RequestAction.FORWARD.name();
-            }
-            return prev == RequestStatus.IN_PROGRESS ? RequestAction.RELEASE.name() : null;
-        }
-        if (status == RequestStatus.ASSIGNED) {
-            return null;
-        }
-        if (status == RequestStatus.REJECTED) {
-            return prev == RequestStatus.IN_PROGRESS ? RequestAction.NOT_DONE.name() : RequestAction.REJECT.name();
-        }
-        if (status == RequestStatus.DEFERRED) {
-            return RequestAction.DEFER.name();
-        }
-        return RequestAction.CANCEL.name();
-    }
-
-    /**
-     * Ключ группы «сотрудник и момент»: пояснение и фото, сохранённые вместе.
-     */
-    private static String groupKey(long usr, OffsetDateTime at) {
-        return usr + "@" + at.toInstant();
-    }
-
-    private static void addNotNull(Set<Long> set, Long value) {
-        if (value != null) {
-            set.add(value);
         }
     }
 

@@ -1,10 +1,10 @@
 package kz.zhsr.app.service;
 
 import kz.zhsr.app.constants.TripStatus;
-import kz.zhsr.app.dto.ListSort;
-import kz.zhsr.app.dto.RouteFilter;
-import kz.zhsr.app.dto.TripFilter;
-import kz.zhsr.app.dto.WagonFilter;
+import kz.zhsr.app.dto.common.ListSort;
+import kz.zhsr.app.dto.route.RouteFilter;
+import kz.zhsr.app.dto.trip.TripFilter;
+import kz.zhsr.app.dto.wagon.WagonFilter;
 
 import java.util.Map;
 
@@ -33,7 +33,7 @@ final class ListSql {
 
     /**
      * Вагоны. Расположение: location_type и place - место по виду расположения (станция, депо, парк отстоя или рейс);
-     * у вагона в рейсе - train_number и name маршрута рейса.
+     * у вагона в рейсе - trip.
      */
     static SqlQuery wagons(WagonFilter filter, Visibility.Access access, ListSort sort) {
         SqlWhere where = new SqlWhere();
@@ -64,12 +64,10 @@ final class ListSql {
                 select wagon.id, wagon.number, wagon.wagon_type, wagon.model_type, wagon.depot,
                        wagon_info.location_type,
                        coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard, wagon_info.trip) as place,
-                       route.train_number, route.name, wagon_info.dbeg_location, wagon_info.wagon_status_type,
+                       wagon_info.trip, wagon_info.dbeg_location, wagon_info.wagon_status_type,
                        wagon_info.dbeg_status
                 from wagon
                 join wagon_info on wagon_info.wagon = wagon.id
-                left join trip on trip.id = wagon_info.trip
-                left join route on route.id = trip.route
                 """, sort.orderBy(WAGON_SORT, "wagon.number, wagon.id"));
     }
 
@@ -85,7 +83,7 @@ final class ListSql {
         SqlWhere where = new SqlWhere();
         where.visible(
                 access.byDepot() ? (access.depot() == null ? "true" : routeViaDepot("trip.route")) : null,
-                access.trip() == null ? null : "trip.id = :visTrip",
+                access.trip() == null ? null : "trip.id = any(:visTrips)",
                 null,
                 access);
         if (filter.id() != null) {
@@ -112,7 +110,8 @@ final class ListSql {
 
         return where.query("""
                 select trip.id, route.train_number, trip.route, route.name, route.transport_type, route.route_kind,
-                       route.duration, trip.trip_status_type, trip.planned_dt, trip.departed_dt
+                       route.duration, trip.trip_status_type, trip.planned_dt, trip.departed_dt, trip.arrived_dt,
+                       trip.departure_marked_dt, trip.arrival_marked_dt
                 from trip
                 join route on route.id = trip.route
                 """, sort.orderBy(TRIP_SORT, "trip.planned_dt, trip.id"));

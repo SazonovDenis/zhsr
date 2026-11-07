@@ -1,11 +1,13 @@
 package kz.zhsr.app.service;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtDb;
 import kz.kis.kisdbtools.repository.Db;
-import kz.zhsr.app.dto.MapPoint;
-import kz.zhsr.app.dto.StageLine;
-import kz.zhsr.app.dto.StageLines;
-import kz.zhsr.app.dto.StationPoint;
+import kz.kis.kisdbtools.repository.DbRecMapper;
+import kz.zhsr.app.dto.route.MapPoint;
+import kz.zhsr.app.dto.route.StageLine;
+import kz.zhsr.app.dto.route.StageLines;
+import kz.zhsr.app.dto.route.StationPoint;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -156,7 +158,7 @@ public class StageService {
         }
         Map<Long, MapPoint> points = new HashMap<>();
         for (DbRec p : db.loadList("stage_point", Map.of("id", new HashSet<>(pointOf.values())))) {
-            points.put(p.getLong("id"), mapPoint(p));
+            points.put(p.getLong("id"), DbRecMapper.toObject(p, MapPoint.class));
         }
         List<StationPoint> res = new ArrayList<>();
         for (Map.Entry<Long, Long> e : pointOf.entrySet()) {
@@ -174,25 +176,19 @@ public class StageService {
      * @return по id перегона - его точки
      */
     private Map<Long, List<MapPoint>> stagePoints(Collection<Long> stages) throws Exception {
-        Map<Long, List<DbRec>> recs = new HashMap<>();
         if (stages.isEmpty()) {
             return Map.of();
         }
-        for (DbRec p : db.loadList("stage_point", Map.of("stage", new HashSet<>(stages)))) {
-            recs.computeIfAbsent(p.getLong("stage"), k -> new ArrayList<>()).add(p);
-        }
+        Map<Long, List<DbRec>> recs = UtDb.collectGroupBy_records(
+                db.loadList("stage_point", Map.of("stage", new HashSet<>(stages))), "stage");
         Map<Long, List<MapPoint>> res = new HashMap<>();
         for (Map.Entry<Long, List<DbRec>> e : recs.entrySet()) {
             res.put(e.getKey(), e.getValue().stream()
                     .sorted(Comparator.comparingInt(p -> p.getInt("seq")))
-                    .map(StageService::mapPoint)
+                    .map(p -> DbRecMapper.toObject(p, MapPoint.class))
                     .toList());
         }
         return res;
-    }
-
-    private static MapPoint mapPoint(DbRec p) {
-        return new MapPoint(p.getLong("id"), ((Number) p.get("x")).doubleValue(), ((Number) p.get("y")).doubleValue());
     }
 
 }
