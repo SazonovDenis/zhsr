@@ -311,7 +311,8 @@ const sections = computed<Section[]>(() => {
       queued: [],
     })
 
-  if (hasRole(u, RoleType.CONDUCTOR) || hasRole(u, RoleType.LNP)) {
+  // «Ваши открытые заявки» — тем, кто подаёт заявки сам: проводник, ЛНП, инструктор поездных бригад
+  if (hasRole(u, RoleType.CONDUCTOR) || hasRole(u, RoleType.LNP) || hasRole(u, RoleType.INSTRUCTOR)) {
     accept()
     add({
       key: 'mine',
