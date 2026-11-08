@@ -102,6 +102,11 @@ public class ListService {
 
     private <T extends WagonOption> List<T> wagonRows(WagonFilter filter, ListSort sort, Class<T> clazz) throws Exception {
         Visibility.Access access = visibility.access(currentUserService.get(), filter.depot());
+        // поиск по номеру отменяет все фильтры и отбор по роли: ищется среди всех вагонов (Ф-ВАГ-04)
+        if (filter.number() != null && !filter.number().isBlank()) {
+            filter = new WagonFilter(null, filter.number(), null, null, null, null);
+            access = new Visibility.Access(true, null, null, false, null, null);
+        }
         SqlQuery q = ListSql.wagons(filter, access, sort);
         List<T> res = db.loadSql(q.sql(), q.params(), clazz);
         refResolver.resolve(res);

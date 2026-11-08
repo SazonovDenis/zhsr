@@ -9,26 +9,28 @@
 
     <FilterBar>
       <TextInput v-model="filter.query" placeholder="Номер, вагон, неисправность" width="15rem" />
-      <CbSegment v-model="filter.scope" single required :values="scopes" />
-      <PeriodPicker v-model:start-date="filter.from" v-model:end-date="filter.to" label="Период:" clearable />
+      <!-- поиск отменяет список и фильтры: они скрыты и не применяются, но не очищаются -->
+      <span v-if="searching" class="requests__search-note">
+        {{ t('При поиске список и фильтры не применяются.') }}
+      </span>
+      <template v-else>
+        <CbSegment v-model="filter.scope" single required :values="scopes" />
+        <PeriodPicker v-model:start-date="filter.from" v-model:end-date="filter.to" label="Период:" clearable />
+      </template>
     </FilterBar>
 
     <FilterBar>
-      <CbButton v-model="filter.statuses" label="Статус" :values="statusChoices" :max-button-count="5" />
-      <CbButton v-model="filter.severities" label="Критичность" :values="severityChoices" :max-button-count="4" />
-      <CbList v-model="filter.services" placeholder="Служба" :values="serviceChoices" style="width: 10rem" />
-      <CbList
-        v-model="filter.trip"
-        single
-        placeholder="Рейс"
-        :values="tripChoices"
-        :source="tripLoad"
-        style="width: 15rem"
-      >
-        <template #option="{ item }">
-          <TripOptionView :trip="tripOptionOf(item)" class="trip-option--list" />
-        </template>
-      </CbList>
+      <template v-if="!searching">
+        <CbButton
+          v-model="filter.statuses"
+          label="Статус"
+          :values="statusChoices"
+          :hidden="[RequestStatus.CLOSED]"
+          :max-button-count="6"
+        />
+        <CbButton v-model="filter.severities" label="Критичность" :values="severityChoices" :max-button-count="4" />
+        <CbList v-model="filter.services" placeholder="Служба" :values="serviceChoices" style="width: 10rem" />
+      </template>
       <template #right>{{ t('{n} заявок', rows.length) }}</template>
     </FilterBar>
 
@@ -56,8 +58,6 @@ import { computed, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue
 
 import type { RepairRequest, RequestCounts } from '@/api/requests'
 import { fetchRequestCounts, fetchRequests, requestFilter } from '@/api/requests'
-import type { TripOption } from '@/api/trips'
-import { fetchTripOptions } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
 import CbButton from '@/shared/components/choice/CbButton.vue'
@@ -72,30 +72,30 @@ import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import type { RowKey, TableSort } from '@/shared/components/table/types'
-import { ServiceType } from '@/shared/constants/systemDicts'
+import { RequestStatus, ServiceType } from '@/shared/constants/systemDicts'
 import { dictChoices } from '@/shared/dict/dictChoices'
 import { provideBusy } from '@/shared/busy'
 import { dictManager } from '@/shared/dict/DictManager'
-import { useLoad } from '@/shared/loadable'
 import { loadCurrentUser } from '@/shared/user'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { useSidePanel } from '../frame/useSidePanel'
-import { tripOptionItem, tripOptionOf } from '../trips/tripOptionItem'
-import TripOptionView from '../trips/TripOptionView.vue'
 import RequestDialog from './RequestDialog.vue'
 import RequestPanel from './RequestPanel.vue'
 import { requestsColumns } from './requestsColumns'
 
 /**
- * Список заявок на ремонт (Ф-ЗАЯ-06): «мои», «на исполнение», «все»; фильтры по периоду подачи, статусу, критичности,
- * службе и рейсу, поиск по номеру, вагону и неисправности. Справа — карточка выбранной заявки с действиями.
+ * Список заявок на ремонт (Ф-ЗАЯ-06): «созданные мной», «мне на исполнение», «все»; фильтры по периоду подачи, статусу, критичности,
+ * службе, поиск по номеру, вагону и неисправности. Справа — карточка выбранной заявки с действиями.
  */
 
-const filter = reactive(requestFilter('all'))
+// по умолчанию — заявки, которые ждут действия пользователя; статусы не выбраны
+const filter = reactive(requestFilter('todo'))
+// поиск: список и фильтры скрыты, сервер их не применяет (Ф-ЗАЯ-06)
+const searching = computed(() => filter.query.trim() !== '')
 
 const scopes: ChoiceItem[] = [
-  { id: 'mine', text: 'Мои' },
-  { id: 'todo', text: 'На исполнение' },
+  { id: 'mine', text: 'Созданные мной' },
+  { id: 'todo', text: 'Мне на исполнение' },
   { id: 'all', text: 'Все' },
 ]
 
@@ -121,17 +121,6 @@ const serviceChoices = computed(() =>
     ([ServiceType.TECHNICAL, ServiceType.CLEANING, ServiceType.EQUIPMENT] as number[]).includes(Number(c.id)),
   ),
 )
-
-const trips = shallowRef<TripOption[]>([])
-const tripChoices = computed(() => trips.value.map((trip) => tripOptionItem(trip)))
-// варианты «Рейса»: рейсы и станции для строк вариантов (остановки) — параллельно, всё — загрузка выпадающего списка
-const tripLoad = useLoad(async () => {
-  const [, list] = await Promise.all([
-    dictManager.prepareDict('Station'),
-    fetchTripOptions({ route: null, station: null, from: null, to: null, states: [] }),
-  ])
-  trips.value = list
-})
 
 // ошибка загрузки показывается на месте строк таблицы
 const loadError = ref<ShownError | null>(null)
@@ -187,6 +176,11 @@ async function loadDicts() {
   }
 }
 void init()
-// варианты фильтра «Рейс» — своя загрузка, список её не ждёт; ошибка — в выпадающем списке «Рейс»
-void tripLoad.run()
 </script>
+
+<style scoped lang="scss">
+.requests__search-note {
+  color: $zs-text-muted;
+  font-size: 0.8rem;
+}
+</style>

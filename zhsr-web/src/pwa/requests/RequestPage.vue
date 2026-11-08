@@ -18,14 +18,11 @@
     </div>
 
     <template v-if="r">
-      <div v-if="r.tor" class="card__tor q-py-sm q-px-md">{{ t('ТОР: вагон отцеплен, ремонт в депо') }}</div>
-
       <div class="card__badges">
         <QueuedRefusal v-if="queuedItem?.refused" :item="queuedItem" />
         <span v-else-if="queuedItem" class="zs-badge card__queued">{{ t('Ожидает отправки') }}</span>
         <DictBadge v-else :id="r.requestStatusType" dict="RequestStatus" />
         <span :style="severityStyle(r.severityType)">{{ dictManager.getValue('Severity', r.severityType) }}</span>
-        <span v-if="r.forwarded" class="card__muted">{{ t('передана в депо') }}</span>
         <SoftLink
           v-if="queuedItem || card.editable.value"
           text="Редактировать заявку"
@@ -78,6 +75,26 @@
         <div v-if="card.stale.value" class="card__stale">{{ t('Фото недоступны без связи') }}</div>
       </section>
 
+      <!-- действия по заявке: только доступные сейчас; без связи действие встаёт в очередь телефона -->
+      <section v-if="card.waitingDecision.value" class="card__section q-pt-md q-px-sm q-pb-none">
+        <div class="card__need-net">{{ t('Действие ждёт отправки — новое можно сделать после неё') }}</div>
+      </section>
+      <section v-else-if="actions.length > 0" class="card__section q-pt-md q-px-sm q-pb-none">
+        <div class="card__buttons">
+          <button
+            v-for="a in actions"
+            :key="a.action"
+            type="button"
+            class="card__btn q-py-none q-px-md"
+            :class="`card__btn--${a.kind}`"
+            :disabled="card.blocked.value"
+            @click="onAction(a.action)"
+          >
+            {{ a.title }}
+          </button>
+        </div>
+      </section>
+
       <section class="card__section q-pt-md q-px-sm q-pb-none">
         <div class="card__section-head">
           <span class="card__section-title">{{ t('История') }}</span>
@@ -93,25 +110,6 @@
           </template>
         </RequestHistory>
       </section>
-    </template>
-
-    <template v-if="hasBar" #bar>
-      <div v-if="!isOnline" class="card__need-net">
-        {{ t('Для действия нужна связь') }}
-      </div>
-      <div class="card__buttons">
-        <button
-          v-for="a in actions"
-          :key="a.action"
-          type="button"
-          class="card__btn q-py-none q-px-md"
-          :class="[`card__btn--${a.kind}`, { 'card__btn--wide': a.kind !== 'secondary' }]"
-          :disabled="card.blocked.value"
-          @click="onAction(a.action)"
-        >
-          {{ a.title }}
-        </button>
-      </div>
     </template>
   </PwaPage>
 
@@ -201,7 +199,6 @@ import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { formatDateTime } from '@/shared/format'
-import { isOnline } from '@/shared/network'
 import type { QueuedRequest } from '@/shared/offline/outbox'
 import PickSheet from '../components/PickSheet.vue'
 import QueuedItem from '../components/QueuedItem.vue'
@@ -288,9 +285,8 @@ const subtitle = computed(() => {
   return `${number} • ${formatDateTime(r.value.createdDt)}`
 })
 
-// отцепка ТОР и передача в депо на телефоне не выполняются
-const actions = computed(() => card.actions.value.filter((a) => a.action !== 'DETACH' && a.action !== 'FORWARD'))
-const hasBar = computed(() => actions.value.length > 0)
+// на телефоне — только действия, доступные сейчас: экономим место
+const actions = computed(() => card.actions.value.filter((a) => !a.reason))
 
 const takeOpen = ref(false)
 
@@ -389,14 +385,6 @@ function goBack() {
   font-size: 0.8rem;
 }
 
-.card__tor {
-  border-radius: 0.3rem;
-  background: #fbe1de;
-  color: $zs-error-fg;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
 .card__top-main {
   display: flex;
   flex: 1;
@@ -481,10 +469,6 @@ function goBack() {
   font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
-
-  &--wide {
-    flex-basis: 100%;
-  }
 
   &--grow {
     flex: 1;

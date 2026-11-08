@@ -2,30 +2,19 @@
   <DesktopFrame v-model:floating="floating" :back="back" :right-open="true">
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Формирование рейса') }}</h1>
-      <div v-if="crew && inProgress" class="desktop-frame__actions">
-        <template v-if="canCouple">
-          <button type="button" class="trip-form__btn q-py-none q-px-md" @click="couple('detach')">
-            {{ t('Отцепка') }}
+      <!-- действия рейса в пути и после прибытия: без прав — кнопки нет; не тот статус — неактивна, причина рядом -->
+      <div v-if="crew && !planned && headerButtons.length > 0" class="desktop-frame__actions">
+        <template v-for="b in headerButtons" :key="b.label">
+          <button
+            type="button"
+            :class="b.primary ? 'zs-btn-primary' : 'trip-form__btn q-py-none q-px-md'"
+            :disabled="!!b.reason || running"
+            @click="b.run"
+          >
+            {{ t(b.label) }}
           </button>
-          <button type="button" class="trip-form__btn q-py-none q-px-md" @click="couple('attach')">
-            {{ t('Прицепка') }}
-          </button>
+          <span v-if="b.reason" class="trip-form__reason">{{ b.reason }}</span>
         </template>
-        <button
-          type="button"
-          class="zs-btn-primary"
-          :disabled="!canMark || running"
-          :title="canMark ? '' : t('Начальник поезда этого рейса')"
-          @click="mark(false)"
-        >
-          {{ t('Отметить прибытие') }}
-        </button>
-        <button v-if="fixDeparture" type="button" class="zs-btn-primary" :disabled="running" @click="mark(true, true)">
-          {{ t('Исправить отправление') }}
-        </button>
-        <button v-if="fixArrival" type="button" class="zs-btn-primary" :disabled="running" @click="mark(false, true)">
-          {{ t('Исправить прибытие') }}
-        </button>
       </div>
     </template>
 
@@ -101,9 +90,17 @@
           <span :class="{ 'trip-form__warn': isAway(i) }">
             {{ where(i) }}
             <span v-if="isAway(i)" class="trip-form__block">{{ t('не на станции отправления') }}</span>
-            <button v-if="canReturn(i)" type="button" class="trip-form__link q-pa-none" @click="returnWagon(i)">
-              {{ t('Оформить передачу') }} →
-            </button>
+            <template v-if="isAway(i) && canTransfer">
+              <button
+                type="button"
+                class="trip-form__link q-pa-none"
+                :disabled="!!returnReason(i)"
+                @click="returnWagon(i)"
+              >
+                {{ t('Оформить передачу') }} →
+              </button>
+              <span v-if="returnReason(i)" class="trip-form__reason trip-form__block">{{ returnReason(i) }}</span>
+            </template>
           </span>
           <span>
             <template v-if="canAssign && w.passenger">
@@ -231,10 +228,10 @@
             </div>
             <div v-if="ready" class="trip-form__verdict">{{ t('Поезд готов к отправлению') }}</div>
             <button
+              v-if="canMark"
               type="button"
               class="zs-btn-primary"
-              :disabled="!canMark || !ready || running"
-              :title="canMark ? '' : t('Начальник поезда этого рейса')"
+              :disabled="!ready || running"
               @click="mark(true)"
             >
               {{ t('Отметить отправление') }}
@@ -335,6 +332,55 @@ const fixArrival = computed(
     markEditable(crew.value.trip.arrivalMarkedDt, now.value),
 )
 const canCouple = computed(() => canMark.value || hasRole(currentUser.value, RoleType.MASTER))
+
+/** Почему действие недоступно в текущем статусе рейса; пусто — доступно. */
+function statusReason(...allowed: number[]): string {
+  const s = crew.value?.trip.tripStatusType
+  if (s !== undefined && allowed.includes(s)) return ''
+  return t('Недоступно в статусе «{status}»', { status: dictManager.getValue('TripState', s) })
+}
+const FIX_REASON = 'Исправить можно в течение 10 минут после отметки'
+
+/** Кнопки в шапке: только те, на которые есть права; reason — почему недоступно сейчас. */
+const headerButtons = computed(() =>
+  [
+    {
+      label: 'Отцепка',
+      show: canCouple.value,
+      primary: false,
+      reason: statusReason(TripStatus.IN_PROGRESS),
+      run: () => couple('detach'),
+    },
+    {
+      label: 'Прицепка',
+      show: canCouple.value,
+      primary: false,
+      reason: statusReason(TripStatus.IN_PROGRESS),
+      run: () => couple('attach'),
+    },
+    {
+      label: 'Отметить прибытие',
+      show: canMark.value,
+      primary: true,
+      reason: statusReason(TripStatus.IN_PROGRESS),
+      run: () => mark(false),
+    },
+    {
+      label: 'Исправить отправление',
+      show: canMark.value,
+      primary: true,
+      reason: statusReason(TripStatus.IN_PROGRESS) || (fixDeparture.value ? '' : t(FIX_REASON)),
+      run: () => mark(true, true),
+    },
+    {
+      label: 'Исправить прибытие',
+      show: canMark.value,
+      primary: true,
+      reason: statusReason(TripStatus.DONE) || (fixArrival.value ? '' : t(FIX_REASON)),
+      run: () => mark(false, true),
+    },
+  ].filter((b) => b.show),
+)
 const canAssign = computed(
   () =>
     canEditCrew.value || (inProgress.value && isAdmin.value) || ((planned.value || inProgress.value) && isChief.value),
@@ -508,15 +554,16 @@ const atStation = (i: number) => {
 }
 const isAway = (i: number) => planned.value && !atStation(i)
 
-// вагон в депо или парке отстоя: передачу на станцию оформляют мастер депо, приёмщик и администратор
-function canReturn(i: number): boolean {
-  const u = currentUser.value
+// передачу на станцию оформляют мастер депо, приёмщик и администратор
+const canTransfer = computed(() =>
+  [RoleType.ADMIN, RoleType.MASTER, RoleType.RECEIVER].some((r) => hasRole(currentUser.value, r)),
+)
+
+/** Почему передачу вагона не оформить: передать на станцию можно только из депо или парка отстоя; пусто — можно. */
+function returnReason(i: number): string {
   const w = liveWagon(i)
-  return (
-    isAway(i) &&
-    (w.locationType === LocationType.DEPOT || w.locationType === LocationType.YARD) &&
-    (hasRole(u, RoleType.ADMIN) || hasRole(u, RoleType.MASTER) || hasRole(u, RoleType.RECEIVER))
-  )
+  if (w.locationType === LocationType.DEPOT || w.locationType === LocationType.YARD) return ''
+  return t('Передать на станцию можно только из депо или парка отстоя')
 }
 
 function returnWagon(i: number) {
@@ -744,6 +791,11 @@ async function mark(depart: boolean, fix = false) {
   }
 }
 
+.trip-form__reason {
+  color: $zs-text-muted;
+  font-size: 0.8rem;
+}
+
 .trip-form__link {
   display: block;
   border: 0;
@@ -753,6 +805,11 @@ async function mark(depart: boolean, fix = false) {
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
+
+  &:disabled {
+    color: $zs-text-muted;
+    cursor: default;
+  }
 }
 
 .trip-form__moves {

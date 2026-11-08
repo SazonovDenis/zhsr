@@ -15,10 +15,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import type { RequestAction } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { formatDateTime } from '@/shared/format'
 import type { OutboxItem } from '@/shared/offline/outbox'
 import RequestHistoryItem from '@/shared/requests/RequestHistoryItem.vue'
+import { ACTIONS } from '@/shared/requests/rights'
 import { currentUser } from '@/shared/user'
 import QueuedPhoto from './QueuedPhoto.vue'
 import QueuedRefusal from './QueuedRefusal.vue'
@@ -38,11 +40,15 @@ const pending = useQueuedPhotos(() => photos.value)
 const waiting = computed(() => props.items.some((x) => !x.refused))
 
 const title = computed(() => {
+  const action = records.value.find((x) => x.kind === 'action')
+  if (action) return t(ACTIONS[action.action as RequestAction].title)
+  const assign = records.value.find((x) => x.kind === 'assign')
+  if (assign) return assign.executor ? `${t('Назначение')}: ${assign.text}` : t('Назначение снято')
   if (records.value.some((x) => x.kind === 'edit')) return t('Исправление заявки')
   return t(records.value.length > 0 ? 'Примечание' : 'Приложено фото')
 })
 const meta = computed(() => `${formatDateTime(props.items[0]!.created)} • ${currentUser.value?.name ?? ''}`)
-const text = computed(() => records.value.find((x) => x.kind === 'note')?.text ?? '')
+const text = computed(() => records.value.find((x) => x.kind === 'note' || x.kind === 'action')?.text ?? '')
 </script>
 
 <style scoped lang="scss">

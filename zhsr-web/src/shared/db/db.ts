@@ -55,7 +55,7 @@ export function randomGuid(): string {
 }
 
 /** Что лежит в очереди: новая заявка, исправление заявки, примечание к заявке или одно фото к заявке. */
-export type OutboxKind = 'request' | 'edit' | 'note' | 'photo'
+export type OutboxKind = 'request' | 'edit' | 'note' | 'photo' | 'action' | 'assign'
 
 /** Сделанное без связи: уходит на сервер, когда связь появится. */
 export interface OutboxRow {
@@ -76,8 +76,12 @@ export interface OutboxRow {
   wagonType: number
   /** рейс — для показа: в черновике рейс — id */
   trip: TripRef | null
-  /** текст примечания */
+  /** текст примечания; у действия — комментарий; у назначения — имя исполнителя для показа */
   text: string
+  /** действие над заявкой (RequestAction) — у записи action */
+  action?: string
+  /** исполнитель — id сотрудника, null — снять назначение; у записи assign */
+  executor?: number | null
   /** фото: каждое фото — своя запись */
   photo: Blob | null
   /** когда пользователь это сделал, ISO */

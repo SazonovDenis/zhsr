@@ -13,6 +13,7 @@ import kz.zhsr.app.dto.user.LoginRequest;
 import kz.zhsr.app.dto.user.UserInfo;
 import kz.zhsr.app.dto.user.UserTrip;
 import kz.zhsr.app.service.dict.DictService;
+import kz.zhsr.app.service.request.RequestService;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -33,14 +34,19 @@ public class SessionService {
     private final CurrentUserService currentUserService;
     private final DictService dictService;
     private final SecurityContextRepository securityContextRepository;
+    private final RequestService requestService;
+    private final TransferService transferService;
 
     public SessionService(Db db, PasswordEncoder passwordEncoder, CurrentUserService currentUserService,
-                          DictService dictService, SecurityContextRepository securityContextRepository) {
+                          DictService dictService, SecurityContextRepository securityContextRepository,
+                          RequestService requestService, TransferService transferService) {
         this.db = db;
         this.passwordEncoder = passwordEncoder;
         this.currentUserService = currentUserService;
         this.dictService = dictService;
         this.securityContextRepository = securityContextRepository;
+        this.requestService = requestService;
+        this.transferService = transferService;
     }
 
     /**
@@ -141,11 +147,12 @@ public class SessionService {
     }
 
     /**
-     * Сводка для сотрудника. Счётчики (заявки, акты передачи) сервер не считает: пусто.
+     * Сводка для сотрудника - счётчики пунктов меню (id из menu.json): requests - заявки, которые ждут его действия;
+     * acts - акты приёма-передачи, которые ждут его приёма.
      */
-    public CurrentState state() {
+    public CurrentState state() throws Exception {
         currentUserService.get();
-        return new CurrentState(Map.of());
+        return new CurrentState(Map.of("requests", requestService.todoCount(), "acts", transferService.pendingCount()));
     }
 
     /**

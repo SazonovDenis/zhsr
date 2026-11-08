@@ -56,17 +56,19 @@ export function placeStation(p: TransferPlace): number | null {
   return null
 }
 
+/** Название расположения: станции, депо или парка отстоя. */
+export function placeName(p: TransferPlace): string {
+  if (p.station !== null) return dictManager.getValue('Station', p.station)
+  if (p.depot !== null) return dictManager.getValue('Depot', p.depot)
+  if (p.yard !== null) return dictManager.getValue('Yard', p.yard)
+  return ''
+}
+
 /** Расположение для показа: «Название • вид расположения». */
 export function transferPlaceText(p: TransferPlace): string {
   const kind = placeKind(p)
   if (kind === null) return ''
-  const name =
-    p.station !== null
-      ? dictManager.getValue('Station', p.station)
-      : p.depot !== null
-        ? dictManager.getValue('Depot', p.depot)
-        : dictManager.getValue('Yard', p.yard)
-  return `${name} • ${dictManager.getValue('LocationKind', kind)}`
+  return `${placeName(p)} • ${dictManager.getValue('LocationKind', kind)}`
 }
 
 /** Расположения станции: сама станция, её депо и парки отстоя. */

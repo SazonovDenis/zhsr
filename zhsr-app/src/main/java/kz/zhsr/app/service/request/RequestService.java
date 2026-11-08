@@ -5,14 +5,17 @@ import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
+import kz.zhsr.app.constants.CrewDuty;
 import kz.zhsr.app.constants.LocationType;
 import kz.zhsr.app.constants.RequestStatus;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.request.RequestActionBody;
 import kz.zhsr.app.dto.request.RequestCounts;
 import kz.zhsr.app.dto.request.RequestDetail;
 import kz.zhsr.app.dto.request.RequestDraft;
+import kz.zhsr.app.dto.request.RequestExecutorBody;
 import kz.zhsr.app.dto.request.RequestExecutorRecord;
 import kz.zhsr.app.dto.request.RequestFilter;
 import kz.zhsr.app.dto.request.RequestNote;
@@ -87,6 +90,15 @@ public class RequestService {
         List<RequestRow> res = load(filter, true, sort);
         refResolver.resolve(res);
         return res;
+    }
+
+    /**
+     * Сколько заявок ждёт действия лично сотрудника (счётчик меню «Заявки»): столько же, сколько строк в списке «мне
+     * на исполнение» без других отборов.
+     */
+    public int todoCount() throws Exception {
+        RequestFilter filter = new RequestFilter("todo", null, null, null, null, null, null, null, null);
+        return load(filter, true, new ListSort(null, false)).size();
     }
 
     /**
@@ -222,23 +234,31 @@ public class RequestService {
      * Выполнить действие над заявкой (Ф-ЗАЯ-03, Ф-ЗАЯ-07): запись в журнал и комментарий - примечанием к заявке.
      */
     @Transactional
-    public RequestDetail action(long id, RequestAction action, String comment) throws Exception {
+    public RequestDetail action(long id, RequestAction action, RequestActionBody body) throws Exception {
+        if (body == null) {
+            body = new RequestActionBody(null, null, null);
+        }
+        if (!offlineReceipt.accept(body.clientGuid())) {
+            return detail(id);
+        }
         CurrentUser user = currentUserService.get();
         RequestRow row = row(id);
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime at = clientTime(body.clientDt(), now);
+        requireUnchangedSince(id, body.clientDt());
         rights.checkAction(user, row, isVisible(user, id), action);
-        String text = comment == null ? "" : comment.trim();
+        String text = body.comment() == null ? "" : body.comment().trim();
         if (action.commentRequired && text.isEmpty()) {
             throw ApiException.badRequest("Укажите комментарий");
         }
         Long executor = switch (action) {
-            case TAKE, DETACH -> user.id();
-            case RELEASE, FORWARD -> null;
+            case TAKE -> user.id();
+            case RELEASE -> null;
             default -> row.getExecutorUsr() == null ? null : row.getExecutorUsr().getId();
         };
-        OffsetDateTime now = OffsetDateTime.now();
-        move(row, action.status, executor, user.id(), now);
+        move(row, action.status, executor, user.id(), at);
         if (!text.isEmpty()) {
-            insertNote(id, text, user.id(), now, now);
+            insertNote(id, text, user.id(), at, now);
         }
         return detail(id);
     }
@@ -249,9 +269,14 @@ public class RequestService {
      * меняется.
      */
     @Transactional
-    public RequestDetail assign(long id, Long executor) throws Exception {
+    public RequestDetail assign(long id, RequestExecutorBody body) throws Exception {
+        if (!offlineReceipt.accept(body.clientGuid())) {
+            return detail(id);
+        }
+        Long executor = body.executor();
         CurrentUser user = currentUserService.get();
         RequestRow row = row(id);
+        requireUnchangedSince(id, body.clientDt());
         rights.checkAssign(user, row);
         Long current = row.getExecutorUsr() == null ? null : row.getExecutorUsr().getId();
         if (Objects.equals(current, executor)) {
@@ -268,7 +293,7 @@ public class RequestService {
         } else {
             throw ApiException.badRequest("Снять исполнителя можно только с назначенной заявки");
         }
-        move(row, status, executor, user.id(), OffsetDateTime.now());
+        move(row, status, executor, user.id(), clientTime(body.clientDt(), OffsetDateTime.now()));
         return detail(id);
     }
 
@@ -321,6 +346,19 @@ public class RequestService {
     // --- внутреннее
 
     /**
+     * Действие, которое ждало связи на телефоне, несвоевременно, если после него у заявки сменились статус или
+     * исполнитель (журналы статусов и исполнителей): пользователь решал по устаревшему виду заявки.
+     *
+     * @param clientDt когда пользователь выполнил действие; null - действие не ждало, проверять нечего
+     * @throws ApiException 409 - после действия заявка изменилась
+     */
+    private void requireUnchangedSince(long id, OffsetDateTime clientDt) throws Exception {
+        if (clientDt != null && db.loadSqlRec(RequestSql.changedAfter(), Map.of("id", id, "at", clientDt)) != null) {
+            throw ApiException.conflict("Пока действие ждало связи, статус или исполнитель заявки изменились");
+        }
+    }
+
+    /**
      * Время действия пользователя. Не передано или позже времени сервера (часы телефона спешат) - время сервера.
      */
     private static OffsetDateTime clientTime(OffsetDateTime clientDt, OffsetDateTime now) {
@@ -329,13 +367,18 @@ public class RequestService {
 
     private List<RequestRow> load(RequestFilter filter, boolean byStatus, ListSort sort) throws Exception {
         CurrentUser user = currentUserService.get();
+        // поиск по номеру, вагону и неисправности отменяет список и все фильтры: ищется среди всех заявок (Ф-ЗАЯ-06)
+        if (filter.query() != null && !filter.query().isBlank()) {
+            filter = new RequestFilter(null, null, filter.query(), null, null, null, null, null, null);
+        }
         SqlQuery q = RequestSql.list(filter, user.id(), visibility(user), List.copyOf(RequestRights.FINAL_STATUSES),
                 byStatus, sort);
         return db.loadSql(q.sql(), q.params(), RequestRow.class);
     }
 
     /**
-     * Параметры условия видимости заявки для исполнения (RequestSql, VISIBLE) - по сотруднику.
+     * Параметры условий видимости заявки для исполнения и списка «на исполнение» (RequestSql, VISIBLE и TODO) - по
+     * сотруднику.
      */
     private static Map<String, Object> visibility(CurrentUser user) {
         Map<String, Object> res = new HashMap<>();
@@ -345,6 +388,14 @@ public class RequestService {
         res.put("myTrip", user.trip() == null ? null : user.trip().id());
         res.put("myDepotStation", user.depotStation());
         res.put("tripLocation", LocationType.TRIP);
+        // приём работы (RequestSql, ACCEPTABLE) и статусы списка «на исполнение» (RequestSql, TODO)
+        CurrentUser.Trip trip = user.trip();
+        res.put("myLnp", trip != null && trip.duty() == CrewDuty.LNP);
+        res.put("myWagons", trip != null && trip.duty() == CrewDuty.CONDUCTOR ? trip.wagons() : List.of());
+        res.put("acceptor", user.hasRole(RoleType.INSTRUCTOR) || user.hasRole(RoleType.OPERATOR));
+        res.put("assigned", RequestStatus.ASSIGNED);
+        res.put("inProgress", RequestStatus.IN_PROGRESS);
+        res.put("done", RequestStatus.DONE);
         return res;
     }
 

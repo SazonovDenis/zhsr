@@ -60,6 +60,41 @@ final class RequestSql {
                           and coalesce(wagon_info.station, depot.station, yard.station) = :myDepotStation))))""";
 
     /**
+     * Сотрудник принимает работу по заявке (Ф-ЗАЯ-03) - то же правило, что {@link RequestRights} canAccept: вагон в
+     * рейсе - текущий рейс сотрудника, а он ЛНП рейса или проводник этого вагона; вагон не в рейсе - сотрудник
+     * инструктор поездных бригад или эксплуатационщик, депо которого на станции вагона. Администратор - всегда.
+     * <p>
+     * Параметры: admin, myTrip, myDepotStation, tripLocation - как у {@link #VISIBLE}; myLnp - сотрудник ЛНП своего
+     * рейса; myWagons - вагоны, за которыми он закреплён проводником; acceptor - роль инструктора или
+     * эксплуатационщика.
+     */
+    private static final String ACCEPTABLE = """
+            (:admin
+             or (wagon_info.location_type = :tripLocation and wagon_info.trip = :myTrip
+                 and (:myLnp or wagon.id = any(:myWagons)))
+             or (wagon_info.location_type <> :tripLocation and :acceptor
+                 and coalesce(wagon_info.station, depot.station, yard.station) = :myDepotStation))""";
+
+    /**
+     * Заявка ждёт действия лично сотрудника - список «мне на исполнение»: назначена ему или в работе у него; выполнена
+     * и он принимает работу ({@link #ACCEPTABLE}).
+     * <p>
+     * Параметры: me, assigned, inProgress, done - статусы (request_status_type); параметры {@link #ACCEPTABLE}.
+     */
+    private static final String TODO = """
+            ((repair_request_info.request_status_type in (:assigned, :inProgress)
+              and repair_request_info.executor_usr = :me)
+             or (repair_request_info.request_status_type = :done and """ + ACCEPTABLE + """
+            ))""";
+
+    /**
+     * Заявка видна сотруднику - список «все»: видна ему для исполнения по службе ({@link #VISIBLE}), ждёт его
+     * действия ({@link #TODO}) или подана им. Администратор видит все. Параметры: как у {@link #VISIBLE} и
+     * {@link #TODO}.
+     */
+    private static final String SEEN = "(" + VISIBLE + "\n or " + TODO + "\n or repair_request.created_by_usr = :me)";
+
+    /**
      * Строка заявки: поля заявки, текущие статус, служба и исполнитель (repair_request_info), где вагон сейчас и
      * число фото. Где вагон: place - станция, депо или парк отстоя; wagon_station - станция места (станция,
      * станция депо или парка отстоя); wagon_trip - рейс, если вагон в рейсе. Параметр tripLocation -
@@ -82,8 +117,8 @@ final class RequestSql {
     /**
      * Заявки по фильтру; если byStatus false - без отбора по статусам и критичности (для чисел у фильтров).
      *
-     * @param me         сотрудник - для списков «мои» и «на исполнение»
-     * @param visibility параметры условия {@link #VISIBLE} - для списка «на исполнение»
+     * @param me         сотрудник - для списков
+     * @param visibility параметры условий {@link #TODO} и {@link #SEEN}, кроме me
      * @param finals     конечные статусы - для отбора открытых и закрытых
      * @param byStatus   отбирать по статусам и критичности фильтра
      */
@@ -93,9 +128,14 @@ final class RequestSql {
         if ("mine".equals(filter.scope())) {
             where.add("repair_request.created_by_usr = :me", "me", me);
         }
-        // «на исполнение»: назначена лично или видна для исполнения
+        // «мне на исполнение»: ждёт действия лично сотрудника
         if ("todo".equals(filter.scope())) {
-            where.add("(repair_request_info.executor_usr = :me or " + VISIBLE + ")", "me", me);
+            where.add(TODO, "me", me);
+            visibility.forEach(where::param);
+        }
+        // «все»: видные сотруднику
+        if ("all".equals(filter.scope())) {
+            where.add(SEEN, "me", me);
             visibility.forEach(where::param);
         }
         if (filter.closed() != null) {
@@ -160,6 +200,20 @@ final class RequestSql {
      */
     static String lockNumbers() {
         return "select pg_advisory_xact_lock(:key) as locked";
+    }
+
+    /**
+     * Смена статуса или исполнителя заявки позже момента: строка есть - была. Параметры: id, at.
+     */
+    static String changedAfter() {
+        return """
+                select repair_request_status.id from repair_request_status
+                where repair_request_status.repair_request = :id and repair_request_status.dbeg > :at
+                union all
+                select repair_request_executor.id from repair_request_executor
+                where repair_request_executor.repair_request = :id and repair_request_executor.dbeg > :at
+                limit 1
+                """;
     }
 
     /**

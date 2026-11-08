@@ -22,8 +22,8 @@ import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { isoDateTime } from '@/shared/format'
 import { isOnline } from '@/shared/network'
-import { findCachedRow } from '@/shared/offline/cache'
-import { queueNote, queuePhotos } from '@/shared/offline/outbox'
+import { findCachedRow, loadCached } from '@/shared/offline/cache'
+import { queueAction, queueAssign, queuedDecision, queueNote, queuePhotos } from '@/shared/offline/outbox'
 import { currentUser } from '@/shared/user'
 import { ACTIONS, canAssign, canEdit, editBlockReason, requestActions } from './rights'
 
@@ -32,8 +32,8 @@ import { ACTIONS, canAssign, canEdit, editBlockReason, requestActions } from './
  * по правам пользователя, ввод комментария к действию, назначение исполнителя и примечание с фото.
  *
  * offline — мобильная часть: без связи заявка показывается из строки сохранённого списка заявок, без истории и фото
- * (stale). Сама карточка на телефоне не сохраняется. Действия без связи недоступны; примечание без связи встаёт в
- * очередь на телефоне и отправится само.
+ * (stale). Сама карточка на телефоне не сохраняется. На телефоне без связи действие, назначение и примечание встают
+ * в очередь и отправятся сами; действие и назначение при отправке проверяются заново (outbox.ts, queueAction).
  */
 /** Сохранённые списки заявок мобильной части: страница «Заявки» и главная. */
 export const isRequestList = (key: string) => key.startsWith('requests:') || key === 'today'
@@ -82,7 +82,7 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
       // карточка и справочники для её показа (неисправность, тип вагона, место вагона) — параллельно
       const [, result] = await busy.run(
         Promise.all([
-          dictManager.prepareDicts('FaultType', 'WagonType', 'Station', 'Depot', 'Yard'),
+          dictManager.prepareDicts('FaultType', 'WagonType', 'Station', 'Depot', 'Yard', 'RequestStatus'),
           offline ? loadOffline(current) : fetchRequest(current).then((data) => ({ data, stale: false })),
         ]),
       )
@@ -108,23 +108,35 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     return executor && executor.id !== user.value?.id ? executor.name : ''
   })
 
-  const actions = computed(() =>
-    request.value && user.value
-      ? requestActions(user.value, request.value).map((a) => ({
-          action: a,
-          ...ACTIONS[a],
-          title: t(ACTIONS[a].title),
-          kind: a === 'TAKE' && foreignExecutor.value ? ('secondary' as const) : ACTIONS[a].kind,
-        }))
-      : [],
-  )
+  /** кнопки действий: все, у недоступных — причина рядом (reason, переведена); конечный статус — кнопок нет */
+  const actions = computed(() => {
+    const r = request.value
+    if (!r || !user.value) return []
+    const status = dictManager.getValue('RequestStatus', r.requestStatusType)
+    return requestActions(user.value, r).map(({ action, reason }) => ({
+      action,
+      ...ACTIONS[action],
+      title: t(ACTIONS[action].title),
+      kind: action === 'TAKE' && foreignExecutor.value ? ('secondary' as const) : ACTIONS[action].kind,
+      reason: reason ? t(reason, { status }) : '',
+    }))
+  })
   const assignable = computed(() => !!request.value && !!user.value && canAssign(user.value, request.value))
   const editable = computed(() => !!request.value && !!user.value && canEdit(user.value, request.value))
   const editHint = computed(() =>
     request.value && user.value ? t(editBlockReason(user.value, request.value) || 'Исправить заявку') : '',
   )
-  /** действия без связи недоступны */
-  const blocked = computed(() => !isOnline.value || running.value)
+  /** действие или назначение по заявке, которое ждёт отправки с телефона; null — нет */
+  const waitingDecision = computed(() => (offline && request.value ? queuedDecision(request.value.id) : null))
+  /**
+   * действия недоступны: идёт действие; на телефоне — пока предыдущее действие ждёт отправки (без связи действие
+   * встаёт в очередь); на десктопе — без связи
+   */
+  const blocked = computed(() =>
+    offline ? running.value || !!waitingDecision.value : !isOnline.value || running.value,
+  )
+  /** на телефоне без связи действие и назначение встают в очередь */
+  const queueing = () => offline && !isOnline.value
   /** примечание недоступно: на телефоне оно без связи встаёт в очередь */
   const noteBlocked = computed(() => (offline ? running.value : blocked.value))
 
@@ -132,15 +144,21 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
   watch(
     () => (assignable.value ? request.value?.service : null),
     async (service) => {
-      staff.value = service && isOnline.value ? await fetchServiceStaff(service) : []
+      staff.value = service && (offline || isOnline.value) ? await serviceStaff(service) : []
     },
     { immediate: true },
   )
 
+  /** Сотрудники службы; на телефоне без связи — сохранённый список: назначение без связи встаёт в очередь. */
+  async function serviceStaff(service: number): Promise<UserRef[]> {
+    if (!offline) return fetchServiceStaff(service)
+    return (await loadCached(`staff:${service}`, () => fetchServiceStaff(service))).data
+  }
+
   /** Загрузить сотрудников службы заново: для выбора исполнителя; ошибку показывает вызывающий. */
   async function loadStaff() {
     const service = request.value?.service
-    staff.value = service ? await fetchServiceStaff(service) : []
+    staff.value = service ? await serviceStaff(service) : []
   }
 
   /** Заявка изменилась на сервере: карточка — новая, списки и счётчики — загрузить заново. */
@@ -175,13 +193,30 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
       actionPhotos.value = []
       return
     }
+    if (queueing()) {
+      void queueDecided(() => queueAction(request.value!.id, action, '', [], user.value?.id ?? 0))
+      return
+    }
     void run(() => runRequestAction(request.value!.id, action))
+  }
+
+  /** Поставить действие или назначение в очередь телефона и сказать об этом. */
+  async function queueDecided(put: () => Promise<void>) {
+    await put()
+    Notify.create({ message: t('Связи нет. Действие сохранено на телефоне и отправится само'), position: 'bottom' })
   }
 
   /** Подтвердить действие с комментарием; без комментария не выполняется. */
   async function confirm() {
     if (!pending.value || !request.value || !comment.value.trim()) return
     const action = pending.value
+    if (queueing()) {
+      const id = request.value.id
+      const photos = actionPhotos.value
+      await queueDecided(() => queueAction(id, action, comment.value.trim(), photos, user.value?.id ?? 0))
+      pending.value = null
+      return
+    }
     if (!(await run(() => runRequestAction(request.value!.id, action, comment.value.trim())))) return
     pending.value = null
     // фото — следом, по одному, со временем действия: в истории они показываются вместе с ним
@@ -207,6 +242,12 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
 
   async function assign(executor: number | null) {
     if (!request.value) return
+    if (queueing()) {
+      const id = request.value.id
+      const name = staff.value.find((u) => u.id === executor)?.name ?? ''
+      await queueDecided(() => queueAssign(id, executor, name, user.value?.id ?? 0))
+      return
+    }
     await run(() => assignRequest(request.value!.id, executor))
   }
 
@@ -249,6 +290,7 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     error,
     running,
     blocked,
+    waitingDecision,
     noteBlocked,
     actions,
     foreignExecutor,

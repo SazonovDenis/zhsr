@@ -80,6 +80,7 @@ import { useRouter } from 'vue-router'
 import type { Transfer } from '@/api/transfers'
 import { acceptTransfer, fetchTransfers, transferFrom, transferTo } from '@/api/transfers'
 import { t } from '@/boot/i18n'
+import { bus } from '@/shared/bus'
 import { provideBusy } from '@/shared/busy'
 import CbButton from '@/shared/components/choice/CbButton.vue'
 import { openDialog } from '@/shared/components/dialog/openDialog'
@@ -169,6 +170,7 @@ async function accept() {
   try {
     await acceptTransfer(act.id)
     Notify.create({ message: t('Вагоны приняты'), type: 'positive', position: 'bottom' })
+    bus.emit('state-refresh')
     await load()
   } catch (e) {
     actionError.value = shownError(e)
@@ -183,6 +185,7 @@ async function reject() {
   const done = await openDialog<Transfer>(ActRejectDialog, { actId: act.id })
   if (!done) return
   Notify.create({ message: t('В приёме отказано'), position: 'bottom' })
+  bus.emit('state-refresh')
   await load()
 }
 </script>

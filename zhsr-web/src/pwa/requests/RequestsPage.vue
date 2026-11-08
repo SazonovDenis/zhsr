@@ -57,7 +57,7 @@ import { shownError } from '@/shared/errors'
 import { isoDateTime } from '@/shared/format'
 import { cachedRows, loadCached } from '@/shared/offline/cache'
 import { outbox, outboxAsRequest, queuedRequests, withQueuedEdit } from '@/shared/offline/outbox'
-import { canWork, FINAL_STATUSES } from '@/shared/requests/rights'
+import { FINAL_STATUSES, seenByMe, waitsForMe } from '@/shared/requests/rights'
 import { isRequestList, loadOffline } from '@/shared/requests/useRequestCard'
 import { currentUser } from '@/shared/user'
 import PwaPage from '../components/PwaPage.vue'
@@ -145,8 +145,8 @@ function matches(r: RepairRequest): boolean {
   if (FINAL_STATUSES.includes(r.requestStatusType) !== closed.value) return false
   if (closed.value && r.createdDt.slice(0, 10) < weekAgo()) return false
   if (scope.value === 'mine') return r.createdByUsr.id === u?.id
-  if (scope.value === 'todo') return r.executorUsr?.id === u?.id || (!!u && canWork(u, r))
-  return true
+  if (scope.value === 'todo') return !!u && waitsForMe(u, r)
+  return !!u && seenByMe(u, r)
 }
 
 /** Список по отбору: с сервера; нет связи — его копия, а нет копии — заявки из других сохранённых списков. */

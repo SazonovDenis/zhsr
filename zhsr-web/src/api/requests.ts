@@ -23,20 +23,9 @@ export interface WagonRef {
 
 /**
  * Действие над заявкой (Ф-ЗАЯ-03, Ф-ЗАЯ-07): взять в работу, выполнено, снять себя, принять работу, вернуть на
- * доработку, не выполнено, отклонить, отложить до ТО, отменить, передать в депо, ТОР — отцепить вагон.
+ * доработку, отклонить, отложить до ТО, отменить.
  */
-export type RequestAction =
-  | 'TAKE'
-  | 'COMPLETE'
-  | 'RELEASE'
-  | 'ACCEPT'
-  | 'RETURN'
-  | 'NOT_DONE'
-  | 'REJECT'
-  | 'DEFER'
-  | 'CANCEL'
-  | 'FORWARD'
-  | 'DETACH'
+export type RequestAction = 'TAKE' | 'COMPLETE' | 'RELEASE' | 'ACCEPT' | 'RETURN' | 'REJECT' | 'DEFER' | 'CANCEL'
 
 /** Заявка на ремонт. Сотрудник и рейс — объектом: id и имя для показа. */
 export interface RepairRequest {
@@ -74,10 +63,6 @@ export interface RepairRequest {
   requestStatusType: number
   /** текущий исполнитель; null — не назначен */
   executorUsr: UserRef | null
-  /** вагон отцеплен в ТОР по этой заявке; сервер пока не хранит — всегда false */
-  tor: boolean
-  /** ПЭМ передал заявку в депо: бригада рейса её уже не исполняет; сервер пока не хранит — всегда false */
-  forwarded: boolean
   /** сколько фото приложено к заявке и примечаниям */
   photoCount: number
 }
@@ -135,7 +120,10 @@ export interface RequestDetail extends RepairRequest {
   photos: StoredPhoto[]
 }
 
-/** Список заявок (Ф-ЗАЯ-06): «мои» — поданные пользователем; «на исполнение» — видные ему или назначенные лично. */
+/**
+ * Список заявок (Ф-ЗАЯ-06): mine — «созданные мной»; todo — «мне на исполнение»: назначены мне, в работе у меня,
+ * ждут моего приёма; all — «все»: видные мне по службе, ждут моего действия или поданы мной.
+ */
 export type RequestScope = 'mine' | 'todo' | 'all'
 
 export interface RequestFilter {
@@ -247,14 +235,33 @@ export async function updateRequest(id: number, draft: RequestDraft): Promise<Re
   return (await http.put<RepairRequest>(`/requests/${id}`, draftForm(draft))).data
 }
 
-/** Выполнить действие над заявкой (Ф-ЗАЯ-03, Ф-ЗАЯ-07); comment пишется примечанием к заявке. */
-export async function runRequestAction(id: number, action: RequestAction, comment = ''): Promise<RequestDetail> {
-  return detailOf((await http.post<ServerDetail>(`/requests/${id}/actions/${action}`, { comment })).data)
+/**
+ * Выполнить действие над заявкой (Ф-ЗАЯ-03, Ф-ЗАЯ-07); comment пишется примечанием к заявке. clientDt — когда
+ * пользователь выполнил действие, ISO, и clientGuid — guid записи: при отправке из очереди. Если после clientDt у
+ * заявки сменились статус или исполнитель, сервер отказывает: действие несвоевременно.
+ */
+export async function runRequestAction(
+  id: number,
+  action: RequestAction,
+  comment = '',
+  clientDt: string | null = null,
+  clientGuid: string | null = null,
+): Promise<RequestDetail> {
+  const body = { comment, clientDt, clientGuid }
+  return detailOf((await http.post<ServerDetail>(`/requests/${id}/actions/${action}`, body)).data)
 }
 
-/** Назначить исполнителя или снять назначение (executor = null) — Ф-ЗАЯ-02. */
-export async function assignRequest(id: number, executor: number | null): Promise<RequestDetail> {
-  return detailOf((await http.put<ServerDetail>(`/requests/${id}/executor`, { executor })).data)
+/**
+ * Назначить исполнителя или снять назначение (executor = null) — Ф-ЗАЯ-02. clientDt и clientGuid — как у
+ * runRequestAction.
+ */
+export async function assignRequest(
+  id: number,
+  executor: number | null,
+  clientDt: string | null = null,
+  clientGuid: string | null = null,
+): Promise<RequestDetail> {
+  return detailOf((await http.put<ServerDetail>(`/requests/${id}/executor`, { executor, clientDt, clientGuid })).data)
 }
 
 /**

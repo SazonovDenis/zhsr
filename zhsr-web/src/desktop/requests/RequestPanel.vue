@@ -14,38 +14,10 @@
     />
 
     <template v-if="r">
-      <div v-if="r.tor" class="request-panel__tor q-py-sm q-px-md">{{ t('ТОР: вагон отцеплен, ремонт в депо') }}</div>
-
       <div class="request-panel__badges">
         <DictBadge :id="r.requestStatusType" dict="RequestStatus" />
         <span :style="severityStyle(r.severityType)">{{ dictManager.getValue('Severity', r.severityType) }}</span>
-        <span v-if="r.forwarded" class="request-panel__mark">{{ t('передана в депо') }}</span>
       </div>
-
-      <!-- действия по заявке; причина — во всплывающем окне -->
-      <div v-if="actions.length > 0 || card.editable.value" class="request-panel__buttons">
-        <button
-          v-for="a in actions"
-          :key="a.action"
-          type="button"
-          class="request-panel__btn q-py-none q-px-md"
-          :class="`request-panel__btn--${a.kind}`"
-          :disabled="card.blocked.value"
-          @click="onAction(a.action)"
-        >
-          {{ a.title }}
-        </button>
-        <button
-          v-if="card.editable.value"
-          type="button"
-          class="request-panel__btn q-py-none q-px-md"
-          :title="card.editHint.value"
-          @click="edit"
-        >
-          {{ t('Исправить') }}
-        </button>
-      </div>
-      <ErrorBox v-if="card.error.value" :error="card.error.value" class="request-panel__error q-py-sm q-px-md" />
 
       <SidePanelFields>
         <span>{{ t('Вагон') }}</span>
@@ -72,6 +44,35 @@
         </span>
       </SidePanelFields>
 
+      <!-- действия по заявке: без прав — нет кнопки; не тот статус — кнопка неактивна, причина рядом;
+           конечный статус — блока нет -->
+      <div v-if="actions.length > 0" class="request-panel__buttons">
+        <template v-for="a in actions" :key="a.action">
+          <button
+            type="button"
+            class="request-panel__btn q-py-none q-px-md"
+            :class="`request-panel__btn--${a.kind}`"
+            :disabled="card.blocked.value || !!a.reason"
+            @click="onAction(a.action)"
+          >
+            {{ a.title }}
+          </button>
+          <span class="request-panel__reason">{{ a.reason }}</span>
+        </template>
+        <template v-if="isAuthor">
+          <button
+            type="button"
+            class="request-panel__btn q-py-none q-px-md"
+            :disabled="card.blocked.value || !card.editable.value"
+            @click="edit"
+          >
+            {{ t('Исправить') }}
+          </button>
+          <span class="request-panel__reason">{{ card.editable.value ? '' : card.editHint.value }}</span>
+        </template>
+      </div>
+      <ErrorBox v-if="card.error.value" :error="card.error.value" class="request-panel__error q-py-sm q-px-md" />
+
       <TextPhotos
         v-if="r.description || tree.photos.length > 0"
         :photos="tree.photos"
@@ -96,6 +97,7 @@ import { computed, toRef } from 'vue'
 
 import type { RepairRequest, RequestAction } from '@/api/requests'
 import { t } from '@/boot/i18n'
+import { currentUser } from '@/shared/user'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import { provideBusy } from '@/shared/busy'
@@ -136,8 +138,7 @@ const card = useRequestCard(toRef(props, 'requestId'), false, busy)
 // история и фото — из плоских списков сервера
 const tree = computed(() => historyTree(card.request.value, [], card.request.value?.createdDt ?? null))
 
-// ТОР (отцепка вагона) на десктопе из карточки не выполняется
-const actions = computed(() => card.actions.value.filter((a) => a.action !== 'DETACH'))
+const actions = computed(() => card.actions.value)
 
 /**
  * Действие по кнопке: взять в работу чужую заявку — после подтверждения; действие с причиной — после ввода причины
@@ -166,6 +167,8 @@ async function onAction(action: RequestAction) {
 }
 
 const r = computed(() => card.request.value)
+// исправляет только автор: остальным кнопки нет
+const isAuthor = computed(() => !!r.value && r.value.createdByUsr.id === currentUser.value?.id)
 
 // исполнитель — во всплывающем окне, из сотрудников службы заявки
 async function assign() {
@@ -198,24 +201,12 @@ async function edit() {
 </script>
 
 <style scoped lang="scss">
-.request-panel__tor {
-  border-radius: 0.3rem;
-  background: #fbe1de;
-  color: $zs-error-fg;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
 .request-panel__badges {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.8rem;
   font-size: 0.8rem;
-}
-
-.request-panel__mark {
-  color: $zs-text-muted;
 }
 
 .request-panel__section-title {
@@ -227,9 +218,15 @@ async function edit() {
 }
 
 .request-panel__buttons {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
   gap: 0.5rem;
+}
+
+.request-panel__reason {
+  color: $zs-text-muted;
+  font-size: 0.8rem;
 }
 
 .request-panel__btn {
@@ -276,9 +273,6 @@ async function edit() {
   }
 }
 
-
-
-
 .request-panel__error {
   border-radius: 0.3rem;
   background: $zs-error-bg;
@@ -289,7 +283,6 @@ async function edit() {
 .request-panel__block {
   display: block;
 }
-
 
 .request-panel__desc {
   font-size: 0.9rem;

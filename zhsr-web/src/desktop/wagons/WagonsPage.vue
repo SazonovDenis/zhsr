@@ -9,39 +9,43 @@
 
     <FilterBar>
       <TextInput v-model="filter.number" placeholder="Номер вагона" width="8.8rem" />
-      <CbList
-        v-model="filter.station"
-        single
-        placeholder="Станция"
-        :values="dictChoices('Station')"
-        :source="dictSource('Station')"
-        style="width: 8.9rem"
-      />
-      <CbList
-        v-model="filter.trip"
-        single
-        placeholder="Рейс"
-        :values="tripChoices"
-        :source="tripLoad"
-        style="width: 17.7rem"
-      >
-        <template #option="{ item }">
-          <TripOptionView :trip="tripOptionOf(item)" class="trip-option--list" />
-        </template>
-      </CbList>
-      <CbButton
-        v-model="filter.locationKinds"
-        label="Расположение"
-        :values="dictChoices('LocationKind')"
-        :max-button-count="4"
-      />
-      <CbButton
-        v-model="filter.states"
-        label="Состояние"
-        :values="dictChoices('WagonState')"
-        :hidden="[WagonStatus.OUT_OF_SERVICE]"
-        :max-button-count="5"
-      />
+      <!-- поиск по номеру отменяет фильтры: они скрыты и не применяются, но не очищаются -->
+      <span v-if="searching" class="wagons__search-note">{{ t('При поиске по номеру фильтры не применяются.') }}</span>
+      <template v-else>
+        <CbList
+          v-model="filter.station"
+          single
+          placeholder="Станция"
+          :values="dictChoices('Station')"
+          :source="dictSource('Station')"
+          style="width: 8.9rem"
+        />
+        <CbList
+          v-model="filter.trip"
+          single
+          placeholder="Рейс"
+          :values="tripChoices"
+          :source="tripLoad"
+          style="width: 17.7rem"
+        >
+          <template #option="{ item }">
+            <TripOptionView :trip="tripOptionOf(item)" class="trip-option--list" />
+          </template>
+        </CbList>
+        <CbButton
+          v-model="filter.locationKinds"
+          label="Расположение"
+          :values="dictChoices('LocationKind')"
+          :max-button-count="4"
+        />
+        <CbButton
+          v-model="filter.states"
+          label="Состояние"
+          :values="dictChoices('WagonState')"
+          :hidden="[WagonStatus.OUT_OF_SERVICE]"
+          :max-button-count="5"
+        />
+      </template>
       <template #right>{{ t('{n} вагонов', rows.length) }}</template>
     </FilterBar>
 
@@ -97,6 +101,8 @@ import { wagonsColumns } from './wagonsColumns'
 /** Список вагонов: фильтры и таблица. */
 
 const filter = reactive<WagonFilter>({ number: '', station: null, trip: null, locationKinds: [], states: [] })
+// поиск по номеру: фильтры скрыты, сервер их не применяет (Ф-ВАГ-04)
+const searching = computed(() => filter.number.trim() !== '')
 
 const rows = shallowRef<WagonRow[]>([])
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок (справочники, фильтры, список)
@@ -167,3 +173,10 @@ void init()
 // варианты фильтра «Рейс» — своя загрузка, список её не ждёт; ошибка — в выпадающем списке «Рейс»
 void tripLoad.run()
 </script>
+
+<style scoped lang="scss">
+.wagons__search-note {
+  color: $zs-text-muted;
+  font-size: 0.8rem;
+}
+</style>

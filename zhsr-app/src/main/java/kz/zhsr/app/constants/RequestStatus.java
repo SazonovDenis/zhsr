@@ -20,11 +20,11 @@ public final class RequestStatus {
     public static final long DONE = 4;
     /** Закрыта - работа принята */
     public static final long CLOSED = 5;
-    /** Отклонена - необоснованна или не выполнена */
+    /** Отклонена - получатель счёл заявку необоснованной */
     public static final long REJECTED = 6;
-    /** Отложена до ТО - решение мастера депо */
+    /** Отложена до ТО - выполнить сейчас невозможно: мастер депо или исполнитель отложил работу до ТО */
     public static final long DEFERRED = 7;
-    /** Отменена - отменена */
+    /** Отменена - автор отозвал заявку */
     public static final long CANCELLED = 8;
 
     private RequestStatus() {

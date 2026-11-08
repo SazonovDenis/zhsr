@@ -46,7 +46,7 @@ public class SessionController {
     }
 
     @GetMapping("/session/state")
-    public CurrentState state() {
+    public CurrentState state() throws Exception {
         return sessionService.state();
     }
 

@@ -1,8 +1,15 @@
 import { computed, ref } from 'vue'
 
 import { isLoginRequired, isPasswordChangeRequired, isRefusal } from '@/api/http'
-import type { RepairRequest, RequestDraft } from '@/api/requests'
-import { addRequestNote, addRequestPhoto, createRequest, updateRequest } from '@/api/requests'
+import type { RepairRequest, RequestAction, RequestDraft } from '@/api/requests'
+import {
+  addRequestNote,
+  addRequestPhoto,
+  assignRequest,
+  createRequest,
+  runRequestAction,
+  updateRequest,
+} from '@/api/requests'
 import type { TripRef } from '@/api/wagons'
 import { bus } from '@/shared/bus'
 import { RequestStatus } from '@/shared/constants/systemDicts'
@@ -14,7 +21,9 @@ import { faultDefaults } from '@/shared/requests/faults'
 import { currentUser, isServerChecked } from '@/shared/user'
 
 /**
- * Очередь отправки на сервер (IndexedDB, таблица outbox): новые заявки, исправления, примечания к заявкам и фото.
+ * Очередь отправки на сервер (IndexedDB, таблица outbox): новые заявки, исправления, примечания к заявкам, фото,
+ * действия над заявками и назначения исполнителя. Действие и назначение — пункты «списка дел»: к моменту отправки они
+ * могут оказаться несвоевременными, тогда сервер отказывает и пользователь видит причину.
  * Запись ждёт на телефоне и уходит на сервер сама, когда связь появится (событие браузера online, восстановление
  * соединения). Записи уходят в том порядке, в каком сделаны, и с временем, когда сделаны
  * (created). Номер заявке присваивает сервер при отправке. Очередь уходит только после сверки локальной БД с сервером
@@ -181,6 +190,48 @@ export async function queueNote(
   await reload()
 }
 
+/**
+ * Поставить в очередь действие над заявкой (Ф-ЗАЯ-03, Ф-ЗАЯ-07) с комментарием и фото. Это пункт «списка дел»: при
+ * отправке сервер проверяет его заново и отказывает, если после него у заявки сменились статус или исполнитель, —
+ * пользователь видит у записи «Не принято» с причиной.
+ */
+export async function queueAction(
+  request: number,
+  action: RequestAction,
+  comment: string,
+  photos: Blob[],
+  author: number,
+): Promise<void> {
+  const at = isoDateTime(new Date())
+  const row = newRow('action', author, { request, action, text: comment, created: at })
+  await db.outbox.bulkPut([row, ...photoRows({ request }, at, photos, author)])
+  await reload()
+  void flushOutbox()
+}
+
+/**
+ * Поставить в очередь назначение исполнителя (Ф-ЗАЯ-02); executor = null — снять назначение, name — имя для показа.
+ * Проверяется при отправке так же, как действие.
+ */
+export async function queueAssign(
+  request: number,
+  executor: number | null,
+  name: string,
+  author: number,
+): Promise<void> {
+  await db.outbox.put(newRow('assign', author, { request, executor, text: name }))
+  await reload()
+  void flushOutbox()
+}
+
+/** Действие или назначение заявки, которое ждёт отправки; нет — null. Пока оно ждёт, новое не ставится. */
+export function queuedDecision(request: number): OutboxItem | null {
+  return (
+    outbox.value.find((x) => (x.kind === 'action' || x.kind === 'assign') && x.request === request && !x.refused) ??
+    null
+  )
+}
+
 /** Поставить фото в очередь и отправить: при связи они идут вслед за заявкой или примечанием. */
 export async function queuePhotos(target: QueueTarget, at: string, photos: Blob[], author: number): Promise<void> {
   await db.outbox.bulkPut(photoRows(target, at, photos, author))
@@ -272,6 +323,9 @@ async function deliver(row: OutboxRow): Promise<void> {
   }
   if (row.kind === 'edit') await updateRequest(row.request!, draft)
   else if (row.kind === 'note') await addRequestNote(row.request!, row.text, [], row.created, row.guid)
+  else if (row.kind === 'action')
+    await runRequestAction(row.request!, row.action as RequestAction, row.text, row.created, row.guid)
+  else if (row.kind === 'assign') await assignRequest(row.request!, row.executor ?? null, row.created, row.guid)
   else await addRequestPhoto(row.request!, row.photo!, row.created, row.guid)
   await db.outbox.delete(row.id)
 }
@@ -346,8 +400,6 @@ export function outboxAsRequest(item: OutboxItem, authorName: string): QueuedReq
     description: item.draft.description,
     requestStatusType: RequestStatus.NEW,
     executorUsr: null,
-    tor: false,
-    forwarded: false,
     photoCount: queuedFor(item.guid).filter((x) => x.kind === 'photo').length,
     refused: item.refused,
   }

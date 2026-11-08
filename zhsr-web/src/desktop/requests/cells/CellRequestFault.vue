@@ -1,18 +1,16 @@
 <template>
   <div class="cell-request-fault">
     <span class="cell-request-fault__name">{{ faultName(row.faultType) }}</span>
-    <span v-if="row.tor" class="cell-request-fault__tor q-py-none q-px-sm">{{ t('ТОР') }}</span>
   </div>
   <div v-if="row.description" class="zs-sub cell-request-fault__desc">{{ row.description }}</div>
 </template>
 
 <script setup lang="ts">
 import type { RepairRequest } from '@/api/requests'
-import { t } from '@/boot/i18n'
 import type { CellProps } from '@/shared/components/table/types'
 import { faultName } from '@/shared/requests/requestView'
 
-/** Неисправность и начало описания одной строкой; отметка ТОР — вагон отцеплен в ремонт. */
+/** Неисправность и начало описания одной строкой. */
 defineProps<CellProps<RepairRequest>>()
 </script>
 
@@ -26,14 +24,6 @@ defineProps<CellProps<RepairRequest>>()
 .cell-request-fault__name {
   font-weight: 600;
   line-height: 1.3;
-}
-
-.cell-request-fault__tor {
-  border-radius: 0.3rem;
-  background: #fbe1de;
-  color: #a3261b;
-  font-size: 0.7rem;
-  font-weight: 700;
 }
 
 .cell-request-fault__desc {

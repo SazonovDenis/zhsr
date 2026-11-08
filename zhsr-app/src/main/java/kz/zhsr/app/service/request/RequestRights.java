@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.EnumSet;
 import java.util.Set;
 
 /**
@@ -38,68 +37,49 @@ public class RequestRights {
     public static final Duration EDIT_PERIOD = Duration.ofMinutes(10);
 
     /**
-     * Действия, которые сотрудник может выполнить над заявкой сейчас.
+     * Почему сотрудник не может выполнить действие: сначала граф статусов ({@link RequestAction#from}), затем кто
+     * выполняет действие. Те же правила - в zhsr-web (shared/requests/rights.ts, actionBlockReason).
      *
      * @param visible заявка видна сотруднику для исполнения (RequestSql, VISIBLE): такой сотрудник берёт её в работу
      *                и отклоняет
+     * @return причина; null - может
      */
-    public Set<RequestAction> actions(CurrentUser user, RequestRow r, boolean visible) {
-        Set<RequestAction> res = EnumSet.noneOf(RequestAction.class);
+    public String blockReason(CurrentUser user, RequestRow r, boolean visible, RequestAction action) {
         long s = r.getRequestStatusType();
-        if (FINAL_STATUSES.contains(s)) {
-            return res;
+        if (!action.from.contains(s)) {
+            return "Действие недоступно в текущем статусе заявки";
         }
         boolean admin = isAdmin(user);
-        boolean executor = isExecutor(user, r);
+        boolean executor = isExecutor(user, r) || admin;
         boolean master = isMyMaster(user, r) || admin;
-        // заявку, переданную в депо, бригада рейса уже не исполняет
-        boolean work = visible && !(r.isForwarded() && inMyTrip(user, r));
-        boolean pem = user.hasRole(RoleType.PEM) && inMyTrip(user, r) && user.trip().duty() == CrewDuty.PEM;
-        boolean active = s == RequestStatus.NEW || s == RequestStatus.ASSIGNED || s == RequestStatus.IN_PROGRESS;
-
-        // назначенную заявку берёт только назначенный исполнитель
-        if ((s == RequestStatus.NEW || s == RequestStatus.DEFERRED) && (work || master)) {
-            res.add(RequestAction.TAKE);
-        }
-        if (s == RequestStatus.ASSIGNED && (executor || admin)) {
-            res.add(RequestAction.TAKE);
-        }
-        if (s == RequestStatus.IN_PROGRESS && (executor || admin)) {
-            res.add(RequestAction.COMPLETE);
-            res.add(RequestAction.NOT_DONE);
-            res.add(RequestAction.RELEASE);
-        }
-        if (s == RequestStatus.DONE && canAccept(user, r)) {
-            res.add(RequestAction.ACCEPT);
-            res.add(RequestAction.RETURN);
-        }
-        if (active && ((pem && !r.isForwarded()) || admin)) {
-            res.add(RequestAction.FORWARD);
-        }
-        if (active && master) {
-            res.add(RequestAction.DEFER);
-        }
-        if ((s == RequestStatus.NEW || s == RequestStatus.ASSIGNED) && (work || master)) {
-            res.add(RequestAction.REJECT);
-        }
-        if (master) {
-            res.add(RequestAction.CANCEL);
-        }
-        if (active && master && !r.isTor()) {
-            res.add(RequestAction.DETACH);
-        }
-        return res;
+        boolean work = visible || master;
+        return switch (action) {
+            // назначенную заявку берёт только назначенный исполнитель
+            case TAKE -> s == RequestStatus.ASSIGNED
+                    ? (executor ? null : "Берёт в работу только назначенный исполнитель")
+                    : (work ? null : "Берёт в работу сотрудник службы заявки, которому она видна, или мастер депо");
+            case COMPLETE, RELEASE -> executor ? null : "Только исполнитель заявки";
+            case ACCEPT, RETURN -> canAccept(user, r) ? null
+                    : "Принимает работу: вагон в рейсе - ЛНП рейса или проводник вагона, иначе - инструктор поездных"
+                    + " бригад или эксплуатационщик депо станции вагона";
+            // выполнить невозможно - откладывает мастер депо или исполнитель заявки в работе
+            case DEFER -> master || (executor && s == RequestStatus.IN_PROGRESS) ? null
+                    : "Откладывает мастер депо станции вагона или исполнитель заявки в работе";
+            case REJECT -> work ? null : "Отклоняет сотрудник службы заявки или мастер депо";
+            case CANCEL -> isAuthor(user, r) || admin ? null : "Отменяет только автор заявки";
+        };
     }
 
     /**
      * Проверить, что сотрудник может выполнить действие.
      *
-     * @param visible см. {@link #actions}
-     * @throws ApiException 403 - не может
+     * @param visible см. {@link #blockReason}
+     * @throws ApiException 403 - не может, с причиной
      */
     public void checkAction(CurrentUser user, RequestRow r, boolean visible, RequestAction action) {
-        if (!actions(user, r, visible).contains(action)) {
-            throw ApiException.forbidden("Действие недоступно");
+        String reason = blockReason(user, r, visible, action);
+        if (reason != null) {
+            throw ApiException.forbidden(reason);
         }
     }
 
@@ -136,7 +116,7 @@ public class RequestRights {
         if (r.getCreatedByUsr().getId() != user.id()) {
             throw ApiException.forbidden("Исправить может только автор заявки");
         }
-        if (r.getRequestStatusType() != RequestStatus.NEW || r.getExecutorUsr() != null || r.isForwarded()
+        if (r.getRequestStatusType() != RequestStatus.NEW || r.getExecutorUsr() != null
                 || now.isAfter(r.getCreatedDt().plus(EDIT_PERIOD))) {
             throw ApiException.forbidden(
                     "Исправить можно в течение 10 минут после подачи, пока не сменились исполнитель и статус");
@@ -161,6 +141,10 @@ public class RequestRights {
 
     private static boolean isAdmin(CurrentUser user) {
         return user.hasRole(RoleType.ADMIN);
+    }
+
+    private static boolean isAuthor(CurrentUser user, RequestRow r) {
+        return r.getCreatedByUsr() != null && r.getCreatedByUsr().getId() == user.id();
     }
 
     private static boolean isExecutor(CurrentUser user, RequestRow r) {

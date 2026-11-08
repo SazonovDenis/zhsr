@@ -45,10 +45,6 @@ public class RequestRow {
     private long requestStatusType;
     /** текущий исполнитель (repair_request_info.executor_usr); null - не назначен */
     private UserRef executorUsr;
-    /** вагон отцеплен в ТОР по этой заявке; пока не хранится - всегда false */
-    private boolean tor;
-    /** ПЭМ передал заявку в депо; пока не хранится - всегда false */
-    private boolean forwarded;
     /** сколько фото приложено к заявке */
     private int photoCount;
 }

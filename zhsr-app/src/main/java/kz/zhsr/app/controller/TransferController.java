@@ -2,6 +2,7 @@ package kz.zhsr.app.controller;
 
 import kz.zhsr.app.dto.ref.UserRef;
 import kz.zhsr.app.dto.wagon.TransferPlace;
+import kz.zhsr.app.dto.wagon.TransferPlaceWagons;
 import kz.zhsr.app.dto.wagon.TransferRow;
 import kz.zhsr.app.dto.wagon.TransferWagon;
 import kz.zhsr.app.service.TransferService;
@@ -35,6 +36,12 @@ public class TransferController {
     @GetMapping("/transfers/wagons")
     public List<TransferWagon> wagons(TransferPlace from) throws Exception {
         return transferService.wagons(from);
+    }
+
+    /** Сколько вагонов стоит в каждом расположении станции. */
+    @GetMapping("/transfers/places")
+    public List<TransferPlaceWagons> places(@RequestParam long station) throws Exception {
+        return transferService.placeWagons(station);
     }
 
     /** Кто может сдать вагоны из расположения «откуда»: параметры station, depot, yard - ровно один. */

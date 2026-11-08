@@ -32,6 +32,8 @@ const CANCEL: Record<OutboxKind, string> = {
   edit: 'Отменить правку',
   note: 'Отменить примечание',
   photo: 'Отменить фото',
+  action: 'Убрать действие',
+  assign: 'Убрать назначение',
 }
 
 const open = ref(false)

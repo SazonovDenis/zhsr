@@ -108,33 +108,21 @@ function serverMoments(d: RequestDetail): { root: Moment; moments: Moment[] } {
 }
 
 /** Каким действием сменился статус; null — это только назначение исполнителя. */
-function actionOf(
-  prev: number,
-  prevExecutor: number | null,
-  status: number,
-  executor: number | null,
-  hasNote: boolean,
-): RequestAction | null {
-  if (status === prev) {
-    if (status === RequestStatus.NEW && executor === prevExecutor) return 'FORWARD'
-    if (status === RequestStatus.IN_PROGRESS && hasNote) return 'DETACH'
-    return null
-  }
+function actionOf(prev: number, status: number): RequestAction | null {
+  if (status === prev) return null
   switch (status) {
     case RequestStatus.IN_PROGRESS:
-      if (prev === RequestStatus.DONE) return 'RETURN'
-      return hasNote ? 'DETACH' : 'TAKE'
+      return prev === RequestStatus.DONE ? 'RETURN' : 'TAKE'
     case RequestStatus.DONE:
       return 'COMPLETE'
     case RequestStatus.CLOSED:
       return 'ACCEPT'
     case RequestStatus.NEW:
-      if (hasNote) return 'FORWARD'
       return prev === RequestStatus.IN_PROGRESS ? 'RELEASE' : null
     case RequestStatus.ASSIGNED:
       return null
     case RequestStatus.REJECTED:
-      return prev === RequestStatus.IN_PROGRESS ? 'NOT_DONE' : 'REJECT'
+      return 'REJECT'
     case RequestStatus.DEFERRED:
       return 'DEFER'
     default:
@@ -161,8 +149,7 @@ function serverEvents(d: RequestDetail, moments: Moment[]): RequestEvent[] {
     }
     const nextStatus = m.status ?? status
     const nextExecutor: UserRef | null = m.executor ? m.executor.usr : executor
-    const hasNote = m.note !== undefined
-    const action = actionOf(status, executor?.id ?? null, nextStatus, nextExecutor?.id ?? null, hasNote)
+    const action = actionOf(status, nextStatus)
     events.push(action ? { ...common, kind: 'STATUS', action } : { ...common, kind: 'ASSIGN', executor: nextExecutor })
     status = nextStatus
     executor = nextExecutor
@@ -174,11 +161,7 @@ function serverEvents(d: RequestDetail, moments: Moment[]): RequestEvent[] {
  * Дерево. detail = null — истории нет (заявка из очереди или без связи), узлы только из очереди. createdDt — время
  * заявки: ожидающие фото этой секунды — фото заявки.
  */
-export function historyTree(
-  detail: RequestDetail | null,
-  queued: OutboxItem[],
-  createdDt: string | null,
-): HistoryTree {
+export function historyTree(detail: RequestDetail | null, queued: OutboxItem[], createdDt: string | null): HistoryTree {
   const server = detail ? serverMoments(detail) : null
   const events = detail && server ? serverEvents(detail, server.moments) : []
   const nodes: HistoryNode[] = events.map((event, i) => ({ key: `event-${i}`, event, queued: [] }))

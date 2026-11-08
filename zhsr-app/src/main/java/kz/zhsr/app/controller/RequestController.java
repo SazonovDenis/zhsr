@@ -76,12 +76,12 @@ public class RequestController {
     @PostMapping("/requests/{id}/actions/{action}")
     public RequestDetail action(@PathVariable long id, @PathVariable RequestAction action,
                                 @RequestBody(required = false) RequestActionBody body) throws Exception {
-        return requestService.action(id, action, body == null ? null : body.comment());
+        return requestService.action(id, action, body);
     }
 
     @PutMapping("/requests/{id}/executor")
     public RequestDetail assign(@PathVariable long id, @RequestBody RequestExecutorBody body) throws Exception {
-        return requestService.assign(id, body.executor());
+        return requestService.assign(id, body);
     }
 
     @PostMapping("/requests/{id}/notes")

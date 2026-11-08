@@ -11,6 +11,7 @@ import kz.zhsr.app.constants.ActStatus;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.dto.ref.UserRef;
 import kz.zhsr.app.dto.wagon.TransferPlace;
+import kz.zhsr.app.dto.wagon.TransferPlaceWagons;
 import kz.zhsr.app.dto.wagon.TransferRow;
 import kz.zhsr.app.dto.wagon.TransferWagon;
 import org.springframework.stereotype.Service;
@@ -126,7 +127,17 @@ public class TransferService {
         if (from.filled() != 1) {
             return List.of();
         }
-        return DbRecMapper.toList(candidates(from), TransferWagon.class);
+        List<TransferWagon> res = DbRecMapper.toList(candidates(from), TransferWagon.class);
+        refResolver.resolve(res);
+        return res;
+    }
+
+    /**
+     * Сколько вагонов стоит в каждом расположении станции - для выбора «откуда»; расположений без вагонов в ответе нет.
+     */
+    public List<TransferPlaceWagons> placeWagons(long station) throws Exception {
+        currentUserService.get();
+        return db.loadSql(TransferSql.placeWagons(), Map.of("station", station), TransferPlaceWagons.class);
     }
 
     /**
@@ -141,6 +152,24 @@ public class TransferService {
                 Map.of("role", giverRole(from), "station", stationOf(from)), UserRef.class);
         refResolver.resolve(res);
         return res;
+    }
+
+    /**
+     * Сколько актов ждёт приёма текущим сотрудником (счётчик меню «Передача»): то же правило, что у canReceive.
+     */
+    public int pendingCount() throws Exception {
+        CurrentUser me = currentUserService.get();
+        boolean admin = me.hasRole(RoleType.ADMIN);
+        if (!admin && me.depotStation() == null) {
+            return 0;
+        }
+        Map<String, Object> params = new HashMap<>();
+        params.put("pending", ActStatus.PENDING);
+        params.put("admin", admin);
+        params.put("receiver", me.hasRole(RoleType.RECEIVER));
+        params.put("master", me.hasRole(RoleType.MASTER));
+        params.put("station", me.depotStation() == null ? 0L : me.depotStation());
+        return db.loadSqlRec(TransferSql.pendingForMe(), params).getLong("pending_count").intValue();
     }
 
     /**
@@ -167,7 +196,8 @@ public class TransferService {
             if (w == null) {
                 throw ApiException.conflict("Вагон " + item.number() + " не там, откуда передаётся");
             }
-            if (w.getString("pending_act") != null) {
+            // getString отдаёт для пустого значения пустую строку, а не null: проверяется само значение
+            if (w.get("pending_act") != null) {
                 throw ApiException.conflict("Вагон " + item.number() + " ожидает приёма по акту "
                         + w.getString("pending_act"));
             }

@@ -1,5 +1,6 @@
 import { isoDateTime } from '@/shared/format'
 import type { UserRef } from './requests'
+import type { WagonRow } from './wagons'
 import { http } from './http'
 
 /** API актов приёма-передачи вагонов между депо, станцией и парком отстоя (Ф-АКТ-02). */
@@ -45,18 +46,12 @@ export interface Transfer {
   canReceive: boolean
 }
 
-/** Вагон для акта. */
-export interface TransferWagon {
-  number: string
-  /** тип вагона — id справочника WagonType */
-  wagonType: number
-  /** вид расположения — id справочника LocationKind */
-  locationType: number
-  place: number
-  /** состояние вагона — id справочника WagonState */
-  wagonStatusType: number
+/** Вагон для акта: строка таблицы вагонов и акт, который ждёт приёма по этому вагону. */
+export interface TransferWagon extends WagonRow {
   /** номер акта, который ожидает приёма с этим вагоном; null — вагон можно передать */
   pendingAct: string | null
+  /** в акте, который ожидает приёма, вагон передаётся с имуществом; null — такого акта нет */
+  pendingWithProperty: boolean | null
 }
 
 export interface TransferDraft {
@@ -82,6 +77,16 @@ export async function fetchTransfers(states: number[]): Promise<Transfer[]> {
 /** Вагоны для акта: те, что стоят в расположении «откуда». */
 export async function fetchTransferWagons(from: TransferPlace): Promise<TransferWagon[]> {
   return (await http.get<TransferWagon[]>('/transfers/wagons', { params: from })).data
+}
+
+/** Расположение станции и сколько вагонов в нём стоит; заполнено одно из station, depot, yard. */
+export interface TransferPlaceWagons extends TransferPlace {
+  wagonCount: number
+}
+
+/** Сколько вагонов стоит в каждом расположении станции; расположений без вагонов в ответе нет. */
+export async function fetchTransferPlaces(station: number): Promise<TransferPlaceWagons[]> {
+  return (await http.get<TransferPlaceWagons[]>('/transfers/places', { params: { station } })).data
 }
 
 /** Кто может сдать вагоны из расположения «откуда» — для акта, проведённого сразу. */

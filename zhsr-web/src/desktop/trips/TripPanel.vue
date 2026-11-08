@@ -19,34 +19,14 @@
       <span>{{ t('Состояние') }}</span>
       <span><DictBadge :id="trip.tripStatusType" dict="TripState" /></span>
     </SidePanelFields>
+    <!-- действия: без прав — кнопки нет; не тот статус рейса — кнопка неактивна, причина рядом -->
     <div v-if="trip" class="trip-panel__actions">
-      <button type="button" class="trip-panel__btn q-py-none q-px-md" @click="openForm">{{ t('Формирование') }}</button>
-      <button v-if="canEditTrip" type="button" class="trip-panel__btn q-py-none q-px-md" @click="editTrip">
-        {{ t('Редактировать') }}
-      </button>
-      <button v-if="canDepart" type="button" class="trip-panel__btn q-py-none q-px-md" @click="mark(true)">
-        {{ t('Отметить отправление') }}
-      </button>
-      <button v-if="canArrive" type="button" class="trip-panel__btn q-py-none q-px-md" @click="mark(false)">
-        {{ t('Отметить прибытие') }}
-      </button>
-      <button v-if="fixDeparture" type="button" class="trip-panel__btn q-py-none q-px-md" @click="mark(true, true)">
-        {{ t('Исправить отправление') }}
-      </button>
-      <button v-if="fixArrival" type="button" class="trip-panel__btn q-py-none q-px-md" @click="mark(false, true)">
-        {{ t('Исправить прибытие') }}
-      </button>
-      <template v-if="canCouple">
-        <button type="button" class="trip-panel__btn q-py-none q-px-md" @click="couple('detach')">
-          {{ t('Отцепка') }}
+      <template v-for="b in buttons" :key="b.label">
+        <button type="button" class="trip-panel__btn q-py-none q-px-md" :disabled="!!b.reason" @click="b.run">
+          {{ t(b.label) }}
         </button>
-        <button type="button" class="trip-panel__btn q-py-none q-px-md" @click="couple('attach')">
-          {{ t('Прицепка') }}
-        </button>
+        <span class="trip-panel__reason">{{ b.reason }}</span>
       </template>
-      <button v-if="canCancel" type="button" class="trip-panel__btn q-py-none q-px-md" @click="cancel">
-        {{ t('Отменить рейс') }}
-      </button>
     </div>
   </SidePanel>
 </template>
@@ -89,8 +69,6 @@ const isChief = computed(() => {
 })
 const isAdmin = computed(() => hasRole(currentUser.value, RoleType.ADMIN))
 const canMark = computed(() => isChief.value || isAdmin.value)
-const canDepart = computed(() => canMark.value && props.trip?.tripStatusType === TripStatus.PLANNED)
-const canArrive = computed(() => canMark.value && props.trip?.tripStatusType === TripStatus.IN_PROGRESS)
 
 // исправить или отменить отметку можно 10 минут после неё
 const now = useNow()
@@ -107,17 +85,65 @@ const fixArrival = computed(
     markEditable(props.trip.arrivalMarkedDt, now.value),
 )
 
-const planned = computed(() => props.trip?.tripStatusType === TripStatus.PLANNED)
-const canEditTrip = computed(
-  () => planned.value && (hasRole(currentUser.value, RoleType.WAGON_PLANNER) || isAdmin.value),
-)
-const canCancel = canEditTrip
+// редактирует и отменяет рейс планировщик вагонов
+const isPlanner = computed(() => hasRole(currentUser.value, RoleType.WAGON_PLANNER) || isAdmin.value)
 // акт составляют начальник поезда этого рейса и мастер депо станции маршрута; станцию проверяет сервер
-const canCouple = computed(
-  () =>
-    props.trip?.tripStatusType === TripStatus.IN_PROGRESS &&
-    (canMark.value || hasRole(currentUser.value, RoleType.MASTER)),
-)
+const canCoupleRole = computed(() => canMark.value || hasRole(currentUser.value, RoleType.MASTER))
+
+/** Почему действие недоступно в текущем статусе рейса; пусто — доступно. */
+function statusReason(...allowed: number[]): string {
+  const s = props.trip?.tripStatusType
+  if (s !== undefined && allowed.includes(s)) return ''
+  return t('Недоступно в статусе «{status}»', { status: dictManager.getValue('TripState', s) })
+}
+const FIX_REASON = 'Исправить можно в течение 10 минут после отметки'
+
+/** Кнопки панели: только те, на которые есть права; reason — почему недоступно сейчас. */
+const buttons = computed(() => {
+  if (!props.trip) return []
+  const all = [
+    { label: 'Формирование', show: true, reason: '', run: openForm },
+    { label: 'Редактировать', show: isPlanner.value, reason: statusReason(TripStatus.PLANNED), run: editTrip },
+    {
+      label: 'Отметить отправление',
+      show: canMark.value,
+      reason: statusReason(TripStatus.PLANNED),
+      run: () => mark(true),
+    },
+    {
+      label: 'Отметить прибытие',
+      show: canMark.value,
+      reason: statusReason(TripStatus.IN_PROGRESS),
+      run: () => mark(false),
+    },
+    {
+      label: 'Исправить отправление',
+      show: canMark.value,
+      reason: statusReason(TripStatus.IN_PROGRESS) || (fixDeparture.value ? '' : t(FIX_REASON)),
+      run: () => mark(true, true),
+    },
+    {
+      label: 'Исправить прибытие',
+      show: canMark.value,
+      reason: statusReason(TripStatus.DONE) || (fixArrival.value ? '' : t(FIX_REASON)),
+      run: () => mark(false, true),
+    },
+    {
+      label: 'Отцепка',
+      show: canCoupleRole.value,
+      reason: statusReason(TripStatus.IN_PROGRESS),
+      run: () => couple('detach'),
+    },
+    {
+      label: 'Прицепка',
+      show: canCoupleRole.value,
+      reason: statusReason(TripStatus.IN_PROGRESS),
+      run: () => couple('attach'),
+    },
+    { label: 'Отменить рейс', show: isPlanner.value, reason: statusReason(TripStatus.PLANNED), run: cancel },
+  ]
+  return all.filter((b) => b.show)
+})
 
 onMounted(() => void loadCurrentUser())
 
@@ -166,9 +192,15 @@ async function mark(depart: boolean, fix = false) {
 
 <style scoped lang="scss">
 .trip-panel__actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
   gap: 0.5rem;
+}
+
+.trip-panel__reason {
+  color: $zs-text-muted;
+  font-size: 0.8rem;
 }
 
 .trip-panel__btn {
@@ -182,8 +214,13 @@ async function mark(depart: boolean, fix = false) {
   font-weight: 600;
   cursor: pointer;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: $zs-bg-hover;
+  }
+
+  &:disabled {
+    color: $zs-text-muted;
+    cursor: default;
   }
 }
 </style>
