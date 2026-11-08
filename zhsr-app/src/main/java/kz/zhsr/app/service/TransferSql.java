@@ -67,22 +67,26 @@ final class TransferSql {
     }
 
     /**
-     * Акты, новые первыми. Условия - по заданным параметрам.
+     * Акты, новые первыми. Станция акта - станция расположения «откуда». Условия - по заданным параметрам.
      *
-     * @param station отбор по параметру station
+     * @param station отбор по параметру station - станция акта
      * @param states  отбор по параметру states
      * @param one     отбор по параметру id
      */
     static String acts(boolean station, boolean states, boolean one) {
         return """
-                select transfer_act.id, transfer_act.number, transfer_act.transfer_direction_type,
-                       transfer_act.station, transfer_act.depot, transfer_act.yard, transfer_act.work_type,
+                select transfer_act.id, transfer_act.number,
+                       transfer_act.from_station, transfer_act.from_depot, transfer_act.from_yard,
+                       transfer_act.to_station, transfer_act.to_depot, transfer_act.to_yard, transfer_act.work_type,
                        transfer_act.act_status_type, transfer_act.transferred_dt, transfer_act.received_dt,
-                       transfer_act.reject_reason, transfer_act.transferred_by_usr, transfer_act.received_by_usr
+                       transfer_act.reject_reason, transfer_act.transferred_by_usr, transfer_act.received_by_usr,
+                       coalesce(transfer_act.from_station, depot.station, yard.station) as station
                 from transfer_act
+                left join depot on depot.id = transfer_act.from_depot
+                left join yard on yard.id = transfer_act.from_yard
                 where true
                 """
-                + (station ? " and transfer_act.station = :station" : "")
+                + (station ? " and coalesce(transfer_act.from_station, depot.station, yard.station) = :station" : "")
                 + (states ? " and transfer_act.act_status_type = any(:states)" : "")
                 + (one ? " and transfer_act.id = :id" : "")
                 + " order by transfer_act.id desc limit 500";

@@ -3,12 +3,7 @@
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Акты передачи') }}</h1>
       <div v-if="canTransfer" class="desktop-frame__actions">
-        <button type="button" class="zs-btn-primary" @click="newAct(TransferDirection.FROM_DEPOT)">
-          {{ t('Приём на станцию') }}
-        </button>
-        <button type="button" class="zs-btn-primary" @click="newAct(TransferDirection.TO_DEPOT)">
-          {{ t('Передача со станции') }}
-        </button>
+        <button type="button" class="zs-btn-primary" @click="newAct">{{ t('Оформить передачу') }}</button>
       </div>
     </template>
 
@@ -32,15 +27,15 @@
       <SidePanel
         :empty="selected ? '' : 'Выберите акт в списке'"
         :title="selected ? t('Акт № {n}', { n: selected.number }) : ''"
-        :subtitle="selected ? directionText(selected) : ''"
+        :subtitle="selected ? dictManager.getValue('Station', selected.station) : ''"
         @close="panel.close"
       >
         <template v-if="selected">
           <SidePanelFields>
-            <span>{{ t('Станция') }}</span>
-            <span>{{ dictManager.getValue('Station', selected.station) }}</span>
-            <span>{{ t('Депо или парк отстоя') }}</span>
-            <span>{{ placeName(selected) }}</span>
+            <span>{{ t('Откуда') }}</span>
+            <span>{{ transferPlaceText(transferFrom(selected)) }}</span>
+            <span>{{ t('Куда') }}</span>
+            <span>{{ transferPlaceText(transferTo(selected)) }}</span>
             <span>{{ t('Вид работ') }}</span>
             <span>{{ dictManager.getValue('WorkType', selected.workType) }}</span>
             <span>{{ t('Состояние') }}</span>
@@ -83,7 +78,7 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { Transfer } from '@/api/transfers'
-import { acceptTransfer, fetchTransfers } from '@/api/transfers'
+import { acceptTransfer, fetchTransfers, transferFrom, transferTo } from '@/api/transfers'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
 import CbButton from '@/shared/components/choice/CbButton.vue'
@@ -93,10 +88,11 @@ import FilterBar from '@/shared/components/FilterBar.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { RowKey } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
-import { ActStatus, RoleType, TransferDirection } from '@/shared/constants/systemDicts'
+import { ActStatus, RoleType } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
+import { transferPlaceText } from '@/shared/transferPlace'
 import { formatDateTime } from '@/shared/format'
 import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
 import DesktopFrame from '../frame/DesktopFrame.vue'
@@ -105,7 +101,7 @@ import SidePanelFields from '../frame/SidePanelFields.vue'
 import { useSidePanel } from '../frame/useSidePanel'
 import ActRejectDialog from './ActRejectDialog.vue'
 
-/** Акты приёма-передачи (Ф-АКТ-02): список, оформление новых, приём вагонов и отказ. По умолчанию — ожидают приёма. */
+/** Акты приёма-передачи между депо, станцией и парком отстоя (Ф-АКТ-02): список, оформление новых, приём вагонов и отказ. По умолчанию — ожидают приёма. */
 const router = useRouter()
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок
 const busy = provideBusy()
@@ -119,16 +115,11 @@ const STATUS_TEXT: Record<number, string> = {
 const statusText = (status: number) => t(STATUS_TEXT[status] ?? '')
 const stateChoices = Object.entries(STATUS_TEXT).map(([id, text]) => ({ id: Number(id), text }))
 
-const directionText = (a: Transfer) =>
-  a.transferDirectionType === TransferDirection.FROM_DEPOT ? t('Приём на станцию') : t('Передача со станции')
-const placeName = (a: Transfer) =>
-  a.depot !== null ? dictManager.getValue('Depot', a.depot) : dictManager.getValue('Yard', a.yard)
-
 const columns = defineColumns<Transfer>([
   { field: 'number', title: 'Номер', width: '7rem' },
-  { field: 'transferDirectionType', title: 'Направление', format: (_, row) => directionText(row) },
   { field: 'station', title: 'Станция', format: (v) => dictManager.getValue('Station', v as number) },
-  { field: 'depot', title: 'Депо или парк отстоя', format: (_, row) => placeName(row) },
+  { field: 'fromStation', title: 'Откуда', format: (_, row) => transferPlaceText(transferFrom(row)) },
+  { field: 'toStation', title: 'Куда', format: (_, row) => transferPlaceText(transferTo(row)) },
   { field: 'wagons', title: 'Вагонов', width: '6rem', format: (_, row) => String(row.wagons.length) },
   { field: 'transferredDt', title: 'Сдано', format: (v) => formatDateTime(v as string) },
   { field: 'actStatusType', title: 'Состояние', format: (v) => statusText(v as number) },
@@ -153,7 +144,7 @@ async function load() {
     await busy.run(async () => {
       const [list] = await Promise.all([
         fetchTransfers(states.value),
-        dictManager.prepareDicts('Station', 'Depot', 'Yard'),
+        dictManager.prepareDicts('Station', 'Depot', 'Yard', 'LocationKind'),
         loadCurrentUser(),
       ])
       rows.value = list
@@ -166,8 +157,8 @@ async function load() {
 watch(states, load, { deep: true })
 void load()
 
-function newAct(dir: number) {
-  void router.push({ name: 'transfer', query: { dir } })
+function newAct() {
+  void router.push({ name: 'transfer' })
 }
 
 async function accept() {

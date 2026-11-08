@@ -8,10 +8,9 @@ import kz.kis.kisdbtools.repository.DbRecMapper;
 import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.ActStatus;
-import kz.zhsr.app.constants.LocationType;
 import kz.zhsr.app.constants.RoleType;
-import kz.zhsr.app.constants.TransferDirection;
 import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.wagon.TransferPlace;
 import kz.zhsr.app.dto.wagon.TransferRow;
 import kz.zhsr.app.dto.wagon.TransferWagon;
 import org.springframework.stereotype.Service;
@@ -26,10 +25,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Передача вагонов в депо и парк отстоя и приём из них (Ф-АКТ-02).
+ * Передача вагонов между депо, станцией и парком отстоя (Ф-АКТ-02).
  * <p>
- * Передаёт: со станции - приёмщик, из депо или парка отстоя - мастер депо. Принимает другая сторона. Обе работают
- * только на станции своего депо. Акт передающей стороны ждёт приёма; акт принимающей стороны проводится сразу, с
+ * Откуда и куда - разные расположения одной станции: сама станция, её депо и парки отстоя; со станции на станцию не
+ * передаётся. Передаёт: со станции - приёмщик, из депо или парка отстоя - мастер депо. Принимает: на станцию -
+ * приёмщик, в депо или парк отстоя - мастер депо. Обе стороны работают только на станции своего депо. Акт передающей стороны ждёт приёма; акт принимающей стороны проводится сразу, с
  * указанием, кто сдал. Администратор может всё, его акт проводится сразу. Расположение вагонов меняется только при
  * приёме.
  */
@@ -48,17 +48,28 @@ public class TransferService {
     /**
      * Новый акт.
      *
-     * @param transferDirectionType направление (transfer_direction_type)
-     * @param station               станция передачи
-     * @param depot                 депо; ровно одно из depot, yard
-     * @param yard                  парк отстоя
-     * @param workType              вид работ (work_type)
-     * @param transferredByUsr      кто сдал вагоны: для акта, проведённого сразу; null - сам составитель
-     * @param transferredDt         время акта, ISO с часовым поясом; null - сейчас
-     * @param wagons                вагоны
+     * @param fromStation      откуда: станция; ровно одно из fromStation, fromDepot, fromYard
+     * @param fromDepot        откуда: депо
+     * @param fromYard         откуда: парк отстоя
+     * @param toStation        куда: станция; ровно одно из toStation, toDepot, toYard
+     * @param toDepot          куда: депо
+     * @param toYard           куда: парк отстоя
+     * @param workType         вид работ (work_type)
+     * @param transferredByUsr кто сдал вагоны: для акта, проведённого сразу; null - сам составитель
+     * @param transferredDt    время акта, ISO с часовым поясом; null - сейчас
+     * @param wagons           вагоны
      */
-    public record TransferBody(long transferDirectionType, long station, Long depot, Long yard, long workType,
-                               Long transferredByUsr, OffsetDateTime transferredDt, List<WagonItem> wagons) {
+    public record TransferBody(Long fromStation, Long fromDepot, Long fromYard, Long toStation, Long toDepot,
+                               Long toYard, long workType, Long transferredByUsr, OffsetDateTime transferredDt,
+                               List<WagonItem> wagons) {
+
+        TransferPlace from() {
+            return new TransferPlace(fromStation, fromDepot, fromYard);
+        }
+
+        TransferPlace to() {
+            return new TransferPlace(toStation, toDepot, toYard);
+        }
     }
 
     /**
@@ -108,20 +119,26 @@ public class TransferService {
     }
 
     /**
-     * Вагоны для акта: со станции - на станции, из депо или парка отстоя - там.
+     * Вагоны для акта: те, что стоят в расположении «откуда»; оно не задано - пусто.
      */
-    public List<TransferWagon> wagons(long direction, Long station, Long depot, Long yard) throws Exception {
+    public List<TransferWagon> wagons(TransferPlace from) throws Exception {
         currentUserService.get();
-        return DbRecMapper.toList(candidates(direction, station, depot, yard), TransferWagon.class);
+        if (from.filled() != 1) {
+            return List.of();
+        }
+        return DbRecMapper.toList(candidates(from), TransferWagon.class);
     }
 
     /**
-     * Кто может сдать вагоны на станции в этом направлении - для акта, проведённого сразу.
+     * Кто может сдать вагоны из расположения «откуда» - для акта, проведённого сразу; оно не задано - пусто.
      */
-    public List<UserRef> givers(long direction, long station) throws Exception {
+    public List<UserRef> givers(TransferPlace from) throws Exception {
         currentUserService.get();
+        if (from.filled() != 1) {
+            return List.of();
+        }
         List<UserRef> res = db.loadSql(TransferSql.stationStaff(),
-                Map.of("role", giverRole(direction), "station", station), UserRef.class);
+                Map.of("role", giverRole(from), "station", stationOf(from)), UserRef.class);
         refResolver.resolve(res);
         return res;
     }
@@ -132,21 +149,19 @@ public class TransferService {
     @Transactional
     public TransferRow create(TransferBody body) throws Exception {
         CurrentUser me = currentUserService.get();
-        long direction = body.transferDirectionType();
-        boolean immediate = canTake(me, direction, body.station());
-        if (!immediate && !canGive(me, direction, body.station())) {
+        TransferPlace from = body.from();
+        TransferPlace to = body.to();
+        long station = requirePlaces(from, to);
+        boolean immediate = canTake(me, to, station);
+        if (!immediate && !canGive(me, from, station)) {
             throw ApiException.forbidden("Акт оформляют приёмщик и мастер депо на станции своего депо");
         }
-        if ((body.depot() == null) == (body.yard() == null)) {
-            throw ApiException.badRequest("Укажите депо или парк отстоя");
-        }
-        requirePlaceAtStation(body);
         List<WagonItem> items = body.wagons() == null ? List.of() : body.wagons();
         if (items.isEmpty()) {
             throw ApiException.badRequest("Отметьте вагоны");
         }
         Map<String, DbRec> available = UtDb.collectGroupBy_record(
-                candidates(direction, body.station(), body.depot(), body.yard()), "number");
+                candidates(from), "number");
         for (WagonItem item : items) {
             DbRec w = available.get(item.number());
             if (w == null) {
@@ -166,10 +181,12 @@ public class TransferService {
 
         Map<String, Object> act = new HashMap<>();
         act.put("number", String.format("P-%05d", db.loadSqlRec(TransferSql.nextActId(), Map.of()).getLong("next_id")));
-        act.put("transfer_direction_type", direction);
-        act.put("station", body.station());
-        act.put("depot", body.depot());
-        act.put("yard", body.yard());
+        act.put("from_station", from.station());
+        act.put("from_depot", from.depot());
+        act.put("from_yard", from.yard());
+        act.put("to_station", to.station());
+        act.put("to_depot", to.depot());
+        act.put("to_yard", to.yard());
         act.put("work_type", body.workType());
         act.put("act_status_type", immediate ? ActStatus.DONE : ActStatus.PENDING);
         act.put("transferred_by_usr", giver);
@@ -229,44 +246,83 @@ public class TransferService {
 
     // --- внутреннее
 
+    /** Перевести вагоны акта в расположение «куда»; запись журнала, открытая приёмом, - в строке вагона акта. */
     private void moveWagons(long id, OffsetDateTime time) throws Exception {
-        DbRec act = db.loadRec("transfer_act", id);
-        boolean toDepot = act.getLong("transfer_direction_type") == TransferDirection.TO_DEPOT;
-        Long depot = act.getLong("depot", null);
-        Long yard = act.getLong("yard", null);
+        TransferPlace to = to(db.loadRec("transfer_act", id));
         for (DbRec row : db.loadList("transfer_act_wagon", Map.of("transfer_act", id))) {
-            long opened = toDepot
-                    ? wagonJournal.moveLocation(row.getLong("wagon"), time,
-                            depot != null ? LocationType.DEPOT : LocationType.YARD, null, depot, yard)
-                    : wagonJournal.moveLocation(row.getLong("wagon"), time, LocationType.STATION,
-                            act.getLong("station"), null, null);
+            long opened = wagonJournal.moveLocation(row.getLong("wagon"), time, to.locationType(), to.station(),
+                    to.depot(), to.yard());
             db.updateRec("transfer_act_wagon", Map.of("id", row.getLong("id"), "wagon_location", opened));
         }
     }
 
-    private List<DbRec> candidates(long direction, Long station, Long depot, Long yard) throws Exception {
-        requireDirection(direction);
-        if (direction == TransferDirection.TO_DEPOT) {
-            if (station == null) {
-                return List.of();
-            }
-            return db.loadSql(TransferSql.stationWagons(), Map.of("station", station, "pending", ActStatus.PENDING));
+    /** Вагоны, которые стоят в расположении; с номером акта, который ждёт приёма по вагону. */
+    private List<DbRec> candidates(TransferPlace place) throws Exception {
+        Map<String, Object> params = Map.of("pending", ActStatus.PENDING);
+        if (place.station() != null) {
+            return db.loadSql(TransferSql.stationWagons(), with(params, "station", place.station()));
         }
-        if (depot != null) {
-            return db.loadSql(TransferSql.depotWagons(), Map.of("depot", depot, "pending", ActStatus.PENDING));
+        if (place.depot() != null) {
+            return db.loadSql(TransferSql.depotWagons(), with(params, "depot", place.depot()));
         }
-        if (yard != null) {
-            return db.loadSql(TransferSql.yardWagons(), Map.of("yard", yard, "pending", ActStatus.PENDING));
-        }
-        return List.of();
+        return db.loadSql(TransferSql.yardWagons(), with(params, "yard", place.yard()));
     }
 
-    private void requirePlaceAtStation(TransferBody body) throws Exception {
-        DbRec place = body.depot() != null ? db.loadRec("depot", body.depot()) : db.loadRec("yard", body.yard());
-        if (place == null || place.getLong("station", null) == null
-                || place.getLong("station") != body.station()) {
-            throw ApiException.badRequest("Депо или парк отстоя не при этой станции");
+    private static Map<String, Object> with(Map<String, Object> params, String name, Object value) {
+        Map<String, Object> res = new HashMap<>(params);
+        res.put(name, value);
+        return res;
+    }
+
+    /**
+     * Проверить «откуда» и «куда»: по одному расположению, разные, не обе станции, на одной станции.
+     *
+     * @return станция акта
+     */
+    private long requirePlaces(TransferPlace from, TransferPlace to) throws Exception {
+        if (from.filled() != 1) {
+            throw ApiException.badRequest("Укажите, откуда передаются вагоны: станция, депо или парк отстоя");
         }
+        if (to.filled() != 1) {
+            throw ApiException.badRequest("Укажите, куда передаются вагоны: станция, депо или парк отстоя");
+        }
+        if (from.station() != null && to.station() != null) {
+            throw ApiException.badRequest("Со станции на станцию вагоны не передаются");
+        }
+        if (from.equals(to)) {
+            throw ApiException.badRequest("Откуда и куда - одно и то же расположение");
+        }
+        long station = stationOf(from);
+        if (stationOf(to) != station) {
+            throw ApiException.badRequest("Откуда и куда - расположения разных станций");
+        }
+        return station;
+    }
+
+    /** Станция расположения: сама станция или станция депо или парка отстоя. */
+    private long stationOf(TransferPlace place) throws Exception {
+        if (place.station() != null) {
+            return place.station();
+        }
+        DbRec rec = place.depot() != null ? db.loadRec("depot", place.depot()) : db.loadRec("yard", place.yard());
+        if (rec == null) {
+            throw ApiException.badRequest("Депо или парк отстоя не найдены");
+        }
+        Long station = rec.getLong("station", null);
+        if (station == null) {
+            throw ApiException.badRequest("У депо или парка отстоя не задана станция");
+        }
+        return station;
+    }
+
+    private static TransferPlace from(DbRec act) {
+        return new TransferPlace(act.getLong("from_station", null), act.getLong("from_depot", null),
+                act.getLong("from_yard", null));
+    }
+
+    private static TransferPlace to(DbRec act) {
+        return new TransferPlace(act.getLong("to_station", null), act.getLong("to_depot", null),
+                act.getLong("to_yard", null));
     }
 
     private DbRec requirePendingForMe(long id, CurrentUser me) throws Exception {
@@ -277,35 +333,29 @@ public class TransferService {
         if (act.getLong("act_status_type") != ActStatus.PENDING) {
             throw ApiException.conflict("Акт не ожидает приёма");
         }
-        if (!canTake(me, act.getLong("transfer_direction_type"), act.getLong("station"))) {
+        if (!canTake(me, to(act), stationOf(from(act)))) {
             throw ApiException.forbidden("Принимает другая сторона на станции своего депо");
         }
         return act;
     }
 
-    private static void requireDirection(long direction) {
-        if (direction != TransferDirection.TO_DEPOT && direction != TransferDirection.FROM_DEPOT) {
-            throw ApiException.badRequest("Неизвестное направление");
-        }
+    /** Кто сдаёт: со станции - приёмщик, из депо или парка отстоя - мастер депо. */
+    private static long giverRole(TransferPlace from) {
+        return from.station() != null ? RoleType.RECEIVER : RoleType.MASTER;
     }
 
-    private static long giverRole(long direction) {
-        requireDirection(direction);
-        return direction == TransferDirection.TO_DEPOT ? RoleType.RECEIVER : RoleType.MASTER;
+    /** Кто принимает: на станцию - приёмщик, в депо или парк отстоя - мастер депо. */
+    private static long takerRole(TransferPlace to) {
+        return to.station() != null ? RoleType.RECEIVER : RoleType.MASTER;
     }
 
-    private static long takerRole(long direction) {
-        requireDirection(direction);
-        return direction == TransferDirection.TO_DEPOT ? RoleType.MASTER : RoleType.RECEIVER;
+    private static boolean canGive(CurrentUser me, TransferPlace from, long station) {
+        return me.hasRole(giverRole(from)) && Long.valueOf(station).equals(me.depotStation());
     }
 
-    private static boolean canGive(CurrentUser me, long direction, long station) {
-        return me.hasRole(giverRole(direction)) && Long.valueOf(station).equals(me.depotStation());
-    }
-
-    private static boolean canTake(CurrentUser me, long direction, long station) {
+    private static boolean canTake(CurrentUser me, TransferPlace to, long station) {
         return me.hasRole(RoleType.ADMIN)
-                || (me.hasRole(takerRole(direction)) && Long.valueOf(station).equals(me.depotStation()));
+                || (me.hasRole(takerRole(to)) && Long.valueOf(station).equals(me.depotStation()));
     }
 
     private TransferRow row(long id, CurrentUser me) throws Exception {
@@ -325,7 +375,8 @@ public class TransferService {
         for (TransferRow a : acts) {
             a.setWagons(wagons.getOrDefault(a.getId(), List.of()));
             a.setCanReceive(a.getActStatusType() == ActStatus.PENDING
-                    && canTake(me, a.getTransferDirectionType(), a.getStation()));
+                    && canTake(me, new TransferPlace(a.getToStation(), a.getToDepot(), a.getToYard()),
+                    a.getStation()));
         }
         refResolver.resolve(acts);
         return acts;

@@ -1,6 +1,7 @@
 package kz.zhsr.app.controller;
 
 import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.wagon.TransferPlace;
 import kz.zhsr.app.dto.wagon.TransferRow;
 import kz.zhsr.app.dto.wagon.TransferWagon;
 import kz.zhsr.app.service.TransferService;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * Акты приёма-передачи вагонов (Ф-АКТ-02).
+ * Акты приёма-передачи вагонов между депо, станцией и парком отстоя (Ф-АКТ-02).
  */
 @RestController
 public class TransferController {
@@ -30,16 +31,16 @@ public class TransferController {
         return transferService.list(states);
     }
 
+    /** Вагоны в расположении «откуда»: параметры station, depot, yard - ровно один. */
     @GetMapping("/transfers/wagons")
-    public List<TransferWagon> wagons(@RequestParam long direction, @RequestParam(required = false) Long station,
-                                      @RequestParam(required = false) Long depot,
-                                      @RequestParam(required = false) Long yard) throws Exception {
-        return transferService.wagons(direction, station, depot, yard);
+    public List<TransferWagon> wagons(TransferPlace from) throws Exception {
+        return transferService.wagons(from);
     }
 
+    /** Кто может сдать вагоны из расположения «откуда»: параметры station, depot, yard - ровно один. */
     @GetMapping("/transfers/givers")
-    public List<UserRef> givers(@RequestParam long direction, @RequestParam long station) throws Exception {
-        return transferService.givers(direction, station);
+    public List<UserRef> givers(TransferPlace from) throws Exception {
+        return transferService.givers(from);
     }
 
     @PostMapping("/transfers")

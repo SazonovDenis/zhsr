@@ -47,7 +47,7 @@
         <mxCell id="e_yard_station" value="Приём-передача из парка отстоя (Ф-АКТ-02)&lt;br style=&quot;font-size: 18px;&quot;&gt;Отмена приёма-передачи в парк отстоя (Ф-АКТ-06)&lt;br style=&quot;font-size: 18px;&quot;&gt;Смена расположения (Ф-ВАГ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" parent="1" source="yard" target="station" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_depot_yard" value="Смена расположения (Ф-ВАГ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.25;exitY=1;exitDx=0;exitDy=0;edgeStyle=orthogonalEdgeStyle;startArrow=classic;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" parent="1" source="depot" target="yard" edge="1">
+        <mxCell id="e_depot_yard" value="Приём-передача между депо и парком отстоя (Ф-АКТ-02)&lt;br style=&quot;font-size: 18px;&quot;&gt;Отмена приёма-передачи между депо и парком отстоя (Ф-АКТ-06)&lt;br style=&quot;font-size: 18px;&quot;&gt;Смена расположения (Ф-ВАГ-03)" style="endArrow=classic;html=1;fontSize=18;labelBackgroundColor=#ffffff;exitX=0.25;exitY=1;exitDx=0;exitDy=0;edgeStyle=orthogonalEdgeStyle;startArrow=classic;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" parent="1" source="depot" target="yard" edge="1">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="170" y="960" />

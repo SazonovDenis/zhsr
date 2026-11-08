@@ -279,10 +279,12 @@ tables:
     columns:
       id: {type: bigint, required: true}
       number: {type: varchar(20), required: true}
-      transfer_direction_type: {type: bigint, required: true, references: transfer_direction_type}
-      station: {type: bigint, required: true, references: station}
-      depot: {type: bigint, references: depot}
-      yard: {type: bigint, references: yard}
+      from_station: {type: bigint, references: station}
+      from_depot: {type: bigint, references: depot}
+      from_yard: {type: bigint, references: yard}
+      to_station: {type: bigint, references: station}
+      to_depot: {type: bigint, references: depot}
+      to_yard: {type: bigint, references: yard}
       work_type: {type: bigint, required: true, references: work_type}
       act_status_type: {type: bigint, required: true, references: act_status_type}
       transferred_by_usr: {type: bigint, required: true, references: usr}
@@ -302,13 +304,6 @@ tables:
       with_property: {type: boolean, required: true}
       note: {type: text}
       wagon_location: {type: bigint, references: wagon_location}
-
-  transfer_direction_type:
-    primary_key: [id]
-    columns:
-      id: {type: bigint, required: true}
-      text: {type: varchar(255), required: true}
-      code: {type: varchar(20), required: true}
 
   transport_type:
     primary_key: [id]

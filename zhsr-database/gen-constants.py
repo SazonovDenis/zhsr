@@ -33,7 +33,6 @@ SYSTEM_DICTS = {
     'role_type': ('RoleType', 'Роль сотрудника', 'Role'),
     'service': ('ServiceType', 'Служба', 'Service'),
     'severity_type': ('Severity', 'Критичность неисправности', 'Severity'),
-    'transfer_direction_type': ('TransferDirection', 'Направление акта приёма-передачи', None),
     'transport_type': ('TransportType', 'Вид перевозки', 'TransportType'),
     'trip_status_type': ('TripStatus', 'Состояние рейса', 'TripState'),
     'wagon_status_type': ('WagonStatus', 'Состояние вагона', 'WagonState'),

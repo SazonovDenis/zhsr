@@ -1,9 +1,7 @@
 <template>
   <DesktopFrame :back="back">
     <template #header>
-      <h1 class="desktop-frame__title">
-        {{ fromDepot ? t('Приём вагонов на станцию') : t('Передача вагонов со станции') }}
-      </h1>
+      <h1 class="desktop-frame__title">{{ t('Передача вагонов') }}</h1>
       <div class="desktop-frame__actions">
         <button type="button" class="zs-btn-primary" :disabled="!canSave" @click="save">{{ okText }}</button>
       </div>
@@ -15,14 +13,7 @@
     <div v-if="ready" class="transfer">
       <div class="transfer__act">
         <div class="transfer__caption">{{ t('Акт') }}</div>
-        <CbSegment
-          :model-value="direction"
-          single
-          required
-          :values="directions"
-          @update:model-value="setDirection($event as number)"
-        />
-        <FormField :label="fromDepot ? 'Станция приёма' : 'Станция передачи'">
+        <FormField label="Станция">
           <CbList
             single
             no-search
@@ -32,15 +23,18 @@
             @update:model-value="setStation($event as number | null)"
           />
         </FormField>
-        <FormField :label="fromDepot ? 'Откуда' : 'Куда'">
+        <FormField label="Откуда">
           <CbList
             single
             no-search
             placeholder="Выберите…"
-            :model-value="target"
-            :values="targets"
-            @update:model-value="setTarget($event as string | null)"
+            :model-value="fromCode"
+            :values="fromChoices"
+            @update:model-value="setFrom($event as string | null)"
           />
+        </FormField>
+        <FormField label="Куда">
+          <CbList v-model="toCode" single no-search placeholder="Выберите…" :values="toChoices" />
         </FormField>
         <FormField label="Вид работ">
           <CbList v-model="work" single no-search placeholder="Выберите…" :values="dictChoices('WorkType')" />
@@ -95,41 +89,40 @@ import type { UserRef } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
 import CbList from '@/shared/components/choice/CbList.vue'
-import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import FormField from '@/shared/components/form/FormField.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
-import { ActStatus, RoleType, TransferDirection } from '@/shared/constants/systemDicts'
+import { ActStatus, RoleType } from '@/shared/constants/systemDicts'
 import { dictChoices } from '@/shared/dict/dictChoices'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { useLoad } from '@/shared/loadable'
+import { placeOfCode, placeStation, stationPlaces } from '@/shared/transferPlace'
 import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
 import { placeText } from '@/shared/wagonPlace'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 
 /**
- * Оформление акта приёма-передачи (Ф-АКТ-02). Акт принимающей стороны и администратора проводится сразу, с указанием,
- * кто сдал вагоны; акт передающей стороны ждёт приёма. Запрос страницы может заранее задать акт: dir, station, depot,
- * yard, wagons (через запятую) — так открывает его «Вернуть на станцию» из прицепки и «Оформить передачу» из
- * формирования рейса. Проверки — на сервере.
+ * Оформление акта приёма-передачи (Ф-АКТ-02): откуда и куда — разные расположения одной станции (сама станция, её депо
+ * и парки отстоя), со станции на станцию не передаётся. Акт принимающей стороны и администратора проводится сразу, с
+ * указанием, кто сдал вагоны; акт передающей стороны ждёт приёма. Запрос страницы может заранее задать акт: from и to —
+ * коды расположений (shared/transferPlace.ts), wagons — номера вагонов через запятую; так открывают акт кнопки панели
+ * вагона, «Вернуть на станцию» из прицепки и «Оформить передачу» из формирования рейса. Проверки — на сервере.
  */
 const route = useRoute()
 const router = useRouter()
 // общее ожидание страницы: спиннер на месте содержимого — на всю цепочку загрузок
 const busy = provideBusy()
 
-const num = (v: unknown) => (v ? Number(v) : null)
 const query = route.query
+const str = (v: unknown) => (typeof v === 'string' && v ? v : null)
 
-const direction = ref<number>(num(query.dir) ?? TransferDirection.TO_DEPOT)
-const station = ref<number | null>(num(query.station))
-const target = ref<string | null>(
-  query.depot ? `d${String(query.depot)}` : query.yard ? `y${String(query.yard)}` : null,
-)
+const station = ref<number | null>(null)
+const fromCode = ref<string | null>(str(query.from))
+const toCode = ref<string | null>(str(query.to))
 const work = ref<number | null>(null)
 const time = ref<string | null>(date.formatDate(new Date(), 'YYYY-MM-DDTHH:mm'))
 const giver = ref<number | null>(null)
@@ -141,14 +134,8 @@ const running = ref(false)
 const wagonsBusy = ref(false)
 const error = ref<ShownError | null>(null)
 
-const fromDepot = computed(() => direction.value === TransferDirection.FROM_DEPOT)
-const directions = computed(() => [
-  { id: TransferDirection.FROM_DEPOT, text: 'Приём на станцию' },
-  { id: TransferDirection.TO_DEPOT, text: 'Передача со станции' },
-])
-
-const placesAt = (name: 'Depot' | 'Yard', id: number) =>
-  dictManager.getList(name).filter((r) => (r as { station?: number }).station === id)
+const from = computed(() => placeOfCode(fromCode.value))
+const to = computed(() => placeOfCode(toCode.value))
 
 // станции, при которых есть депо или парк отстоя
 const stations = computed(() => {
@@ -159,27 +146,18 @@ const stations = computed(() => {
   return [...ids].filter((id): id is number => !!id).map((id) => ({ id, text: dictManager.getValue('Station', id) }))
 })
 
-const targets = computed(() => {
-  if (!ready.value || !station.value) return []
-  return [
-    ...placesAt('Depot', station.value).map((r) => ({
-      id: `d${r.id}`,
-      text: `${dictManager.getValue('Depot', r.id)} • ${t('депо')}`,
-    })),
-    ...placesAt('Yard', station.value).map((r) => ({
-      id: `y${r.id}`,
-      text: `${dictManager.getValue('Yard', r.id)} • ${t('парк отстоя')}`,
-    })),
-  ]
-})
-const depot = computed(() => (target.value?.startsWith('d') ? Number(target.value.slice(1)) : null))
-const yard = computed(() => (target.value?.startsWith('y') ? Number(target.value.slice(1)) : null))
+// откуда — любое расположение станции; куда — другое расположение, со станции на станцию не передаётся
+const fromChoices = computed(() => (ready.value && station.value ? stationPlaces(station.value) : []))
+const toChoices = computed(() =>
+  fromChoices.value.filter((p) => p.id !== fromCode.value && !(from.value.station !== null && p.id.startsWith('s'))),
+)
 
-// принимающая сторона и администратор проводят акт сразу
+// принимающая сторона и администратор проводят акт сразу: на станцию принимает приёмщик, иначе мастер депо
 const immediate = computed(() => {
   const u = currentUser.value
   if (hasRole(u, RoleType.ADMIN)) return true
-  const taker = fromDepot.value ? RoleType.RECEIVER : RoleType.MASTER
+  if (!toCode.value) return false
+  const taker = to.value.station !== null ? RoleType.RECEIVER : RoleType.MASTER
   return hasRole(u, taker) && u?.depotStation === station.value
 })
 
@@ -187,15 +165,15 @@ const okText = computed(() => (immediate.value ? t('Оформить и прин
 
 const emptyText = computed(() => {
   if (!station.value) return t('Выберите станцию')
-  if (fromDepot.value && !target.value) return t('Выберите, откуда принимаются вагоны: депо или парк отстоя')
+  if (!fromCode.value) return t('Выберите, откуда передаются вагоны')
   return t('Вагонов нет')
 })
 
 const canSave = computed(
   () =>
     !running.value &&
-    !!station.value &&
-    !!target.value &&
+    !!fromCode.value &&
+    !!toCode.value &&
     !!work.value &&
     !!time.value &&
     selected.value.length > 0 &&
@@ -211,13 +189,17 @@ const back = () => {
 const givers = shallowRef<UserRef[]>([])
 const giverChoices = computed(() => givers.value.map((g) => ({ id: g.id, text: g.name })))
 const giverLoad = useLoad(async () => {
-  givers.value = station.value ? await fetchTransferGivers(direction.value, station.value) : []
+  givers.value = fromCode.value ? await fetchTransferGivers(from.value) : []
 })
 
 async function loadWagons() {
+  if (!fromCode.value) {
+    wagons.value = []
+    return
+  }
   wagonsBusy.value = true
   try {
-    wagons.value = await fetchTransferWagons(direction.value, station.value, depot.value, yard.value)
+    wagons.value = await fetchTransferWagons(from.value)
     const shown = wagons.value.map((w) => w.number)
     selected.value = selected.value.filter((n) => shown.includes(n))
   } catch (e) {
@@ -227,30 +209,21 @@ async function loadWagons() {
   }
 }
 
-function reload() {
-  giver.value = null
-  void loadWagons()
-  if (immediate.value) void giverLoad.run()
-}
-
-function setDirection(value: number) {
-  direction.value = value
-  selected.value = []
-  property.value = []
-  reload()
-}
-
 function setStation(value: number | null) {
   station.value = value
-  target.value = null
-  selected.value = []
-  property.value = []
-  reload()
+  setFrom(null)
 }
 
-function setTarget(value: string | null) {
-  target.value = value
+// новое «откуда»: другие вагоны и другие сдающие; «куда», совпавшее с ним, сбрасывается
+function setFrom(value: string | null) {
+  fromCode.value = value
+  if (!toChoices.value.some((p) => p.id === toCode.value)) toCode.value = null
+  selected.value = []
+  property.value = []
+  giver.value = null
+  givers.value = []
   void loadWagons()
+  if (immediate.value) void giverLoad.run()
 }
 
 watch(immediate, (now) => {
@@ -261,9 +234,10 @@ void busy
   .run(async () => {
     const [user] = await Promise.all([
       loadCurrentUser(),
-      dictManager.prepareDicts('Station', 'Depot', 'Yard', 'WagonType'),
+      dictManager.prepareDicts('Station', 'Depot', 'Yard', 'LocationKind', 'WagonType'),
     ])
-    station.value ??= user.depotStation
+    // станция — по заданному «откуда», иначе станция депо сотрудника
+    station.value = (fromCode.value ? placeStation(from.value) : null) ?? user.depotStation
     ready.value = true
     await loadWagons()
     if (immediate.value) void giverLoad.run()
@@ -275,10 +249,12 @@ async function save() {
   running.value = true
   try {
     const act = await createTransfer({
-      transferDirectionType: direction.value,
-      station: station.value!,
-      depot: depot.value,
-      yard: yard.value,
+      fromStation: from.value.station,
+      fromDepot: from.value.depot,
+      fromYard: from.value.yard,
+      toStation: to.value.station,
+      toDepot: to.value.depot,
+      toYard: to.value.yard,
       workType: work.value!,
       transferredByUsr: giver.value,
       transferredDt: time.value!,

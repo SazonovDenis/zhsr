@@ -268,14 +268,7 @@ import { openDialog } from '@/shared/components/dialog/openDialog'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
-import {
-  CouplingType,
-  CrewDuty,
-  LocationType,
-  RoleType,
-  TransferDirection,
-  TripStatus,
-} from '@/shared/constants/systemDicts'
+import { CouplingType, CrewDuty, LocationType, RoleType, TripStatus } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -531,9 +524,8 @@ function returnWagon(i: number) {
   void router.push({
     name: 'transfer',
     query: {
-      dir: TransferDirection.FROM_DEPOT,
-      station: crew.value!.trip.departureStation,
-      ...(w.locationType === LocationType.DEPOT ? { depot: w.place } : { yard: w.place }),
+      from: w.locationType === LocationType.DEPOT ? `d${w.place}` : `y${w.place}`,
+      to: `s${crew.value!.trip.departureStation}`,
       wagons: w.number,
     },
   })

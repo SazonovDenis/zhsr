@@ -57,15 +57,6 @@
         </loadUpdateData>
     </changeSet>
 
-    <changeSet id="01-nsi-data-transfer_direction_type" author="zhsr" runOnChange="true">
-        <loadUpdateData tableName="transfer_direction_type" primaryKey="id" file="db/dict/transfer_direction_type.tsv" separator="\t" encoding="UTF-8">
-            <column header="id" name="id" type="NUMERIC"/>
-            <column header="text" name="text" type="STRING"/>
-            <column header="code" name="code" type="STRING"/>
-            <column header="description" type="skip"/>
-        </loadUpdateData>
-    </changeSet>
-
     <changeSet id="01-nsi-data-act_status_type" author="zhsr" runOnChange="true">
         <loadUpdateData tableName="act_status_type" primaryKey="id" file="db/dict/act_status_type.tsv" separator="\t" encoding="UTF-8">
             <column header="id" name="id" type="NUMERIC"/>

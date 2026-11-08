@@ -138,14 +138,6 @@ export const Severity = {
   CRITICAL: 4,
 } as const
 
-/** Направление акта приёма-передачи: id transfer_direction_type */
-export const TransferDirection = {
-  /** В депо или парк отстоя - станция -> депо или парк отстоя этой станции */
-  TO_DEPOT: 1,
-  /** Из депо или парка отстоя - депо или парк отстоя -> станция */
-  FROM_DEPOT: 2,
-} as const
-
 /** Вид перевозки: id transport_type */
 export const TransportType = {
   /** Пассажирская - по умолчанию */

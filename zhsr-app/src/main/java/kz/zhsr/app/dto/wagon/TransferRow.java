@@ -15,10 +15,14 @@ import java.util.List;
 public class TransferRow {
     private long id;
     private String number;
-    private long transferDirectionType;
+    private Long fromStation;
+    private Long fromDepot;
+    private Long fromYard;
+    private Long toStation;
+    private Long toDepot;
+    private Long toYard;
+    /** станция акта - станция расположения «откуда» (вычисляемое) */
     private long station;
-    private Long depot;
-    private Long yard;
     private long workType;
     private long actStatusType;
     private UserRef transferredByUsr;

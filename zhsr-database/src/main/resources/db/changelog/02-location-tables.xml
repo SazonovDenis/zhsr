@@ -228,12 +228,13 @@
         </createTable>
     </changeSet>
 
-    <!-- акт приёма-передачи вагонов в депо или парк отстоя и из них: ровно одна из ссылок depot, yard;
-         station - станция, на которой происходит передача: станция депо или парка отстоя;
+    <!-- акт приёма-передачи вагонов между станцией, её депо и парками отстоя: откуда - ровно одна из ссылок
+         from_station, from_depot, from_yard, куда - ровно одна из to_station, to_depot, to_yard; откуда и куда -
+         разные расположения одной станции, со станции на станцию не передаётся;
          transferred_by_usr, transferred_dt - кто и когда сдал; received_by_usr, received_dt - кто и когда принял или отказал;
-         act_status_type: ожидает приёма - приём не отмечен, расположение не меняется; проведён - принят, расположение
-         меняется; отказ - reject_reason, расположение не меняется; отменён - со ссылкой act_cancellation, весь акт
-         целиком; акт можно оформить сразу принятым -->
+         act_status_type: ожидает приёма - приём не отмечен, расположение не меняется; проведён - принят, вагоны
+         переходят в расположение "куда"; отказ - reject_reason, расположение не меняется; отменён - со ссылкой
+         act_cancellation, весь акт целиком; акт можно оформить сразу принятым -->
     <changeSet id="02-location-tables-transfer_act" author="zhsr">
         <createTable tableName="transfer_act">
             <column name="id" type="bigint" autoIncrement="true">
@@ -242,14 +243,12 @@
             <column name="number" type="varchar(20)">
                 <constraints nullable="false"/>
             </column>
-            <column name="transfer_direction_type" type="bigint">
-                <constraints nullable="false"/>
-            </column>
-            <column name="station" type="bigint">
-                <constraints nullable="false"/>
-            </column>
-            <column name="depot" type="bigint"/>
-            <column name="yard" type="bigint"/>
+            <column name="from_station" type="bigint"/>
+            <column name="from_depot" type="bigint"/>
+            <column name="from_yard" type="bigint"/>
+            <column name="to_station" type="bigint"/>
+            <column name="to_depot" type="bigint"/>
+            <column name="to_yard" type="bigint"/>
             <column name="work_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
@@ -269,8 +268,8 @@
         </createTable>
     </changeSet>
 
-    <!-- вагоны акта приёма-передачи; wagon_location - запись журнала расположения, открытая приёмом: депо или парк
-         отстоя либо их станция; пуста, пока акт не принят, и у отменённого акта: отмена удаляет запись -->
+    <!-- вагоны акта приёма-передачи; wagon_location - запись журнала расположения, открытая приёмом: расположение
+         "куда"; пуста, пока акт не принят, и у отменённого акта: отмена удаляет запись -->
     <changeSet id="02-location-tables-transfer_act_wagon" author="zhsr">
         <createTable tableName="transfer_act_wagon">
             <column name="id" type="bigint" autoIncrement="true">

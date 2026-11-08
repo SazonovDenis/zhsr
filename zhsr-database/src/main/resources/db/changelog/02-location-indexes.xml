@@ -413,23 +413,33 @@
         <addUniqueConstraint tableName="transfer_act" columnNames="number" constraintName="uq_transfer_act_number"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-fk_transfer_act_transfer_direction_type" author="zhsr">
-        <addForeignKeyConstraint baseTableName="transfer_act" baseColumnNames="transfer_direction_type" constraintName="fk_transfer_act_transfer_direction_type"
-                                 referencedTableName="transfer_direction_type" referencedColumnNames="id"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-fk_transfer_act_station" author="zhsr">
-        <addForeignKeyConstraint baseTableName="transfer_act" baseColumnNames="station" constraintName="fk_transfer_act_station"
+    <changeSet id="02-location-indexes-fk_transfer_act_from_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="transfer_act" baseColumnNames="from_station" constraintName="fk_transfer_act_from_station"
                                  referencedTableName="station" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-fk_transfer_act_depot" author="zhsr">
-        <addForeignKeyConstraint baseTableName="transfer_act" baseColumnNames="depot" constraintName="fk_transfer_act_depot"
+    <changeSet id="02-location-indexes-fk_transfer_act_from_depot" author="zhsr">
+        <addForeignKeyConstraint baseTableName="transfer_act" baseColumnNames="from_depot" constraintName="fk_transfer_act_from_depot"
                                  referencedTableName="depot" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-fk_transfer_act_yard" author="zhsr">
-        <addForeignKeyConstraint baseTableName="transfer_act" baseColumnNames="yard" constraintName="fk_transfer_act_yard"
+    <changeSet id="02-location-indexes-fk_transfer_act_from_yard" author="zhsr">
+        <addForeignKeyConstraint baseTableName="transfer_act" baseColumnNames="from_yard" constraintName="fk_transfer_act_from_yard"
+                                 referencedTableName="yard" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_transfer_act_to_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="transfer_act" baseColumnNames="to_station" constraintName="fk_transfer_act_to_station"
+                                 referencedTableName="station" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_transfer_act_to_depot" author="zhsr">
+        <addForeignKeyConstraint baseTableName="transfer_act" baseColumnNames="to_depot" constraintName="fk_transfer_act_to_depot"
+                                 referencedTableName="depot" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_transfer_act_to_yard" author="zhsr">
+        <addForeignKeyConstraint baseTableName="transfer_act" baseColumnNames="to_yard" constraintName="fk_transfer_act_to_yard"
                                  referencedTableName="yard" referencedColumnNames="id"/>
     </changeSet>
 
@@ -462,9 +472,19 @@
         <addUniqueConstraint tableName="transfer_act" columnNames="act_cancellation" constraintName="uq_transfer_act_act_cancellation"/>
     </changeSet>
 
-    <!-- акт - в депо или в парк отстоя -->
-    <changeSet id="02-location-indexes-ck_transfer_act_place" author="zhsr">
-        <sql>alter table transfer_act add constraint ck_transfer_act_place check (num_nonnulls(depot, yard) = 1)</sql>
+    <!-- откуда - ровно одно из: станция, депо, парк отстоя -->
+    <changeSet id="02-location-indexes-ck_transfer_act_from" author="zhsr">
+        <sql>alter table transfer_act add constraint ck_transfer_act_from check (num_nonnulls(from_station, from_depot, from_yard) = 1)</sql>
+    </changeSet>
+
+    <!-- куда - ровно одно из: станция, депо, парк отстоя -->
+    <changeSet id="02-location-indexes-ck_transfer_act_to" author="zhsr">
+        <sql>alter table transfer_act add constraint ck_transfer_act_to check (num_nonnulls(to_station, to_depot, to_yard) = 1)</sql>
+    </changeSet>
+
+    <!-- откуда и куда - разные расположения; со станции на станцию не передаётся; одна станция проверяется в коде -->
+    <changeSet id="02-location-indexes-ck_transfer_act_places" author="zhsr">
+        <sql>alter table transfer_act add constraint ck_transfer_act_places check (num_nonnulls(from_station, to_station) &lt; 2 and (from_depot = to_depot) is not true and (from_yard = to_yard) is not true)</sql>
     </changeSet>
 
     <!-- приём или отказ: пуст у ожидающего приёма, заполнен у проведённого и отказа, у отменённого - как был до отмены;

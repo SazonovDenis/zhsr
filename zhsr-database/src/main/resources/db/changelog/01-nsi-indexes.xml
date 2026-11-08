@@ -42,10 +42,6 @@
         <addUniqueConstraint tableName="coupling_type" columnNames="code" constraintName="uq_coupling_type_code"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-uq_transfer_direction_type_code" author="zhsr">
-        <addUniqueConstraint tableName="transfer_direction_type" columnNames="code" constraintName="uq_transfer_direction_type_code"/>
-    </changeSet>
-
     <changeSet id="01-nsi-indexes-uq_act_status_type_code" author="zhsr">
         <addUniqueConstraint tableName="act_status_type" columnNames="code" constraintName="uq_act_status_type_code"/>
     </changeSet>

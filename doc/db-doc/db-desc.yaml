@@ -32,10 +32,11 @@ diagrams:
     hide_fields: [ "wagon", "wagon_location", "wagon_status", "coupling_type", "act_status_type" ]
 
   transfer_act:
-    title: "Передача вагонов со станции и обратно"
-    description: "Акт приёма-передачи вагонов со станции в депо или парк отстоя. Приём вагонов обратно на станцию"
-    tables: [ wagon: { hide_references: [ "depot" ] }, transfer_act, transfer_act_wagon, transfer_direction_type, act_status_type, act_cancellation, station, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, wagon_location: { hide_references: [ "depot", "wagon", "yard" ] } ]
-    hide_fields: [ "wagon", "transfer_direction_type", "act_status_type", "station", "depot", "yard", "wagon_location" ]
+    title: "Передача вагонов между депо, станцией и парком отстоя"
+    description: "Акт приёма-передачи вагонов между станцией, её депо и парками отстоя"
+    tables: [ wagon: { hide_references: [ "depot" ] }, transfer_act, transfer_act_wagon, act_status_type, act_cancellation, station, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, wagon_location: { hide_references: [ "station", "depot", "wagon", "yard" ] } ]
+    hide_fields: [ "wagon", "act_status_type", "station", "depot", "yard", "wagon_location" ]
+    top: [ transfer_act_wagon, act_cancellation, act_status_type ]
 
   repair_request_data:
     title: "Заявки на ремонт: описание"
@@ -59,7 +60,7 @@ diagrams:
   system_dict:
     title: "Справочники: системные константы"
     description: "Значения отражены в константах кода (kz.zhsr.app.constants) и меняются только вместе с кодом. Данные - zhsr-database/src/main/resources/db/dict/*.tsv, загружаются при создании БД. В администрировании не редактируются."
-    tables: [ role_type, service, category_type, transport_type, location_type, trip_status_type, crew_duty_type, coupling_type, transfer_direction_type, act_status_type, work_type, wagon_status_type, request_status_type, severity_type ]
+    tables: [ role_type, service, category_type, transport_type, location_type, trip_status_type, crew_duty_type, coupling_type, act_status_type, work_type, wagon_status_type, request_status_type, severity_type ]
 
   fault_type:
     title: "Справочник: типы неисправностей"
@@ -292,18 +293,6 @@ tables:
     description: |
       Системный справочник.
     constants_from: zhsr-database/src/main/resources/db/dict/coupling_type.tsv
-    columns:
-      text:
-        title: "Значение"
-      code:
-        title: "Код"
-        description: "Уникален"
-
-  transfer_direction_type:
-    title: "Направление акта приёма-передачи"
-    description: |
-      Системный справочник.
-    constants_from: zhsr-database/src/main/resources/db/dict/transfer_direction_type.tsv
     columns:
       text:
         title: "Значение"
@@ -710,29 +699,31 @@ tables:
         description: "wagon_status, открытая актом: прицепка - в пути, отцепка - в простое"
 
   transfer_act:
-    title: "Приём передача вагонов со станции и обратно"
+    title: "Приём-передача вагонов между депо, станцией и парком отстоя"
     description: |
-      Акт приёма-передачи вагонов со станции в депо или парк отстоя и обратно.
-      Передающая сторона: со станции в депо или парк отстоя - приёмщик, из депо или парка отстоя на станцию - мастер депо.
-      Принимающая сторона: со станции в депо или парк отстоя - мастер депо, из депо или парка отстоя на станцию - приёмщик.
-      Заполнено ровно одно из: депо, парк отстоя. Расположение вагонов меняется только при статусе "проведён" (принят).
-      Акт можно оформить сразу принятым. Отменяется весь акт целиком.
+      Акт приёма-передачи вагонов: откуда и куда - разные расположения одной станции (сама станция, её депо и парки
+      отстоя); со станции на станцию не передаётся.
+      Передающая сторона: со станции - приёмщик, из депо или парка отстоя - мастер депо.
+      Принимающая сторона: на станцию - приёмщик, в депо или парк отстоя - мастер депо.
+      Откуда - ровно одно из from_station, from_depot, from_yard; куда - ровно одно из to_station, to_depot, to_yard.
+      Расположение вагонов меняется только при статусе "проведён" (принят). Акт можно оформить сразу принятым.
+      Отменяется весь акт целиком.
     columns:
       number:
         title: "Номер"
         description: "Уникален"
-      transfer_direction_type:
-        title: "Направление"
-        constants_from: zhsr-database/src/main/resources/db/dict/transfer_direction_type.tsv
-      station:
-        title: "Станция, на которой происходит передача"
-        description: "Станция депо или парка отстоя"
-      depot:
-        title: "Депо"
-        description: "Пусто, если задан парк отстоя"
-      yard:
-        title: "Парк отстоя"
-        description: "Пусто, если задано депо"
+      from_station:
+        title: "Откуда: станция"
+      from_depot:
+        title: "Откуда: депо"
+      from_yard:
+        title: "Откуда: парк отстоя"
+      to_station:
+        title: "Куда: станция"
+      to_depot:
+        title: "Куда: депо"
+      to_yard:
+        title: "Куда: парк отстоя"
       work_type:
         title: "Вид работ"
         description: "При передаче для ремонта"

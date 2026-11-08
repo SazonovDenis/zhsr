@@ -103,7 +103,7 @@ import ErrorBox from '@/shared/components/ErrorBox.vue'
 import FormField from '@/shared/components/form/FormField.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
-import { TransferDirection } from '@/shared/constants/systemDicts'
+import { placeCode } from '@/shared/transferPlace'
 import { dictManager } from '@/shared/dict/DictManager'
 import { useCoupling } from '@/shared/trips/useCoupling'
 import DesktopFrame from '../frame/DesktopFrame.vue'
@@ -132,9 +132,8 @@ function returnToStation() {
   void router.push({
     name: 'transfer',
     query: {
-      dir: TransferDirection.FROM_DEPOT,
-      station: card.station.value,
-      ...card.returnFrom.value,
+      from: placeCode({ station: null, depot: null, yard: null, ...card.returnFrom.value }),
+      to: `s${card.station.value}`,
       wagons: card.selected.value.join(','),
     },
   })

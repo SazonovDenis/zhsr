@@ -36,7 +36,6 @@ public class SystemDicts implements ApplicationRunner {
             RoleType.class,
             ServiceType.class,
             Severity.class,
-            TransferDirection.class,
             TransportType.class,
             TripStatus.class,
             WagonStatus.class,

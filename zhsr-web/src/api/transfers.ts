@@ -2,20 +2,32 @@ import { isoDateTime } from '@/shared/format'
 import type { UserRef } from './requests'
 import { http } from './http'
 
-/** API актов приёма-передачи вагонов (Ф-АКТ-02). */
+/** API актов приёма-передачи вагонов между депо, станцией и парком отстоя (Ф-АКТ-02). */
+
+/** Расположение в акте: откуда или куда; заполнено ровно одно из полей. */
+export interface TransferPlace {
+  /** станция — id справочника Station */
+  station: number | null
+  /** депо — id справочника Depot */
+  depot: number | null
+  /** парк отстоя — id справочника Yard */
+  yard: number | null
+}
 
 /** Акт приёма-передачи. */
 export interface Transfer {
   id: number
   number: string
-  /** направление — константы TransferDirection */
-  transferDirectionType: number
-  /** станция передачи — id справочника Station */
+  /** откуда: ровно одно из fromStation, fromDepot, fromYard — id справочников Station, Depot, Yard */
+  fromStation: number | null
+  fromDepot: number | null
+  fromYard: number | null
+  /** куда: ровно одно из toStation, toDepot, toYard */
+  toStation: number | null
+  toDepot: number | null
+  toYard: number | null
+  /** станция акта — станция расположения «откуда», id справочника Station */
   station: number
-  /** депо — id справочника Depot; null — парк отстоя */
-  depot: number | null
-  /** парк отстоя — id справочника Yard; null — депо */
-  yard: number | null
   /** вид работ — id справочника WorkType */
   workType: number
   /** состояние — константы ActStatus */
@@ -48,10 +60,12 @@ export interface TransferWagon {
 }
 
 export interface TransferDraft {
-  transferDirectionType: number
-  station: number
-  depot: number | null
-  yard: number | null
+  fromStation: number | null
+  fromDepot: number | null
+  fromYard: number | null
+  toStation: number | null
+  toDepot: number | null
+  toYard: number | null
   workType: number
   /** кто сдал вагоны — для акта, проведённого сразу */
   transferredByUsr: number | null
@@ -65,20 +79,25 @@ export async function fetchTransfers(states: number[]): Promise<Transfer[]> {
   return (await http.get<Transfer[]>('/transfers', { params: { states } })).data
 }
 
-/** Вагоны для акта: со станции — на станции, из депо или парка отстоя — там. */
-export async function fetchTransferWagons(
-  direction: number,
-  station: number | null,
-  depot: number | null,
-  yard: number | null,
-): Promise<TransferWagon[]> {
-  return (await http.get<TransferWagon[]>('/transfers/wagons', { params: { direction, station, depot, yard } })).data
+/** Вагоны для акта: те, что стоят в расположении «откуда». */
+export async function fetchTransferWagons(from: TransferPlace): Promise<TransferWagon[]> {
+  return (await http.get<TransferWagon[]>('/transfers/wagons', { params: from })).data
 }
 
-/** Кто может сдать вагоны на станции — для акта, проведённого сразу. */
-export async function fetchTransferGivers(direction: number, station: number): Promise<UserRef[]> {
-  return (await http.get<UserRef[]>('/transfers/givers', { params: { direction, station } })).data
+/** Кто может сдать вагоны из расположения «откуда» — для акта, проведённого сразу. */
+export async function fetchTransferGivers(from: TransferPlace): Promise<UserRef[]> {
+  return (await http.get<UserRef[]>('/transfers/givers', { params: from })).data
 }
+
+/** Откуда передаются вагоны акта. */
+export const transferFrom = (a: Transfer): TransferPlace => ({
+  station: a.fromStation,
+  depot: a.fromDepot,
+  yard: a.fromYard,
+})
+
+/** Куда передаются вагоны акта. */
+export const transferTo = (a: Transfer): TransferPlace => ({ station: a.toStation, depot: a.toDepot, yard: a.toYard })
 
 /** Оформить акт. */
 export async function createTransfer(draft: TransferDraft): Promise<Transfer> {
