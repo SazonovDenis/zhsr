@@ -63,7 +63,7 @@
         </label>
       </div>
 
-      <div v-if="canEdit" class="trip-form__pool q-py-sm q-px-md">
+      <div v-if="canEditCrew" class="trip-form__pool q-py-sm q-px-md">
         <span class="trip-form__pool-title">{{ t('Нераспределённые проводники') }}</span>
         <div class="trip-form__chips">
           <span v-for="m in norm.pool" :key="m.usr.id" class="trip-form__chip q-py-none q-px-sm">
@@ -297,9 +297,10 @@ import { markEditable, useNow } from '@/shared/trips/tripTimes'
 
 /**
  * Формирование рейса (Ф-РЕЙ-02, Ф-РЕЙ-06): слева состав и бригада, справа закреплённая панель рейса с готовностью и
- * отметкой отправления. Состав, начальника поезда, ПЭМ и проводников рейса в статусе «План» меняют планировщик и
- * администратор; проводников по вагонам распределяет и начальник поезда этого рейса, он и администратор отмечают
- * отправление и прибытие. Остальные видят экран без правки. Проверки — на сервере; здесь только доступность кнопок.
+ * отметкой отправления. В рейсе в статусе «План» состав, начальника поезда и ПЭМ меняют планировщик вагонов и
+ * администратор, список проводников — планировщик проводников и администратор; проводников по вагонам распределяют
+ * планировщик проводников и начальник поезда этого рейса. Начальник поезда и администратор отмечают отправление и
+ * прибытие. Остальные видят экран без правки. Проверки — на сервере; здесь только доступность кнопок.
  */
 const props = defineProps<{ id: string }>()
 
@@ -318,7 +319,12 @@ const planned = computed(() => crew.value?.trip.tripStatusType === TripStatus.PL
 const inProgress = computed(() => crew.value?.trip.tripStatusType === TripStatus.IN_PROGRESS)
 
 const isAdmin = computed(() => hasRole(currentUser.value, RoleType.ADMIN))
-const canEdit = computed(() => planned.value && (isAdmin.value || hasRole(currentUser.value, RoleType.PLANNER)))
+// состав, начальник поезда и ПЭМ — планировщик вагонов
+const canEdit = computed(() => planned.value && (isAdmin.value || hasRole(currentUser.value, RoleType.WAGON_PLANNER)))
+// список проводников рейса — планировщик проводников
+const canEditCrew = computed(
+  () => planned.value && (isAdmin.value || hasRole(currentUser.value, RoleType.CREW_PLANNER)),
+)
 const isChief = computed(
   () => !!crew.value?.crew.some((m) => m.crewDutyType === CrewDuty.LNP && m.usr.id === currentUser.value?.id),
 )
@@ -337,7 +343,8 @@ const fixArrival = computed(
 )
 const canCouple = computed(() => canMark.value || hasRole(currentUser.value, RoleType.MASTER))
 const canAssign = computed(
-  () => canEdit.value || (inProgress.value && isAdmin.value) || ((planned.value || inProgress.value) && isChief.value),
+  () =>
+    canEditCrew.value || (inProgress.value && isAdmin.value) || ((planned.value || inProgress.value) && isChief.value),
 )
 
 const back = () => void router.push({ name: 'trips' })

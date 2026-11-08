@@ -203,15 +203,6 @@
         <addUniqueConstraint tableName="service" columnNames="code" constraintName="uq_service_code"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-uq_fault_category_type_code" author="zhsr">
-        <addUniqueConstraint tableName="fault_category_type" columnNames="code" constraintName="uq_fault_category_type_code"/>
-    </changeSet>
-
-    <changeSet id="01-nsi-indexes-fk_fault_category_type_service" author="zhsr">
-        <addForeignKeyConstraint baseTableName="fault_category_type" baseColumnNames="service" constraintName="fk_fault_category_type_service"
-                                 referencedTableName="service" referencedColumnNames="id"/>
-    </changeSet>
-
     <changeSet id="01-nsi-indexes-uq_fault_group_type_code" author="zhsr">
         <addUniqueConstraint tableName="fault_group_type" columnNames="code" constraintName="uq_fault_group_type_code"/>
     </changeSet>
@@ -223,11 +214,6 @@
     <changeSet id="01-nsi-indexes-fk_fault_type_fault_group_type" author="zhsr">
         <addForeignKeyConstraint baseTableName="fault_type" baseColumnNames="fault_group_type" constraintName="fk_fault_type_fault_group_type"
                                  referencedTableName="fault_group_type" referencedColumnNames="id"/>
-    </changeSet>
-
-    <changeSet id="01-nsi-indexes-fk_fault_type_fault_category_type" author="zhsr">
-        <addForeignKeyConstraint baseTableName="fault_type" baseColumnNames="fault_category_type" constraintName="fk_fault_type_fault_category_type"
-                                 referencedTableName="fault_category_type" referencedColumnNames="id"/>
     </changeSet>
 
     <changeSet id="01-nsi-indexes-fk_fault_type_severity_type" author="zhsr">

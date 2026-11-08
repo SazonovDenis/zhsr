@@ -61,9 +61,8 @@ public class DictService {
             "FaultType", new Def("fault_type", r -> {
                 Map<String, Object> res = rec(r, "text", multiText(r.getString("name"), null, null));
                 res.put("faultGroupType", r.getLong("fault_group_type", null));
-                res.put("faultCategoryType", r.getLong("fault_category_type"));
                 res.put("severityType", r.getLong("severity_type"));
-                res.put("service", r.getLong("service", null));
+                res.put("service", r.getLong("service"));
                 res.put("disabled", r.getBoolean("disabled"));
                 return res;
             })

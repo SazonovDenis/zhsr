@@ -3,7 +3,9 @@
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Рейсы') }}</h1>
       <div class="desktop-frame__actions">
-        <button v-if="isPlanner" type="button" class="zs-btn-primary" @click="addTrip">{{ t('Создать рейс') }}</button>
+        <button v-if="isWagonPlanner" type="button" class="zs-btn-primary" @click="addTrip">
+          {{ t('Создать рейс') }}
+        </button>
       </div>
     </template>
 
@@ -117,8 +119,8 @@ function openForm(row: unknown) {
   void router.push({ name: 'trip-form', params: { id: (row as TripRow).id } })
 }
 
-const isPlanner = computed(
-  () => hasRole(currentUser.value, RoleType.PLANNER) || hasRole(currentUser.value, RoleType.ADMIN),
+const isWagonPlanner = computed(
+  () => hasRole(currentUser.value, RoleType.WAGON_PLANNER) || hasRole(currentUser.value, RoleType.ADMIN),
 )
 
 const rows = shallowRef<TripRow[]>([])

@@ -139,7 +139,8 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
 
   /** Загрузить сотрудников службы заново: для выбора исполнителя; ошибку показывает вызывающий. */
   async function loadStaff() {
-    if (request.value) staff.value = await fetchServiceStaff(request.value.service)
+    const service = request.value?.service
+    staff.value = service ? await fetchServiceStaff(service) : []
   }
 
   /** Заявка изменилась на сервере: карточка — новая, списки и счётчики — загрузить заново. */

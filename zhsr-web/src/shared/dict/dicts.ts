@@ -42,8 +42,6 @@ export const dictDefs = {
   RequestStatus: { translate: 'i18n', system: true },
   Severity: { translate: 'i18n', system: true },
   Service: { translate: 'i18n', system: true },
-  // категория неисправности; service — служба-исполнитель категории
-  FaultCategory: { translate: 'i18n', system: true },
   // пополняемые
   // WagonType, Depot, Yard, Station нужны мобильной части без сети — строки выбора вагона при подаче заявки
   WagonType: { translate: 'none', offline: true },
@@ -56,8 +54,8 @@ export const dictDefs = {
   Yard: { translate: 'none', offline: true },
   // группа неисправностей; sortOrder — порядок показа; нужна мобильной части без сети — подача заявки
   FaultGroup: { translate: 'multilang', offline: true },
-  // вид неисправности: faultGroupType, faultCategoryType, severityType — критичность по умолчанию, service — служба-исполнитель (может не
-  // быть), disabled — отключён: не предлагается при подаче заявки
+  // вид неисправности: faultGroupType, severityType — критичность по умолчанию, service — служба-исполнитель,
+  // disabled — отключён: не предлагается при подаче заявки
   FaultType: { translate: 'multilang', offline: true },
 } satisfies Record<string, DictDef>
 

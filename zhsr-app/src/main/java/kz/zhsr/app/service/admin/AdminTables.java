@@ -1,7 +1,6 @@
 package kz.zhsr.app.service.admin;
 
 import kz.zhsr.app.constants.ConductorCategory;
-import kz.zhsr.app.constants.FaultCategory;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.constants.ServiceType;
 import kz.zhsr.app.constants.Severity;
@@ -46,7 +45,6 @@ public final class AdminTables {
             "fault_group_type", "name",
             "wagon_type", "text",
             "model_type", "text",
-            FaultCategory.TABLE, "text",
             Severity.TABLE, "text",
             ServiceType.TABLE, "text"
     );
@@ -97,9 +95,8 @@ public final class AdminTables {
                 text("code", "Код", true, 30),
                 text("name", "Название", true, 300),
                 ref("fault_group_type", "Группа", false, "fault_group_type"),
-                ref("fault_category_type", "Категория", true, FaultCategory.TABLE),
                 ref("severity_type", "Критичность по умолчанию", true, Severity.TABLE),
-                ref("service", "Служба-исполнитель", false, ServiceType.TABLE),
+                ref("service", "Служба-исполнитель", true, ServiceType.TABLE),
                 // отключённая запись в таблице показывается зачёркнутой: своей колонки нет, поле - только в форме
                 formOnly(DISABLED, "Отключена", BOOL, true))));
     }

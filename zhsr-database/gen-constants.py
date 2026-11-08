@@ -28,7 +28,6 @@ SYSTEM_DICTS = {
     'category_type': ('ConductorCategory', 'Категория проводника', None),
     'coupling_type': ('CouplingType', 'Отцепка или прицепка', None),
     'crew_duty_type': ('CrewDuty', 'Должность члена бригады на рейсе', 'CrewDuty'),
-    'fault_category_type': ('FaultCategory', 'Категория неисправности', 'FaultCategory'),
     'location_type': ('LocationType', 'Вид расположения вагона', 'LocationKind'),
     'request_status_type': ('RequestStatus', 'Статус заявки на ремонт', 'RequestStatus'),
     'role_type': ('RoleType', 'Роль сотрудника', 'Role'),

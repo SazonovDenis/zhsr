@@ -46,8 +46,10 @@ import java.util.Set;
  * Рейс: создание (Ф-РЕЙ-01), правка (Ф-РЕЙ-07), отмена (Ф-РЕЙ-05), формирование (Ф-РЕЙ-02, Ф-РЕЙ-06), отправление
  * (Ф-РЕЙ-03) и прибытие (Ф-РЕЙ-04).
  * <p>
- * Права: состав и бригаду рейса в статусе «план» меняют планировщик и администратор. Проводников по вагонам
- * распределяют они же в статусе «план», а начальник поезда этого рейса и администратор - и в статусе «выполняется».
+ * Права: рейс создают, исправляют и отменяют планировщик вагонов и администратор. В рейсе в статусе «план» состав,
+ * начальника поезда и ПЭМ меняют планировщик вагонов и администратор, список проводников - планировщик проводников и
+ * администратор. Проводников по вагонам распределяют в статусе «план» планировщик проводников и начальник поезда этого
+ * рейса, в статусе «выполняется» - начальник поезда этого рейса; администратор - всегда.
  * Отправление и прибытие отмечает начальник поезда этого рейса. Администратор может всё. Смотреть формирование может тот, кому рейс
  * виден в списке рейсов.
  * <p>
@@ -114,7 +116,7 @@ public class TripService {
     }
 
     /**
-     * Создать рейс в статусе «план» (Ф-РЕЙ-01). Создают планировщик и администратор.
+     * Создать рейс в статусе «план» (Ф-РЕЙ-01). Создают планировщик вагонов и администратор.
      */
     @Transactional
     public TripRow create(TripBody body) throws Exception {
@@ -131,7 +133,7 @@ public class TripService {
     }
 
     /**
-     * Исправить маршрут и плановое отправление рейса в статусе «план» (Ф-РЕЙ-07). Исправляют планировщик и администратор.
+     * Исправить маршрут и плановое отправление рейса в статусе «план» (Ф-РЕЙ-07). Исправляют планировщик вагонов и администратор.
      */
     @Transactional
     public TripRow update(long id, TripBody body) throws Exception {
@@ -152,13 +154,13 @@ public class TripService {
     }
 
     /**
-     * Отменить рейс в статусе «план» (Ф-РЕЙ-05): расположение вагонов не меняется. Отменяют планировщик и администратор.
+     * Отменить рейс в статусе «план» (Ф-РЕЙ-05): расположение вагонов не меняется. Отменяют планировщик вагонов и администратор.
      */
     @Transactional
     public TripRow cancel(long id) throws Exception {
         DbRec trip = requireTrip(id);
-        if (!canEdit(currentUserService.get())) {
-            throw ApiException.forbidden("Рейс отменяет планировщик");
+        if (!isWagonPlanner(currentUserService.get())) {
+            throw ApiException.forbidden("Рейс отменяет планировщик вагонов");
         }
         if (trip.getLong("trip_status_type") != TripStatus.PLANNED) {
             throw ApiException.conflict("Отменяется только рейс в статусе «План»");
@@ -277,7 +279,8 @@ public class TripService {
      */
     @Transactional
     public TripCrew setConductors(long id, List<Long> users) throws Exception {
-        DbRec trip = requirePlanEdit(id);
+        DbRec trip = requirePlanEdit(id, isCrewPlanner(currentUserService.get()),
+                "Проводников рейса набирает планировщик проводников");
         Set<Long> keep = new HashSet<>(users);
         Set<Long> present = new HashSet<>();
         Set<Long> changed = new HashSet<>();
@@ -315,13 +318,13 @@ public class TripService {
         DbRec trip = requireTrip(id);
         CurrentUser me = currentUserService.get();
         long state = trip.getLong("trip_status_type");
-        boolean planner = canEdit(me);
+        boolean planner = isCrewPlanner(me);
         boolean admin = me.hasRole(RoleType.ADMIN);
         boolean allowed = (state == TripStatus.PLANNED && (planner || isChief(id, me)))
                 || (state == TripStatus.IN_PROGRESS && (admin || isChief(id, me)));
         if (!allowed) {
             throw ApiException.forbidden(state == TripStatus.PLANNED || state == TripStatus.IN_PROGRESS
-                    ? "Распределяет проводников планировщик или начальник поезда рейса"
+                    ? "Распределяет проводников планировщик проводников или начальник поезда рейса"
                     : "Рейс закончен");
         }
         DbRec member = db.loadRec("trip_crew", Map.of("trip", id, "usr", user, "crew_duty_type", CrewDuty.CONDUCTOR));
@@ -354,7 +357,8 @@ public class TripService {
      */
     @Transactional
     public TripCrew setDuty(long id, long duty, DutyBody body) throws Exception {
-        DbRec trip = requirePlanEdit(id);
+        DbRec trip = requirePlanEdit(id, isWagonPlanner(currentUserService.get()),
+                "Начальника поезда и ПЭМ назначает планировщик вагонов");
         long role = roleOf(duty);
         Long user = body.usr();
         DbRec current = db.loadRec("trip_crew", Map.of("trip", id, "crew_duty_type", duty));
@@ -389,7 +393,7 @@ public class TripService {
      */
     @Transactional
     public TripCrew setWagons(long id, List<String> numbers) throws Exception {
-        requirePlanEdit(id);
+        requirePlanEdit(id, isWagonPlanner(currentUserService.get()), "Состав рейса меняет планировщик вагонов");
         if (new HashSet<>(numbers).size() != numbers.size()) {
             throw ApiException.badRequest("Вагон указан в составе дважды");
         }
@@ -783,8 +787,8 @@ public class TripService {
     }
 
     private void requirePlanner() {
-        if (!canEdit(currentUserService.get())) {
-            throw ApiException.forbidden("Рейс создаёт и исправляет планировщик");
+        if (!isWagonPlanner(currentUserService.get())) {
+            throw ApiException.forbidden("Рейс создаёт и исправляет планировщик вагонов");
         }
     }
 
@@ -817,10 +821,16 @@ public class TripService {
         }
     }
 
-    private DbRec requirePlanEdit(long id) throws Exception {
+    /**
+     * Рейс в статусе «план», который сотрудник может менять.
+     *
+     * @param allowed есть ли у сотрудника право на изменение
+     * @param message текст отказа, если права нет
+     */
+    private DbRec requirePlanEdit(long id, boolean allowed, String message) throws Exception {
         DbRec trip = requireTrip(id);
-        if (!canEdit(currentUserService.get())) {
-            throw ApiException.forbidden("Состав и бригаду рейса меняет планировщик");
+        if (!allowed) {
+            throw ApiException.forbidden(message);
         }
         if (trip.getLong("trip_status_type") != TripStatus.PLANNED) {
             throw ApiException.conflict("Состав и бригада меняются только у рейса в статусе «План»");
@@ -828,8 +838,18 @@ public class TripService {
         return trip;
     }
 
-    private static boolean canEdit(CurrentUser user) {
-        return user.hasRole(RoleType.PLANNER) || user.hasRole(RoleType.ADMIN);
+    /**
+     * Рейс, состав, начальника поезда и ПЭМ меняют планировщик вагонов и администратор.
+     */
+    private static boolean isWagonPlanner(CurrentUser user) {
+        return user.hasRole(RoleType.WAGON_PLANNER) || user.hasRole(RoleType.ADMIN);
+    }
+
+    /**
+     * Проводников рейса набирают и распределяют по вагонам планировщик проводников и администратор.
+     */
+    private static boolean isCrewPlanner(CurrentUser user) {
+        return user.hasRole(RoleType.CREW_PLANNER) || user.hasRole(RoleType.ADMIN);
     }
 
     boolean isChief(long trip, CurrentUser user) throws Exception {

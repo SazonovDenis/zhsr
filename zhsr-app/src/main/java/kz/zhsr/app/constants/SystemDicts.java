@@ -31,7 +31,6 @@ public class SystemDicts implements ApplicationRunner {
             ConductorCategory.class,
             CouplingType.class,
             CrewDuty.class,
-            FaultCategory.class,
             LocationType.class,
             RequestStatus.class,
             RoleType.class,

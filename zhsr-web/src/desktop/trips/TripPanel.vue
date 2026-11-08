@@ -108,7 +108,9 @@ const fixArrival = computed(
 )
 
 const planned = computed(() => props.trip?.tripStatusType === TripStatus.PLANNED)
-const canEditTrip = computed(() => planned.value && (hasRole(currentUser.value, RoleType.PLANNER) || isAdmin.value))
+const canEditTrip = computed(
+  () => planned.value && (hasRole(currentUser.value, RoleType.WAGON_PLANNER) || isAdmin.value),
+)
 const canCancel = canEditTrip
 // акт составляют начальник поезда этого рейса и мастер депо станции маршрута; станцию проверяет сервер
 const canCouple = computed(

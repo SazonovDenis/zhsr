@@ -59,11 +59,11 @@ diagrams:
   system_dict:
     title: "Справочники: системные константы"
     description: "Значения отражены в константах кода (kz.zhsr.app.constants) и меняются только вместе с кодом. Данные - zhsr-database/src/main/resources/db/dict/*.tsv, загружаются при создании БД. В администрировании не редактируются."
-    tables: [ role_type, service, category_type, transport_type, location_type, trip_status_type, crew_duty_type, coupling_type, transfer_direction_type, act_status_type, work_type, wagon_status_type, request_status_type, severity_type, fault_category_type ]
+    tables: [ role_type, service, category_type, transport_type, location_type, trip_status_type, crew_duty_type, coupling_type, transfer_direction_type, act_status_type, work_type, wagon_status_type, request_status_type, severity_type ]
 
   fault_type:
     title: "Справочник: типы неисправностей"
-    tables: [ fault_type, fault_group_type, severity_type, service, fault_category_type, role_type ]
+    tables: [ fault_type, fault_group_type, severity_type, service, role_type ]
     hide_fields: [ "role_type" ]
 
   wagon:
@@ -412,26 +412,10 @@ tables:
         title: "Код"
         description: "Уникален"
 
-  fault_category_type:
-    title: "Категория неисправности"
-    description: |
-      Системный справочник.
-    constants_from: zhsr-database/src/main/resources/db/dict/fault_category_type.tsv
-    columns:
-      text:
-        title: "Значение"
-      code:
-        title: "Код"
-        description: "Уникален"
-      service:
-        title: "Служба-исполнитель"
-        description: "Если у типа неисправности служба-исполнитель не задана"
-        constants_from: zhsr-database/src/main/resources/db/dict/service.tsv
-
   fault_group_type:
     title: "Группа неисправностей"
     description: |
-      Группа классификатора DIN, раздел экипировки или уборки.
+      Группа классификатора DIN, раздел экипировки или клининга.
     columns:
       code:
         title: "Код группы (DIN)"
@@ -444,7 +428,7 @@ tables:
   fault_type:
     title: "Тип неисправности"
     description: |
-      Позиция справочника неисправностей. Группа и категория - независимые поля, не связанные между собой.
+      Позиция справочника неисправностей. Группа и служба-исполнитель - независимые поля, не связанные между собой.
       Тип с заявками не удаляется, а отключается; тип без заявок можно удалить.
     columns:
       code:
@@ -454,15 +438,11 @@ tables:
         title: "Название"
       fault_group_type:
         title: "Группа неисправности"
-      fault_category_type:
-        title: "Категория неисправности"
-        constants_from: zhsr-database/src/main/resources/db/dict/fault_category_type.tsv
       severity_type:
         title: "Критичность по умолчанию"
         constants_from: zhsr-database/src/main/resources/db/dict/severity_type.tsv
       service:
         title: "Служба-исполнитель"
-        description: "Пусто - служба определяется категорией неисправности"
         constants_from: zhsr-database/src/main/resources/db/dict/service.tsv
       disabled:
         title: "Отключён"

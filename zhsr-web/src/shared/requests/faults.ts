@@ -1,9 +1,9 @@
-import { ServiceType, Severity } from '@/shared/constants/systemDicts'
+import { Severity } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
 
 /**
- * Выбор неисправности — общее для десктопной и мобильной частей: дерево «категория → группа → неисправность» из
- * справочников FaultCategory, FaultGroup и FaultType, поиск словами и значения по умолчанию.
+ * Выбор неисправности — общее для десктопной и мобильной частей: дерево «служба-исполнитель → группа → неисправность»
+ * из справочников Service, FaultGroup и FaultType, поиск словами и значения по умолчанию.
  */
 
 export interface FaultItem {
@@ -19,13 +19,13 @@ export interface FaultGroupNode {
   items: FaultItem[]
 }
 
-export interface FaultCategoryNode {
-  /** id справочника FaultCategory */
+export interface FaultServiceNode {
+  /** id справочника Service */
   id: number
   name: string
-  /** цвет метки категории */
+  /** цвет метки службы */
   color: string
-  /** сколько неисправностей в категории без частых — они повторяют неисправности других групп по смыслу */
+  /** сколько неисправностей у службы без частых — они повторяют неисправности других групп по смыслу */
   count: number
   groups: FaultGroupNode[]
 }
@@ -49,33 +49,33 @@ export function isFaultSearch(query: string): boolean {
 }
 
 /** Дерево неисправностей; при поиске — только совпавшие по названию неисправности или группы. */
-export function faultTree(query = ''): FaultCategoryNode[] {
+export function faultTree(query = ''): FaultServiceNode[] {
   const q = isFaultSearch(query) ? query.trim().toLowerCase() : ''
   const groups = [...dictManager.getList('FaultGroup')].sort((a, b) => Number(a.sortOrder) - Number(b.sortOrder))
   const types = activeFaults()
   const frequent = frequentGroupId()
   return dictManager
-    .getList('FaultCategory')
-    .map((cat) => {
+    .getList('Service')
+    .map((service) => {
       const nodes = groups
         .map((g) => {
           const groupName = dictManager.getValue('FaultGroup', g.id)
           const items = types
-            .filter((f) => f.faultCategoryType === cat.id && f.faultGroupType === g.id)
+            .filter((f) => f.service === service.id && f.faultGroupType === g.id)
             .map((f) => ({ id: f.id, name: dictManager.getValue('FaultType', f.id) }))
             .filter((f) => !q || `${f.name} ${groupName}`.toLowerCase().includes(q))
           return { id: g.id, name: groupName, items }
         })
         .filter((g) => g.items.length > 0)
       return {
-        id: cat.id,
-        name: dictManager.getValue('FaultCategory', cat.id),
-        color: (cat.color as string | undefined) ?? '#62666d',
+        id: service.id,
+        name: dictManager.getValue('Service', service.id),
+        color: (service.color as string | undefined) ?? '#62666d',
         count: nodes.filter((g) => g.id !== frequent).reduce((n, g) => n + g.items.length, 0),
         groups: nodes,
       }
     })
-    .filter((c) => c.groups.length > 0)
+    .filter((s) => s.groups.length > 0)
 }
 
 /** Частые неисправности. */
@@ -87,16 +87,14 @@ export function frequentFaults(): FaultItem[] {
 }
 
 /**
- * Значения по неисправности (Ф-ЗАЯ-01): критичность по умолчанию и служба-исполнитель из вида неисправности; служба не
- * задана — служба категории неисправности.
+ * Значения по неисправности (Ф-ЗАЯ-01): критичность по умолчанию и служба-исполнитель из вида неисправности; вида
+ * неисправности нет в справочнике — служба пуста.
  */
-export function faultDefaults(fault: number): { severity: number; service: number } {
+export function faultDefaults(fault: number): { severity: number; service: number | null } {
   const rec = dictManager.getRec('FaultType', fault)
-  const category = rec ? dictManager.getRec('FaultCategory', rec.faultCategoryType as number) : null
   return {
     severity: (rec?.severityType as number | undefined) ?? Severity.MEDIUM,
-    service:
-      (rec?.service as number | null | undefined) ?? (category?.service as number | undefined) ?? ServiceType.TECHNICAL,
+    service: (rec?.service as number | undefined) ?? null,
   }
 }
 

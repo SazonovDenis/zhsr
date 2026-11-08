@@ -32,10 +32,12 @@ public final class RoleType {
     public static final long INSTRUCTOR = 10;
     /** Инструктор-нормировщик (нарядный стол) */
     public static final long SCHEDULER = 11;
-    /** Планировщик - нет в zholserik; рейсы, состав и бригада (tz.actors.md) */
-    public static final long PLANNER = 12;
+    /** Планировщик вагонов - нет в zholserik; вагоны, маршруты, рейсы, состав, ЛНП и ПЭМ (tz.actors.md) */
+    public static final long WAGON_PLANNER = 12;
     /** Эксплуатационщик */
     public static final long OPERATOR = 13;
+    /** Планировщик проводников - нет в zholserik; проводники рейса (tz.actors.md) */
+    public static final long CREW_PLANNER = 14;
 
     private RoleType() {
     }

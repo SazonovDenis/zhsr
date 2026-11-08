@@ -16,7 +16,6 @@ export const REQUEST_DICTS = [
   'Service',
   'FaultType',
   'FaultGroup',
-  'FaultCategory',
   'WagonType',
   'Station',
   'Depot',

@@ -120,16 +120,6 @@
         </loadUpdateData>
     </changeSet>
 
-    <changeSet id="01-nsi-data-fault_category_type" author="zhsr" runOnChange="true">
-        <loadUpdateData tableName="fault_category_type" primaryKey="id" file="db/dict/fault_category_type.tsv" separator="\t" encoding="UTF-8">
-            <column header="id" name="id" type="NUMERIC"/>
-            <column header="text" name="text" type="STRING"/>
-            <column header="code" name="code" type="STRING"/>
-            <column header="service" name="service" type="NUMERIC"/>
-            <column header="description" type="skip"/>
-        </loadUpdateData>
-    </changeSet>
-
     <changeSet id="01-nsi-data-role_type" author="zhsr" runOnChange="true">
         <loadUpdateData tableName="role_type" primaryKey="id" file="db/dict/role_type.tsv" separator="\t" encoding="UTF-8">
             <column header="id" name="id" type="NUMERIC"/>

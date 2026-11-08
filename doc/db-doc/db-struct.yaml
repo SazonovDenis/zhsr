@@ -88,14 +88,6 @@ tables:
       version: {type: bigint, required: true}
       changed_dt: {type: timestamptz, required: true}
 
-  fault_category_type:
-    primary_key: [id]
-    columns:
-      id: {type: bigint, required: true}
-      text: {type: varchar(255), required: true}
-      code: {type: varchar(20), required: true}
-      service: {type: bigint, required: true, references: service}
-
   fault_group_type:
     primary_key: [id]
     columns:
@@ -111,9 +103,8 @@ tables:
       code: {type: varchar(30), required: true}
       name: {type: varchar(300), required: true}
       fault_group_type: {type: bigint, references: fault_group_type}
-      fault_category_type: {type: bigint, required: true, references: fault_category_type}
       severity_type: {type: bigint, required: true, references: severity_type}
-      service: {type: bigint, references: service}
+      service: {type: bigint, required: true, references: service}
       disabled: {type: boolean, required: true}
 
   location_type:

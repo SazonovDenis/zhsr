@@ -48,16 +48,6 @@ export const CrewDuty = {
   PEM: 3,
 } as const
 
-/** Категория неисправности: id fault_category_type */
-export const FaultCategory = {
-  /** Техническая */
-  TECHNICAL: 1,
-  /** Уборка */
-  CLEANING: 2,
-  /** Экипировка */
-  EQUIPMENT: 3,
-} as const
-
 /** Вид расположения вагона: id location_type */
 export const LocationType = {
   /** Станция */
@@ -114,10 +104,12 @@ export const RoleType = {
   INSTRUCTOR: 10,
   /** Инструктор-нормировщик (нарядный стол) */
   SCHEDULER: 11,
-  /** Планировщик - нет в zholserik; рейсы, состав и бригада (tz.actors.md) */
-  PLANNER: 12,
+  /** Планировщик вагонов - нет в zholserik; вагоны, маршруты, рейсы, состав, ЛНП и ПЭМ (tz.actors.md) */
+  WAGON_PLANNER: 12,
   /** Эксплуатационщик */
   OPERATOR: 13,
+  /** Планировщик проводников - нет в zholserik; проводники рейса (tz.actors.md) */
+  CREW_PLANNER: 14,
 } as const
 
 /** Служба: id service */
@@ -216,12 +208,6 @@ export const SYSTEM_DICT_RECORDS = {
     { id: 2, text: 'Начальник поезда' },
     { id: 3, text: 'Поездной электромеханик' },
   ],
-  // fault_category_type
-  FaultCategory: [
-    { id: 1, text: 'Техническая', service: 1 },
-    { id: 2, text: 'Уборка', service: 2 },
-    { id: 3, text: 'Экипировка', service: 3 },
-  ],
   // location_type
   LocationKind: [
     { id: 1, text: 'Станция' },
@@ -253,8 +239,9 @@ export const SYSTEM_DICT_RECORDS = {
     { id: 9, text: 'Экипировщик', service: 3 },
     { id: 10, text: 'Инструктор поездных бригад', service: 4 },
     { id: 11, text: 'Инструктор-нормировщик (нарядный стол)', service: 4 },
-    { id: 12, text: 'Планировщик', service: null },
+    { id: 12, text: 'Планировщик вагонов', service: null },
     { id: 13, text: 'Эксплуатационщик', service: 5 },
+    { id: 14, text: 'Планировщик проводников', service: null },
   ],
   // service
   Service: [

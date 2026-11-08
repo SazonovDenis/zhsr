@@ -432,24 +432,6 @@
         </createTable>
     </changeSet>
 
-    <!-- категория неисправности; service - служба-исполнитель, если у типа неисправности она не задана -->
-    <changeSet id="01-nsi-tables-fault_category_type" author="zhsr">
-        <createTable tableName="fault_category_type">
-            <column name="id" type="bigint">
-                <constraints primaryKey="true" nullable="false"/>
-            </column>
-            <column name="text" type="varchar(255)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="code" type="varchar(20)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="service" type="bigint">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-    </changeSet>
-
     <!-- группа неисправностей: группа DIN, раздел экипировки или уборки -->
     <changeSet id="01-nsi-tables-fault_group_type" author="zhsr">
         <createTable tableName="fault_group_type">
@@ -468,7 +450,7 @@
         </createTable>
     </changeSet>
 
-    <!-- тип неисправности; группа и категория не связаны между собой -->
+    <!-- тип неисправности; service - служба-исполнитель -->
     <changeSet id="01-nsi-tables-fault_type" author="zhsr">
         <createTable tableName="fault_type">
             <column name="id" type="bigint" autoIncrement="true">
@@ -481,13 +463,12 @@
                 <constraints nullable="false"/>
             </column>
             <column name="fault_group_type" type="bigint"/>
-            <column name="fault_category_type" type="bigint">
-                <constraints nullable="false"/>
-            </column>
             <column name="severity_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="service" type="bigint"/>
+            <column name="service" type="bigint">
+                <constraints nullable="false"/>
+            </column>
             <!-- отключён: не предлагается при подаче заявки; тип неисправности с заявками не удаляется, а отключается -->
             <column name="disabled" type="boolean" defaultValueBoolean="false">
                 <constraints nullable="false"/>

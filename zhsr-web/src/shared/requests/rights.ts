@@ -74,7 +74,7 @@ function isMyMaster(user: CurrentUser, r: RepairRequest): boolean {
  */
 export function canWork(user: CurrentUser, r: RepairRequest): boolean {
   if (isAdmin(user)) return true
-  if (!user.services.includes(r.service)) return false
+  if (r.service === null || !user.services.includes(r.service)) return false
   // заявку, переданную в депо, бригада рейса уже не исполняет
   if (inMyTrip(user, r)) return !r.forwarded
   return atMyDepot(user, r)

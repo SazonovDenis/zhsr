@@ -10,5 +10,6 @@ id	text	code	service	description
 9	Экипировщик	EQUIPPER	3	МСИ, съёмное оборудование, посуда, медицинские принадлежности
 10	Инструктор поездных бригад	INSTRUCTOR	4	замещает нормировщика
 11	Инструктор-нормировщик (нарядный стол)	SCHEDULER	4	
-12	Планировщик	PLANNER		нет в zholserik; рейсы, состав и бригада (tz.actors.md)
+12	Планировщик вагонов	WAGON_PLANNER		нет в zholserik; вагоны, маршруты, рейсы, состав, ЛНП и ПЭМ (tz.actors.md)
 13	Эксплуатационщик	OPERATOR	5	
+14	Планировщик проводников	CREW_PLANNER		нет в zholserik; проводники рейса (tz.actors.md)

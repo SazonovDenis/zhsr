@@ -36,7 +36,7 @@ public record CurrentUser(
      * Роль сотрудника. Системный справочник: права и видимость (Visibility) проверяются по id - константы RoleType.
      *
      * @param id      role_type.id
-     * @param service служба роли (service); null - служба определяется категорией неисправности
+     * @param service служба роли (service); null - роль не относится к службе
      */
     public record Role(long id, Long service) implements Serializable {
     }

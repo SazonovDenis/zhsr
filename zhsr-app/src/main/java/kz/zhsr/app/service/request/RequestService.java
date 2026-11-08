@@ -409,15 +409,10 @@ public class RequestService {
     }
 
     /**
-     * Служба-исполнитель типа неисправности; не задана - служба категории неисправности.
+     * Служба-исполнитель типа неисправности.
      */
     private long faultService(long faultType) throws Exception {
-        DbRec fault = db.loadRec("fault_type", faultType);
-        Long service = fault.getLong("service", null);
-        if (service != null) {
-            return service;
-        }
-        return db.loadRec("fault_category_type", fault.getLong("fault_category_type"), true).getLong("service");
+        return db.loadRec("fault_type", faultType, true).getLong("service");
     }
 
     /**

@@ -33,7 +33,7 @@ import java.util.Set;
 /**
  * Маршруты (Ф-МАР-01, Ф-МАР-02): карточка со всеми станциями, создание, сохранение из редактора, станции для следующей
  * остановки и пересчёт остановок; станции маршрутов для строк списков. Путь между остановками - по маршрутной сети
- * ({@link RouteNetwork}). Создаёт и правит маршруты администратор или планировщик.
+ * ({@link RouteNetwork}). Создаёт и правит маршруты администратор или планировщик вагонов.
  */
 @Service
 public class RouteService {
@@ -386,14 +386,14 @@ public class RouteService {
     }
 
     /**
-     * Создавать и править маршруты может администратор или планировщик (Ф-МАР-01).
+     * Создавать и править маршруты может администратор или планировщик вагонов (Ф-МАР-01).
      *
      * @throws ApiException 403 - не может
      */
     private void checkEditor() {
         CurrentUser user = currentUserService.get();
-        if (!user.hasRole(RoleType.ADMIN) && !user.hasRole(RoleType.PLANNER)) {
-            throw ApiException.forbidden("Создавать и править маршруты может администратор или планировщик");
+        if (!user.hasRole(RoleType.ADMIN) && !user.hasRole(RoleType.WAGON_PLANNER)) {
+            throw ApiException.forbidden("Создавать и править маршруты может администратор или планировщик вагонов");
         }
     }
 

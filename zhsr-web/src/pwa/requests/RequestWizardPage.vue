@@ -26,13 +26,13 @@
       </div>
       <div class="wizard__tree">
         <template v-for="c in tree" :key="c.id">
-          <button type="button" class="wizard__cat q-py-none q-px-md" @click="toggleCat(c.id)">
+          <button type="button" class="wizard__cat q-py-none q-px-md" @click="toggleService(c.id)">
             <span class="wizard__cat-mark" :style="{ background: c.color }" />
             <span class="wizard__grow">{{ c.name }}</span>
             <span class="wizard__count">{{ c.count }}</span>
-            <SvgIcon name="chevron-down" size="0.8rem" :class="{ 'wizard__chevron--closed': !catOpen(c.id) }" />
+            <SvgIcon name="chevron-down" size="0.8rem" :class="{ 'wizard__chevron--closed': !serviceOpen(c.id) }" />
           </button>
-          <template v-if="catOpen(c.id)">
+          <template v-if="serviceOpen(c.id)">
             <template v-for="g in c.groups" :key="g.id">
               <button type="button" class="wizard__group q-py-none q-pr-md q-pl-lg" @click="toggleGroup(g.id)">
                 <span class="wizard__grow">{{ g.name }}</span>
@@ -226,7 +226,7 @@ import {
 } from '@/shared/offline/outbox'
 import { isoDateTime } from '@/shared/format'
 import { faultDefaults, faultTree, frequentFaults, frequentGroupId, isFaultSearch } from '@/shared/requests/faults'
-import { FaultCategory, Severity } from '@/shared/constants/systemDicts'
+import { ServiceType, Severity } from '@/shared/constants/systemDicts'
 import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
 import { faultName } from '@/shared/requests/requestView'
 import { canAssignOnCreate } from '@/shared/requests/rights'
@@ -285,14 +285,14 @@ const searching = computed(() => isFaultSearch(faultQuery.value))
 const tree = computed(() => faultTree(faultQuery.value))
 const frequent = computed(() => frequentFaults())
 // раскрыты по умолчанию технические неисправности и частые; при поиске раскрыто всё найденное
-const openCats = ref<number[]>([FaultCategory.TECHNICAL])
+const openServices = ref<number[]>([ServiceType.TECHNICAL])
 // группа частых неисправностей раскрывается, когда справочники загружены (onMounted)
 const openGroups = ref<number[]>([])
-const catOpen = (id: number) => searching.value || openCats.value.includes(id)
+const serviceOpen = (id: number) => searching.value || openServices.value.includes(id)
 const groupOpen = (id: number) => searching.value || openGroups.value.includes(id)
 
 const flip = (list: number[], id: number) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
-const toggleCat = (id: number) => (openCats.value = flip(openCats.value, id))
+const toggleService = (id: number) => (openServices.value = flip(openServices.value, id))
 const toggleGroup = (id: number) => (openGroups.value = flip(openGroups.value, id))
 
 // неисправность выбрана — критичность по умолчанию из неё

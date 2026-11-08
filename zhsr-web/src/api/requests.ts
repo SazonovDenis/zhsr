@@ -54,8 +54,11 @@ export interface RepairRequest {
   wagonStation: number | null
   /** рейс заявки */
   trip: TripRef | null
-  /** служба-исполнитель — id справочника Service (константы ServiceType) */
-  service: number
+  /**
+   * служба-исполнитель — id справочника Service (константы ServiceType); null — только у заявки из очереди телефона,
+   * если её неисправности нет в справочнике
+   */
+  service: number | null
   /** неисправность — id справочника FaultType */
   faultType: number
   /** критичность — id справочника Severity (константы Severity) */

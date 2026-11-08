@@ -1,4 +1,4 @@
-import { FaultCategory, RequestStatus, Severity, TripStatus, WagonStatus } from '@/shared/constants/systemDicts'
+import { RequestStatus, ServiceType, Severity, TripStatus, WagonStatus } from '@/shared/constants/systemDicts'
 import type { DictName } from './dicts'
 
 /**
@@ -6,7 +6,7 @@ import type { DictName } from './dicts'
  * DictManager добавляет эти поля к записям справочника:
  * - bg, fg — цвета фона и текста плашки (DictBadge);
  * - fg, weight — цвет текста и насыщенность шрифта критичности в списках;
- * - color — цвет метки категории неисправности.
+ * - color — цвет метки службы-исполнителя в дереве неисправностей.
  */
 export const DICT_COLORS: Partial<Record<DictName, Record<number, Record<string, string | number>>>> = {
   WagonState: {
@@ -38,9 +38,11 @@ export const DICT_COLORS: Partial<Record<DictName, Record<number, Record<string,
     [Severity.HIGH]: { fg: '#b45309', weight: 600 },
     [Severity.CRITICAL]: { fg: '#b91c1c', weight: 700 },
   },
-  FaultCategory: {
-    [FaultCategory.TECHNICAL]: { color: '#3b6fb6' },
-    [FaultCategory.CLEANING]: { color: '#2f8f6a' },
-    [FaultCategory.EQUIPMENT]: { color: '#b7832a' },
+  Service: {
+    [ServiceType.TECHNICAL]: { color: '#3b6fb6' },
+    [ServiceType.CLEANING]: { color: '#2f8f6a' },
+    [ServiceType.EQUIPMENT]: { color: '#b7832a' },
+    [ServiceType.INSTRUCTOR]: { color: '#7a4fb0' },
+    [ServiceType.OPERATION]: { color: '#5c6b7a' },
   },
 }

@@ -49,7 +49,8 @@ public class Visibility {
     public static final Map<Long, Scope> BY_ROLE = Map.ofEntries(
             Map.entry(RoleType.ADMIN, Scope.ANY_DEPOT),
             Map.entry(RoleType.MANAGER, Scope.ANY_DEPOT),
-            Map.entry(RoleType.PLANNER, Scope.ANY_DEPOT),
+            Map.entry(RoleType.WAGON_PLANNER, Scope.ANY_DEPOT),
+            Map.entry(RoleType.CREW_PLANNER, Scope.ANY_DEPOT),
             Map.entry(RoleType.INSTRUCTOR, Scope.ANY_DEPOT),
             Map.entry(RoleType.SCHEDULER, Scope.ANY_DEPOT),
             Map.entry(RoleType.OPERATOR, Scope.ANY_DEPOT),
