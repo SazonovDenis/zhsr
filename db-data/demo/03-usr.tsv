@@ -28,7 +28,7 @@ id	login	full_name	password_hash	phone	disabled	change_password	created_dt
 103	850515400200	Иванов Алексей Владимирович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
 104	820715400500	Жолдасов Нурлан Ибрагимович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
 105	780910300400	Мұханов Ерлан Жақсыбекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
-106	880405400700	Омарова Сауле Кайратовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
+106	recv	Омарова Сауле Кайратовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
 107	910812400800	Ким Елена Викторовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
 108	950220350600	Смирнова Анна Павловна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
 109	870301400900	Бекова Айгуль Нурлановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
@@ -56,3 +56,4 @@ id	login	full_name	password_hash	phone	disabled	change_password	created_dt
 131	990101400209	Омаров Ержан Талгатович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
 132	990101400210	Ибраева Динара Нурлановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
 133	990101400211	Бригадир клининга ПК «Марат»	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
+134	medic	Нурланова Айгерим Болатовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00

@@ -34,6 +34,7 @@ import { computed } from 'vue'
 import type { RequestPhoto } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { formatDateTime } from '@/shared/format'
+import { userName } from '@/shared/user'
 import type { HistoryNode, RequestEvent } from './historyTree'
 import RequestHistoryItem from './RequestHistoryItem.vue'
 import { eventTitle, futureSteps, receivedLate } from './requestView'
@@ -52,13 +53,13 @@ const future = computed(() => (props.status === null ? [] : futureSteps(props.st
 
 /** Дата и кем; поступило на сервер заметно позже — и когда поступило. */
 function metaOf(e: RequestEvent): string {
-  const meta = `${formatDateTime(e.at)} • ${e.by?.name ?? t('Система')}`
+  const meta = `${formatDateTime(e.at)} • ${e.by ? userName(e.by) : t('Система')}`
   if (!receivedLate(e.at, e.receivedAt)) return meta
   return `${meta}, ${t('поступило: {at}', { at: formatDateTime(e.receivedAt) })}`
 }
 
 function textOf(e: RequestEvent): string {
-  return e.executor ? t('Исполнитель: {name}', { name: e.executor.name }) : (e.text ?? '')
+  return e.executor ? t('Исполнитель: {name}', { name: userName(e.executor) }) : (e.text ?? '')
 }
 
 function pendingOf(node: HistoryNode): RequestPhoto[] {

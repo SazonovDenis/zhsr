@@ -16,9 +16,10 @@ import java.util.List;
  *                не раньше from) или ещё выполняется; ISO с часовым поясом
  * @param to      конец периода планового отправления, не включительно: ISO с часовым поясом
  * @param states  id состояния рейса (trip_status_type)
+ * @param wagon   часть номера вагона: вагон в составе рейса; остальные фильтры не отменяет
  */
 public record TripFilter(Long id, Long depot, Long route, Long station,
                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to,
-                         List<Long> states) {
+                         List<Long> states, String wagon) {
 }

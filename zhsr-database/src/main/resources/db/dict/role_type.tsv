@@ -13,3 +13,4 @@ id	text	code	service	description
 12	Планировщик вагонов	WAGON_PLANNER		нет в zholserik; вагоны, маршруты, рейсы, состав, ЛНП и ПЭМ (tz.actors.md)
 13	Эксплуатационщик	OPERATOR	5	
 14	Планировщик проводников	CREW_PLANNER		нет в zholserik; проводники рейса (tz.actors.md)
+15	Медик	MEDIC	4	

@@ -150,29 +150,6 @@ final class TripSql {
     }
 
     /**
-     * Свободные вагоны на станции отправления, в депо и в парке отстоя при ней: не списаны и не входят в состав
-     * другого активного рейса; вагоны этого рейса не показываются. Параметры: trip, station, states.
-     */
-    static String wagonCandidates() {
-        return """
-                select wagon.number, wagon.wagon_type, wagon_info.location_type,
-                       coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard) as place,
-                       wagon_info.wagon_status_type
-                from wagon
-                join wagon_info on wagon_info.wagon = wagon.id
-                left join depot on depot.id = wagon_info.depot
-                left join yard on yard.id = wagon_info.yard
-                where (wagon_info.station = :station or depot.station = :station or yard.station = :station)
-                  and (wagon.dend is null or wagon.dend >= current_date)
-                  and not exists (select 1 from trip_wagon
-                                  join trip on trip.id = trip_wagon.trip
-                                  where trip_wagon.wagon = wagon.id
-                                    and (trip.id = :trip or trip.trip_status_type = any(:states)))
-                order by wagon.number
-                """;
-    }
-
-    /**
      * Вагоны станции, её депо и парка отстоя для прицепки; other_trip - другой активный рейс, в составе которого
      * вагон. Параметры: trip, station, states.
      */

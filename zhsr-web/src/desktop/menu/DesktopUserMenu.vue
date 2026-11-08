@@ -239,11 +239,10 @@ function onChangePassword() {
   white-space: nowrap;
 }
 
+// роли не обрезаются: не помещаются в строку — переносятся
 .user-block__role {
-  overflow: hidden;
   color: $zs-menu-fg-muted;
   font-size: 0.8rem;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 </style>

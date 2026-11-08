@@ -9,14 +9,22 @@
 
     <FilterBar>
       <TextInput v-model="filter.query" placeholder="Номер, вагон, неисправность" width="15rem" />
-      <!-- поиск отменяет список и фильтры: они скрыты и не применяются, но не очищаются -->
+      <!-- поиск отменяет список и фильтры, кроме периода: они скрыты и не применяются, но не очищаются -->
       <span v-if="searching" class="requests__search-note">
-        {{ t('При поиске список и фильтры не применяются.') }}
+        {{ t('При поиске список и фильтры, кроме периода, не применяются.') }}
       </span>
       <template v-else>
-        <CbSegment v-model="filter.scope" single required :values="scopes" />
-        <PeriodPicker v-model:start-date="filter.from" v-model:end-date="filter.to" label="Период:" clearable />
+        <!-- список: можно снять — тогда «все»; при фильтре по вагону недоступен -->
+        <CbSegment v-model="list" single :values="listChoices" />
+        <span v-if="wagonFilter" class="requests__wagon q-py-xs q-pl-sm q-pr-xs">
+          {{ t('Вагон № {number}', { number: wagonFilter.number }) }}
+          <button type="button" class="requests__wagon-clear q-pa-none" :title="t('Снять фильтр')" @click="clearWagon">
+            ✕
+          </button>
+        </span>
       </template>
+      <!-- период доступен всегда, и при поиске -->
+      <PeriodPicker v-model:start-date="filter.from" v-model:end-date="filter.to" label="Период:" clearable />
     </FilterBar>
 
     <FilterBar>
@@ -43,20 +51,22 @@
       row-key="id"
       :sort="sort"
       :loading="busy.active.value"
+      :row-menu="rowMenu"
       empty="Заявок по выбранному фильтру нет"
       @sort="sort = $event"
     />
 
     <template #right>
-      <RequestPanel :request-id="selectedId === null ? null : Number(selectedId)" @close="panel.close" />
+      <RequestPanel ref="panelRef" :request-id="selectedId === null ? null : Number(selectedId)" @close="panel.close" />
     </template>
   </DesktopFrame>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
-import type { RepairRequest, RequestCounts } from '@/api/requests'
+import type { RepairRequest, RequestAction, RequestCounts } from '@/api/requests'
 import { fetchRequestCounts, fetchRequests, requestFilter } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
@@ -67,16 +77,18 @@ import type { ChoiceItem } from '@/shared/components/choice/choice'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
+import { wagonRequestsPeriod } from '@/shared/requests/requestView'
 import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
-import type { RowKey, TableSort } from '@/shared/components/table/types'
+import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
+import { ACTIONS, assignBlockReason, editBlockReason, requestActions } from '@/shared/requests/rights'
 import { RequestStatus, ServiceType } from '@/shared/constants/systemDicts'
 import { dictChoices } from '@/shared/dict/dictChoices'
 import { provideBusy } from '@/shared/busy'
 import { dictManager } from '@/shared/dict/DictManager'
-import { loadCurrentUser } from '@/shared/user'
+import { currentUser, loadCurrentUser } from '@/shared/user'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { useSidePanel } from '../frame/useSidePanel'
 import RequestDialog from './RequestDialog.vue'
@@ -88,16 +100,58 @@ import { requestsColumns } from './requestsColumns'
  * службе, поиск по номеру, вагону и неисправности. Справа — карточка выбранной заявки с действиями.
  */
 
+const router = useRouter()
+const route = useRoute()
+
 // по умолчанию — заявки, которые ждут действия пользователя; статусы не выбраны
 const filter = reactive(requestFilter('todo'))
-// поиск: список и фильтры скрыты, сервер их не применяет (Ф-ЗАЯ-06)
-const searching = computed(() => filter.query.trim() !== '')
 
-const scopes: ChoiceItem[] = [
+/** Выбор списка: «созданные мной», «мне на исполнение», «действующие»; null — все. */
+type ListChoice = 'mine' | 'todo' | 'open'
+const list = ref<ListChoice | null>('todo')
+
+/** Фильтр по вагону — переход «Заявки вагона» с панели вагона; отключает выбор списка. */
+const wagonFilter = ref<{ id: number; number: string } | null>(null)
+
+const LISTS: { id: ListChoice; text: string }[] = [
   { id: 'mine', text: 'Созданные мной' },
   { id: 'todo', text: 'Мне на исполнение' },
-  { id: 'all', text: 'Все' },
+  { id: 'open', text: 'Действующие' },
 ]
+const listChoices = computed<ChoiceItem[]>(() => LISTS.map((c) => ({ ...c, disabled: !!wagonFilter.value })))
+
+// выбор списка и вагон → фильтр сервера: «действующие» — все видные, не в конечном статусе; без выбора и по вагону —
+// все
+watch(
+  [list, wagonFilter],
+  () => {
+    const choice = wagonFilter.value ? null : list.value
+    filter.scope = choice === 'mine' || choice === 'todo' ? choice : 'all'
+    filter.closed = choice === 'open' ? false : null
+    filter.wagon = wagonFilter.value?.id ?? null
+  },
+  { immediate: true },
+)
+
+/**
+ * Переход «Заявки вагона» с панели вагона (?wagon=id&number=номер): все заявки вагона за месяц; остальные фильтры
+ * и выбор списка сброшены, период можно менять.
+ */
+function applyRouteQuery() {
+  const id = Number(route.query.wagon)
+  const number = route.query.number
+  if (!id || typeof number !== 'string') return
+  Object.assign(filter, requestFilter('all', wagonRequestsPeriod()))
+  list.value = null
+  wagonFilter.value = { id, number }
+  void router.replace({ name: 'requests' })
+}
+
+function clearWagon() {
+  wagonFilter.value = null
+}
+// поиск: список и фильтры скрыты, сервер их не применяет (Ф-ЗАЯ-06)
+const searching = computed(() => filter.query.trim() !== '')
 
 const rows = shallowRef<RepairRequest[]>([])
 const counts = shallowRef<RequestCounts>({ requestStatusType: {}, severityType: {} })
@@ -145,10 +199,61 @@ async function loadCounts() {
   }
 }
 
+applyRouteQuery()
+watch(() => route.query.wagon, applyRouteQuery)
+
 // фильтр или сортировка изменились — данные загружаются заново
 watch([filter, sort], load, { deep: true })
 
 // новая заявка подана — список загружается заново, заявка становится выбранной
+// --- меню строки: те же действия и пояснения, что у кнопок панели заявки, затем действие со списком «Новая заявка»
+
+const panelRef = ref<InstanceType<typeof RequestPanel> | null>(null)
+
+/** Запустить действие панели по заявке строки: меню уже выбрало строку, панель открывается и грузит карточку. */
+async function withPanel(row: RepairRequest, run: (p: InstanceType<typeof RequestPanel>) => unknown) {
+  await nextTick()
+  const p = panelRef.value
+  if (p && (await p.ready(row.id))) await run(p)
+}
+
+/** Перевести причину из прав заявки: в тексте может быть статус заявки. */
+function reasonText(row: RepairRequest, reason: string): string {
+  return reason ? t(reason, { status: dictManager.getValue('RequestStatus', row.requestStatusType) }) : ''
+}
+
+const rowMenu: RowMenuItem<RepairRequest>[] = [
+  ...(Object.keys(ACTIONS) as RequestAction[]).map((action) => ({
+    label: ACTIONS[action].title,
+    disabled: (row: RepairRequest) => {
+      const user = currentUser.value
+      if (!user) return ''
+      return reasonText(row, requestActions(user, row).find((a) => a.action === action)?.reason ?? '')
+    },
+    run: (row: RepairRequest) => void withPanel(row, (p) => p.onAction(action)),
+  })),
+  {
+    label: 'Исправить',
+    disabled: (row) => (currentUser.value ? reasonText(row, editBlockReason(currentUser.value, row)) : ''),
+    run: (row) => void withPanel(row, (p) => p.edit()),
+  },
+  // исполнитель уже есть — «Переназначить», иначе «Назначить»
+  // виден всегда один из двух пунктов, поэтому черта — над обоими
+  ...[false, true].map((reassign) => ({
+    label: reassign ? 'Переназначить исполнителя' : 'Назначить исполнителя',
+    separator: true,
+    visible: (row: RepairRequest) => !!row.executorUsr === reassign,
+    disabled: (row: RepairRequest) => {
+      const reason = currentUser.value ? assignBlockReason(currentUser.value, row) : ''
+      const text = reassign ? 'Вы не можете переназначить: {reason}' : 'Вы не можете назначить: {reason}'
+      return reason ? t(text, { reason: reasonText(row, reason) }) : ''
+    },
+    run: (row: RepairRequest) => void withPanel(row, (p) => p.assign()),
+  })),
+  { label: 'Добавить примечание', run: (row) => void withPanel(row, (p) => p.addNote()) },
+  { label: 'Новая заявка', separator: true, run: () => void addRequest() },
+]
+
 async function addRequest() {
   const request = await openDialog<RepairRequest>(RequestDialog)
   if (!request) return
@@ -179,6 +284,24 @@ void init()
 </script>
 
 <style scoped lang="scss">
+.requests__wagon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 0.0625rem solid $primary;
+  border-radius: 1rem;
+  background: $zs-selected-bg;
+  font-size: 0.8rem;
+}
+
+.requests__wagon-clear {
+  border: 0;
+  background: none;
+  color: $zs-text-muted;
+  font: inherit;
+  cursor: pointer;
+}
+
 .requests__search-note {
   color: $zs-text-muted;
   font-size: 0.8rem;

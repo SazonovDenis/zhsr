@@ -2,8 +2,16 @@
   <DesktopFrame v-model:floating="panel.floating.value" :right-open="panel.open.value">
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Акты передачи') }}</h1>
-      <div v-if="canTransfer" class="desktop-frame__actions">
-        <button type="button" class="zs-btn-primary" @click="newAct">{{ t('Оформить передачу') }}</button>
+      <div class="desktop-frame__actions">
+        <button
+          type="button"
+          class="zs-btn-primary"
+          :disabled="!!transferReason"
+          :title="transferReason || undefined"
+          @click="newAct"
+        >
+          {{ t('Оформить передачу') }}
+        </button>
       </div>
     </template>
 
@@ -20,6 +28,7 @@
       :retry="load"
       row-key="id"
       :loading="busy.active.value"
+      :row-menu="rowMenu"
       empty="Актов по выбранному фильтру нет"
     />
 
@@ -41,10 +50,10 @@
             <span>{{ t('Состояние') }}</span>
             <span>{{ statusText(selected.actStatusType) }}</span>
             <span>{{ t('Сдал') }}</span>
-            <span>{{ selected.transferredByUsr.name }} • {{ formatDateTime(selected.transferredDt) }}</span>
+            <span>{{ userName(selected.transferredByUsr) }} • {{ formatDateTime(selected.transferredDt) }}</span>
             <template v-if="selected.receivedByUsr">
               <span>{{ t('Принял') }}</span>
-              <span>{{ selected.receivedByUsr.name }} • {{ formatDateTime(selected.receivedDt) }}</span>
+              <span>{{ userName(selected.receivedByUsr) }} • {{ formatDateTime(selected.receivedDt) }}</span>
             </template>
             <template v-if="selected.rejectReason">
               <span>{{ t('Причина отказа') }}</span>
@@ -58,11 +67,24 @@
             </div>
           </div>
           <ErrorBox v-if="actionError" :error="actionError" />
-          <div v-if="selected.canReceive" class="acts__actions">
-            <button type="button" class="zs-btn-primary" :disabled="running" @click="accept">
+          <!-- приём: кнопки видны всегда; принять нельзя — неактивны, причина во всплывающей подсказке -->
+          <div class="acts__actions">
+            <button
+              type="button"
+              class="zs-btn-primary"
+              :disabled="running || !!receiveReason"
+              :title="receiveReason || undefined"
+              @click="accept(selected)"
+            >
               {{ t('Принять вагоны') }}
             </button>
-            <button type="button" class="acts__btn q-py-none q-px-md" :disabled="running" @click="reject">
+            <button
+              type="button"
+              class="acts__btn q-py-none q-px-md"
+              :disabled="running || !!receiveReason"
+              :title="receiveReason || undefined"
+              @click="reject(selected)"
+            >
               {{ t('Отказать в приёме') }}
             </button>
           </div>
@@ -87,7 +109,7 @@ import { openDialog } from '@/shared/components/dialog/openDialog'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { RowKey } from '@/shared/components/table/types'
+import type { RowKey, RowMenuItem } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
 import { ActStatus, RoleType } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -95,7 +117,8 @@ import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { transferPlaceText } from '@/shared/transferPlace'
 import { formatDateTime } from '@/shared/format'
-import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
+import { roleReason } from '@/shared/roleReason'
+import { loadCurrentUser, userName } from '@/shared/user'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
@@ -135,9 +158,32 @@ const loadError = ref<ShownError | null>(null)
 const actionError = ref<ShownError | null>(null)
 const running = ref(false)
 
-const canTransfer = computed(() =>
-  [RoleType.ADMIN, RoleType.RECEIVER, RoleType.MASTER].some((r) => hasRole(currentUser.value, r)),
+// передачу оформляют приёмщик и мастер депо; администратор может всё
+const transferReason = computed(() =>
+  roleReason([RoleType.RECEIVER, RoleType.MASTER], 'Передачу оформляет мастер депо или приёмщик'),
 )
+
+/** Почему вагоны по выбранному акту не принять. */
+const receiveReason = computed(() => (selected.value ? receiveReasonOf(selected.value) : ''))
+
+// меню строки: те же действия и пояснения, что у кнопок панели акта, затем действие со списком «Оформить передачу»
+const rowMenu: RowMenuItem<Transfer>[] = [
+  { label: 'Принять вагоны', disabled: receiveReasonOf, run: (act) => void accept(act) },
+  { label: 'Отказать в приёме', disabled: receiveReasonOf, run: (act) => void reject(act) },
+  { label: 'Оформить передачу', separator: true, disabled: () => transferReason.value, run: newAct },
+]
+
+/** Почему вагоны по акту не принять: не тот статус или принимает другой сотрудник; пусто — можно. */
+function receiveReasonOf(act: Transfer): string {
+  if (act.canReceive) return ''
+  if (act.actStatusType !== ActStatus.PENDING) {
+    return t('Недоступно в состоянии «{status}»', { status: statusText(act.actStatusType) })
+  }
+  const station = dictManager.getValue('Station', act.station)
+  return act.toStation !== null
+    ? t('Принимает приёмщик станции {station}', { station })
+    : t('Принимает мастер депо станции {station}', { station })
+}
 
 async function load() {
   loadError.value = null
@@ -162,8 +208,7 @@ function newAct() {
   void router.push({ name: 'transfer' })
 }
 
-async function accept() {
-  const act = selected.value
+async function accept(act: Transfer | null) {
   if (!act) return
   actionError.value = null
   running.value = true
@@ -179,8 +224,7 @@ async function accept() {
   }
 }
 
-async function reject() {
-  const act = selected.value
+async function reject(act: Transfer | null) {
   if (!act) return
   const done = await openDialog<Transfer>(ActRejectDialog, { actId: act.id })
   if (!done) return

@@ -3,7 +3,15 @@
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Вагоны') }}</h1>
       <div class="desktop-frame__actions">
-        <button type="button" class="zs-btn-primary" @click="addWagon">{{ t('Ввести вагон') }}</button>
+        <button
+          type="button"
+          class="zs-btn-primary"
+          :disabled="!!addReason"
+          :title="addReason || undefined"
+          @click="addWagon"
+        >
+          {{ t('Ввести вагон') }}
+        </button>
       </div>
     </template>
 
@@ -58,7 +66,9 @@
       row-key="id"
       :sort="sort"
       :loading="busy.active.value"
+      :row-menu="rowMenu"
       empty="Нет вагонов по выбранному фильтру"
+      @row-dblclick="openJournal($event as WagonRow)"
       @sort="sort = $event"
     />
 
@@ -70,6 +80,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, shallowRef, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import type { TripOption } from '@/api/trips'
 import { fetchTripOptions } from '@/api/trips'
@@ -78,7 +89,7 @@ import { fetchWagons } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import CbButton from '@/shared/components/choice/CbButton.vue'
 import CbList from '@/shared/components/choice/CbList.vue'
-import type { RowKey, TableSort } from '@/shared/components/table/types'
+import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -96,9 +107,42 @@ import { tripOptionItem, tripOptionOf } from '../trips/tripOptionItem'
 import TripOptionView from '../trips/TripOptionView.vue'
 import WagonPanel from './WagonPanel.vue'
 import WagonNewDialog from './WagonNewDialog.vue'
+import { addWagonReason, TRANSFER_TARGETS, wagonTransfers } from './wagonActions'
 import { wagonsColumns } from './wagonsColumns'
 
 /** Список вагонов: фильтры и таблица. */
+
+const router = useRouter()
+
+// вагон вводит администратор (Ф-ВАГ-01)
+const addReason = computed(() => addWagonReason())
+
+/**
+ * Меню строки (три точки и правая кнопка): те же действия и пояснения, что у кнопок панели вагона и страницы —
+ * журнал, передачи вагона, затем действие со списком «Ввести вагон».
+ */
+const transferItems: RowMenuItem<WagonRow>[] = TRANSFER_TARGETS.map((target, i) => ({
+  label: target.label,
+  separator: i === 0,
+  disabled: (w: WagonRow) => wagonTransfers(w)[i]!.reason,
+  run: (w: WagonRow) => {
+    const query = wagonTransfers(w)[i]!.query
+    if (query) void router.push({ name: 'transfer', query })
+  },
+}))
+// двойной клик по строке — журнал вагона
+function openJournal(w: WagonRow) {
+  void router.push({ name: 'wagon-journal', params: { number: w.number } })
+}
+
+const rowMenu: RowMenuItem<WagonRow>[] = [
+  {
+    label: 'Журнал вагона',
+    run: openJournal,
+  },
+  ...transferItems,
+  { label: 'Ввести вагон', separator: true, disabled: () => addReason.value, run: () => void addWagon() },
+]
 
 const filter = reactive<WagonFilter>({ number: '', station: null, trip: null, locationKinds: [], states: [] })
 // поиск по номеру: фильтры скрыты, сервер их не применяет (Ф-ВАГ-04)
@@ -164,7 +208,9 @@ async function init() {
 
 async function loadDicts() {
   try {
-    await busy.run(dictManager.prepareDicts('Station', 'Yard', 'WagonType', 'WagonModel', 'Depot'))
+    await busy.run(
+      dictManager.prepareDicts('Station', 'Yard', 'WagonType', 'WagonModel', 'Depot', 'TripState', 'LocationKind'),
+    )
   } catch (e) {
     loadError.value = shownError(e)
   }

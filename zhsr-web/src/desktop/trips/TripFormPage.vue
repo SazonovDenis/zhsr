@@ -2,18 +2,18 @@
   <DesktopFrame v-model:floating="floating" :back="back" :right-open="true">
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Формирование рейса') }}</h1>
-      <!-- действия рейса в пути и после прибытия: без прав — кнопки нет; не тот статус — неактивна, причина рядом -->
+      <!-- действия рейса в пути и после прибытия: видны все; нет прав или не тот статус — неактивна, причина рядом -->
       <div v-if="crew && !planned && headerButtons.length > 0" class="desktop-frame__actions">
         <template v-for="b in headerButtons" :key="b.label">
           <button
             type="button"
             :class="b.primary ? 'zs-btn-primary' : 'trip-form__btn q-py-none q-px-md'"
             :disabled="!!b.reason || running"
+            :title="b.reason || undefined"
             @click="b.run"
           >
             {{ t(b.label) }}
           </button>
-          <span v-if="b.reason" class="trip-form__reason">{{ b.reason }}</span>
         </template>
       </div>
     </template>
@@ -22,7 +22,9 @@
     <LoadSpinner v-if="busy.active.value" />
 
     <div v-if="crew && norm" class="trip-form q-pt-none q-px-none q-pb-md">
-      <div class="trip-form__caption">{{ t('Состав и бригада') }}</div>
+      <div class="trip-form__caption">
+        {{ t('Состав и бригада') }}
+      </div>
 
       <div class="trip-form__staff">
         <label v-for="d in duties" :key="d.duty" class="trip-form__duty">
@@ -47,12 +49,12 @@
             </template>
           </CbList>
           <span v-else class="trip-form__staff-name" :class="{ 'trip-form__bad': !d.member }">
-            {{ d.member?.usr.name ?? t('не назначен') }}
+            {{ d.member ? userName(d.member.usr) : t('не назначен') }}
           </span>
         </label>
       </div>
 
-      <div v-if="canEditCrew" class="trip-form__pool q-py-sm q-px-md">
+      <div class="trip-form__pool q-py-sm q-px-md">
         <span class="trip-form__pool-title">{{ t('Нераспределённые проводники') }}</span>
         <div class="trip-form__chips">
           <span v-for="m in norm.pool" :key="m.usr.id" class="trip-form__chip q-py-none q-px-sm">
@@ -60,7 +62,8 @@
             <button
               type="button"
               class="trip-form__chip-del q-pa-none"
-              :title="t('Убрать из бригады')"
+              :title="crewReason || t('Убрать из бригады')"
+              :disabled="!!crewReason"
               @click="removeConductor(m)"
             >
               ✕
@@ -68,7 +71,13 @@
           </span>
           <span v-if="norm.pool.length === 0" class="trip-form__muted">{{ t('Все проводники распределены') }}</span>
         </div>
-        <button type="button" class="trip-form__btn q-py-none q-px-md" @click="pickConductors">
+        <button
+          type="button"
+          class="trip-form__btn q-py-none q-px-md"
+          :disabled="!!crewReason"
+          :title="crewReason || undefined"
+          @click="pickConductors"
+        >
           {{ t('Проводники…') }}
         </button>
       </div>
@@ -90,16 +99,16 @@
           <span :class="{ 'trip-form__warn': isAway(i) }">
             {{ where(i) }}
             <span v-if="isAway(i)" class="trip-form__block">{{ t('не на станции отправления') }}</span>
-            <template v-if="isAway(i) && canTransfer">
+            <template v-if="isAway(i)">
               <button
                 type="button"
                 class="trip-form__link q-pa-none"
                 :disabled="!!returnReason(i)"
+                :title="returnReason(i) || undefined"
                 @click="returnWagon(i)"
               >
                 {{ t('Оформить передачу') }} →
               </button>
-              <span v-if="returnReason(i)" class="trip-form__reason trip-form__block">{{ returnReason(i) }}</span>
             </template>
           </span>
           <span>
@@ -124,12 +133,12 @@
             </template>
             <span v-else :class="{ 'trip-form__muted': !w.passenger }">{{ conductorsText(w) }}</span>
           </span>
-          <span v-if="canEdit" class="trip-form__moves">
+          <span class="trip-form__moves">
             <button
               type="button"
               class="trip-form__move q-pa-none"
-              :disabled="i === 0"
-              :title="t('Выше')"
+              :disabled="!canEdit || i === 0"
+              :title="editReason || t('Выше')"
               @click="moveWagon(i, -1)"
             >
               ↑
@@ -137,8 +146,8 @@
             <button
               type="button"
               class="trip-form__move q-pa-none"
-              :disabled="i === norm.wagons.length - 1"
-              :title="t('Ниже')"
+              :disabled="!canEdit || i === norm.wagons.length - 1"
+              :title="editReason || t('Ниже')"
               @click="moveWagon(i, 1)"
             >
               ↓
@@ -146,7 +155,8 @@
             <button
               type="button"
               class="trip-form__move q-pa-none"
-              :title="t('Убрать из состава')"
+              :disabled="!canEdit"
+              :title="editReason || t('Убрать из состава')"
               @click="removeWagon(i)"
             >
               ✕
@@ -154,17 +164,23 @@
             <button
               type="button"
               class="trip-form__btn q-py-none q-px-md"
-              :title="t('Добавить вагоны после этого')"
+              :disabled="!canEdit"
+              :title="editReason || t('Добавить вагоны после этого')"
               @click="addWagons(i + 1)"
             >
               {{ t('+ Вагон') }}
             </button>
           </span>
-          <span v-else />
         </div>
         <div v-if="norm.wagons.length === 0" class="trip-form__empty q-pa-md">
           {{ t('Состав не сформирован') }}
-          <button v-if="canEdit" type="button" class="trip-form__btn q-py-none q-px-md" @click="addWagons(0)">
+          <button
+            type="button"
+            class="trip-form__btn q-py-none q-px-md"
+            :disabled="!canEdit"
+            :title="editReason"
+            @click="addWagons(0)"
+          >
             {{ t('+ Вагон') }}
           </button>
         </div>
@@ -228,10 +244,10 @@
             </div>
             <div v-if="ready" class="trip-form__verdict">{{ t('Поезд готов к отправлению') }}</div>
             <button
-              v-if="canMark"
               type="button"
               class="zs-btn-primary"
-              :disabled="!ready || running"
+              :disabled="!canMark || !ready || running"
+              :title="canMark ? undefined : t(MARK_REASON)"
               @click="mark(true)"
             >
               {{ t('Отметить отправление') }}
@@ -273,7 +289,7 @@ import { formatDateTime } from '@/shared/format'
 import { useLoad } from '@/shared/loadable'
 import type { WagonNorm } from '@/shared/trips/crewNorm'
 import { crewNorm, normDone, slotOptions } from '@/shared/trips/crewNorm'
-import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
+import { currentUser, hasRole, loadCurrentUser, userName } from '@/shared/user'
 import { placeText } from '@/shared/wagonPlace'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import SidePanel from '../frame/SidePanel.vue'
@@ -315,6 +331,22 @@ const canEdit = computed(() => planned.value && (isAdmin.value || hasRole(curren
 const canEditCrew = computed(
   () => planned.value && (isAdmin.value || hasRole(currentUser.value, RoleType.CREW_PLANNER)),
 )
+/** Почему состав, ЛНП и ПЭМ не поменять: нет прав или рейс не в статусе «План»; пусто — можно. */
+const editReason = computed(() =>
+  why(
+    isAdmin.value || hasRole(currentUser.value, RoleType.WAGON_PLANNER),
+    PLANNER_REASON,
+    statusReason(TripStatus.PLANNED),
+  ),
+)
+/** Почему список проводников рейса не поменять: нет прав или рейс не в статусе «План»; пусто — можно. */
+const crewReason = computed(() =>
+  why(
+    isAdmin.value || hasRole(currentUser.value, RoleType.CREW_PLANNER),
+    CREW_PLANNER_REASON,
+    statusReason(TripStatus.PLANNED),
+  ),
+)
 const isChief = computed(
   () => !!crew.value?.crew.some((m) => m.crewDutyType === CrewDuty.LNP && m.usr.id === currentUser.value?.id),
 )
@@ -340,54 +372,59 @@ function statusReason(...allowed: number[]): string {
   return t('Недоступно в статусе «{status}»', { status: dictManager.getValue('TripState', s) })
 }
 const FIX_REASON = 'Исправить можно в течение 10 минут после отметки'
+const MARK_REASON = 'Отмечает ЛНП этого рейса'
+const PLANNER_REASON = 'Состав, ЛНП и ПЭМ меняет планировщик вагонов'
+const CREW_PLANNER_REASON = 'Проводников рейса назначает планировщик проводников'
+const COUPLE_REASON = 'Акт составляет ЛНП этого рейса или мастер депо'
+const TRANSFER_REASON = 'Передачу оформляет мастер депо или приёмщик'
 
-/** Кнопки в шапке: только те, на которые есть права; reason — почему недоступно сейчас. */
-const headerButtons = computed(() =>
-  [
-    {
-      label: 'Отцепка',
-      show: canCouple.value,
-      primary: false,
-      reason: statusReason(TripStatus.IN_PROGRESS),
-      run: () => couple('detach'),
-    },
-    {
-      label: 'Прицепка',
-      show: canCouple.value,
-      primary: false,
-      reason: statusReason(TripStatus.IN_PROGRESS),
-      run: () => couple('attach'),
-    },
-    {
-      label: 'Отметить прибытие',
-      show: canMark.value,
-      primary: true,
-      reason: statusReason(TripStatus.IN_PROGRESS),
-      run: () => mark(false),
-    },
-    {
-      label: 'Исправить отправление',
-      show: canMark.value,
-      primary: true,
-      reason: statusReason(TripStatus.IN_PROGRESS) || (fixDeparture.value ? '' : t(FIX_REASON)),
-      run: () => mark(true, true),
-    },
-    {
-      label: 'Исправить прибытие',
-      show: canMark.value,
-      primary: true,
-      reason: statusReason(TripStatus.DONE) || (fixArrival.value ? '' : t(FIX_REASON)),
-      run: () => mark(false, true),
-    },
-  ].filter((b) => b.show),
-)
+/** Почему кнопка недоступна: сначала нет прав (rights — права есть, reason — текст), затем status; пусто — доступна. */
+const why = (rights: boolean, reason: string, status: string) => (rights ? status : t(reason))
+
+/** Кнопки в шапке: видны все; reason — почему недоступно сейчас. */
+const headerButtons = computed(() => [
+  {
+    label: 'Отцепка',
+    primary: false,
+    reason: why(canCouple.value, COUPLE_REASON, statusReason(TripStatus.IN_PROGRESS)),
+    run: () => couple('detach'),
+  },
+  {
+    label: 'Прицепка',
+    primary: false,
+    reason: why(canCouple.value, COUPLE_REASON, statusReason(TripStatus.IN_PROGRESS)),
+    run: () => couple('attach'),
+  },
+  {
+    label: 'Отметить прибытие',
+    primary: true,
+    reason: why(canMark.value, MARK_REASON, statusReason(TripStatus.IN_PROGRESS)),
+    run: () => mark(false),
+  },
+  {
+    label: 'Исправить отправление',
+    primary: true,
+    reason: why(
+      canMark.value,
+      MARK_REASON,
+      statusReason(TripStatus.IN_PROGRESS) || (fixDeparture.value ? '' : t(FIX_REASON)),
+    ),
+    run: () => mark(true, true),
+  },
+  {
+    label: 'Исправить прибытие',
+    primary: true,
+    reason: why(canMark.value, MARK_REASON, statusReason(TripStatus.DONE) || (fixArrival.value ? '' : t(FIX_REASON))),
+    run: () => mark(false, true),
+  },
+])
 const canAssign = computed(
   () =>
     canEditCrew.value || (inProgress.value && isAdmin.value) || ((planned.value || inProgress.value) && isChief.value),
 )
 
 const back = () => void router.push({ name: 'trips' })
-const label = (m: CrewMember) => (m.senior ? `${m.usr.name} • ${t('ст.')}` : m.usr.name)
+const label = (m: CrewMember) => (m.senior ? `${userName(m.usr)} • ${t('ст.')}` : userName(m.usr))
 
 async function load() {
   error.value = null
@@ -439,12 +476,12 @@ const duties = computed(() => {
     const member = crew.value?.crew.find((m) => m.crewDutyType === duty) ?? null
     const choices: { id: number; text: string; data?: Record<string, unknown> }[] = list.map((c) => ({
       id: c.id,
-      text: c.name,
+      text: userName(c),
       data: { busy: busyText(c) },
     }))
     // назначенный виден и если сейчас недоступен для выбора
     if (member && !choices.some((c) => c.id === member.usr.id))
-      choices.unshift({ id: member.usr.id, text: member.usr.name })
+      choices.unshift({ id: member.usr.id, text: userName(member.usr) })
     return { duty, title, member, choices }
   }
   return [line(CrewDuty.LNP, 'Начальник поезда', chiefs.value), line(CrewDuty.PEM, 'ПЭМ', pems.value)]
@@ -481,7 +518,7 @@ async function pickConductors() {
   const trip = crew.value!.trip
   const saved = await openDialog<boolean>(CrewPickDialog, {
     tripId: trip.id,
-    tripName: `${trip.trainNumber} ${trip.name}`,
+    tripName: `${trip.trainNumber} • ${trip.name}`,
     station: dictManager.getValue('Station', trip.departureStation),
   })
   if (saved) await load()
@@ -526,9 +563,11 @@ function removeWagon(i: number) {
 }
 
 async function addWagons(pos: number) {
+  const trip = crew.value!.trip
   const added = await openDialog<string[]>(TripWagonsDialog, {
     tripId: tripId.value,
-    station: dictManager.getValue('Station', crew.value!.trip.departureStation),
+    departureStation: trip.departureStation,
+    plannedDt: trip.plannedDt,
   })
   if (!added) return
   const list = numbers()
@@ -559,8 +598,12 @@ const canTransfer = computed(() =>
   [RoleType.ADMIN, RoleType.MASTER, RoleType.RECEIVER].some((r) => hasRole(currentUser.value, r)),
 )
 
-/** Почему передачу вагона не оформить: передать на станцию можно только из депо или парка отстоя; пусто — можно. */
+/**
+ * Почему передачу вагона не оформить: нет прав; передать на станцию можно только из депо или парка отстоя; пусто —
+ * можно.
+ */
 function returnReason(i: number): string {
+  if (!canTransfer.value) return t(TRANSFER_REASON)
   const w = liveWagon(i)
   if (w.locationType === LocationType.DEPOT || w.locationType === LocationType.YARD) return ''
   return t('Передать на станцию можно только из депо или парка отстоя')
@@ -612,7 +655,7 @@ const readiness = computed(() => {
     {
       ok: n.chiefAndPem,
       title: t('Начальник поезда и ПЭМ'),
-      detail: `${t('ЛНП')} ${chief?.usr.name ?? '—'} • ${t('ПЭМ')} ${pem?.usr.name ?? '—'}`,
+      detail: `${t('ЛНП')} ${chief ? userName(chief.usr) : '—'} • ${t('ПЭМ')} ${pem ? userName(pem.usr) : '—'}`,
     },
     {
       ok: normDone(n),
@@ -789,11 +832,6 @@ async function mark(depart: boolean, fix = false) {
   &--bad {
     outline: 0.0625rem solid $zs-error-fg;
   }
-}
-
-.trip-form__reason {
-  color: $zs-text-muted;
-  font-size: 0.8rem;
 }
 
 .trip-form__link {

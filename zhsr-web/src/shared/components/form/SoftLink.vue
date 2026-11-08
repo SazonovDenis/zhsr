@@ -1,5 +1,7 @@
 <template>
-  <button type="button" class="soft-link zs-focusable q-pa-none" @click="emit('click')">{{ t(text) }}</button>
+  <button type="button" class="soft-link zs-focusable q-pa-none" @click="emit('click')">
+    {{ t(text, params ?? {}) }}
+  </button>
 </template>
 
 <script setup lang="ts">
@@ -11,7 +13,11 @@ import { t } from '@/boot/i18n'
  *
  *   <SoftLink text="Создать новый маршрут" @click="newRoute" />
  */
-defineProps<{ text: string }>()
+defineProps<{
+  text: string
+  /** значения для подстановки в текст: «Рейсы вагона ({n})» */
+  params?: Record<string, unknown> | undefined
+}>()
 
 const emit = defineEmits<{ click: [] }>()
 </script>

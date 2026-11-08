@@ -16,7 +16,7 @@ public final class ServiceType {
     public static final long CLEANING = 2;
     /** Экипировка */
     public static final long EQUIPMENT = 3;
-    /** Инструкторская - инструктор поездных бригад, инструктор-нормировщик */
+    /** Инструкторская - инструктор поездных бригад, инструктор-нормировщик, медик */
     public static final long INSTRUCTOR = 4;
     /** Эксплуатация - эксплуатационщик */
     public static final long OPERATION = 5;

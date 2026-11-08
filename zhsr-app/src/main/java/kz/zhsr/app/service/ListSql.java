@@ -65,10 +65,62 @@ final class ListSql {
                        wagon_info.location_type,
                        coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard, wagon_info.trip) as place,
                        wagon_info.trip, wagon_info.dbeg_location, wagon_info.wagon_status_type,
-                       wagon_info.dbeg_status
+                       wagon_info.dbeg_status, wagon.maker, wagon.build_year, wagon.dbeg, wagon.dend
                 from wagon
                 join wagon_info on wagon_info.wagon = wagon.id
                 """, sort.orderBy(WAGON_SORT, "wagon.number, wagon.id"));
+    }
+
+    /**
+     * Вагоны рейсов в статусе «план» и «выполняется» - второй проход списка вагонов: от рейсов (их немного, индекс
+     * ix_trip_active), а не от вагонов. Параметры planned, inProgress - состояния рейса.
+     */
+    static String activeTripWagons() {
+        return """
+                select trip_wagon.wagon, trip_wagon.trip, trip.trip_status_type
+                from trip
+                join trip_wagon on trip_wagon.trip = trip.id
+                where trip.trip_status_type in (:planned, :inProgress)
+                order by trip.planned_dt
+                """;
+    }
+
+    /**
+     * Расположение вагонов на момент - второй проход списка вагонов при фильтре at: запись журнала, действующая в
+     * момент (индекс ex_wagon_location_overlap). Параметры ids, at.
+     */
+    static String locationsAt() {
+        return """
+                select wagon_location.wagon, wagon_location.location_type,
+                       coalesce(wagon_location.station, wagon_location.depot, wagon_location.yard,
+                                wagon_location.trip) as place,
+                       wagon_location.trip
+                from wagon_location
+                where wagon_location.wagon = any(:ids) and tstzrange(wagon_location.dbeg, wagon_location.dend) @> :at
+                """;
+    }
+
+    /** Состояние вагонов на момент - как {@link #locationsAt()}. Параметры ids, at. */
+    static String statusesAt() {
+        return """
+                select wagon_status.wagon, wagon_status.wagon_status_type
+                from wagon_status
+                where wagon_status.wagon = any(:ids) and tstzrange(wagon_status.dbeg, wagon_status.dend) @> :at
+                """;
+    }
+
+    /**
+     * Вагоны актов, ожидающих приёма, - второй проход списка вагонов: от ожидающих актов (индекс
+     * ix_transfer_act_pending), а не от вагонов. Параметр pending - состояние акта.
+     */
+    static String pendingTransferWagons() {
+        return """
+                select transfer_act_wagon.wagon, transfer_act.id, transfer_act.number, transfer_act.to_station,
+                       transfer_act.to_depot, transfer_act.to_yard
+                from transfer_act
+                join transfer_act_wagon on transfer_act_wagon.transfer_act = transfer_act.id
+                where transfer_act.act_status_type = :pending
+                """;
     }
 
     // --- рейсы
@@ -97,6 +149,13 @@ final class ListSql {
                     exists (select 1 from route_station
                             where route_station.route = trip.route and route_station.station = :station)""",
                     "station", filter.station());
+        }
+        if (filter.wagon() != null && !filter.wagon().isBlank()) {
+            where.add("""
+                    exists (select 1 from trip_wagon
+                            join wagon on wagon.id = trip_wagon.wagon
+                            where trip_wagon.trip = trip.id and strpos(wagon.number, :wagon) > 0)""",
+                    "wagon", filter.wagon().trim());
         }
         if (filter.from() != null) {
             // рейс, идущий в периоде, виден и если отправился раньше from

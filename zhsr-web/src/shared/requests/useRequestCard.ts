@@ -25,7 +25,7 @@ import { isOnline } from '@/shared/network'
 import { findCachedRow, loadCached } from '@/shared/offline/cache'
 import { queueAction, queueAssign, queuedDecision, queueNote, queuePhotos } from '@/shared/offline/outbox'
 import { currentUser } from '@/shared/user'
-import { ACTIONS, canAssign, canEdit, editBlockReason, requestActions } from './rights'
+import { ACTIONS, assignBlockReason, canAssign, canEdit, editBlockReason, requestActions } from './rights'
 
 /**
  * Карточка заявки — общее для правой панели десктопа и экрана заявки на телефоне: загрузка заявки, кнопки действий
@@ -108,7 +108,7 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     return executor && executor.id !== user.value?.id ? executor.name : ''
   })
 
-  /** кнопки действий: все, у недоступных — причина рядом (reason, переведена); конечный статус — кнопок нет */
+  /** кнопки действий: все, у недоступных — причина рядом (reason, переведена) */
   const actions = computed(() => {
     const r = request.value
     if (!r || !user.value) return []
@@ -122,6 +122,18 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     }))
   })
   const assignable = computed(() => !!request.value && !!user.value && canAssign(user.value, request.value))
+  /** назначение или переназначение: у заявки уже есть исполнитель */
+  const reassign = computed(() => !!request.value?.executorUsr)
+  /** почему исполнителя не назначить — «Вы не можете назначить (переназначить): …» (переведено); пусто — можно */
+  const assignHint = computed(() => {
+    const r = request.value
+    if (!r || !user.value) return ''
+    const reason = assignBlockReason(user.value, r)
+    if (!reason) return ''
+    const status = dictManager.getValue('RequestStatus', r.requestStatusType)
+    const text = reassign.value ? 'Вы не можете переназначить: {reason}' : 'Вы не можете назначить: {reason}'
+    return t(text, { reason: t(reason, { status }) })
+  })
   const editable = computed(() => !!request.value && !!user.value && canEdit(user.value, request.value))
   const editHint = computed(() =>
     request.value && user.value ? t(editBlockReason(user.value, request.value) || 'Исправить заявку') : '',
@@ -299,6 +311,8 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     comment,
     actionPhotos,
     assignable,
+    assignHint,
+    reassign,
     staff,
     loadStaff,
     editable,

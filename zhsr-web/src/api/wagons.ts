@@ -1,4 +1,5 @@
 import type { TableSort } from '@/shared/components/table/types'
+import type { UserRef } from './requests'
 import { LocationType } from '@/shared/constants/systemDicts'
 import { http } from './http'
 
@@ -33,6 +34,38 @@ export interface WagonRow extends WagonOption {
   wagonStatusType: number
   /** с какого времени вагон в этом состоянии, ISO с часовым поясом */
   dbegStatus: string
+  /** изготовитель; null — не указан */
+  maker: string | null
+  /** год постройки; null — не указан */
+  buildYear: number | null
+  /** ввод в эксплуатацию, ISO-дата; null — не указан */
+  dbeg: string | null
+  /** вывод из эксплуатации, ISO-дата; null — вагон в эксплуатации */
+  dend: string | null
+  /** рейсы в состоянии «план» и «выполняется», в составе которых вагон, по плановому отправлению */
+  trips: WagonTrip[]
+  /** акт, ожидающий приёма по вагону; null — нет */
+  pendingTransfer: WagonPendingTransfer | null
+  /** расположение на момент фильтра at — по журналу; null — момент не задан или вагона тогда ещё не было */
+  locationAt?: WagonPlace | null
+  /** состояние на момент фильтра at — id справочника WagonState; null — как у locationAt */
+  wagonStatusTypeAt?: number | null
+}
+
+/** Рейс, в составе которого вагон: «план» или «выполняется». */
+export interface WagonTrip {
+  trip: TripRef
+  /** состояние рейса — id справочника TripState */
+  tripStatusType: number
+}
+
+/** Акт приёма-передачи, ожидающий приёма по вагону: номер и куда передаётся вагон (ровно одно из to*). */
+export interface WagonPendingTransfer {
+  id: number
+  number: string
+  toStation: number | null
+  toDepot: number | null
+  toYard: number | null
 }
 
 export interface WagonFilter {
@@ -48,6 +81,8 @@ export interface WagonFilter {
   states: number[]
   /** депо приписки — id справочника Depot; null — без ограничения (сервер может ограничить по роли) */
   depot?: number | null
+  /** момент, например отправление рейса, ISO с поясом: дополнительно расположение и состояние на него */
+  at?: string | null
 }
 
 /** Новый вагон: паспорт (wagon), депо приписки, начальное расположение и состояние. */
@@ -145,4 +180,66 @@ export function requestWagon(w: WagonOption): RequestWagon {
     place: inTrip ? null : w.place,
     station: w.locationType === LocationType.STATION ? w.place : null,
   }
+}
+
+/** Основание записи журнала вагона — как на сервере (WagonJournalRow.BASIS_*). */
+export const JournalBasis = {
+  /** ввод вагона: первая запись журнала без документа */
+  ENTRY: 1,
+  /** ручная правка: запись без документа, не первая */
+  MANUAL: 2,
+  TRANSFER: 3,
+  DETACH: 4,
+  ATTACH: 5,
+  DEPARTURE: 6,
+  ARRIVAL: 7,
+} as const
+
+/** Расположение вагона в записи журнала. */
+export interface WagonPlace {
+  /** вид расположения — id справочника LocationKind */
+  locationType: number
+  /** место по виду: id справочника Station, Depot, Yard или id рейса */
+  place: number
+  /** рейс, в составе которого вагон; null — вагон не в рейсе */
+  trip: TripRef | null
+}
+
+/** Строка журнала вагона (Ф-ВАГ-05): записи расположения и состояния, открытые одним документом в одно время. */
+export interface WagonJournalRow {
+  /** время события, ISO с часовым поясом */
+  dbeg: string
+  /** расположение после события */
+  location: WagonPlace | null
+  /** расположение до события; null — не менялось или это первая запись */
+  prevLocation: WagonPlace | null
+  /** событие сменило расположение */
+  locationChanged: boolean
+  /** состояние после события — id справочника WagonState */
+  wagonStatusType: number
+  /** состояние до события; null — не менялось или это первая запись */
+  prevWagonStatusType: number | null
+  /** событие сменило состояние */
+  statusChanged: boolean
+  /** основание — константы JournalBasis */
+  basisType: number
+  /** номер акта приёма-передачи, отцепки или прицепки; иначе null */
+  actNumber: string | null
+  /** рейс отправления, прибытия, отцепки или прицепки; иначе null */
+  basisTrip: TripRef | null
+  /** кто провёл документ; null — документа нет */
+  byUsr: UserRef | null
+  /** причина из акта отцепки или прицепки; null — нет */
+  comment: string | null
+}
+
+/**
+ * Журнал вагона за период: from — начало, to — конец, не включая (ISO с поясом); null — без границы. Новые первыми.
+ */
+export async function fetchWagonJournal(
+  wagonId: number,
+  from: string | null,
+  to: string | null,
+): Promise<WagonJournalRow[]> {
+  return (await http.get<WagonJournalRow[]>(`/wagons/${wagonId}/journal`, { params: { from, to } })).data
 }

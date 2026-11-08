@@ -1,16 +1,15 @@
 <template>
   <DictBadge :id="row.wagonStatusType" dict="WagonState" class="cell-wagon-state" />
-  <div class="zs-sub">{{ t('с {date}', { date: formatDateTime(row.dbegStatus) }) }}</div>
+  <div class="zs-sub">{{ sinceText(row.dbegStatus, nowMinute) }}</div>
 </template>
 
 <script setup lang="ts">
 import type { WagonRow } from '@/api/wagons'
-import { t } from '@/boot/i18n'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import type { CellProps } from '@/shared/components/table/types'
-import { formatDateTime } from '@/shared/format'
+import { nowMinute, sinceText } from '@/shared/since'
 
-/** Состояние вагона плашкой и с какого времени. */
+/** Состояние вагона плашкой, с какого времени и сколько уже длится. */
 defineProps<CellProps<WagonRow>>()
 </script>
 

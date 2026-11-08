@@ -1,8 +1,21 @@
 <template>
   <div class="dialog-actions q-py-md q-px-lg">
+    <q-btn
+      v-for="(action, index) in leftActions"
+      :key="`left${index}`"
+      no-caps
+      unelevated
+      outline
+      color="grey-8"
+      :icon="action.icon"
+      :label="action.title && t(action.title)"
+      :disable="action.disabled || !!actionRunning"
+      class="dialog-actions__btn zs-focusable"
+      @click="emit('action', action)"
+    />
     <slot name="left" />
     <q-space />
-    <template v-for="(action, index) in visible" :key="index">
+    <template v-for="(action, index) in rightActions" :key="index">
       <q-btn
         no-caps
         unelevated
@@ -28,7 +41,7 @@ import type { DialogAction } from './types'
 import { isActionVisible } from './types'
 
 /**
- * Кнопки подвала диалога. Пока действие выполняется (actionRunning), его кнопка крутит спиннер, а заблокированы все
+ * Кнопки подвала диалога: кнопки с left («Отмена») — у левого края, остальные — справа. Пока действие выполняется (actionRunning), его кнопка крутит спиннер, а заблокированы все
  * кнопки: и та, что его запустила, и соседние.
  */
 const props = withDefaults(defineProps<{ actions?: DialogAction[]; actionRunning?: string | null }>(), {
@@ -39,6 +52,9 @@ const props = withDefaults(defineProps<{ actions?: DialogAction[]; actionRunning
 const emit = defineEmits<{ action: [action: DialogAction] }>()
 
 const visible = computed(() => props.actions.filter(isActionVisible))
+// у левого края — «Отмена» и другие кнопки с left, перед слотом left; остальные — справа
+const leftActions = computed(() => visible.value.filter((a) => a.left))
+const rightActions = computed(() => visible.value.filter((a) => !a.left))
 </script>
 
 <style scoped lang="scss">

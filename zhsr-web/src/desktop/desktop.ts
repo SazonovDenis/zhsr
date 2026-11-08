@@ -2,6 +2,7 @@
 export { default as DesktopLayout } from './DesktopLayout.vue'
 export { default as DesktopHomePage } from './home/DesktopHomePage.vue'
 export { default as WagonsPage } from './wagons/WagonsPage.vue'
+export { default as WagonJournalPage } from './wagons/WagonJournalPage.vue'
 export { default as TripsPage } from './trips/TripsPage.vue'
 export { default as TripFormPage } from './trips/TripFormPage.vue'
 export { default as ActsPage } from './acts/ActsPage.vue'

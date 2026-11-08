@@ -2,9 +2,9 @@ import type { TripRef } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import { formatDateTime } from '@/shared/format'
 
-/** Рейс для показа: «002 Алматы — Астана». */
+/** Рейс для показа: «002 • Алматы — Астана». */
 export function tripRefText(trip: TripRef): string {
-  return `${trip.trainNumber} ${trip.name}`
+  return `${trip.trainNumber} • ${trip.name}`
 }
 
 /** Рейс для показа с датой: поезд ходит регулярно, поэтому номер и маршрут не отличают один рейс от другого. */

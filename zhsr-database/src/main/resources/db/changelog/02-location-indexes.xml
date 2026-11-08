@@ -221,6 +221,11 @@
         </createIndex>
     </changeSet>
 
+    <!-- рейсы в статусе «план» (1) и «выполняется» (2): второй проход списка вагонов - рейсы вагона -->
+    <changeSet id="02-location-indexes-ix_trip_active" author="zhsr">
+        <sql>create index ix_trip_active on trip (trip_status_type) where trip_status_type in (1, 2)</sql>
+    </changeSet>
+
     <!-- trip_wagon: строки состава удаляются вместе с рейсом -->
 
     <changeSet id="02-location-indexes-uq_trip_wagon_trip_wagon" author="zhsr">

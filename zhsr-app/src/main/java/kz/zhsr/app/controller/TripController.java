@@ -6,7 +6,6 @@ import kz.zhsr.app.dto.trip.StaffCandidate;
 import kz.zhsr.app.dto.trip.CouplingWagon;
 import kz.zhsr.app.dto.trip.TripCrew;
 import kz.zhsr.app.dto.trip.TripRow;
-import kz.zhsr.app.dto.trip.WagonCandidate;
 import kz.zhsr.app.service.CouplingService;
 import kz.zhsr.app.service.TripService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -76,10 +75,6 @@ public class TripController {
         return tripService.staffCandidates(id, duty);
     }
 
-    @GetMapping("/trips/{id}/wagon-candidates")
-    public List<WagonCandidate> wagonCandidates(@PathVariable long id) throws Exception {
-        return tripService.wagonCandidates(id);
-    }
 
     @PutMapping("/trips/{id}/conductors")
     public TripCrew setConductors(@PathVariable long id, @RequestBody List<Long> users) throws Exception {

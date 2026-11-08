@@ -53,6 +53,7 @@ public class Visibility {
             Map.entry(RoleType.CREW_PLANNER, Scope.ANY_DEPOT),
             Map.entry(RoleType.INSTRUCTOR, Scope.ANY_DEPOT),
             Map.entry(RoleType.SCHEDULER, Scope.ANY_DEPOT),
+            Map.entry(RoleType.MEDIC, Scope.ANY_DEPOT),
             Map.entry(RoleType.OPERATOR, Scope.ANY_DEPOT),
             Map.entry(RoleType.MASTER, Scope.OWN_DEPOT),
             Map.entry(RoleType.RECEIVER, Scope.OWN_DEPOT),

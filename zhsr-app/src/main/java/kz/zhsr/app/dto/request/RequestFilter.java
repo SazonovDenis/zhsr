@@ -17,6 +17,7 @@ import java.util.List;
  * @param severities критичность (severity_type)
  * @param services   службы (service)
  * @param trip       рейс заявки
+ * @param wagon      вагон заявки (id)
  * @param from       время подачи - с этой даты включительно; null - без ограничения
  * @param to         время подачи - по эту дату включительно; null - без ограничения
  */
@@ -28,6 +29,7 @@ public record RequestFilter(
         List<Long> severities,
         List<Long> services,
         Long trip,
+        Long wagon,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
 ) {

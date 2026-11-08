@@ -153,7 +153,7 @@ import type { QueuedRequest } from '@/shared/offline/outbox'
 import { outboxAsRequest, queuedRequests, withQueuedEdit } from '@/shared/offline/outbox'
 import { CrewDuty, RequestStatus, RoleType, ServiceType, TripStatus } from '@/shared/constants/systemDicts'
 import { canAccept, canWork } from '@/shared/requests/rights'
-import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
+import { currentUser, hasRole, loadCurrentUser, userName } from '@/shared/user'
 import { crewNorm, normDone } from '@/shared/trips/crewNorm'
 import { delayText, markEditable, useNow } from '@/shared/trips/tripTimes'
 import CalendarDialog from '../components/CalendarDialog.vue'
@@ -191,7 +191,10 @@ const crew = shallowRef<TripCrew | null>(null)
 const norm = computed(() => (crew.value ? crewNorm(crew.value) : null))
 
 // сотрудник бригады на должности; нет — «не назначен»
-const memberName = (duty: number) => crew.value?.crew.find((m) => m.crewDutyType === duty)?.usr.name ?? t('не назначен')
+const memberName = (duty: number) => {
+  const m = crew.value?.crew.find((x) => x.crewDutyType === duty)
+  return m ? userName(m.usr) : t('не назначен')
+}
 
 // отправление и прибытие отмечают начальник поезда и администратор; нужна связь
 const isChief = computed(

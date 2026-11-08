@@ -3,7 +3,15 @@
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Маршруты') }}</h1>
       <div class="desktop-frame__actions">
-        <button type="button" class="zs-btn-primary" @click="openRouteNew(router)">{{ t('Новый маршрут') }}</button>
+        <button
+          type="button"
+          class="zs-btn-primary"
+          :disabled="!!createReason"
+          :title="createReason || undefined"
+          @click="openRouteNew(router)"
+        >
+          {{ t('Новый маршрут') }}
+        </button>
       </div>
     </template>
 
@@ -22,6 +30,7 @@
       row-key="id"
       :sort="sort"
       :loading="busy.active.value"
+      :row-menu="rowMenu"
       empty="Маршрутов по выбранному фильтру нет"
       @sort="sort = $event"
       @row-dblclick="edit"
@@ -42,7 +51,7 @@ import { fetchRoutes } from '@/api/routes'
 import { t } from '@/boot/i18n'
 import type { ChoiceItem } from '@/shared/components/choice/choice'
 import CbButton from '@/shared/components/choice/CbButton.vue'
-import type { RowKey, TableSort } from '@/shared/components/table/types'
+import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -50,6 +59,8 @@ import FilterBar from '@/shared/components/FilterBar.vue'
 import { dictChoices } from '@/shared/dict/dictChoices'
 import { provideBusy } from '@/shared/busy'
 import { dictManager } from '@/shared/dict/DictManager'
+import { RoleType } from '@/shared/constants/systemDicts'
+import { roleReason } from '@/shared/roleReason'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { useSidePanel } from '../frame/useSidePanel'
 import { openRouteNew } from './openRouteNew'
@@ -62,6 +73,9 @@ import { routesColumns } from './routesColumns'
  */
 
 const router = useRouter()
+
+// маршрут создают администратор и планировщик вагонов (Ф-МАР-01)
+const createReason = computed(() => roleReason([RoleType.WAGON_PLANNER], 'Создаёт планировщик вагонов'))
 
 const states: ChoiceItem[] = [
   { id: 'active', text: 'Действует' },
@@ -98,6 +112,16 @@ watch([filter, sort], load, { deep: true })
 function edit(route: RouteRow) {
   void router.push({ name: 'route-edit', params: { id: route.id } })
 }
+
+// меню строки: то же, что кнопка панели маршрута, затем действие со списком «Новый маршрут»
+const rowMenu: RowMenuItem<RouteRow>[] = [
+  {
+    label: 'Редактировать',
+    disabled: () => roleReason([RoleType.WAGON_PLANNER], 'Правит планировщик вагонов'),
+    run: edit,
+  },
+  { label: 'Новый маршрут', separator: true, disabled: () => createReason.value, run: () => void openRouteNew(router) },
+]
 
 // цепочка загрузок — сразу в setup: спиннер виден с первой отрисовки; она же — повтор по клику на ошибку в таблице
 async function init() {

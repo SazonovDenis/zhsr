@@ -140,6 +140,8 @@ export interface RequestFilter {
   services: number[]
   /** рейс — id рейса */
   trip: number | null
+  /** вагон — id вагона */
+  wagon: number | null
   /** период по времени подачи: ISO-даты «2026-10-30» включительно; null — без ограничения */
   from: string | null
   to: string | null
@@ -155,6 +157,7 @@ export function requestFilter(scope: RequestScope, patch: Partial<RequestFilter>
     severities: [],
     services: [],
     trip: null,
+    wagon: null,
     from: null,
     to: null,
     ...patch,

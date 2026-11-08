@@ -44,6 +44,7 @@
             role="row"
             @click="onRowClick(item)"
             @dblclick="emit('row-dblclick', item)"
+            @contextmenu="onContextMenu($event, item)"
           >
             <slot name="row" :row="item" :index="index" :grid-style="gridStyle">
               <div class="data-table__grid" :style="gridStyle">
@@ -58,6 +59,18 @@
                 </div>
               </div>
             </slot>
+            <!-- меню строки: три точки в конце строки, полупрозрачные; то же меню — по правой кнопке -->
+            <button
+              v-if="hasMenu(item)"
+              type="button"
+              class="data-table__menu-btn q-pa-none"
+              :title="t('Действия')"
+              :aria-label="t('Действия')"
+              @click.stop="onMenuButton($event, item)"
+              @dblclick.stop
+            >
+              <q-icon name="more_vert" size="1.2rem" />
+            </button>
           </div>
         </template>
       </q-virtual-scroll>
@@ -87,6 +100,8 @@
       <slot name="footer" :rows="rows" />
     </div>
 
+    <RowMenu ref="rowMenuEl" />
+
     <!-- строки уже есть, идёт новая загрузка — спиннер поверх строк, без плавного появления -->
     <q-inner-loading :showing="loading && rows.length > 0" :transition-duration="0">
       <q-spinner color="primary" size="2.5rem" />
@@ -103,7 +118,8 @@ import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import type { ShownError } from '@/shared/errors'
 import CellText from './CellText.vue'
-import type { Column, RowKey, TableSort } from './types'
+import RowMenu from './RowMenu.vue'
+import type { Column, RowKey, RowMenuItem, TableSort } from './types'
 
 /**
  * Таблица из колонок-описаний (см. Column в types.ts).
@@ -118,6 +134,9 @@ import type { Column, RowKey, TableSort } from './types'
  * - Выбранная строка (v-model:selected) подсвечивается, а при смене выбора прокручивается в видимую область.
  * - Строка может быть зачёркнута (struck): значения перечёркнуты, например у отключённой записи.
  * - Подвал: строка по колонкам (column.footer) и свободный слот footer под таблицей.
+ * - Меню строки (rowMenu): в конце строки — полупрозрачные три точки, по ним и по правой кнопке мыши открывается меню
+ *   действий. Пункты задаёт страница; у пункта — видимость и причина недоступности для строки. Открытие меню выбирает
+ *   строку. Если видимых пунктов нет — нет ни точек, ни меню (по правой кнопке — обычное меню браузера).
  */
 const props = withDefaults(
   defineProps<{
@@ -138,8 +157,19 @@ const props = withDefaults(
     error?: ShownError | null
     /** повтор загрузки: клик по ошибке запускает его; null — повтора нет */
     retry?: (() => void) | null
+    /** меню строки: пункты по порядку; null — меню нет */
+    rowMenu?: RowMenuItem<Row>[] | null
   }>(),
-  { selected: null, struck: null, sort: null, loading: false, empty: 'Нет данных', error: null, retry: null },
+  {
+    selected: null,
+    struck: null,
+    sort: null,
+    loading: false,
+    empty: 'Нет данных',
+    error: null,
+    retry: null,
+    rowMenu: null,
+  },
 )
 
 const emit = defineEmits<{
@@ -211,6 +241,43 @@ function onHeaderClick(col: Column<Row>) {
   if (props.sort?.field !== field) emit('sort', { field, desc: false })
   else if (!props.sort.desc) emit('sort', { field, desc: true })
   else emit('sort', null)
+}
+
+// --- меню строки
+
+const rowMenuEl = ref<InstanceType<typeof RowMenu> | null>(null)
+
+function menuItems(row: Row) {
+  return (props.rowMenu ?? [])
+    .filter((item) => item.visible?.(row) ?? true)
+    .map((item) => ({
+      label: item.label,
+      reason: item.disabled?.(row) ?? '',
+      separator: !!item.separator,
+      run: () => item.run(row),
+    }))
+}
+
+function hasMenu(row: Row): boolean {
+  return !!props.rowMenu && props.rowMenu.some((item) => item.visible?.(row) ?? true)
+}
+
+function openMenu(row: Row, x: number, y: number, alignRight = false) {
+  emit('update:selected', keyOf(row))
+  void rowMenuEl.value?.show(menuItems(row), x, y, alignRight)
+}
+
+// под тремя точками, правым краем к ним
+function onMenuButton(e: MouseEvent, row: Row) {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  openMenu(row, rect.right, rect.bottom, true)
+}
+
+// у курсора; без пунктов — обычное меню браузера
+function onContextMenu(e: MouseEvent, row: Row) {
+  if (!hasMenu(row)) return
+  e.preventDefault()
+  openMenu(row, e.clientX, e.clientY)
 }
 
 function onRowClick(row: Row) {
@@ -291,7 +358,13 @@ watch(
 }
 
 .data-table__row {
+  position: relative;
   cursor: pointer;
+
+  // три точки меню строки: поверх конца строки, полупрозрачные; ярче под курсором строки и самих точек
+  &:hover .data-table__menu-btn {
+    opacity: 0.8;
+  }
 
   &:hover {
     background: $zs-row-hover-bg;
@@ -301,6 +374,31 @@ watch(
   &--selected:hover {
     background: $zs-row-selected-bg;
     box-shadow: inset 0.1rem 0 0 $zs-row-selected-bar;
+  }
+}
+
+.data-table__menu-btn {
+  position: absolute;
+  top: 50%;
+  right: 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  color: $zs-text-muted;
+  opacity: 0.4;
+  cursor: pointer;
+  transform: translateY(-50%);
+
+  &:hover,
+  &:focus-visible {
+    background: #fff;
+    opacity: 1;
+    outline: none;
   }
 }
 

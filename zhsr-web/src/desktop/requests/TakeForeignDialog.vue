@@ -20,7 +20,7 @@ const emit = defineEmits<{ done: [confirmed: boolean] }>()
 const show = defineModel<boolean>('show', { default: false })
 
 const actions: DialogAction[] = [
-  { title: 'Отмена' },
+  { title: 'Отмена', left: true },
   { title: 'Взять в работу', default: true, exec: () => emit('done', true) },
 ]
 </script>

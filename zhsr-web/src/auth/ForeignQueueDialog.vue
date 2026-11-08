@@ -25,7 +25,7 @@ const emit = defineEmits<{ done: [confirmed: boolean] }>()
 const show = defineModel<boolean>('show', { default: false })
 
 const actions: DialogAction[] = [
-  { title: 'Отмена' },
+  { title: 'Отмена', left: true },
   { title: 'Удалить и войти', default: true, exec: () => emit('done', true) },
 ]
 </script>

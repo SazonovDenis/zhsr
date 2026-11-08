@@ -158,6 +158,9 @@ final class RequestSql {
         if (filter.trip() != null) {
             where.add("repair_request.trip = :trip", "trip", filter.trip());
         }
+        if (filter.wagon() != null) {
+            where.add("repair_request.wagon = :wagon", "wagon", filter.wagon());
+        }
         if (filter.from() != null) {
             where.add("repair_request.created_dt >= :from", "from", filter.from());
         }

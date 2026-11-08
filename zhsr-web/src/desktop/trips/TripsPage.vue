@@ -3,7 +3,13 @@
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Рейсы') }}</h1>
       <div class="desktop-frame__actions">
-        <button v-if="isWagonPlanner" type="button" class="zs-btn-primary" @click="addTrip">
+        <button
+          type="button"
+          class="zs-btn-primary"
+          :disabled="!!createReason"
+          :title="createReason || undefined"
+          @click="addTrip"
+        >
           {{ t('Создать рейс') }}
         </button>
       </div>
@@ -11,13 +17,15 @@
 
     <FilterBar>
       <RouteSelect v-model="filter.route" placeholder="Маршрут" compact style="width: 17.7rem" />
+      <!-- номер вагона: рейсы, в составе которых вагон; остальные фильтры не отменяет -->
+      <TextInput v-model="filter.wagon" placeholder="Номер вагона" width="8.8rem" />
       <CbList
         v-model="filter.station"
         single
-        placeholder="Станция"
+        placeholder="Станция следования"
         :values="dictChoices('Station')"
         :source="dictSource('Station')"
-        style="width: 8.9rem"
+        style="width: 14rem"
       />
       <PeriodPicker
         v-model:start-date="filter.from"
@@ -45,6 +53,7 @@
       row-key="id"
       :sort="sort"
       :loading="busy.active.value"
+      :row-menu="rowMenu"
       empty="Рейсов по выбранному фильтру нет"
       @sort="sort = $event"
       @row-dblclick="openForm"
@@ -58,7 +67,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, shallowRef, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import type { TripRow, TripFilter } from '@/api/trips'
 import { fetchTrips } from '@/api/trips'
@@ -66,34 +75,51 @@ import { t } from '@/boot/i18n'
 import CbButton from '@/shared/components/choice/CbButton.vue'
 import CbList from '@/shared/components/choice/CbList.vue'
 import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
-import type { RowKey, TableSort } from '@/shared/components/table/types'
+import { actionsMenu } from '@/shared/components/table/rowMenu'
+import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import FilterBar from '@/shared/components/FilterBar.vue'
+import TextInput from '@/shared/components/form/TextInput.vue'
 import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
 import { provideBusy } from '@/shared/busy'
-import { RoleType } from '@/shared/constants/systemDicts'
-import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
+import { loadCurrentUser } from '@/shared/user'
 import RouteSelect from '../routes/RouteSelect.vue'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { useSidePanel } from '../frame/useSidePanel'
 import TripPanel from './TripPanel.vue'
 import TripNewDialog from './TripNewDialog.vue'
 import { FUTURE_STATES, sidePeriod, sidePresets, statesForPeriod, statesSide } from './tripPeriod'
+import { createTripReason, TRIP_ACTION_LABELS, useTripActions } from './tripActions'
 import { tripsColumns } from './tripsColumns'
 
 /** Список рейсов: фильтры и таблица. */
 
 // по умолчанию — план и выполняется, неделя вперёд
 const router = useRouter()
-const filter = reactive<TripFilter>({
+const route = useRoute()
+const filter = reactive<TripFilter & { wagon: string }>({
   route: null,
   station: null,
   ...sidePeriod(statesSide(FUTURE_STATES)),
   states: [...FUTURE_STATES],
+  wagon: '',
 })
+
+/**
+ * Переход «Рейсы вагона» с панели вагона (?wagon=номер): рейсы вагона в состояниях «план» и «выполняется» за всё
+ * время — период сброшен, остальные фильтры тоже.
+ */
+function applyRouteQuery() {
+  const wagon = route.query.wagon
+  if (typeof wagon !== 'string' || !wagon) return
+  Object.assign(filter, { route: null, station: null, from: null, to: null, states: [...FUTURE_STATES], wagon })
+  void router.replace({ name: 'trips' })
+}
+applyRouteQuery()
+watch(() => route.query.wagon, applyRouteQuery)
 
 // варианты периода зависят от выбранных состояний
 const presets = computed(() => sidePresets(statesSide(filter.states)))
@@ -119,9 +145,15 @@ function openForm(row: unknown) {
   void router.push({ name: 'trip-form', params: { id: (row as TripRow).id } })
 }
 
-const isWagonPlanner = computed(
-  () => hasRole(currentUser.value, RoleType.WAGON_PLANNER) || hasRole(currentUser.value, RoleType.ADMIN),
-)
+// рейс создаёт планировщик вагонов (Ф-РЕЙ-01)
+const createReason = computed(() => createTripReason())
+
+// меню строки: те же действия и пояснения, что у кнопок панели рейса, затем действие со списком «Создать рейс»
+const { actionsOf } = useTripActions(() => void load())
+const rowMenu: RowMenuItem<TripRow>[] = [
+  ...actionsMenu(TRIP_ACTION_LABELS, actionsOf),
+  { label: 'Создать рейс', separator: true, disabled: () => createReason.value, run: () => void addTrip() },
+]
 
 const rows = shallowRef<TripRow[]>([])
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок (справочники, фильтры, список)

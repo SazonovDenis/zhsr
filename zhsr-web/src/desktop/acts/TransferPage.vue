@@ -123,7 +123,7 @@ import {
   stationPlaceList,
   transferPlaceText,
 } from '@/shared/transferPlace'
-import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
+import { currentUser, hasRole, loadCurrentUser, userName } from '@/shared/user'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { wagonsColumns } from '../wagons/wagonsColumns'
 import CellTransferProperty from './cells/CellTransferProperty.vue'
@@ -304,7 +304,7 @@ const back = () => {
 
 // кто сдал — свой выпадающий список, страница его не ждёт; ошибка — в самом списке
 const givers = shallowRef<UserRef[]>([])
-const giverChoices = computed(() => givers.value.map((g) => ({ id: g.id, text: g.name })))
+const giverChoices = computed(() => givers.value.map((g) => ({ id: g.id, text: userName(g) })))
 const giverLoad = useLoad(async () => {
   givers.value = fromCode.value ? await fetchTransferGivers(from.value) : []
 })

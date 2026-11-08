@@ -61,15 +61,20 @@
           <span>{{ t('Служба') }}</span>
           <span>{{ dictManager.getValue('Service', r.service) }}</span>
           <span>{{ t('Автор') }}</span>
-          <span>{{ r.createdByUsr.name }}</span>
+          <span>{{ userName(r.createdByUsr) }}</span>
           <template v-if="receivedLate(r.createdDt, r.receivedDt)">
             <span>{{ t('Поступила на сервер') }}</span>
             <span>{{ formatDateTime(r.receivedDt) }}</span>
           </template>
           <span>{{ t('Исполнитель') }}</span>
           <span>
-            {{ r.executorUsr?.name ?? t('не назначен') }}
-            <SoftLink v-if="card.assignable.value" text="Назначить" class="card__assign q-ml-sm" @click="openAssign" />
+            {{ r.executorUsr ? userName(r.executorUsr) : t('не назначен') }}
+            <SoftLink
+              v-if="card.assignable.value"
+              :text="card.reassign.value ? 'Переназначить' : 'Назначить'"
+              class="card__assign q-ml-sm"
+              @click="openAssign"
+            />
           </span>
         </div>
         <div v-if="card.stale.value" class="card__stale">{{ t('Фото недоступны без связи') }}</div>
@@ -156,7 +161,8 @@
   <!-- назначение исполнителя -->
   <PickSheet
     v-model:show="assignOpen"
-    :title="t('Назначить исполнителя')"
+    :title="t(card.reassign.value ? 'Переназначить исполнителя' : 'Назначить исполнителя')"
+    :ok-text="card.reassign.value ? 'Переназначить' : 'Назначить'"
     :options="assignOptions"
     :selected="detail?.executorUsr?.id ?? null"
     :error="assignError"
@@ -212,7 +218,7 @@ import { historyTree } from '@/shared/requests/historyTree'
 import RequestHistory from '@/shared/requests/RequestHistory.vue'
 import { faultName, receivedLate, severityStyle } from '@/shared/requests/requestView'
 import { useRequestCard } from '@/shared/requests/useRequestCard'
-import { currentUser } from '@/shared/user'
+import { currentUser, userName } from '@/shared/user'
 import BottomSheet from '../components/BottomSheet.vue'
 import PwaPage from '../components/PwaPage.vue'
 import { tripRefDatedText } from '@/shared/trips/tripRefText'
@@ -309,7 +315,10 @@ const staffOptions = computed(() => {
 
 // выбор исполнителя в листе снизу; null — не назначен
 const assignOpen = ref(false)
-const assignOptions = computed(() => [{ id: null, name: t('Не назначен') }, ...staffOptions.value])
+const assignOptions = computed(() => [
+  { id: null, name: t('Не назначен') },
+  ...staffOptions.value.map((u) => ({ id: u.id, name: userName(u) })),
+])
 
 const assignError = ref<ShownError | null>(null)
 

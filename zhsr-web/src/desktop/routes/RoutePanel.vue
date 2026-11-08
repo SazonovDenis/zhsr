@@ -23,8 +23,15 @@
         </span>
       </SidePanelFields>
 
+      <!-- без прав кнопка видна, но неактивна, причина во всплывающей подсказке -->
       <div class="route-panel__actions">
-        <button type="button" class="route-panel__edit q-py-none q-px-md" @click="emit('edit')">
+        <button
+          type="button"
+          class="route-panel__edit q-py-none q-px-md"
+          :disabled="!!editReason"
+          :title="editReason || undefined"
+          @click="emit('edit')"
+        >
           {{ t('Редактировать') }}
         </button>
       </div>
@@ -74,6 +81,8 @@ import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { dictManager } from '@/shared/dict/DictManager'
 import RouteMap from '@/shared/components/map/RouteMap.vue'
+import { RoleType } from '@/shared/constants/systemDicts'
+import { roleReason } from '@/shared/roleReason'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import RouteStops from './RouteStops.vue'
@@ -86,6 +95,9 @@ import RouteStops from './RouteStops.vue'
 const props = defineProps<{ route: RouteRow | null }>()
 
 const emit = defineEmits<{ close: []; edit: [] }>()
+
+// маршрут правят администратор и планировщик вагонов (Ф-МАР-02)
+const editReason = computed(() => roleReason([RoleType.WAGON_PLANNER], 'Правит планировщик вагонов'))
 
 // остановки — списком или на карте; выбор сохраняется при переходе к другому маршруту
 const TABS = [
@@ -137,7 +149,9 @@ const period = computed(() => {
 <style scoped lang="scss">
 .route-panel__actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 0.5rem;
   margin: -0.3rem 0 -0.9rem;
 }
 

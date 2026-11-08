@@ -23,7 +23,7 @@
         :disabled="!!error || disabled"
         @click="confirm"
       >
-        {{ t('Назначить') }}
+        {{ t(okText) }}
       </button>
     </template>
   </BottomSheet>
@@ -62,8 +62,10 @@ const props = withDefaults(
     error?: ShownError | null
     retry?: (() => unknown) | null
     disabled?: boolean
+    /** текст кнопки применения на русском */
+    okText?: string
   }>(),
-  { subtitle: '', error: null, retry: null, disabled: false },
+  { subtitle: '', error: null, retry: null, disabled: false, okText: 'Назначить' },
 )
 
 const emit = defineEmits<{ pick: [id: T] }>()

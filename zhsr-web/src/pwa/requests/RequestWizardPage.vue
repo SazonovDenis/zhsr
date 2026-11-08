@@ -84,7 +84,7 @@
         <span class="wizard__label">{{ t('Исполнитель') }}</span>
         <select v-model="draft.executorUsr" class="wizard__select q-py-none q-px-md">
           <option :value="null">{{ t('Не назначать — возьмёт любой сотрудник службы') }}</option>
-          <option v-for="u in staff" :key="u.id" :value="u.id">{{ u.name }}</option>
+          <option v-for="u in staff" :key="u.id" :value="u.id">{{ userName(u) }}</option>
         </select>
       </div>
       <div class="wizard__field">
@@ -232,7 +232,7 @@ import { faultName } from '@/shared/requests/requestView'
 import { canAssignOnCreate } from '@/shared/requests/rights'
 import { loadOffline } from '@/shared/requests/useRequestCard'
 import { useWagonPick } from '@/shared/requests/useWagonPick'
-import { currentUser, loadCurrentUser } from '@/shared/user'
+import { currentUser, loadCurrentUser, userName } from '@/shared/user'
 import PwaPage from '../components/PwaPage.vue'
 import { tripRefText } from '@/shared/trips/tripRefText'
 
@@ -346,7 +346,7 @@ const tripOptions = computed(() => {
   const wagonTrip = pickedWagon.value?.trip
   if (wagonTrip) add(wagonTrip.id, tripRefText(wagonTrip))
   const u = currentUser.value?.trip
-  if (u) add(u.id, `${u.trainNumber} ${u.name}`)
+  if (u) add(u.id, `${u.trainNumber} • ${u.name}`)
   if (requestTrip.value) add(requestTrip.value.id, tripRefText(requestTrip.value))
   return list
 })

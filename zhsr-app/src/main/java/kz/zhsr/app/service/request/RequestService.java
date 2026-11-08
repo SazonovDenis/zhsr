@@ -97,7 +97,7 @@ public class RequestService {
      * на исполнение» без других отборов.
      */
     public int todoCount() throws Exception {
-        RequestFilter filter = new RequestFilter("todo", null, null, null, null, null, null, null, null);
+        RequestFilter filter = new RequestFilter("todo", null, null, null, null, null, null, null, null, null);
         return load(filter, true, new ListSort(null, false)).size();
     }
 
@@ -367,9 +367,11 @@ public class RequestService {
 
     private List<RequestRow> load(RequestFilter filter, boolean byStatus, ListSort sort) throws Exception {
         CurrentUser user = currentUserService.get();
-        // поиск по номеру, вагону и неисправности отменяет список и все фильтры: ищется среди всех заявок (Ф-ЗАЯ-06)
+        // поиск по номеру, вагону и неисправности отменяет список и фильтры, кроме периода: ищется среди всех заявок
+        // (Ф-ЗАЯ-06)
         if (filter.query() != null && !filter.query().isBlank()) {
-            filter = new RequestFilter(null, null, filter.query(), null, null, null, null, null, null);
+            filter = new RequestFilter(null, null, filter.query(), null, null, null, null, null, filter.from(),
+                    filter.to());
         }
         SqlQuery q = RequestSql.list(filter, user.id(), visibility(user), List.copyOf(RequestRights.FINAL_STATUSES),
                 byStatus, sort);

@@ -4,7 +4,10 @@ import kz.kis.kiscore.model.DbRec;
 import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUserService;
+import kz.zhsr.app.constants.ActStatus;
+import kz.zhsr.app.constants.TripStatus;
 import kz.zhsr.app.dto.common.ListSort;
+import kz.zhsr.app.dto.ref.TripRef;
 import kz.zhsr.app.dto.route.RouteFilter;
 import kz.zhsr.app.dto.route.RouteOption;
 import kz.zhsr.app.dto.route.RouteRow;
@@ -13,9 +16,14 @@ import kz.zhsr.app.dto.trip.TripOption;
 import kz.zhsr.app.dto.trip.TripRow;
 import kz.zhsr.app.dto.wagon.WagonFilter;
 import kz.zhsr.app.dto.wagon.WagonOption;
+import kz.zhsr.app.dto.wagon.WagonPendingTransfer;
 import kz.zhsr.app.dto.wagon.WagonRow;
+import kz.zhsr.app.dto.wagon.WagonPlace;
+import kz.zhsr.app.dto.wagon.WagonTrip;
 import org.springframework.stereotype.Service;
 
+import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -60,7 +68,78 @@ public class ListService {
      * Список вагонов (GET /wagons). По умолчанию - по номеру вагона.
      */
     public List<WagonRow> wagons(WagonFilter filter, ListSort sort) throws Exception {
-        return wagonRows(filter, sort, WagonRow.class);
+        List<WagonRow> rows = wagonRows(filter, sort, WagonRow.class);
+        addWagonTripsAndTransfers(rows);
+        if (filter.at() != null) {
+            addWagonStateAt(rows, filter.at());
+        }
+        return rows;
+    }
+
+    /**
+     * Второй проход списка вагонов при фильтре at: расположение и состояние на момент по журналам - дополнительно к
+     * текущим.
+     */
+    private void addWagonStateAt(List<WagonRow> rows, OffsetDateTime at) throws Exception {
+        if (rows.isEmpty()) {
+            return;
+        }
+        Map<Long, WagonRow> byId = new HashMap<>();
+        for (WagonRow row : rows) {
+            byId.put(row.getId(), row);
+        }
+        Map<String, Object> params = Map.of("ids", List.copyOf(byId.keySet()), "at", at);
+        for (DbRec rec : db.loadSql(ListSql.locationsAt(), params)) {
+            WagonPlace place = new WagonPlace();
+            place.setLocationType(rec.getLong("location_type"));
+            place.setPlace(rec.getLong("place"));
+            Long trip = rec.getLong("trip", null);
+            place.setTrip(trip == null ? null : new TripRef(trip));
+            byId.get(rec.getLong("wagon")).setLocationAt(place);
+        }
+        for (DbRec rec : db.loadSql(ListSql.statusesAt(), params)) {
+            byId.get(rec.getLong("wagon")).setWagonStatusTypeAt(rec.getLong("wagon_status_type"));
+        }
+        refResolver.resolve(rows);
+    }
+
+    /**
+     * Второй проход списка вагонов: рейсы «план» и «выполняется», в составе которых вагон, и акт, ожидающий приёма.
+     * Грузятся от рейсов и актов (их немного), без списка вагонов, и раскладываются по строкам.
+     */
+    private void addWagonTripsAndTransfers(List<WagonRow> rows) throws Exception {
+        if (rows.isEmpty()) {
+            return;
+        }
+        Map<Long, WagonRow> byId = new HashMap<>();
+        for (WagonRow row : rows) {
+            byId.put(row.getId(), row);
+        }
+        List<DbRec> trips = db.loadSql(ListSql.activeTripWagons(),
+                Map.of("planned", TripStatus.PLANNED, "inProgress", TripStatus.IN_PROGRESS));
+        for (DbRec rec : trips) {
+            WagonRow row = byId.get(rec.getLong("wagon"));
+            if (row != null) {
+                WagonTrip trip = new WagonTrip();
+                trip.setTrip(new TripRef(rec.getLong("trip")));
+                trip.setTripStatusType(rec.getLong("trip_status_type"));
+                row.getTrips().add(trip);
+            }
+        }
+        List<DbRec> acts = db.loadSql(ListSql.pendingTransferWagons(), Map.of("pending", ActStatus.PENDING));
+        for (DbRec rec : acts) {
+            WagonRow row = byId.get(rec.getLong("wagon"));
+            if (row != null) {
+                WagonPendingTransfer act = new WagonPendingTransfer();
+                act.setId(rec.getLong("id"));
+                act.setNumber(rec.getString("number"));
+                act.setToStation(rec.getLong("to_station", null));
+                act.setToDepot(rec.getLong("to_depot", null));
+                act.setToYard(rec.getLong("to_yard", null));
+                row.setPendingTransfer(act);
+            }
+        }
+        refResolver.resolve(rows);
     }
 
     /**
@@ -104,7 +183,7 @@ public class ListService {
         Visibility.Access access = visibility.access(currentUserService.get(), filter.depot());
         // поиск по номеру отменяет все фильтры и отбор по роли: ищется среди всех вагонов (Ф-ВАГ-04)
         if (filter.number() != null && !filter.number().isBlank()) {
-            filter = new WagonFilter(null, filter.number(), null, null, null, null);
+            filter = new WagonFilter(null, filter.number(), null, null, null, null, filter.at());
             access = new Visibility.Access(true, null, null, false, null, null);
         }
         SqlQuery q = ListSql.wagons(filter, access, sort);

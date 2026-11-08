@@ -21,7 +21,7 @@ import { formatDateTime } from '@/shared/format'
 import type { OutboxItem } from '@/shared/offline/outbox'
 import RequestHistoryItem from '@/shared/requests/RequestHistoryItem.vue'
 import { ACTIONS } from '@/shared/requests/rights'
-import { currentUser } from '@/shared/user'
+import { currentUser, userName } from '@/shared/user'
 import QueuedPhoto from './QueuedPhoto.vue'
 import QueuedRefusal from './QueuedRefusal.vue'
 import { useQueuedPhotos } from './useQueuedPhotos'
@@ -47,7 +47,9 @@ const title = computed(() => {
   if (records.value.some((x) => x.kind === 'edit')) return t('Исправление заявки')
   return t(records.value.length > 0 ? 'Примечание' : 'Приложено фото')
 })
-const meta = computed(() => `${formatDateTime(props.items[0]!.created)} • ${currentUser.value?.name ?? ''}`)
+const meta = computed(
+  () => `${formatDateTime(props.items[0]!.created)} • ${currentUser.value ? userName(currentUser.value) : ''}`,
+)
 const text = computed(() => records.value.find((x) => x.kind === 'note' || x.kind === 'action')?.text ?? '')
 </script>
 

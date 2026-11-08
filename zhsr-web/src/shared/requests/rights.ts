@@ -149,8 +149,8 @@ export function seenByMe(user: CurrentUser, r: RepairRequest): boolean {
 }
 
 /**
- * Нет прав на действие — кнопку не показывают: как на сервере (RequestRights.blockReason), без статуса. Текст на
- * русском; пусто — права есть.
+ * Почему нет прав на действие: как на сервере (RequestRights.blockReason), без статуса. Текст на русском; пусто —
+ * права есть.
  */
 export function actionRightsReason(user: CurrentUser, r: RepairRequest, action: RequestAction): string {
   const admin = isAdmin(user)
@@ -188,19 +188,29 @@ export function actionStatusReason(r: RepairRequest, action: RequestAction): str
 }
 
 /**
- * Действия над заявкой, на которые у пользователя есть права, в порядке показа кнопок; reason — почему действие
- * недоступно в текущем статусе (пусто — доступно). Заявка в конечном статусе — пусто: кнопок нет.
+ * Все действия над заявкой в порядке показа кнопок; reason — почему действие недоступно: сначала нет прав, затем не
+ * тот статус (пусто — доступно). Десктоп показывает все кнопки, недоступные — неактивными с причиной; телефон —
+ * только доступные.
  */
 export function requestActions(user: CurrentUser, r: RepairRequest): { action: RequestAction; reason: string }[] {
-  if (FINAL_STATUSES.includes(r.requestStatusType)) return []
-  return (Object.keys(ACTIONS) as RequestAction[])
-    .filter((action) => !actionRightsReason(user, r, action))
-    .map((action) => ({ action, reason: actionStatusReason(r, action) }))
+  return (Object.keys(ACTIONS) as RequestAction[]).map((action) => ({
+    action,
+    reason: actionRightsReason(user, r, action) || actionStatusReason(r, action),
+  }))
 }
 
 /** Назначить исполнителя может мастер депо станции вагона, пока заявка не закончена (Ф-ЗАЯ-02). */
 export function canAssign(user: CurrentUser, r: RepairRequest): boolean {
-  return !FINAL_STATUSES.includes(r.requestStatusType) && (isMyMaster(user, r) || isAdmin(user))
+  return !assignBlockReason(user, r)
+}
+
+/**
+ * Почему пользователь не может назначить исполнителя — коротко, на русском (в тексте статуса {status}); пусто — может.
+ */
+export function assignBlockReason(user: CurrentUser, r: RepairRequest): string {
+  if (!isMyMaster(user, r) && !isAdmin(user)) return 'назначает мастер депо станции вагона'
+  if (FINAL_STATUSES.includes(r.requestStatusType)) return 'заявка в статусе «{status}»'
+  return ''
 }
 
 /**

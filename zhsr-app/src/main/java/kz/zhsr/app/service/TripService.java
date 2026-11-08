@@ -23,7 +23,6 @@ import kz.zhsr.app.dto.trip.StaffCandidate;
 import kz.zhsr.app.dto.trip.TripCrew;
 import kz.zhsr.app.dto.trip.TripFilter;
 import kz.zhsr.app.dto.trip.TripRow;
-import kz.zhsr.app.dto.trip.WagonCandidate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -258,19 +257,6 @@ public class TripService {
         // кандидат сам является ссылкой, поэтому resolve не заходит в него: рейсы заполняются отдельно
         refResolver.resolve(staff.stream().map(StaffCandidate::getBusyTrip).filter(Objects::nonNull).toList());
         return staff;
-    }
-
-    /**
-     * Вагоны для добавления в состав.
-     */
-    public List<WagonCandidate> wagonCandidates(long id) throws Exception {
-        requireVisible(id);
-        Long station = load(id).getTrip().getDepartureStation();
-        if (station == null) {
-            return List.of();
-        }
-        return db.loadSql(TripSql.wagonCandidates(), Map.of("trip", id, "station", station, "states", ACTIVE),
-                WagonCandidate.class);
     }
 
     /**
@@ -783,7 +769,7 @@ public class TripService {
     }
 
     private TripRow row(long id) throws Exception {
-        return listService.trips(new TripFilter(id, null, null, null, null, null, null), new ListSort(null, false)).get(0);
+        return listService.trips(new TripFilter(id, null, null, null, null, null, null, null), new ListSort(null, false)).get(0);
     }
 
     private void requirePlanner() {
@@ -814,7 +800,7 @@ public class TripService {
      */
     private void requireVisible(long id) throws Exception {
         Visibility.Access access = visibility.access(currentUserService.get(), null);
-        SqlQuery q = ListSql.trips(new TripFilter(id, null, null, null, null, null, null), access,
+        SqlQuery q = ListSql.trips(new TripFilter(id, null, null, null, null, null, null, null), access,
                 new ListSort(null, false));
         if (db.loadSql(q.sql(), q.params()).isEmpty()) {
             throw ApiException.notFound("Рейс не найден");

@@ -104,3 +104,11 @@ export async function logoutUser(): Promise<boolean> {
 export function hasRole(user: CurrentUser | null, role: number): boolean {
   return !!user?.roles.includes(role)
 }
+
+/**
+ * ФИО сотрудника для показа: текущий пользователь — с пометкой «(вы)», в том числе в списках выбора. Реактивно:
+ * зависит от currentUser.
+ */
+export function userName(u: { id: number; name: string }): string {
+  return u.id === currentUser.value?.id ? t('{name} (вы)', { name: u.name }) : u.name
+}

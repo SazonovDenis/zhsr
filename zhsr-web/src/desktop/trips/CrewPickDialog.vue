@@ -25,7 +25,7 @@
       <label v-for="c in candidates" :key="c.id" class="crew-pick__row q-py-sm q-px-md">
         <q-checkbox v-model="selected" :val="c.id" dense />
         <span>
-          {{ c.name }}
+          {{ userName(c) }}
           <span v-if="c.senior" class="zs-sub">{{ t('ст.') }}</span>
         </span>
         <span class="zs-sub">{{ busyText(c) }}</span>
@@ -49,6 +49,7 @@ import FormDialog from '@/shared/components/dialog/FormDialog.vue'
 import { formatDateTime } from '@/shared/format'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import { tripRefText } from '@/shared/trips/tripRefText'
+import { userName } from '@/shared/user'
 
 /**
  * Диалог «Проводники…» (Ф-РЕЙ-06): планировщик проводников набирает проводников рейса. Сверху — рейс и станция отправления, ниже

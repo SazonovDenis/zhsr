@@ -107,6 +107,13 @@ const routes: RouteRecordRaw[] = [
     children: [
       { path: '', name: 'home', component: () => desktop().then((m) => m.DesktopHomePage) },
       { path: 'wagons', name: 'wagons', component: () => desktop().then((m) => m.WagonsPage) },
+      {
+        path: 'wagons/:number/journal',
+        name: 'wagon-journal',
+        meta: { hideMenu: true },
+        props: true,
+        component: () => desktop().then((m) => m.WagonJournalPage),
+      },
       { path: 'trips', name: 'trips', component: () => desktop().then((m) => m.TripsPage) },
       {
         path: 'trips/:id',

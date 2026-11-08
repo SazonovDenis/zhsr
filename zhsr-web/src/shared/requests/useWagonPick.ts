@@ -45,8 +45,8 @@ export function useWagonPick(user: () => CurrentUser | null, offline = false) {
   const tripWagons = shallowRef<RequestWagon[]>([])
 
   const trip = computed(() => user()?.trip ?? null)
-  /** подпись фильтра: «Рейс 002 Алматы — Астана» */
-  const tripLabel = computed(() => (trip.value ? `${trip.value.trainNumber} ${trip.value.name}` : ''))
+  /** подпись фильтра: «Рейс 002 • Алматы — Астана» */
+  const tripLabel = computed(() => (trip.value ? `${trip.value.trainNumber} • ${trip.value.name}` : ''))
   /** фильтр по рейсу есть и действует (поиск по номеру его отключает) */
   const tripActive = computed(() => !!trip.value && tripOn.value && !query.value)
   /** вагон проводника — первым в выборе */

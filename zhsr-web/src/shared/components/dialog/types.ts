@@ -19,6 +19,8 @@ export interface DialogAction {
   exec?: (action: DialogAction) => void
   /** только в заголовке: кнопка справа от заголовка, иначе слева */
   right?: boolean
+  /** только в подвале: кнопка у левого края, например «Отмена»; иначе справа */
+  left?: boolean
 }
 
 export function isActionVisible(action: DialogAction): boolean {

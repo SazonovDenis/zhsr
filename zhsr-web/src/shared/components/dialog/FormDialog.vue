@@ -27,7 +27,7 @@ import DialogFrame from './DialogFrame.vue'
 
 /**
  * Общий предок диалогов ввода («Ввести вагон», «Создать рейс», «Новый маршрут»): поля формы (слот default), текст
- * ошибки, подсказка и кнопки «Отмена» и основного действия.
+ * ошибки, подсказка и кнопки: «Отмена» слева, справа — дополнительные (extraActions) и основного действия.
  *
  * Слот actions-left — кнопки слева на панели диалога, например «Удалить запись».
  *
@@ -51,8 +51,10 @@ const props = withDefaults(
     error?: ShownError | null
     /** пояснение под полями на русском, например «Рейс создаётся в статусе «План»» */
     hint?: string
+    /** дополнительные кнопки справа — перед кнопкой основного действия, например «Назначить себя» */
+    extraActions?: DialogAction[]
   }>(),
-  { okText: 'Сохранить', width: '35rem', running: false, error: null, hint: '' },
+  { okText: 'Сохранить', width: '35rem', running: false, error: null, hint: '', extraActions: () => [] },
 )
 
 const emit = defineEmits<{ ok: [] }>()
@@ -65,7 +67,8 @@ const shown = computed(() => props.error)
 const busy = useBusy()
 
 const actions = computed<DialogAction[]>(() => [
-  { title: 'Отмена' },
+  { title: 'Отмена', left: true },
+  ...props.extraActions,
   { name: 'ok', title: props.okText, default: true },
 ])
 

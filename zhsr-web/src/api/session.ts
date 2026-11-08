@@ -94,6 +94,8 @@ export const DEMO_LOGINS = [
   { login: 'cond', name: 'Абенова Д. С.', password: '123456' },
   { login: 'pem', name: 'Касымов Д. Е.', password: '123456' },
   { login: 'master', name: 'Оспанова М. Т.', password: '123456' },
+  { login: 'recv', name: 'Омарова С. К.', password: '123456' },
   { login: 'instr', name: 'Сейткали Р. А.', password: '123456' },
+  { login: 'medic', name: 'Нурланова А. Б.', password: '123456' },
   { login: 'admin', name: 'Администратор', password: '123456' },
 ]

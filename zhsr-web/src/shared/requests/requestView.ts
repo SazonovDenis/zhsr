@@ -1,4 +1,7 @@
-import type { RepairRequest } from '@/api/requests'
+import { date } from 'quasar'
+
+import type { RepairRequest, RequestFilter } from '@/api/requests'
+import { requestFilter } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { RequestStatus } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -95,4 +98,18 @@ export function futureSteps(status: number): { title: string; meta: string }[] {
   ]
   const from = status === RequestStatus.CLOSED ? undefined : STEP_OF[status]
   return from === undefined ? [] : all.slice(from)
+}
+
+/** Период перехода «Заявки вагона»: ровно месяц — с того же числа прошлого месяца по сегодня, ISO-даты. */
+export function wagonRequestsPeriod(): { from: string; to: string } {
+  const now = new Date()
+  return {
+    from: date.formatDate(date.subtractFromDate(now, { months: 1 }), 'YYYY-MM-DD'),
+    to: date.formatDate(now, 'YYYY-MM-DD'),
+  }
+}
+
+/** Фильтр перехода «Заявки вагона»: все видные заявки вагона за месяц — для списка и для числа у ссылки. */
+export function wagonRequestsFilter(wagon: number): RequestFilter {
+  return requestFilter('all', { wagon, ...wagonRequestsPeriod() })
 }

@@ -32,44 +32,47 @@
         <span>{{ t('Служба') }}</span>
         <span>{{ dictManager.getValue('Service', r.service) }}</span>
         <span>{{ t('Автор') }}</span>
-        <span>{{ r.createdByUsr.name }}</span>
+        <span>{{ userName(r.createdByUsr) }}</span>
         <template v-if="receivedLate(r.createdDt, r.receivedDt)">
           <span>{{ t('Поступила на сервер') }}</span>
           <span>{{ formatDateTime(r.receivedDt) }}</span>
         </template>
         <span>{{ t('Исполнитель') }}</span>
         <span>
-          {{ r.executorUsr?.name ?? t('не назначен') }}
-          <SoftLink v-if="card.assignable.value" text="Назначить" class="q-ml-sm" @click="assign" />
+          {{ r.executorUsr ? userName(r.executorUsr) : t('не назначен') }}
+          <SoftLink
+            v-if="card.assignable.value"
+            :text="card.reassign.value ? 'Переназначить' : 'Назначить'"
+            class="q-ml-sm"
+            @click="assign"
+          />
+          <span v-else class="request-panel__reason request-panel__block">{{ card.assignHint.value }}</span>
         </span>
       </SidePanelFields>
 
-      <!-- действия по заявке: без прав — нет кнопки; не тот статус — кнопка неактивна, причина рядом;
-           конечный статус — блока нет -->
-      <div v-if="actions.length > 0" class="request-panel__buttons">
+      <!-- действия по заявке: видны все; нет прав или не тот статус — кнопка неактивна, причина во всплывающей подсказке -->
+      <div class="request-panel__buttons">
         <template v-for="a in actions" :key="a.action">
           <button
             type="button"
             class="request-panel__btn q-py-none q-px-md"
             :class="`request-panel__btn--${a.kind}`"
             :disabled="card.blocked.value || !!a.reason"
+            :title="a.reason || undefined"
             @click="onAction(a.action)"
           >
             {{ a.title }}
           </button>
-          <span class="request-panel__reason">{{ a.reason }}</span>
         </template>
-        <template v-if="isAuthor">
-          <button
-            type="button"
-            class="request-panel__btn q-py-none q-px-md"
-            :disabled="card.blocked.value || !card.editable.value"
-            @click="edit"
-          >
-            {{ t('Исправить') }}
-          </button>
-          <span class="request-panel__reason">{{ card.editable.value ? '' : card.editHint.value }}</span>
-        </template>
+        <button
+          type="button"
+          class="request-panel__btn q-py-none q-px-md"
+          :disabled="card.blocked.value || !card.editable.value"
+          :title="card.editable.value ? undefined : card.editHint.value"
+          @click="edit"
+        >
+          {{ t('Исправить') }}
+        </button>
       </div>
       <ErrorBox v-if="card.error.value" :error="card.error.value" class="request-panel__error q-py-sm q-px-md" />
 
@@ -93,11 +96,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, toRef, watch } from 'vue'
 
 import type { RepairRequest, RequestAction } from '@/api/requests'
 import { t } from '@/boot/i18n'
-import { currentUser } from '@/shared/user'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import { provideBusy } from '@/shared/busy'
@@ -117,6 +119,7 @@ import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import RequestDialog from './RequestDialog.vue'
 import { tripRefDatedText, tripRefText } from '@/shared/trips/tripRefText'
+import { userName } from '@/shared/user'
 import RequestAssignDialog from './RequestAssignDialog.vue'
 import RequestTextDialog from './RequestTextDialog.vue'
 import TakeForeignDialog from './TakeForeignDialog.vue'
@@ -167,8 +170,6 @@ async function onAction(action: RequestAction) {
 }
 
 const r = computed(() => card.request.value)
-// исправляет только автор: остальным кнопки нет
-const isAuthor = computed(() => !!r.value && r.value.createdByUsr.id === currentUser.value?.id)
 
 // исполнитель — во всплывающем окне, из сотрудников службы заявки
 async function assign() {
@@ -198,6 +199,24 @@ async function edit() {
   const updated = await openDialog<RepairRequest>(RequestDialog, { request: r.value })
   if (updated) await card.load()
 }
+
+/**
+ * Дождаться карточки заявки id: меню строки списка выбирает заявку и сразу запускает действие панели. false —
+ * карточка не загрузилась (ошибка показана в панели).
+ */
+function ready(id: number): Promise<boolean> {
+  if (card.request.value?.id === id) return Promise.resolve(true)
+  return new Promise((resolve) => {
+    const stop = watch([() => card.request.value?.id, () => card.error.value], ([loaded, error]) => {
+      if (loaded !== id && !error) return
+      stop()
+      resolve(loaded === id)
+    })
+  })
+}
+
+// действия панели для меню строки списка заявок: те же окна и проверки, что у кнопок
+defineExpose({ ready, onAction, edit, assign, addNote })
 </script>
 
 <style scoped lang="scss">
@@ -218,10 +237,13 @@ async function edit() {
 }
 
 .request-panel__buttons {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.request-panel__block {
+  display: block;
 }
 
 .request-panel__reason {

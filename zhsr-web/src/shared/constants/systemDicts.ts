@@ -110,6 +110,8 @@ export const RoleType = {
   OPERATOR: 13,
   /** Планировщик проводников - нет в zholserik; проводники рейса (tz.actors.md) */
   CREW_PLANNER: 14,
+  /** Медик */
+  MEDIC: 15,
 } as const
 
 /** Служба: id service */
@@ -120,7 +122,7 @@ export const ServiceType = {
   CLEANING: 2,
   /** Экипировка */
   EQUIPMENT: 3,
-  /** Инструкторская - инструктор поездных бригад, инструктор-нормировщик */
+  /** Инструкторская - инструктор поездных бригад, инструктор-нормировщик, медик */
   INSTRUCTOR: 4,
   /** Эксплуатация - эксплуатационщик */
   OPERATION: 5,
@@ -234,6 +236,7 @@ export const SYSTEM_DICT_RECORDS = {
     { id: 12, text: 'Планировщик вагонов', service: null },
     { id: 13, text: 'Эксплуатационщик', service: 5 },
     { id: 14, text: 'Планировщик проводников', service: null },
+    { id: 15, text: 'Медик', service: 4 },
   ],
   // service
   Service: [

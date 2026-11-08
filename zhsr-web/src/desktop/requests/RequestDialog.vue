@@ -105,7 +105,7 @@ import { useLoad } from '@/shared/loadable'
 import { faultDefaults, frequentFaults } from '@/shared/requests/faults'
 import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
 import { canAssignOnCreate } from '@/shared/requests/rights'
-import { currentUser, loadCurrentUser } from '@/shared/user'
+import { currentUser, loadCurrentUser, userName } from '@/shared/user'
 import WagonPickField from './WagonPickField.vue'
 import { tripRefText } from '@/shared/trips/tripRefText'
 
@@ -168,14 +168,14 @@ const serviceName = computed(() => (service.value ? dictManager.getValue('Servic
 // рейсы: идущие и планируемые; рейс заявки есть в списке, даже если он уже закончился
 const trips = shallowRef<TripOption[]>([])
 const tripChoices = computed<ChoiceItem[]>(() => {
-  const list: ChoiceItem[] = trips.value.map((trip) => ({ id: trip.id, text: `${trip.trainNumber} ${trip.name}` }))
+  const list: ChoiceItem[] = trips.value.map((trip) => ({ id: trip.id, text: `${trip.trainNumber} • ${trip.name}` }))
   if (r?.trip && !list.some((c) => c.id === r.trip!.id)) list.unshift({ id: r.trip.id, text: tripRefText(r.trip) })
   return list
 })
 
 const canChooseExecutor = computed(() => !r && !!currentUser.value && canAssignOnCreate(currentUser.value))
 const staff = shallowRef<UserRef[]>([])
-const staffChoices = computed(() => staff.value.map((u) => ({ id: u.id, text: u.name })))
+const staffChoices = computed(() => staff.value.map((u) => ({ id: u.id, text: userName(u) })))
 
 watch(
   () => (canChooseExecutor.value ? service.value : null),

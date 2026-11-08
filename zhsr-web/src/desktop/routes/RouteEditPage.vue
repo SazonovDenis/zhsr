@@ -102,6 +102,8 @@
               color="primary"
               :label="t('Сохранить маршрут')"
               :loading="saving"
+              :disable="!!saveReason"
+              :title="saveReason || undefined"
               class="route-edit__save-btn"
               @click="save"
             />
@@ -138,6 +140,9 @@ import { provideBusy } from '@/shared/busy'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import RouteMap from '@/shared/components/map/RouteMap.vue'
 import { dictManager } from '@/shared/dict/DictManager'
+import { RoleType } from '@/shared/constants/systemDicts'
+import { roleReason } from '@/shared/roleReason'
+import { loadCurrentUser } from '@/shared/user'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { formatHm, totalMinutes } from './duration'
 import RouteStops from './RouteStops.vue'
@@ -153,6 +158,9 @@ import RouteStopsEditor from './RouteStopsEditor.vue'
 const props = defineProps<{ id: string }>()
 
 const router = useRouter()
+
+// маршрут правят администратор и планировщик вагонов (Ф-МАР-02); остальным кнопка неактивна, причина рядом
+const saveReason = computed(() => roleReason([RoleType.WAGON_PLANNER], 'Правит планировщик вагонов'))
 
 const route = shallowRef<Route | null>(null)
 // общее ожидание страницы: спиннер на месте маршрута — на всю цепочку загрузок
@@ -390,7 +398,9 @@ async function init() {
   loadError.value = null
   try {
     // станции нужны редактору (названия, узловые станции) — грузятся параллельно с маршрутом
-    const [, r] = await busy.run(Promise.all([dictManager.prepareDict('Station'), fetchRoute(Number(props.id))]))
+    const [, r] = await busy.run(
+      Promise.all([dictManager.prepareDict('Station'), fetchRoute(Number(props.id)), loadCurrentUser()]),
+    )
     fill(r)
   } catch (e) {
     loadError.value = shownError(e)
@@ -493,7 +503,9 @@ void init()
 
 .route-edit__save {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .route-edit__save-btn {

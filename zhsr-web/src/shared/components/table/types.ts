@@ -45,6 +45,23 @@ export interface Column<Row> {
   sortField?: string
 }
 
+/**
+ * Пункт меню строки таблицы: меню за тремя точками в конце строки и по правой кнопке мыши. Меню задаёт страница
+ * (DataTable, rowMenu).
+ */
+export interface RowMenuItem<Row> {
+  /** текст на русском; переводится при показе */
+  label: string
+  /** виден ли пункт для строки; не задано — виден всегда */
+  visible?: (row: Row) => boolean
+  /** почему пункт недоступен для строки — уже переведённый текст, показывается под пунктом; пусто — доступен */
+  disabled?: (row: Row) => string
+  /** действие пункта */
+  run: (row: Row) => void
+  /** черта над пунктом: отделяет группу, например действия со списком от действий со строкой */
+  separator?: boolean
+}
+
 /** props компонента ячейки */
 export interface CellProps<Row, Value = unknown> {
   row: Row

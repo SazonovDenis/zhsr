@@ -43,6 +43,8 @@ export interface TripFilter {
   states: number[]
   /** депо: маршрут рейса идёт через станцию депо; null — без ограничения (сервер может ограничить по роли) */
   depot?: number | null
+  /** часть номера вагона: вагон в составе рейса; остальные фильтры не отменяет */
+  wagon?: string
 }
 
 /** Новый рейс: маршрут и плановое отправление. Рейс создаётся в состоянии «План». */
@@ -245,18 +247,6 @@ export interface StaffCandidate extends UserRef {
   busyUntil: string | null
 }
 
-/** Вагон для добавления в состав: на станции отправления, в депо или в парке отстоя при ней. */
-export interface WagonCandidate {
-  number: string
-  /** тип вагона — id справочника WagonType */
-  wagonType: number
-  /** вид расположения — id справочника LocationKind */
-  locationType: number
-  place: number
-  /** состояние вагона — id справочника WagonState */
-  wagonStatusType: number
-}
-
 /** Рейс, его состав и бригада. */
 export async function fetchTripCrew(tripId: number): Promise<TripCrew> {
   return (await http.get<TripCrew>(`/trips/${tripId}/crew`)).data
@@ -291,11 +281,6 @@ export async function fetchStaffCandidates(tripId: number, duty: number): Promis
 /** Назначить начальника поезда или ПЭМ; null — снять с должности. */
 export async function setTripDuty(tripId: number, duty: number, user: number | null): Promise<TripCrew> {
   return (await http.put<TripCrew>(`/trips/${tripId}/duty/${duty}`, { usr: user })).data
-}
-
-/** Свободные вагоны для добавления в состав. */
-export async function fetchWagonCandidates(tripId: number): Promise<WagonCandidate[]> {
-  return (await http.get<WagonCandidate[]>(`/trips/${tripId}/wagon-candidates`)).data
 }
 
 /** Состав рейса целиком, по порядку: вагон не из списка уходит из состава и снимается с проводников. */

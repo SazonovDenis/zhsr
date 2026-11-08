@@ -38,6 +38,8 @@ public final class RoleType {
     public static final long OPERATOR = 13;
     /** Планировщик проводников - нет в zholserik; проводники рейса (tz.actors.md) */
     public static final long CREW_PLANNER = 14;
+    /** Медик */
+    public static final long MEDIC = 15;
 
     private RoleType() {
     }

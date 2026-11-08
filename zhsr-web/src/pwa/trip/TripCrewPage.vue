@@ -140,7 +140,7 @@ import { isOnline } from '@/shared/network'
 import { loadCached } from '@/shared/offline/cache'
 import type { WagonNorm } from '@/shared/trips/crewNorm'
 import { crewNorm, normDone, slotOptions } from '@/shared/trips/crewNorm'
-import { currentUser, loadCurrentUser } from '@/shared/user'
+import { currentUser, loadCurrentUser, userName } from '@/shared/user'
 import type { PickOption } from '../components/PickSheet.vue'
 import PickSheet from '../components/PickSheet.vue'
 import PwaPage from '../components/PwaPage.vue'
@@ -183,7 +183,7 @@ const readOnlyReason = computed(() => {
   return t('Для действия нужна связь')
 })
 
-const label = (m: CrewMember) => (m.senior ? `${m.usr.name} • ${t('ст.')}` : m.usr.name)
+const label = (m: CrewMember) => (m.senior ? `${userName(m.usr)} • ${t('ст.')}` : userName(m.usr))
 
 const readiness = computed(() => {
   const n = norm.value!
@@ -193,7 +193,7 @@ const readiness = computed(() => {
     {
       ok: n.chiefAndPem,
       title: t('Начальник поезда и ПЭМ'),
-      detail: `${t('ЛНП')} ${chief?.usr.name ?? '—'} • ${t('ПЭМ')} ${pem?.usr.name ?? '—'}`,
+      detail: `${t('ЛНП')} ${chief ? userName(chief.usr) : '—'} • ${t('ПЭМ')} ${pem ? userName(pem.usr) : '—'}`,
     },
     {
       ok: n.full && n.notOk.length === 0,
