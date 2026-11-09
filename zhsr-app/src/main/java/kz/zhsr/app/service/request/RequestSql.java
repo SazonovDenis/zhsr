@@ -88,11 +88,21 @@ final class RequestSql {
             ))""";
 
     /**
-     * Заявка видна сотруднику - список «все»: видна ему для исполнения по службе ({@link #VISIBLE}), ждёт его
-     * действия ({@link #TODO}) или подана им. Администратор видит все. Параметры: как у {@link #VISIBLE} и
-     * {@link #TODO}.
+     * Заявка видна бригаде текущего рейса сотрудника, независимо от службы и исполнителя: ЛНП - по всем вагонам, которые
+     * сейчас в составе его рейса; проводник - по вагонам, за которыми он закреплён. Параметры: myTrip, myLnp,
+     * myWagons, tripLocation - как у {@link #ACCEPTABLE}.
      */
-    private static final String SEEN = "(" + VISIBLE + "\n or " + TODO + "\n or repair_request.created_by_usr = :me)";
+    private static final String CREW = """
+            (wagon_info.location_type = :tripLocation and wagon_info.trip = :myTrip
+             and (:myLnp or wagon.id = any(:myWagons)))""";
+
+    /**
+     * Заявка видна сотруднику - список «все»: видна ему для исполнения по службе ({@link #VISIBLE}), видна бригаде
+     * его рейса ({@link #CREW}), ждёт его действия ({@link #TODO}) или подана им. Администратор видит все. Параметры:
+     * как у {@link #VISIBLE}, {@link #CREW} и {@link #TODO}.
+     */
+    private static final String SEEN = "(" + VISIBLE + "\n or " + CREW + "\n or " + TODO
+            + "\n or repair_request.created_by_usr = :me)";
 
     /**
      * Строка заявки: поля заявки, текущие статус, служба и исполнитель (repair_request_info), где вагон сейчас и

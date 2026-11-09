@@ -141,11 +141,24 @@ export function waitsForMe(user: CurrentUser, r: RepairRequest): boolean {
 }
 
 /**
- * Заявка видна пользователю — список «все» (Ф-ЗАЯ-06), как на сервере: видна ему для исполнения по службе, ждёт его
- * действия или подана им; администратору — все.
+ * Заявка видна бригаде текущего рейса пользователя, как на сервере (RequestSql, CREW): ЛНП — по всем вагонам, которые
+ * сейчас в составе его рейса; проводник — по своим вагонам. Служба и исполнитель не важны.
+ */
+function seenByCrew(user: CurrentUser, r: RepairRequest): boolean {
+  if (!inMyTrip(user, r)) return false
+  const trip = user.trip!
+  return (
+    trip.crewDutyType === CrewDuty.LNP ||
+    (trip.crewDutyType === CrewDuty.CONDUCTOR && trip.wagons.includes(r.wagon.number))
+  )
+}
+
+/**
+ * Заявка видна пользователю — список «все» (Ф-ЗАЯ-06), как на сервере: видна ему для исполнения по службе, видна
+ * бригаде его рейса, ждёт его действия или подана им; администратору — все.
  */
 export function seenByMe(user: CurrentUser, r: RepairRequest): boolean {
-  return canWork(user, r) || waitsForMe(user, r) || r.createdByUsr.id === user.id
+  return canWork(user, r) || seenByCrew(user, r) || waitsForMe(user, r) || r.createdByUsr.id === user.id
 }
 
 /**
