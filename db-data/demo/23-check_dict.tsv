@@ -1,0 +1,5 @@
+id	text_ru	text_kk	text_en	sort_order	disabled
+1	В порядке / Нарушение	Тәртіпте / Бұзушылық	OK / Violation	1	false
+2	Да / Нет	Иә / Жоқ	Yes / No	2	false
+3	Допущен / Не допущен	Жіберілді / Жіберілмеді	Admitted / Not admitted	3	false
+4	Вид инструктажа	Нұсқаулық түрі	Briefing type	4	false

@@ -26,7 +26,7 @@ public final class RoleType {
     public static final long CLEANING = 7;
     /** Руководитель */
     public static final long MANAGER = 8;
-    /** Экипировщик - МСИ, съёмное оборудование, посуда, медицинские принадлежности */
+    /** Мастер экипировки - МСИ, съёмное оборудование, посуда, медицинские принадлежности */
     public static final long EQUIPPER = 9;
     /** Инструктор поездных бригад - замещает нормировщика */
     public static final long INSTRUCTOR = 10;

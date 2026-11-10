@@ -41,7 +41,7 @@ public final class AdminTables {
             RoleType.TABLE, "text",
             ConductorCategory.TABLE, "text",
             "station", "name",
-            "depot", "name",
+            "depot", "name_ru",
             "fault_group_type", "name",
             "wagon_type", "text",
             "model_type", "text",
@@ -65,7 +65,7 @@ public final class AdminTables {
     static {
         add(new AdminTable("depot", "Депо", List.of(
                 text("code", "Код", true, 20),
-                text("name", "Название", true, 255),
+                text("name_ru", "Название на русском", true, 255),
                 text("name_kk", "Название на казахском", false, 255),
                 text("name_en", "Название на английском", false, 255),
                 ref("station", "Станция", false, "station"))));
@@ -86,7 +86,11 @@ public final class AdminTables {
                 text("text", "Название", true, 255))));
         add(new AdminTable("model_type", "Модели вагонов", List.of(
                 text("code", "Код", true, 20),
-                text("text", "Название", true, 255))));
+                text("text", "Название", true, 255),
+                // базы расчёта норм экипировки
+                col("seats", "Мест", INT, false),
+                col("compartments", "Купе", INT, false),
+                col("windows", "Окон", INT, false))));
         add(new AdminTable("fault_group_type", "Группы неисправностей", List.of(
                 text("code", "Код", true, 20),
                 text("name", "Название", true, 200),

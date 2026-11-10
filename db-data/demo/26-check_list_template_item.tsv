@@ -1,0 +1,113 @@
+id	check_list_template	parent_item	text_ru	text_kk	text_en	value_kind	check_dict	sort_order	disabled
+1	1		Безопасность (блокирует отправку)	Қауіпсіздік (жөнелтуді бұғаттайды)	Safety (blocks departure)			1	false
+2	1	1	Пожарная сигнализация	Өрт дабылы	Fire alarm	3	1	1	false
+3	1	1	Сигнализация нагрева букс	Букстардың қызуы туралы дабыл	Axle box overheating alarm	3	1	2	false
+4	1	1	Хвостовые сигналы	Құйрық сигналдары	Tail signals	3	1	3	false
+5	1	1	Утечка тока на корпус	Корпусқа ток кетуі	Current leakage to body	3	1	4	false
+6	1		Комфорт	Жайлылық	Comfort			2	false
+7	1	6	Температура в вагоне, °C	Вагондағы температура, °C	Temperature in the wagon, °C	2		1	false
+8	1	6	Есть горячая вода	Ыстық су бар	Hot water available	3	2	2	false
+9	1	6	Санитарный узел исправен	Санитариялық торап жарамды	Toilet in working order	3	2	3	false
+10	1	6	Общее освещение	Жалпы жарықтандыру	General lighting	3	1	4	false
+11	2		Показатели	Көрсеткіштер	Readings			1	false
+12	2	11	Давление верхнее, мм рт. ст.	Жоғарғы қысым, сын. бағ. мм	Systolic pressure, mmHg	2		1	false
+13	2	11	Давление нижнее, мм рт. ст.	Төменгі қысым, сын. бағ. мм	Diastolic pressure, mmHg	2		2	false
+14	2	11	Пульс, уд/мин	Тамыр соғысы, соққы/мин	Pulse, bpm	2		3	false
+15	2	11	Температура тела, °C	Дене температурасы, °C	Body temperature, °C	2		4	false
+16	2	11	Алкоголь в выдыхаемом воздухе, мг/л	Дем шығарылған ауадағы алкоголь, мг/л	Breath alcohol, mg/l	2		5	false
+17	2	11	Пупиллометрия: признаки ПАВ	Пупиллометрия: ПББЗ белгілері	Pupillometry: signs of psychoactive substances	3	2	6	false
+18	2		Заключение	Қорытынды	Conclusion			2	false
+19	2	18	Допуск к рейсу	Рейске жіберу	Admission to the trip	3	3	1	false
+20	2	18	Причина отказа	Бас тарту себебі	Reason for refusal	1		2	false
+21	3		Инструктаж	Нұсқаулық	Briefing			1	false
+22	3	21	Вид инструктажа	Нұсқаулық түрі	Briefing type	3	4	1	false
+23	3	21	Тема	Тақырып	Topic	1		2	false
+24	3	21	Тест пройден	Тест тапсырылды	Test passed	3	2	3	false
+25	4		Сервис и комфорт	Сервис және жайлылық	Service and comfort			1	false
+26	4	25	Температура выше 24° или ниже 20°	Температура 24°-тан жоғары немесе 20°-тан төмен	Temperature above 24° or below 20°	3	1	1	false
+27	4	25	Нет горячей воды	Ыстық су жоқ	No hot water	3	1	2	false
+28	4	25	Санитарный узел вышел из строя	Санитариялық торап істен шықты	Toilet out of order	3	1	3	false
+29	4	25	Постельное бельё с пятнами или изношено	Төсек жаймасы дақты немесе тозған	Bed linen stained or worn	3	1	4	false
+30	4	25	Бельё без даты ввода или старше 48 месяцев	Жаймада пайдалануға берілген күні жоқ немесе 48 айдан асқан	Linen without date or older than 48 months	3	1	5	false
+31	4	25	Недостаточная уборка	Жинау жеткіліксіз	Insufficient cleaning	3	1	6	false
+32	4	25	Бытовая техника (диспенсер, микроволновка, холодильник) не работает или отсутствует	Тұрмыстық техника (диспенсер, микротолқынды пеш, тоңазытқыш) жұмыс істемейді немесе жоқ	Appliances (water dispenser, microwave, fridge) broken or missing	3	1	7	false
+33	4	25	Дозаторы мыла не работают	Сабын дозаторлары жұмыс істемейді	Soap dispensers not working	3	1	8	false
+34	4	25	Невежливый персонал поезда	Поезд қызметкерлерінің әдепсіздігі	Impolite train staff	3	1	9	false
+35	4	25	Нет расходных материалов (мыло, туалетная бумага)	Шығын материалдары жоқ (сабын, дәретхана қағазы)	No consumables (soap, toilet paper)	3	1	10	false
+36	4	25	Форма не соответствует	Киім нысаны сай емес	Uniform non-compliant	3	1	11	false
+37	4		Техническое состояние	Техникалық жағдай	Technical condition			2	false
+38	4	37	Общее освещение не работает	Жалпы жарықтандыру жұмыс істемейді	General lighting not working	3	1	1	false
+39	4	37	Индивидуальное освещение не работает	Жеке жарықтандыру жұмыс істемейді	Reading lights not working	3	1	2	false
+40	4	37	Наружные табло не работают	Сыртқы таблолар жұмыс істемейді	Exterior displays not working	3	1	3	false
+41	4	37	Внутренние табло не работают	Ішкі таблолар жұмыс істемейді	Interior displays not working	3	1	4	false
+42	4	37	Межвагонная дверь не работает	Вагонаралық есік жұмыс істемейді	Inter-car door not working	3	1	5	false
+43	4	37	Наружная дверь не работает	Сыртқы есік жұмыс істемейді	Exterior door not working	3	1	6	false
+44	4	37	Дверь санузла не работает	Санторап есігі жұмыс істемейді	Toilet door not working	3	1	7	false
+45	4	37	Смыв в туалете не работает	Дәретханадағы су ағызу жұмыс істемейді	Toilet flush not working	3	1	8	false
+46	4	37	Неэстетичный вид мебели и панелей	Жиһаз бен панельдердің түрі нашар	Furniture and panels look worn	3	1	9	false
+47	4	37	Окна не закрываются герметично	Терезелер тығыз жабылмайды	Windows do not seal	3	1	10	false
+48	4		Стандарты	Стандарттар	Standards			3	false
+49	4	48	Укомплектование персонала не по плану	Қызметкерлер жоспар бойынша жинақталмаған	Staffing not as planned	3	1	1	false
+50	4	48	Поездной электромеханик не на дежурстве	Поездық электромеханик кезекшілікте емес	Train electrician not on duty	3	1	2	false
+51	4	48	Уборщики недоступны во время поездки	Сапар кезінде жинаушылар жоқ	Cleaners unavailable during the trip	3	1	3	false
+52	4	48	Персоналу не выданы перчатки и маски	Қызметкерлерге қолғап пен маска берілмеген	Staff not given gloves and masks	3	1	4	false
+53	4	48	Неоформленный багаж	Рәсімделмеген жүк	Unregistered luggage	3	1	5	false
+54	4	48	Безбилетный пассажир	Билетсіз жолаушы	Passenger without ticket	3	1	6	false
+55	5		Пол / ковёр	Еден / кілем	Floor / carpet			1	false
+56	5	55	Пятна	Дақтар	Stains	3	1	1	false
+57	5	55	Расхождение швов покрытия (до 25 мм)	Жабын тігістерінің ажырауы (25 мм дейін)	Floor covering seams open (up to 25 mm)	3	1	2	false
+58	5	55	Неприятный запах	Жағымсыз иіс	Unpleasant odour	3	1	3	false
+59	5	55	Нет даты ввода в эксплуатацию / владельца	Пайдалануға берілген күні / иесі жоқ	No commissioning date / owner	3	1	4	false
+60	5	55	Срок эксплуатации более 48 месяцев	Пайдалану мерзімі 48 айдан асқан	In service for more than 48 months	3	1	5	false
+61	5		Постельное бельё и полотенца	Төсек жаймасы мен сүлгілер	Bed linen and towels			2	false
+62	5	61	Пятна	Дақтар	Stains	3	1	1	false
+63	5	61	Плохо выглажено	Нашар үтіктелген	Poorly ironed	3	1	2	false
+64	5	61	Дырки	Тесіктер	Holes	3	1	3	false
+65	5	61	Нет даты ввода в эксплуатацию / владельца	Пайдалануға берілген күні / иесі жоқ	No commissioning date / owner	3	1	4	false
+66	5	61	Срок эксплуатации более 48 месяцев	Пайдалану мерзімі 48 айдан асқан	In service for more than 48 months	3	1	5	false
+67	5	61	Неприятный запах	Жағымсыз иіс	Unpleasant odour	3	1	6	false
+68	5		Матрасы	Матрастар	Mattresses			3	false
+69	5	68	Пятна	Дақтар	Stains	3	1	1	false
+70	5	68	Дырки	Тесіктер	Holes	3	1	2	false
+71	5	68	Неприятный запах	Жағымсыз иіс	Unpleasant odour	3	1	3	false
+72	5	68	Нет даты ввода в эксплуатацию / владельца	Пайдалануға берілген күні / иесі жоқ	No commissioning date / owner	3	1	4	false
+73	5	68	Срок эксплуатации более 60 месяцев	Пайдалану мерзімі 60 айдан асқан	In service for more than 60 months	3	1	5	false
+74	5		Одеяла	Көрпелер	Blankets			4	false
+75	5	74	Пятна	Дақтар	Stains	3	1	1	false
+76	5	74	Дырки	Тесіктер	Holes	3	1	2	false
+77	5	74	Неприятный запах	Жағымсыз иіс	Unpleasant odour	3	1	3	false
+78	5	74	Нет даты ввода в эксплуатацию / владельца	Пайдалануға берілген күні / иесі жоқ	No commissioning date / owner	3	1	4	false
+79	5	74	Срок эксплуатации более 48 месяцев	Пайдалану мерзімі 48 айдан асқан	In service for more than 48 months	3	1	5	false
+80	5		Окна	Терезелер	Windows			5	false
+81	5	80	Более одного пятна или отпечатка	Бірден көп дақ немесе саусақ ізі	More than one stain or fingerprint	3	1	1	false
+82	5	80	Есть разводы	Жолақ іздер бар	Streaks present	3	1	2	false
+83	5		Панели / потолок	Панельдер / төбе	Panels / ceiling			6	false
+84	5	83	Более одного пятна или отпечатка	Бірден көп дақ немесе саусақ ізі	More than one stain or fingerprint	3	1	1	false
+85	5	83	Есть разводы	Жолақ іздер бар	Streaks present	3	1	2	false
+86	5		Санитарный узел	Санитариялық торап	Toilet			7	false
+87	5	86	Пол: более одного пятна	Еден: бірден көп дақ	Floor: more than one stain	3	1	1	false
+88	5	86	Раковина: любое пятно	Раковина: кез келген дақ	Sink: any stain	3	1	2	false
+89	5	86	Зеркало: более одного пятна или отпечатка	Айна: бірден көп дақ немесе із	Mirror: more than one stain or fingerprint	3	1	3	false
+90	5	86	Зеркало: разводы	Айна: жолақ іздер	Mirror: streaks	3	1	4	false
+91	5	86	Дозатор: мало жидкого мыла	Дозатор: сұйық сабын аз	Dispenser: not enough liquid soap	3	1	5	false
+92	5	86	Туалетная бумага: недостаточно	Дәретхана қағазы: жеткіліксіз	Toilet paper: insufficient	3	1	6	false
+93	5	86	Панели: более одного пятна	Панельдер: бірден көп дақ	Panels: more than one stain	3	1	7	false
+94	5	86	Потолок: более одного пятна	Төбе: бірден көп дақ	Ceiling: more than one stain	3	1	8	false
+95	5	86	Окно: более одного пятна	Терезе: бірден көп дақ	Window: more than one stain	3	1	9	false
+96	5	86	Неприятный запах	Жағымсыз иіс	Unpleasant odour	3	1	10	false
+97	5	86	Дверь и ручка загрязнены	Есік пен тұтқа ластанған	Door and handle dirty	3	1	11	false
+98	5		Столы	Үстелдер	Tables			8	false
+99	5	98	Более одного пятна или отпечатка	Бірден көп дақ немесе саусақ ізі	More than one stain or fingerprint	3	1	1	false
+100	5	98	Есть разводы	Жолақ іздер бар	Streaks present	3	1	2	false
+101	5		Места	Орындар	Seats			9	false
+102	5	101	Более одного пятна на кв. м	Шаршы метрде бірден көп дақ	More than one stain per sq. m	3	1	1	false
+103	5	101	Более одной полосы на кв. м	Шаршы метрде бірден көп жолақ	More than one streak per sq. m	3	1	2	false
+104	5	101	Неприятный запах	Жағымсыз иіс	Unpleasant odour	3	1	3	false
+105	5		Двери (включая межвагонные)	Есіктер (вагонаралықты қоса)	Doors (incl. inter-car)			10	false
+106	5	105	Более одного пятна или отпечатка	Бірден көп дақ немесе саусақ ізі	More than one stain or fingerprint	3	1	1	false
+107	5	105	Дверные ручки грязные	Есік тұтқалары кір	Door handles dirty	3	1	2	false
+108	5		Титан / диспенсер для воды	Титан / су диспенсері	Water heater / dispenser			11	false
+109	5	108	Снаружи: более одного пятна или отпечатка	Сыртында: бірден көп дақ немесе із	Outside: more than one stain or fingerprint	3	1	1	false
+110	5	108	Внутри: накипь	Ішінде: қақ	Inside: scale	3	1	2	false
+111	5	108	Снаружи: видимые известковые отложения	Сыртында: көрінетін әк шөгінділері	Outside: visible limescale	3	1	3	false
+112	5	108	Неприятный запах	Жағымсыз иіс	Unpleasant odour	3	1	4	false

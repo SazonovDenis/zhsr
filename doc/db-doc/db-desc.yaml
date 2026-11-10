@@ -82,6 +82,42 @@ diagrams:
     tables: [ station, stage, stage_point, route_station, route ]
     hide_fields: [ "route" ]
 
+  check_list_struct:
+    title: "Чек-листы: структура"
+    description: |
+      Шаблон чек-листа - пункты (разделы и пункты со значением) - нормативы пунктов. Какое значение пункта - нарушение,
+      решает норматив; по нарушению создаётся заявка с неисправностью норматива.
+    tables: [ check_list_template, check_list_template_item, check_dict, check_dict_value, check_list_item_norm, check_list_item_norm_value, wagon_type, fault_type ]
+    hide_fields: [ wagon_type, fault_type, check_dict ]
+    top: [ check_list_template, check_dict ]
+
+  check_list:
+    title: "Чек-листы: проведённые проверки"
+    description: |
+      Заполненные чек-листы: проверка вагона, рейса или сотрудника (медосмотр, инструктаж). У значения пункта
+      сохраняются норматив, признак нарушения и созданная заявка.
+    tables: [ check_list, check_list_value, check_list_template, check_list_template_item: { hide_references: [ parent_item ] }, check_dict_value, check_list_item_norm, wagon, trip: { hide_references: [ departed_by_usr, arrived_by_usr ] }, usr, repair_request: { hide_references: [ created_by_usr ] } ]
+    hide_fields: [ check_list_template, check_list_template_item, check_dict_value, check_list_item_norm, wagon, trip, usr, repair_request ]
+    top: [ check_list_template, check_list_template_item ]
+
+  equip_list_struct:
+    title: "Экипировка: структура"
+    description: |
+      Шаблон описи экипировки - пункты (разделы и позиции имущества) - нормативы пунктов. Требуемое количество
+      считается по нормативу с учётом количества мест, купе и окон у модели вагона.
+    tables: [ equip_list_template, equip_list_template_item, equip_list_item_norm, wagon_type, model_type, fault_type ]
+    hide_fields: [ wagon_type, fault_type ]
+    top: [ equip_list_template ]
+
+  equip_list:
+    title: "Экипировка: проведённые описи"
+    description: |
+      Заполненные описи вагона: текущий факт - что лежит в вагоне. У значения пункта сохраняются требуемое количество,
+      норматив и признак нарушения; недостача по всей описи - одна заявка.
+    tables: [ equip_list, equip_list_value, equip_list_template, equip_list_template_item: { hide_references: [ parent_item ] }, equip_list_item_norm, wagon, trip: { hide_references: [ departed_by_usr, arrived_by_usr ] }, usr, repair_request: { hide_references: [ created_by_usr ] } ]
+    hide_fields: [ equip_list_template, equip_list_template_item, equip_list_item_norm, wagon, trip, usr, repair_request ]
+    top: [ equip_list_template, equip_list_template_item ]
+
 tables:
 
   role_type:
@@ -188,7 +224,7 @@ tables:
       code:
         title: "Код депо"
         description: "Уникален в компании"
-      name:
+      name_ru:
         title: "Название на русском"
       name_kk:
         title: "Название на казахском"
@@ -362,6 +398,15 @@ tables:
       code:
         title: "Код модели"
         description: "Уникален"
+      seats:
+        title: "Количество мест"
+        description: "База расчёта норм экипировки"
+      compartments:
+        title: "Количество купе"
+        description: "База расчёта норм экипировки"
+      windows:
+        title: "Количество окон"
+        description: "База расчёта норм экипировки"
 
   request_status_type:
     title: "Статус заявки на ремонт"
@@ -412,7 +457,7 @@ tables:
       name:
         title: "Название"
       sort_order:
-        title: "Порядок показа"
+        title: "Порядок в списке"
 
   fault_type:
     title: "Тип неисправности"
@@ -505,7 +550,7 @@ tables:
         description: "Пусто - маршрут действует"
       route_kind:
         title: "Вид маршрута"
-        description: "Константы RouteKind в коде: 1 - регулярный, 2 - разовый (поезд без расписания)"
+        constants_from: kz.zhsr.app.constants.RouteKind
       transport_type:
         title: "Пассажирский или грузовой"
         constants_from: zhsr-database/src/main/resources/db/dict/transport_type.tsv
@@ -992,3 +1037,302 @@ tables:
         title: "Состояние"
         description: "Вычисляемое: из текущей записи wagon_status"
         constants_from: zhsr-database/src/main/resources/db/dict/wagon_status_type.tsv
+
+  check_dict:
+    title: "Справочник вариантов ответов"
+    description: |
+      Готовые наборы ответов для пунктов чек-листа: "Да / Нет", "В порядке / Нарушение" и т. п.
+    columns:
+      text_ru:
+        title: "Название на русском"
+      text_kk:
+        title: "Название на казахском"
+      text_en:
+        title: "Название на английском"
+      sort_order:
+        title: "Порядок в списке"
+      disabled:
+        title: "Отключён"
+        description: "Не предлагается новым пунктам. Справочник с заполненными чек-листами не удаляется, а отключается"
+
+  check_dict_value:
+    title: "Вариант ответа"
+    description: |
+      Ответ из набора: "Да", "Нет" и т. п. Является такой ответ нарушением или нет - решает норматив пункта (check_list_item_norm_value).
+    columns:
+      check_dict:
+        title: "Справочник ответов"
+      text_ru:
+        title: "Название на русском"
+      text_kk:
+        title: "Название на казахском"
+      text_en:
+        title: "Название на английском"
+      sort_order:
+        title: "Порядок в списке"
+      disabled:
+        title: "Отключён"
+        description: "Не предлагается при заполнении. Значение с заполненными чек-листами не удаляется, а отключается"
+
+  check_list_template:
+    title: "Шаблон чек-листа"
+    description: |
+      Чек-лист проверки: приёмка вагона, проверка вагонов, медосмотр, инструктаж и т. п.
+    columns:
+      text_ru:
+        title: "Название на русском"
+      text_kk:
+        title: "Название на казахском"
+      text_en:
+        title: "Название на английском"
+      sort_order:
+        title: "Порядок в списке"
+      disabled:
+        title: "Отключён"
+        description: "Не предлагается для новых проверок. Шаблон с заполненными чек-листами не удаляется, а отключается"
+
+  check_list_template_item:
+    title: "Пункт шаблона чек-листа"
+    description: |
+      Пункт со значением или раздел, в котором лежат другие пункты (вид значения пуст).
+    columns:
+      check_list_template:
+        title: "Шаблон чек-листа"
+      parent_item:
+        title: "Раздел"
+        description: "Пункт-раздел, в который входит пункт. Пусто - пункт верхнего уровня"
+      text_ru:
+        title: "Название на русском"
+      text_kk:
+        title: "Название на казахском"
+      text_en:
+        title: "Название на английском"
+      value_kind:
+        title: "Вид значения"
+        description: "Пусто - раздел"
+        constants_from: kz.zhsr.app.constants.CheckValueKind
+      check_dict:
+        title: "Справочник ответов"
+        description: "Задан ровно у пункта со значением справочника"
+      sort_order:
+        title: "Порядок в списке"
+      disabled:
+        title: "Отключён"
+        description: "Не показывается в новых чек-листах. Пункт с заполненными чек-листами не удаляется, а отключается"
+
+  check_list_item_norm:
+    title: "Норматив пункта чек-листа"
+    description: |
+      Какое значение пункта - нарушение. Пункт без норматива нарушения не даёт. Для вагона берётся действующий
+      норматив его типа вагона, если его нет - общий (тип вагона пуст); нет ни того ни другого - пункт к типу вагона
+      не относится и не показывается. Нормативы пункта для одного типа вагона по периодам не пересекаются.
+    columns:
+      check_list_template_item:
+        title: "Пункт шаблона"
+      wagon_type:
+        title: "Тип вагона"
+        description: "Пусто - для всех типов вагона"
+        constants_from: db-data/default/04-wagon_type.tsv
+      required:
+        title: "Обязателен к заполнению"
+      num_min:
+        title: "Число не меньше"
+        description: "Для пункта с числом, включительно. Пусто - без границы"
+      num_max:
+        title: "Число не больше"
+        description: "Для пункта с числом, включительно. Пусто - без границы"
+      critical:
+        title: "Критичный"
+        description: "Нарушение блокирует отправку вагона в рейс"
+      fault_type:
+        title: "Неисправность заявки"
+        description: "Неисправность заявки, которая создаётся по нарушению. Пусто - нарушение без заявки"
+      dbeg:
+        title: "Начало действия"
+      dend:
+        title: "Конец действия"
+        description: "Пусто - текущая запись"
+
+  check_list_item_norm_value:
+    title: "Допустимое значение по нормативу"
+    description: |
+      Для пункта со значением справочника: допустимые значения; любое другое значение - нарушение. Удаляется вместе
+      с нормативом.
+    columns:
+      check_list_item_norm:
+        title: "Норматив"
+      check_dict_value:
+        title: "Допустимое значение"
+
+  check_list:
+    title: "Чек-лист"
+    description: |
+      Заполненный чек-лист: проверка вагона, рейса или сотрудника. Задано хотя бы одно из трёх.
+    columns:
+      check_list_template:
+        title: "Шаблон чек-листа"
+      wagon:
+        title: "Вагон"
+        description: "Проверяемый вагон"
+      trip:
+        title: "Рейс"
+        description: "Рейс, к которому относится проверка"
+      checked_usr:
+        title: "Проверяемый сотрудник"
+        description: "Медосмотр, инструктаж"
+      created_by_usr:
+        title: "Кто проводил проверку"
+      created_dt:
+        title: "Когда начата"
+      completed_dt:
+        title: "Когда завершена"
+        description: "Пусто - черновик"
+
+  check_list_value:
+    title: "Значение пункта чек-листа"
+    description: |
+      Пункт в чек-листе - один раз для каждого пункта из шаблона чек-листа. Удаляется вместе с чек-листом.
+    columns:
+      check_list:
+        title: "Чек-лист"
+      check_list_template_item:
+        title: "Пункт шаблона"
+      value_string:
+        title: "Строка"
+      value_number:
+        title: "Число"
+      check_dict_value:
+        title: "Зафиксированное значение"
+      comment:
+        title: "Описание нарушения"
+      check_list_item_norm:
+        title: "Норматив"
+        description: "Норматив на момент проведения чек-листа, по которому по которому проверено значение. Пусто - норматива нет"
+      violation:
+        title: "Было ли нарушение"
+        description: "Нарушает ли фактическое значение норматив на момент описи. Сохраняется, чтобы уже проведенные чек-листы не менялась при смене норматива."
+      repair_request:
+        title: "Заявка"
+        description: "Заявка, созданная по нарушению"
+
+  equip_list_template:
+    title: "Шаблон описи экипировки"
+    description: |
+      Экипировка по Приказу №545, опись имущества вагона и т. п.
+    columns:
+      text_ru:
+        title: "Название на русском"
+      text_kk:
+        title: "Название на казахском"
+      text_en:
+        title: "Название на английском"
+      fault_type:
+        title: "Неисправность заявки по недостаче"
+        description: "Одна заявка на всю опись. Пусто - опись без заявки"
+      sort_order:
+        title: "Порядок в списке"
+      disabled:
+        title: "Отключён"
+        description: "Не предлагается для новых описей. Шаблон с заполненными описями не удаляется, а отключается"
+
+  equip_list_template_item:
+    title: "Пункт шаблона описи экипировки"
+    description: |
+      Позиция имущества или раздел, в котором лежат другие пункты (единица измерения пуста).
+    columns:
+      equip_list_template:
+        title: "Шаблон описи"
+      parent_item:
+        title: "Раздел"
+        description: "Пункт-раздел, в который входит пункт. Пусто - пункт верхнего уровня"
+      text_ru:
+        title: "Название на русском"
+      text_kk:
+        title: "Название на казахском"
+      text_en:
+        title: "Название на английском"
+      unit:
+        title: "Единица измерения"
+        description: "шт, г, комплект и т. п. Пусто - раздел"
+      sort_order:
+        title: "Порядок в списке"
+      disabled:
+        title: "Отключён"
+        description: "Не показывается в новых описях. Пункт с заполненными описями не удаляется, а отключается"
+
+  equip_list_item_norm:
+    title: "Норматив пункта описи экипировки"
+    description: |
+      Требуется = количество на единицу базы × база + добавка для головного и хвостового вагона. Число мест, купе и
+      окон - у модели вагона. Подбор норматива для вагона - как у норматива чек-листа: сначала по типу вагона, потом
+      общий. Пункт без норматива (опись имущества) сравнивается с прошлой описью вагона.
+    columns:
+      equip_list_template_item:
+        title: "Пункт шаблона"
+      wagon_type:
+        title: "Тип вагона"
+        description: "Пусто - для всех типов вагона"
+        constants_from: db-data/default/04-wagon_type.tsv
+      quantity_per_basis:
+        title: "Количество на единицу базы"
+      basis:
+        title: "База расчёта"
+        constants_from: kz.zhsr.app.constants.EquipBasis
+      quantity_kind:
+        title: "Как сравнивать"
+        constants_from: kz.zhsr.app.constants.EquipQuantityKind
+      head_tail_extra:
+        title: "Добавка в головной и хвостовой вагон"
+      norm_text:
+        title: "Норма текстом"
+        description: "Как в приказе"
+      critical:
+        title: "Критичный"
+        description: "Недостача блокирует отправку вагона в рейс"
+      dbeg:
+        title: "Начало действия"
+      dend:
+        title: "Конец действия"
+        description: "Пусто - текущая запись"
+
+  equip_list:
+    title: "Проведённая опись экипировки"
+    description: |
+      Заполненная опись вагона: текущий факт - что лежит в вагоне.
+    columns:
+      equip_list_template:
+        title: "Шаблон описи"
+      wagon:
+        title: "Вагон"
+      trip:
+        title: "Рейс"
+      created_by_usr:
+        title: "Кто составил опись"
+      created_dt:
+        title: "Когда начата"
+      completed_dt:
+        title: "Когда завершена"
+        description: "Пусто - черновик"
+      repair_request:
+        title: "Заявка по недостаче. Пусто - заявка не создавалась"
+
+  equip_list_value:
+    title: "Значение пункта описи экипировки"
+    description: |
+      Пункт в описи - один раз. Удаляется вместе с описью.
+    columns:
+      equip_list:
+        title: "Опись"
+      equip_list_template_item:
+        title: "Пункт шаблона"
+      quantity_actual:
+        title: "Зафиксированное количество (фактически)"
+      quantity_required:
+        title: "Требуемое количество (норматив)"
+        description: "По нормативу на момент описи. Пусто - норматива нет"
+      equip_list_item_norm:
+        title: "Норматив"
+        description: "Норматив на момент описи, по которому посчитано требуемое количество"
+      violation:
+        title: "Было ли нарушение"
+        description: "Нарушает ли фактическое количество норматив на момент описи. Сохраняется, чтобы уже проведенные описи не менялась при смене норматива."

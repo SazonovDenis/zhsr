@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
+        objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
+
+    <!-- Чек-листы и экипировка: уникальность, внешние ключи, проверки, индексы -->
+
+    <!-- check_dict_value -->
+
+    <changeSet id="04-check-indexes-fk_check_dict_value_check_dict" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_dict_value" baseColumnNames="check_dict" constraintName="fk_check_dict_value_check_dict"
+                                 referencedTableName="check_dict" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-ix_check_dict_value_check_dict" author="zhsr">
+        <createIndex tableName="check_dict_value" indexName="ix_check_dict_value_check_dict">
+            <column name="check_dict"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- check_list_template_item -->
+
+    <changeSet id="04-check-indexes-fk_check_list_template_item_check_list_template" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_template_item" baseColumnNames="check_list_template" constraintName="fk_check_list_template_item_check_list_template"
+                                 referencedTableName="check_list_template" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_template_item_parent_item" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_template_item" baseColumnNames="parent_item" constraintName="fk_check_list_template_item_parent_item"
+                                 referencedTableName="check_list_template_item" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_template_item_check_dict" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_template_item" baseColumnNames="check_dict" constraintName="fk_check_list_template_item_check_dict"
+                                 referencedTableName="check_dict" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-ix_check_list_template_item_check_list_template" author="zhsr">
+        <createIndex tableName="check_list_template_item" indexName="ix_check_list_template_item_check_list_template">
+            <column name="check_list_template"/>
+        </createIndex>
+    </changeSet>
+    <!-- константы CheckValueKind: 1 - строка, 2 - число, 3 - значение справочника; пусто - раздел -->
+    <changeSet id="04-check-indexes-ck_check_list_template_item_value_kind" author="zhsr">
+        <sql>alter table check_list_template_item add constraint ck_check_list_template_item_value_kind check (value_kind in (1, 2, 3))</sql>
+    </changeSet>
+    <!-- справочник задан ровно у пункта со значением справочника -->
+    <changeSet id="04-check-indexes-ck_check_list_template_item_check_dict" author="zhsr">
+        <sql>alter table check_list_template_item add constraint ck_check_list_template_item_check_dict check ((value_kind = 3) = (check_dict is not null))</sql>
+    </changeSet>
+
+    <!-- check_list_item_norm -->
+
+    <changeSet id="04-check-indexes-fk_check_list_item_norm_check_list_template_item" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_item_norm" baseColumnNames="check_list_template_item" constraintName="fk_check_list_item_norm_check_list_template_item"
+                                 referencedTableName="check_list_template_item" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_item_norm_wagon_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_item_norm" baseColumnNames="wagon_type" constraintName="fk_check_list_item_norm_wagon_type"
+                                 referencedTableName="wagon_type" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_item_norm_fault_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_item_norm" baseColumnNames="fault_type" constraintName="fk_check_list_item_norm_fault_type"
+                                 referencedTableName="fault_type" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-ix_check_list_item_norm_check_list_template_item" author="zhsr">
+        <createIndex tableName="check_list_item_norm" indexName="ix_check_list_item_norm_check_list_template_item">
+            <column name="check_list_template_item"/>
+        </createIndex>
+    </changeSet>
+    <changeSet id="04-check-indexes-ck_check_list_item_norm_period" author="zhsr">
+        <sql>alter table check_list_item_norm add constraint ck_check_list_item_norm_period check (dend is null or dend &gt; dbeg)</sql>
+    </changeSet>
+    <!-- нормативы пункта для одного типа вагона (и общие нормативы пункта) по периодам не пересекаются -->
+    <changeSet id="04-check-indexes-ex_check_list_item_norm_overlap" author="zhsr">
+        <sql>alter table check_list_item_norm add constraint ex_check_list_item_norm_overlap exclude using gist (check_list_template_item with =, coalesce(wagon_type, 0) with =, tstzrange(dbeg, dend) with &amp;&amp;)</sql>
+    </changeSet>
+    <changeSet id="04-check-indexes-ck_check_list_item_norm_num" author="zhsr">
+        <sql>alter table check_list_item_norm add constraint ck_check_list_item_norm_num check (num_min is null or num_max is null or num_min &lt;= num_max)</sql>
+    </changeSet>
+
+    <!-- check_list_item_norm_value: удаляются вместе с нормативом -->
+
+    <changeSet id="04-check-indexes-fk_check_list_item_norm_value_check_list_item_norm" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_item_norm_value" baseColumnNames="check_list_item_norm" constraintName="fk_check_list_item_norm_value_check_list_item_norm"
+                                 referencedTableName="check_list_item_norm" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_item_norm_value_check_dict_value" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_item_norm_value" baseColumnNames="check_dict_value" constraintName="fk_check_list_item_norm_value_check_dict_value"
+                                 referencedTableName="check_dict_value" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-uq_clinv_check_list_item_norm_check_dict_value" author="zhsr">
+        <addUniqueConstraint tableName="check_list_item_norm_value" columnNames="check_list_item_norm, check_dict_value" constraintName="uq_clinv_check_list_item_norm_check_dict_value"/>
+    </changeSet>
+
+    <!-- check_list -->
+
+    <changeSet id="04-check-indexes-fk_check_list_check_list_template" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list" baseColumnNames="check_list_template" constraintName="fk_check_list_check_list_template"
+                                 referencedTableName="check_list_template" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_wagon" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list" baseColumnNames="wagon" constraintName="fk_check_list_wagon"
+                                 referencedTableName="wagon" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_trip" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list" baseColumnNames="trip" constraintName="fk_check_list_trip"
+                                 referencedTableName="trip" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_checked_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list" baseColumnNames="checked_usr" constraintName="fk_check_list_checked_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_created_by_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list" baseColumnNames="created_by_usr" constraintName="fk_check_list_created_by_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+    <!-- проверяли хотя бы что-то: вагон, рейс или сотрудника -->
+    <changeSet id="04-check-indexes-ck_check_list_subject" author="zhsr">
+        <sql>alter table check_list add constraint ck_check_list_subject check (num_nonnulls(wagon, trip, checked_usr) &gt; 0)</sql>
+    </changeSet>
+    <changeSet id="04-check-indexes-ix_check_list_wagon" author="zhsr">
+        <createIndex tableName="check_list" indexName="ix_check_list_wagon">
+            <column name="wagon"/>
+        </createIndex>
+    </changeSet>
+    <changeSet id="04-check-indexes-ix_check_list_trip" author="zhsr">
+        <createIndex tableName="check_list" indexName="ix_check_list_trip">
+            <column name="trip"/>
+        </createIndex>
+    </changeSet>
+    <changeSet id="04-check-indexes-ix_check_list_checked_usr" author="zhsr">
+        <createIndex tableName="check_list" indexName="ix_check_list_checked_usr">
+            <column name="checked_usr"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- check_list_value: удаляются вместе с чек-листом -->
+
+    <changeSet id="04-check-indexes-fk_check_list_value_check_list" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_value" baseColumnNames="check_list" constraintName="fk_check_list_value_check_list"
+                                 referencedTableName="check_list" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_value_check_list_template_item" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_value" baseColumnNames="check_list_template_item" constraintName="fk_check_list_value_check_list_template_item"
+                                 referencedTableName="check_list_template_item" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_value_check_dict_value" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_value" baseColumnNames="check_dict_value" constraintName="fk_check_list_value_check_dict_value"
+                                 referencedTableName="check_dict_value" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_value_check_list_item_norm" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_value" baseColumnNames="check_list_item_norm" constraintName="fk_check_list_value_check_list_item_norm"
+                                 referencedTableName="check_list_item_norm" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_check_list_value_repair_request" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_value" baseColumnNames="repair_request" constraintName="fk_check_list_value_repair_request"
+                                 referencedTableName="repair_request" referencedColumnNames="id"/>
+    </changeSet>
+    <!-- пункт в чек-листе - один раз -->
+    <changeSet id="04-check-indexes-uq_check_list_value_check_list_check_list_template_item" author="zhsr">
+        <addUniqueConstraint tableName="check_list_value" columnNames="check_list, check_list_template_item" constraintName="uq_check_list_value_check_list_check_list_template_item"/>
+    </changeSet>
+    <!-- заполнено не больше одного значения -->
+    <changeSet id="04-check-indexes-ck_check_list_value_one" author="zhsr">
+        <sql>alter table check_list_value add constraint ck_check_list_value_one check (num_nonnulls(value_string, value_number, check_dict_value) &lt;= 1)</sql>
+    </changeSet>
+
+    <!-- equip_list_template -->
+
+    <changeSet id="04-check-indexes-fk_equip_list_template_fault_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list_template" baseColumnNames="fault_type" constraintName="fk_equip_list_template_fault_type"
+                                 referencedTableName="fault_type" referencedColumnNames="id"/>
+    </changeSet>
+
+    <!-- equip_list_template_item -->
+
+    <changeSet id="04-check-indexes-fk_equip_list_template_item_equip_list_template" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list_template_item" baseColumnNames="equip_list_template" constraintName="fk_equip_list_template_item_equip_list_template"
+                                 referencedTableName="equip_list_template" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_equip_list_template_item_parent_item" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list_template_item" baseColumnNames="parent_item" constraintName="fk_equip_list_template_item_parent_item"
+                                 referencedTableName="equip_list_template_item" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-ix_equip_list_template_item_equip_list_template" author="zhsr">
+        <createIndex tableName="equip_list_template_item" indexName="ix_equip_list_template_item_equip_list_template">
+            <column name="equip_list_template"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- equip_list_item_norm -->
+
+    <changeSet id="04-check-indexes-fk_equip_list_item_norm_equip_list_template_item" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list_item_norm" baseColumnNames="equip_list_template_item" constraintName="fk_equip_list_item_norm_equip_list_template_item"
+                                 referencedTableName="equip_list_template_item" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_equip_list_item_norm_wagon_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list_item_norm" baseColumnNames="wagon_type" constraintName="fk_equip_list_item_norm_wagon_type"
+                                 referencedTableName="wagon_type" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-ix_equip_list_item_norm_equip_list_template_item" author="zhsr">
+        <createIndex tableName="equip_list_item_norm" indexName="ix_equip_list_item_norm_equip_list_template_item">
+            <column name="equip_list_template_item"/>
+        </createIndex>
+    </changeSet>
+    <changeSet id="04-check-indexes-ck_equip_list_item_norm_period" author="zhsr">
+        <sql>alter table equip_list_item_norm add constraint ck_equip_list_item_norm_period check (dend is null or dend &gt; dbeg)</sql>
+    </changeSet>
+    <!-- нормативы пункта для одного типа вагона (и общие нормативы пункта) по периодам не пересекаются -->
+    <changeSet id="04-check-indexes-ex_equip_list_item_norm_overlap" author="zhsr">
+        <sql>alter table equip_list_item_norm add constraint ex_equip_list_item_norm_overlap exclude using gist (equip_list_template_item with =, coalesce(wagon_type, 0) with =, tstzrange(dbeg, dend) with &amp;&amp;)</sql>
+    </changeSet>
+    <!-- константы EquipBasis: 1 - вагон, 2 - место, 3 - купе, 4 - окно -->
+    <changeSet id="04-check-indexes-ck_equip_list_item_norm_basis" author="zhsr">
+        <sql>alter table equip_list_item_norm add constraint ck_equip_list_item_norm_basis check (basis in (1, 2, 3, 4))</sql>
+    </changeSet>
+    <!-- константы EquipQuantityKind: 1 - ровно, 2 - не менее -->
+    <changeSet id="04-check-indexes-ck_equip_list_item_norm_quantity_kind" author="zhsr">
+        <sql>alter table equip_list_item_norm add constraint ck_equip_list_item_norm_quantity_kind check (quantity_kind in (1, 2))</sql>
+    </changeSet>
+    <changeSet id="04-check-indexes-ck_equip_list_item_norm_quantity" author="zhsr">
+        <sql>alter table equip_list_item_norm add constraint ck_equip_list_item_norm_quantity check (quantity_per_basis &gt;= 0 and head_tail_extra &gt;= 0)</sql>
+    </changeSet>
+
+    <!-- equip_list -->
+
+    <changeSet id="04-check-indexes-fk_equip_list_equip_list_template" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list" baseColumnNames="equip_list_template" constraintName="fk_equip_list_equip_list_template"
+                                 referencedTableName="equip_list_template" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_equip_list_wagon" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list" baseColumnNames="wagon" constraintName="fk_equip_list_wagon"
+                                 referencedTableName="wagon" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_equip_list_trip" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list" baseColumnNames="trip" constraintName="fk_equip_list_trip"
+                                 referencedTableName="trip" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_equip_list_created_by_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list" baseColumnNames="created_by_usr" constraintName="fk_equip_list_created_by_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_equip_list_repair_request" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list" baseColumnNames="repair_request" constraintName="fk_equip_list_repair_request"
+                                 referencedTableName="repair_request" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-ix_equip_list_wagon" author="zhsr">
+        <createIndex tableName="equip_list" indexName="ix_equip_list_wagon">
+            <column name="wagon"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- equip_list_value: удаляются вместе с описью -->
+
+    <changeSet id="04-check-indexes-fk_equip_list_value_equip_list" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list_value" baseColumnNames="equip_list" constraintName="fk_equip_list_value_equip_list"
+                                 referencedTableName="equip_list" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_equip_list_value_equip_list_template_item" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list_value" baseColumnNames="equip_list_template_item" constraintName="fk_equip_list_value_equip_list_template_item"
+                                 referencedTableName="equip_list_template_item" referencedColumnNames="id"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-fk_equip_list_value_equip_list_item_norm" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list_value" baseColumnNames="equip_list_item_norm" constraintName="fk_equip_list_value_equip_list_item_norm"
+                                 referencedTableName="equip_list_item_norm" referencedColumnNames="id"/>
+    </changeSet>
+    <!-- пункт в описи - один раз -->
+    <changeSet id="04-check-indexes-uq_equip_list_value_equip_list_equip_list_template_item" author="zhsr">
+        <addUniqueConstraint tableName="equip_list_value" columnNames="equip_list, equip_list_template_item" constraintName="uq_equip_list_value_equip_list_equip_list_template_item"/>
+    </changeSet>
+    <changeSet id="04-check-indexes-ck_equip_list_value_quantity" author="zhsr">
+        <sql>alter table equip_list_value add constraint ck_equip_list_value_quantity check (quantity_actual &gt;= 0 and (quantity_required is null or quantity_required &gt;= 0))</sql>
+    </changeSet>
+
+</databaseChangeLog>

@@ -21,7 +21,7 @@
         Имена ограничений и индексов: <префикс>_<таблица>_<поля>, префиксы pk, fk, uq, ck, ex, ix, ux.
         PostgreSQL обрезает имена длиннее 63 символов. Поля пишутся всегда полностью; если имя не помещается,
         имя таблицы заменяется аббревиатурой из списка ниже - одной и той же во всех таких именах:
-            (пока нет)
+            clinv - check_list_item_norm_value
 
         repair-act.xml (repair_act, repair_close_act) в общую миграцию не входит.
     -->
@@ -39,5 +39,9 @@
     <include file="db/changelog/03-repair-tables.xml"/>
 
     <include file="db/changelog/03-repair-indexes.xml"/>
+
+    <include file="db/changelog/04-check-tables.xml"/>
+
+    <include file="db/changelog/04-check-indexes.xml"/>
 
 </databaseChangeLog>

@@ -28,9 +28,9 @@ _*/
 .DS_Store
 Thumbs.db
 
+*.pid
 *.class
 ?
-
 
 
 # кэш диаграмм doc-db
@@ -38,6 +38,5 @@ Thumbs.db
 
 #
 doc.todo/
-toask.md
-*.pid
-
+todo*.md
+doc-dashboard

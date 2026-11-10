@@ -26,6 +26,98 @@ tables:
       text: {type: varchar(255), required: true}
       code: {type: varchar(20), required: true}
 
+  check_dict:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      text_ru: {type: varchar(255), required: true}
+      text_kk: {type: varchar(255)}
+      text_en: {type: varchar(255)}
+      sort_order: {type: integer, required: true}
+      disabled: {type: boolean, required: true}
+
+  check_dict_value:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      check_dict: {type: bigint, required: true, references: check_dict}
+      text_ru: {type: varchar(255), required: true}
+      text_kk: {type: varchar(255)}
+      text_en: {type: varchar(255)}
+      sort_order: {type: integer, required: true}
+      disabled: {type: boolean, required: true}
+
+  check_list:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      check_list_template: {type: bigint, required: true, references: check_list_template}
+      wagon: {type: bigint, references: wagon}
+      trip: {type: bigint, references: trip}
+      checked_usr: {type: bigint, references: usr}
+      created_by_usr: {type: bigint, required: true, references: usr}
+      created_dt: {type: timestamptz, required: true}
+      completed_dt: {type: timestamptz}
+
+  check_list_item_norm:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      check_list_template_item: {type: bigint, required: true, references: check_list_template_item}
+      wagon_type: {type: bigint, references: wagon_type}
+      required: {type: boolean, required: true}
+      num_min: {type: 'numeric(12,3)'}
+      num_max: {type: 'numeric(12,3)'}
+      critical: {type: boolean, required: true}
+      fault_type: {type: bigint, references: fault_type}
+      dbeg: {type: timestamptz, required: true}
+      dend: {type: timestamptz}
+
+  check_list_item_norm_value:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      check_list_item_norm: {type: bigint, required: true, references: check_list_item_norm}
+      check_dict_value: {type: bigint, required: true, references: check_dict_value}
+
+  check_list_template:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      text_ru: {type: varchar(255), required: true}
+      text_kk: {type: varchar(255)}
+      text_en: {type: varchar(255)}
+      sort_order: {type: integer, required: true}
+      disabled: {type: boolean, required: true}
+
+  check_list_template_item:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      check_list_template: {type: bigint, required: true, references: check_list_template}
+      parent_item: {type: bigint, references: check_list_template_item}
+      text_ru: {type: varchar(500), required: true}
+      text_kk: {type: varchar(500)}
+      text_en: {type: varchar(500)}
+      value_kind: {type: integer}
+      check_dict: {type: bigint, references: check_dict}
+      sort_order: {type: integer, required: true}
+      disabled: {type: boolean, required: true}
+
+  check_list_value:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      check_list: {type: bigint, required: true, references: check_list}
+      check_list_template_item: {type: bigint, required: true, references: check_list_template_item}
+      value_string: {type: text}
+      value_number: {type: 'numeric(12,3)'}
+      check_dict_value: {type: bigint, references: check_dict_value}
+      comment: {type: text}
+      check_list_item_norm: {type: bigint, references: check_list_item_norm}
+      violation: {type: boolean, required: true}
+      repair_request: {type: bigint, references: repair_request}
+
   coupling_act:
     primary_key: [id]
     columns:
@@ -76,7 +168,7 @@ tables:
     columns:
       id: {type: bigint, required: true}
       code: {type: varchar(20), required: true}
-      name: {type: varchar(255), required: true}
+      name_ru: {type: varchar(255), required: true}
       name_kk: {type: varchar(255)}
       name_en: {type: varchar(255)}
       station: {type: bigint, references: station}
@@ -87,6 +179,68 @@ tables:
       name: {type: varchar(50), required: true}
       version: {type: bigint, required: true}
       changed_dt: {type: timestamptz, required: true}
+
+  equip_list:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      equip_list_template: {type: bigint, required: true, references: equip_list_template}
+      wagon: {type: bigint, required: true, references: wagon}
+      trip: {type: bigint, references: trip}
+      created_by_usr: {type: bigint, required: true, references: usr}
+      created_dt: {type: timestamptz, required: true}
+      completed_dt: {type: timestamptz}
+      repair_request: {type: bigint, references: repair_request}
+
+  equip_list_item_norm:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      equip_list_template_item: {type: bigint, required: true, references: equip_list_template_item}
+      wagon_type: {type: bigint, references: wagon_type}
+      quantity_per_basis: {type: 'numeric(12,3)', required: true}
+      basis: {type: integer, required: true}
+      quantity_kind: {type: integer, required: true}
+      head_tail_extra: {type: 'numeric(12,3)', required: true}
+      norm_text: {type: varchar(200)}
+      critical: {type: boolean, required: true}
+      dbeg: {type: timestamptz, required: true}
+      dend: {type: timestamptz}
+
+  equip_list_template:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      text_ru: {type: varchar(255), required: true}
+      text_kk: {type: varchar(255)}
+      text_en: {type: varchar(255)}
+      fault_type: {type: bigint, references: fault_type}
+      sort_order: {type: integer, required: true}
+      disabled: {type: boolean, required: true}
+
+  equip_list_template_item:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      equip_list_template: {type: bigint, required: true, references: equip_list_template}
+      parent_item: {type: bigint, references: equip_list_template_item}
+      text_ru: {type: varchar(500), required: true}
+      text_kk: {type: varchar(500)}
+      text_en: {type: varchar(500)}
+      unit: {type: varchar(20)}
+      sort_order: {type: integer, required: true}
+      disabled: {type: boolean, required: true}
+
+  equip_list_value:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      equip_list: {type: bigint, required: true, references: equip_list}
+      equip_list_template_item: {type: bigint, required: true, references: equip_list_template_item}
+      quantity_actual: {type: 'numeric(12,3)', required: true}
+      quantity_required: {type: 'numeric(12,3)'}
+      equip_list_item_norm: {type: bigint, references: equip_list_item_norm}
+      violation: {type: boolean, required: true}
 
   fault_group_type:
     primary_key: [id]
@@ -120,6 +274,9 @@ tables:
       id: {type: bigint, required: true}
       text: {type: varchar(255), required: true}
       code: {type: varchar(20), required: true}
+      seats: {type: integer}
+      compartments: {type: integer}
+      windows: {type: integer}
 
   offline_receipt:
     primary_key: [client_guid]

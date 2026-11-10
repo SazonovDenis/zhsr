@@ -31,7 +31,7 @@ id	login	full_name	password_hash	phone	disabled	change_password	created_dt
 106	recv	Омарова Сауле Кайратовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
 107	910812400800	Ким Елена Викторовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
 108	950220350600	Смирнова Анна Павловна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:05+05:00
-109	870301400900	Бекова Айгуль Нурлановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
+109	equip	Бекова Айгуль Нурлановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
 110	790615300300	Петров Сергей Иванович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
 111	930512400101	Абенова Гульнара Ериковна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00
 112	940218300102	Касымов Данияр Маратович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-07 13:00:06+05:00

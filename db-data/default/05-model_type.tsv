@@ -1,7 +1,7 @@
-id	text	code	description
-1	Тулпар-Тальго	TULPAR_TALGO	Испанская технология Talgo, сборка в Астане; выпуск до 2017
-2	Тулпар (ТВЗ/ТМХ)	TULPAR_TMH	Завод «Тулпар» после перехода к Трансмашхолдингу, 2019
-3	Stadler, спальный	STADLER_SLEEPER	40 спальных мест; заказ КТЖ 2023-2030
-4	Stadler, кушетный	STADLER_COUCHETTE	58 мест
-5	Stadler, штабной	STADLER_STAFF	18 мест, для маломобильных пассажиров
-6	Stadler, вагон-генератор	STADLER_GENERATOR	Энергоснабжение состава
+id	text	code	seats	compartments	windows	description
+1	Тулпар-Тальго	TULPAR_TALGO	20	5	10	Испанская технология Talgo, сборка в Астане; выпуск до 2017; купейный вагон - 20 мест
+2	Тулпар (ТВЗ/ТМХ)	TULPAR_TMH	54	9	18	Завод «Тулпар» после перехода к Трансмашхолдингу, 2019; плацкартный вагон модели 61-4447 - 54 места, 9 отсеков
+3	Stadler, спальный	STADLER_SLEEPER	40	10	20	40 спальных мест; заказ КТЖ 2023-2030
+4	Stadler, кушетный	STADLER_COUCHETTE	58	10	20	58 мест
+5	Stadler, штабной	STADLER_STAFF	18	5	12	18 мест, для маломобильных пассажиров
+6	Stadler, вагон-генератор	STADLER_GENERATOR	0	0	4	Энергоснабжение состава

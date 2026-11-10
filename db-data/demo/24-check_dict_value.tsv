@@ -1,0 +1,11 @@
+id	check_dict	text_ru	text_kk	text_en	sort_order	disabled
+1	1	В порядке	Тәртіпте	OK	1	false
+2	1	Нарушение	Бұзушылық	Violation	2	false
+3	2	Да	Иә	Yes	1	false
+4	2	Нет	Жоқ	No	2	false
+5	3	Допущен	Жіберілді	Admitted	1	false
+6	3	Не допущен	Жіберілмеді	Not admitted	2	false
+7	4	Предрейсовый	Рейс алдындағы	Pre-trip	1	false
+8	4	Повторный	Қайталама	Repeated	2	false
+9	4	Внеплановый	Жоспардан тыс	Unscheduled	3	false
+10	4	Целевой	Мақсатты	Targeted	4	false

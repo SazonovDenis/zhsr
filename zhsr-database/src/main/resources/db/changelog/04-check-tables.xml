@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
+        objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
+
+    <!-- Чек-листы и экипировка: шаблоны, пункты, нормативы, заполненные чек-листы и описи экипировки.
+
+         Обе части устроены одинаково: шаблон -> пункт шаблона -> норматив пункта -> заполненный документ -> значение
+         пункта. Многоязычные названия: text_ru - на русском, text_kk - на казахском, text_en - на английском.
+         Шаблон, пункт и значение справочника, по которым есть заполненные документы, не удаляются, а отключаются
+         (disabled).
+
+         Норматив действует с dbeg по dend (не включая); dend пуст - текущая запись. Для вагона берётся действующий
+         норматив его типа вагона (wagon_type), если его нет - общий (wagon_type пуст). Нет ни того ни другого - пункт
+         к типу вагона не относится и не показывается. -->
+
+    <!-- ===== Чек-листы ===== -->
+
+    <!-- справочник готовых ответов чек-листа: "Да / Нет", "В порядке / Нарушение" и т. п. -->
+    <changeSet id="04-check-tables-check_dict" author="zhsr">
+        <createTable tableName="check_dict">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text_ru" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="text_kk" type="varchar(255)"/>
+            <column name="text_en" type="varchar(255)"/>
+            <column name="sort_order" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="disabled" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- значение справочника готовых ответов: "Да", "Нет" и т. п.; нарушение ли это значение - решает норматив пункта -->
+    <changeSet id="04-check-tables-check_dict_value" author="zhsr">
+        <createTable tableName="check_dict_value">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="check_dict" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="text_ru" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="text_kk" type="varchar(255)"/>
+            <column name="text_en" type="varchar(255)"/>
+            <column name="sort_order" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="disabled" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- шаблон чек-листа: приёмка вагона, медосмотр, инструктаж и т. п. -->
+    <changeSet id="04-check-tables-check_list_template" author="zhsr">
+        <createTable tableName="check_list_template">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text_ru" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="text_kk" type="varchar(255)"/>
+            <column name="text_en" type="varchar(255)"/>
+            <column name="sort_order" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="disabled" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- пункт шаблона чек-листа; parent_item - раздел, в который входит пункт, пусто - пункт верхнего уровня;
+         value_kind - вид значения пункта: константы CheckValueKind в коде (1 - строка, 2 - число, 3 - значение
+         справочника check_dict); пусто - раздел: значения у него нет, в нём лежат другие пункты -->
+    <changeSet id="04-check-tables-check_list_template_item" author="zhsr">
+        <createTable tableName="check_list_template_item">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="check_list_template" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="parent_item" type="bigint"/>
+            <column name="text_ru" type="varchar(500)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="text_kk" type="varchar(500)"/>
+            <column name="text_en" type="varchar(500)"/>
+            <column name="value_kind" type="integer"/>
+            <column name="check_dict" type="bigint"/>
+            <column name="sort_order" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="disabled" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- норматив пункта чек-листа: какое значение - нарушение; пункт без норматива нарушения не даёт;
+         fault_type - неисправность заявки по нарушению, пусто - нарушение без заявки;
+         critical - нарушение блокирует отправку вагона в рейс;
+         required - пункт обязателен к заполнению;
+         num_min, num_max - допустимые границы числа (value_kind = 2), включительно; пусто - без границы;
+         для значения справочника (value_kind = 3) допустимые значения - check_list_item_norm_value -->
+    <changeSet id="04-check-tables-check_list_item_norm" author="zhsr">
+        <createTable tableName="check_list_item_norm">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="check_list_template_item" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="wagon_type" type="bigint"/>
+            <column name="required" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="num_min" type="numeric(12,3)"/>
+            <column name="num_max" type="numeric(12,3)"/>
+            <column name="critical" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="fault_type" type="bigint"/>
+            <column name="dbeg" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dend" type="timestamptz"/>
+        </createTable>
+    </changeSet>
+
+    <!-- допустимое значение справочника по нормативу; любое другое значение - нарушение -->
+    <changeSet id="04-check-tables-check_list_item_norm_value" author="zhsr">
+        <createTable tableName="check_list_item_norm_value">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="check_list_item_norm" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="check_dict_value" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- заполненный чек-лист; что проверяли: вагон (wagon), рейс (trip), сотрудник (checked_usr) - медосмотр,
+         инструктаж; created_by_usr - кто проводил проверку; completed_dt - когда проверка завершена,
+         пусто - черновик -->
+    <changeSet id="04-check-tables-check_list" author="zhsr">
+        <createTable tableName="check_list">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="check_list_template" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="wagon" type="bigint"/>
+            <column name="trip" type="bigint"/>
+            <column name="checked_usr" type="bigint"/>
+            <column name="created_by_usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="completed_dt" type="timestamptz"/>
+        </createTable>
+    </changeSet>
+
+    <!-- значение пункта заполненного чек-листа: заполняется одно из value_string, value_number, check_dict_value - по
+         виду значения пункта; comment - описание нарушения;
+         check_list_item_norm - норматив, по которому проверено значение, пусто - норматива нет;
+         violation - значение нарушает норматив; repair_request - заявка, созданная по нарушению -->
+    <changeSet id="04-check-tables-check_list_value" author="zhsr">
+        <createTable tableName="check_list_value">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="check_list" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="check_list_template_item" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="value_string" type="text"/>
+            <column name="value_number" type="numeric(12,3)"/>
+            <column name="check_dict_value" type="bigint"/>
+            <column name="comment" type="text"/>
+            <column name="check_list_item_norm" type="bigint"/>
+            <column name="violation" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="repair_request" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ===== Экипировка ===== -->
+
+    <!-- шаблон описи экипировки: экипировка по Приказу №545, опись имущества вагона и т. п.;
+         fault_type - неисправность заявки по недостаче: одна заявка на всю опись, пусто - опись без заявки -->
+    <changeSet id="04-check-tables-equip_list_template" author="zhsr">
+        <createTable tableName="equip_list_template">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="text_ru" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="text_kk" type="varchar(255)"/>
+            <column name="text_en" type="varchar(255)"/>
+            <column name="fault_type" type="bigint"/>
+            <column name="sort_order" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="disabled" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- пункт шаблона описи экипировки: позиция имущества или раздел; parent_item - раздел, в который входит пункт,
+         пусто - пункт верхнего уровня; unit - единица измерения (шт, г, комплект), пусто - раздел -->
+    <changeSet id="04-check-tables-equip_list_template_item" author="zhsr">
+        <createTable tableName="equip_list_template_item">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="equip_list_template" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="parent_item" type="bigint"/>
+            <column name="text_ru" type="varchar(500)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="text_kk" type="varchar(500)"/>
+            <column name="text_en" type="varchar(500)"/>
+            <column name="unit" type="varchar(20)"/>
+            <column name="sort_order" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="disabled" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- норматив пункта описи экипировки; требуется = quantity_per_basis * база + head_tail_extra (для головного и хвостового вагона);
+         basis - база расчёта: константы EquipBasis в коде (1 - вагон, 2 - место, 3 - купе, 4 - окно); число мест,
+         купе, окон - у модели вагона (model_type);
+         quantity_kind - как сравнивать: константы EquipQuantityKind в коде (1 - ровно, 2 - не менее);
+         norm_text - норма текстом, как в приказе; critical - недостача блокирует отправку вагона в рейс;
+         пункт без норматива (опись имущества) сравнивается с прошлой описью вагона -->
+    <changeSet id="04-check-tables-equip_list_item_norm" author="zhsr">
+        <createTable tableName="equip_list_item_norm">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="equip_list_template_item" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="wagon_type" type="bigint"/>
+            <column name="quantity_per_basis" type="numeric(12,3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="basis" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quantity_kind" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="head_tail_extra" type="numeric(12,3)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="norm_text" type="varchar(200)"/>
+            <column name="critical" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dbeg" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dend" type="timestamptz"/>
+        </createTable>
+    </changeSet>
+
+    <!-- заполненная опись экипировки вагона: текущий факт - что лежит в вагоне; created_by_usr - кто составил опись;
+         completed_dt - когда опись завершена, пусто - черновик; repair_request - заявка по недостаче -->
+    <changeSet id="04-check-tables-equip_list" author="zhsr">
+        <createTable tableName="equip_list">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="equip_list_template" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="wagon" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="trip" type="bigint"/>
+            <column name="created_by_usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="completed_dt" type="timestamptz"/>
+            <column name="repair_request" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+    <!-- значение пункта описи: quantity_actual - фактически в вагоне; quantity_required - требуется по нормативу на момент описи,
+         пусто - норматива нет; equip_list_item_norm - норматив, по которому посчитано требуемое количество;
+         violation - фактическое количество нарушает норматив -->
+    <changeSet id="04-check-tables-equip_list_value" author="zhsr">
+        <createTable tableName="equip_list_value">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="equip_list" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="equip_list_template_item" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quantity_actual" type="numeric(12,3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quantity_required" type="numeric(12,3)"/>
+            <column name="equip_list_item_norm" type="bigint"/>
+            <column name="violation" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

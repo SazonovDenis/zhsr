@@ -103,8 +103,8 @@
             <column name="code" type="varchar(20)">
                 <constraints nullable="false"/>
             </column>
-            <!-- название: name - на русском, name_kk - на казахском, name_en - на английском -->
-            <column name="name" type="varchar(255)">
+            <!-- название: name_ru - на русском, name_kk - на казахском, name_en - на английском -->
+            <column name="name_ru" type="varchar(255)">
                 <constraints nullable="false"/>
             </column>
             <column name="name_kk" type="varchar(255)"/>
@@ -278,6 +278,11 @@
             <column name="code" type="varchar(20)">
                 <constraints nullable="false"/>
             </column>
+            <!-- число мест, купе и окон вагона этой модели: базы расчёта норм экипировки (equip_list_item_norm.basis);
+                 пусто - не задано -->
+            <column name="seats" type="integer"/>
+            <column name="compartments" type="integer"/>
+            <column name="windows" type="integer"/>
         </createTable>
     </changeSet>
 

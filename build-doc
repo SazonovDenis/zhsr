@@ -17,4 +17,6 @@ done
 
 "$DOC_DB/import-struct" --liquibase zhsr-database/src/main/resources/db/changelog/db.changelog-master.xml \
     -o doc/db-doc/db-struct.yaml
+# константы Java-классов из constants_from в db-desc.yaml -> db-consts.yaml: перечисления значений колонок
+"$DOC_DB/import-consts" --doc doc/db-doc
 "$BUILD_DOC/build-doc" --db doc/db-doc --func-page tz.functions
