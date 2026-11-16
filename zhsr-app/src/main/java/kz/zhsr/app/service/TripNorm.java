@@ -22,8 +22,8 @@ final class TripNorm {
      * @return номера пассажирских вагонов, у которых норма не выполнена, по порядку состава
      */
     static List<String> notOk(List<TripCrew.Wagon> composition, List<TripCrew.Member> crew) {
-        // отцепленные вагоны в составе не едут
-        List<TripCrew.Wagon> wagons = composition.stream().filter(w -> !w.isDetached()).toList();
+        // норма - по вагонам, которые едут в поезде
+        List<TripCrew.Wagon> wagons = composition.stream().filter(TripCrew.Wagon::isRiding).toList();
         List<String> order = wagons.stream().map(TripCrew.Wagon::getNumber).toList();
         List<TripCrew.Member> conductors = crew.stream().filter(m -> m.getCrewDutyType() == CrewDuty.CONDUCTOR).toList();
 

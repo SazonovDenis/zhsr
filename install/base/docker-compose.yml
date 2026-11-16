@@ -1,0 +1,101 @@
+# zhsr на сервере: БД, хранилище файлов, миграции, сервер, nginx. Образы приложения - sazonovden/zhsr-*:latest.
+# Память рассчитана на 2 ГБ (t4g.small) со swap 2 ГБ (setup.sh); на машине больше - поднять mem_limit и JAVA_OPTS.
+# Параметры - .env рядом.
+
+name: zhsr
+
+services:
+
+  zhsr-db:
+    image: postgres:15-alpine
+    container_name: zhsr-db
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      POSTGRES_USER: ${DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD}
+      POSTGRES_DB: postgres
+    command: postgres -c shared_buffers=128MB -c max_connections=40
+    volumes:
+      - zhsr_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U ${DB_ADMIN_USER} -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  # Хранилище файлов (фото заявок), S3-совместимое; наружу не открыто
+  zhsr-s3:
+    image: pgsty/silo:latest
+    container_name: zhsr-s3
+    restart: unless-stopped
+    mem_limit: 256m
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+      MINIO_DOMAIN: ""
+      GOMEMLIMIT: "192MiB"
+      MINIO_API_REQUESTS_MAX: "16"
+    command: server /data --compat
+    volumes:
+      - zhsr_s3_data:/data
+
+  # Миграции структуры БД: при каждом запуске применяет новые и завершается; пересоздание БД - ./app-reset
+  zhsr-database:
+    image: sazonovden/zhsr-database:latest
+    container_name: zhsr-database
+    restart: "no"
+    mem_limit: 384m
+    depends_on:
+      zhsr-db:
+        condition: service_healthy
+    volumes:
+      - ./.env:/app/.env:ro
+
+  # Пересоздание БД с демо-данными - только по команде ./app-reset --demo, с остальными не запускается
+  zhsr-database-demo:
+    image: sazonovden/zhsr-database-demo:latest
+    profiles: [ "demo" ]
+    mem_limit: 384m
+    depends_on:
+      zhsr-db:
+        condition: service_healthy
+    volumes:
+      - ./.env:/app/.env:ro
+
+  zhsr-app:
+    image: sazonovden/zhsr-app:latest
+    container_name: zhsr-app
+    restart: unless-stopped
+    mem_limit: 640m
+    environment:
+      - JAVA_OPTS=-Xms128m -Xmx384m
+    depends_on:
+      zhsr-database:
+        condition: service_completed_successfully
+      zhsr-s3:
+        condition: service_started
+    volumes:
+      - ./.env:/app/.env:ro
+
+  zhsr-nginx:
+    image: sazonovden/zhsr-nginx:latest
+    container_name: zhsr-nginx
+    restart: unless-stopped
+    mem_limit: 64m
+    depends_on:
+      - zhsr-app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # свой сертификат: server.crt, server.key (кладёт ./ssl-letsencrypt); нет - самоподписанный
+      - ./ssl:/etc/nginx/ssl-host:ro
+      # проверка Let's Encrypt (certbot --webroot -w ./acme)
+      - ./acme:/var/www/acme:ro
+
+volumes:
+  zhsr_db_data:
+    name: zhsr_db_data
+  zhsr_s3_data:
+    name: zhsr_s3_data

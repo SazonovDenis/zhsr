@@ -37,8 +37,8 @@ public class Visibility {
          */
         OWN_TRIP,
         /**
-         * Только вагоны, за которыми сотрудник закреплён в текущем рейсе, сам рейс и его маршрут;
-         * рейса нет или вагон не закреплён - ничего.
+         * Текущий рейс сотрудника, если за ним закреплён вагон в этом рейсе: рейс, его маршрут и все вагоны его
+         * состава; рейса нет или вагон не закреплён - ничего. Свои вагоны выбирает фронт по данным сотрудника.
          */
         OWN_WAGON
     }
@@ -121,7 +121,8 @@ public class Visibility {
                 trips.add(user.otherTrip().id());
             }
         }
-        return new Access(byDepot, byDepot ? depot : null, tripId, ownTrip && tripId != null, wagons, trips);
+        // проводник видит весь состав своего рейса, как ЛНП
+        return new Access(byDepot, byDepot ? depot : null, tripId, tripId != null, wagons, trips);
     }
 
 }

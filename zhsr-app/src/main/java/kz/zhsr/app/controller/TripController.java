@@ -20,7 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * Рейс: создание, правка, отмена, формирование, отправление, прибытие, отцепка и прицепка; список рейсов - в
+ * Рейс: создание, правка, отмена, бригада, отправление, прибытие, прицепка и отцепка в рейсе; вагоны поезда - в
+ * {@link TrainController}; список рейсов - в
  * {@link ListController}.
  */
 @RestController
@@ -50,7 +51,7 @@ public class TripController {
     }
 
     @GetMapping("/trips/{id}/coupling-wagons")
-    public List<CouplingWagon> couplingWagons(@PathVariable long id, @RequestParam long type,
+    public List<CouplingWagon> couplingWagons(@PathVariable long id, @RequestParam int type,
                                               @RequestParam(required = false) Long station) throws Exception {
         return couplingService.wagons(id, type, station);
     }
@@ -93,11 +94,6 @@ public class TripController {
         return tripService.setDuty(id, duty, body);
     }
 
-    @PutMapping("/trips/{id}/wagons")
-    public TripCrew setWagons(@PathVariable long id, @RequestBody List<String> wagons) throws Exception {
-        return tripService.setWagons(id, wagons);
-    }
-
     @PostMapping("/trips/{id}/depart")
     public TripCrew depart(@PathVariable long id, @RequestBody TripService.MarkBody body) throws Exception {
         return tripService.depart(id, body);
@@ -106,6 +102,12 @@ public class TripController {
     @PostMapping("/trips/{id}/arrive")
     public TripCrew arrive(@PathVariable long id, @RequestBody TripService.MarkBody body) throws Exception {
         return tripService.arrive(id, body);
+    }
+
+    @PostMapping("/trips/{id}/responsible")
+    public TripCrew assignResponsible(@PathVariable long id, @RequestBody TripService.ResponsibleBody body)
+            throws Exception {
+        return tripService.assignResponsible(id, body);
     }
 
     @PutMapping("/trips/{id}/depart")

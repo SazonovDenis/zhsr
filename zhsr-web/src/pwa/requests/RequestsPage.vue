@@ -1,30 +1,21 @@
 <template>
   <PwaPage ref="page" :stale="stale">
-    <div class="requests__pills">
-      <button
-        v-for="s in scopes"
-        :key="s.id"
-        type="button"
-        class="requests__pill q-py-none q-px-md"
-        :class="{ 'requests__pill--on': scope === s.id }"
-        :disabled="mode === 'unsent'"
-        @click="scope = s.id"
-      >
-        {{ t(s.text) }}
-      </button>
-    </div>
-    <div class="requests__pills">
-      <button
-        v-for="m in modes"
-        :key="m.id"
-        type="button"
-        class="requests__pill q-py-none q-px-md"
-        :class="{ 'requests__pill--on': mode === m.id }"
-        @click="mode = m.id"
-      >
-        {{ t(m.text) }}
-      </button>
-    </div>
+    <CbSegment
+      :model-value="scope"
+      single
+      required
+      :values="scopes.map((x) => ({ ...x, disabled: mode === 'unsent' }))"
+      :max-button-count="3"
+      @update:model-value="scope = $event as RequestScope"
+    />
+    <CbSegment
+      :model-value="mode"
+      single
+      required
+      :values="modes"
+      :max-button-count="3"
+      @update:model-value="mode = $event as RequestsMode"
+    />
 
     <ErrorBox v-if="error" :error="error" :retry="load" class="requests__error q-py-sm q-px-md" />
     <LoadSpinner v-if="busy.active.value" />
@@ -50,6 +41,7 @@ import { t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
 import { dictManager } from '@/shared/dict/DictManager'
 import { provideBusy } from '@/shared/busy'
+import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import type { ShownError } from '@/shared/errors'
@@ -177,7 +169,10 @@ async function load() {
   try {
     // заявки и справочник неисправностей для строк — параллельно
     const [, result] = await busy.run(
-      Promise.all([dictManager.prepareDict('FaultType'), mode.value === 'unsent' ? loadUnsent() : loadList()]),
+      Promise.all([
+        dictManager.prepareDicts('FaultType', 'WagonType'),
+        mode.value === 'unsent' ? loadUnsent() : loadList(),
+      ]),
     )
     if (my !== seq) return
     requests.value = result.data
@@ -223,36 +218,6 @@ void load().then(async () => {
 </script>
 
 <style scoped lang="scss">
-.requests__pills {
-  display: flex;
-  gap: 0.5rem;
-  overflow-x: auto;
-}
-
-.requests__pill {
-  flex: none;
-  height: 2.5rem;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 62.5rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.5;
-  }
-
-  &--on {
-    border-color: $primary;
-    background: $primary;
-    color: #fff;
-  }
-}
-
 .requests__fab {
   display: flex;
   align-items: center;

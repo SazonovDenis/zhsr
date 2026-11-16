@@ -80,6 +80,11 @@ export async function logout(): Promise<void> {
 }
 
 /** Текущий пользователь: роли, депо, текущий рейс; и контекст сервера: идентификатор БД, версии справочников. */
+/** БД сервера загружена с демо-данными (db_info.demo): страница входа показывает быстрый вход. Доступно без входа. */
+export async function fetchDemo(): Promise<boolean> {
+  return (await http.get<boolean>('/session/demo')).data
+}
+
 export async function fetchCurrentUser(): Promise<CurrentUser> {
   return (await http.get<CurrentUser>('/getUserInfo')).data
 }

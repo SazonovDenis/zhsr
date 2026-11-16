@@ -24,10 +24,13 @@ export const menuState = reactive({
   userCollapsed: null as boolean | null,
   panelNeedsSpace: false,
   openGroup: null as string | null,
+  /** раскрытая подгруппа администрирования; null — все свёрнуты; раскрыта всегда одна */
+  openSubGroup: null as string | null,
 })
 
 // выход: раскрытые группы и выбор свернуть меню — не для следующего пользователя
 onSessionReset(() => {
   menuState.userCollapsed = null
   menuState.openGroup = null
+  menuState.openSubGroup = null
 })

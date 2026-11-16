@@ -6,17 +6,24 @@
         <slot />
       </div>
       <div class="calendar-dialog__buttons">
-        <button type="button" class="calendar-dialog__btn q-py-none q-px-md" @click="show = false">
-          {{ t('Отмена') }}
-        </button>
-        <button
-          type="button"
-          class="calendar-dialog__btn calendar-dialog__btn--primary q-py-none q-px-md"
-          :disabled="!model || running"
+        <q-btn
+          unelevated
+          outline
+          no-caps
+          color="ink"
+          class="calendar-dialog__btn zs-pwa-btn zs-pwa-btn--lg zs-soft-border"
+          :label="t('Отмена')"
+          @click="show = false"
+        />
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          class="calendar-dialog__btn zs-pwa-btn zs-pwa-btn--lg"
+          :disable="!model || running"
+          :label="t(okText)"
           @click="emit('confirm')"
-        >
-          {{ t(okText) }}
-        </button>
+        />
       </div>
     </div>
   </q-dialog>
@@ -86,30 +93,13 @@ onBeforeUnmount(() => dialogHistory.forget(historyEntry))
   display: flex;
   flex: none;
   gap: 0.6rem;
-  padding: 0.8rem 0.5rem calc(0.8rem + env(safe-area-inset-bottom));
+  // отступ вокруг кнопок одинаковый со всех сторон; снизу — ещё и вырез экрана (safe-area)
+  padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom));
   border-top: 0.0625rem solid $zs-border;
 }
 
+// кнопки — q-btn размера zs-pwa-btn--lg; здесь только раскладка в ряду
 .calendar-dialog__btn {
   flex: 1;
-  min-height: 3.3rem;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.4rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-
-  &--primary {
-    border: 0;
-    background: $primary;
-    color: #fff;
-  }
-
-  &:disabled {
-    opacity: 0.4;
-  }
 }
 </style>

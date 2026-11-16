@@ -1,6 +1,11 @@
 <template>
   <!-- крестики сброса Tab пропускает: с клавиатуры значение стирают в самом поле -->
-  <div ref="rootEl" class="cb-list" :class="{ 'cb-list--no-search': noSearch }" @focusout="onFocusOut">
+  <div
+    ref="rootEl"
+    class="cb-list"
+    :class="{ 'cb-list--no-search': noSearch, 'cb-list--disabled': disabled }"
+    @focusout="onFocusOut"
+  >
     <!-- поле отображения; mousedown мимо поля ввода не забирает у него фокус — иначе список закрылся бы -->
     <div
       class="cb-list__field q-py-none q-px-sm"
@@ -26,15 +31,17 @@
           :class="{ 'cb-list__input--behind': valueShown }"
           :value="isOpen ? query : singleDisplay"
           :placeholder="placeholderText"
+          :disabled="disabled"
           @input="onSingleInput"
           @keydown="onKeydown"
         />
-        <!-- место под крестик есть всегда: появляясь и исчезая, он не меняет ширину поля -->
+        <!-- место под крестик есть всегда: появляясь и исчезая, он не меняет ширину поля; noClear — крестика нет -->
         <button
+          v-if="!noClear"
           type="button"
           tabindex="-1"
           class="cb-list__clear q-pa-none"
-          :class="{ 'cb-list__clear--hidden': !(selected.length > 0 && !isDisabled(selected[0])) }"
+          :class="{ 'cb-list__clear--hidden': disabled || !(selected.length > 0 && !isDisabled(selected[0])) }"
           :title="t('Очистить')"
           @click.stop="clearAll"
         >
@@ -174,10 +181,16 @@ import { displayOf, effectiveOf, isDisabled, labelOf, modelIds, modelOf, nextEna
  * Открытие и закрытие: фокус в поле (например, по Tab) список не открывает. Его открывают клик по полю, начало ввода
  * и стрелка вниз. Фокус ушёл из поля и списка — список закрывается.
  *
+ * disabled: поле недоступно — показано бледным, список не открывается.
+ *
+ * noClear (single): крестика сброса в поле нет — значение только выбирают другое, не стирают крестиком.
+ *
+ * focus() — поставить фокус в поле ввода, например после выбора, от которого зависят варианты.
+ *
  * noSearch: искать нельзя, поля ввода нет ни в поле, ни в списке. Выбранное показывается обычным текстом без рамки.
  *
  * На маленьком экране в single при выбранном значении стрелка не показывается: место занимает крестик сброса, а
- * список открывается кликом по полю.
+ * список открывается кликом по полю. С noClear стрелка видна всегда.
  *
  * allowCustom: разрешает значения, которых нет в values. Текст из строки поиска превращается в значения
  * (customParse) и добавляется по Enter или клику на «Добавить». Такие значения хранятся как
@@ -189,6 +202,8 @@ import { displayOf, effectiveOf, isDisabled, labelOf, modelIds, modelOf, nextEna
  * Сложный вид строки собирается в предметном компоненте поверх CbList (пример — RouteOption), сам CbList про
  * предметную область не знает.
  * Событие open — список открывается: значения, которые зависят от обстоятельств, можно загрузить в этот момент.
+ * Событие search — изменился текст поиска: варианты, которые ищет сервер, владелец загружает по нему; CbList по-прежнему
+ * отбирает из values строки, подходящие к тексту.
  */
 const props = withDefaults(
   defineProps<{
@@ -210,6 +225,10 @@ const props = withDefaults(
      * загрузка заново (source.retry); null — варианты уже есть
      */
     source?: Loadable | null
+    /** поле недоступно: список не открывается, значение не меняется; причину вызывающий показывает в title */
+    disabled?: boolean
+    /** single: без крестика сброса в поле */
+    noClear?: boolean
   }>(),
   {
     single: false,
@@ -222,6 +241,8 @@ const props = withDefaults(
     customPlaceholder: '',
     noSearch: false,
     source: null,
+    disabled: false,
+    noClear: false,
   },
 )
 
@@ -230,6 +251,8 @@ const emit = defineEmits<{
   change: [values: unknown[]]
   /** список открывается */
   open: []
+  /** изменился текст поиска: варианты, которые ищет сервер, можно загрузить по нему */
+  search: [text: string]
 }>()
 
 const slots = defineSlots<{
@@ -290,7 +313,7 @@ const showSearch = computed(() => {
  * сброса, и две кнопки подряд не помещаются. Список открывается кликом по полю.
  */
 const showArrow = computed(() => {
-  if (!props.single || screenScale() > 0) return true
+  if (!props.single || props.noClear || screenScale() > 0) return true
   return selected.value.length === 0
 })
 
@@ -314,7 +337,10 @@ const customCandidates = computed(() => {
 
 watch(() => props.modelValue, syncSelected, { immediate: true })
 watch(() => props.values, syncSelected)
-watch(query, () => (highlighted.value = -1))
+watch(query, (text) => {
+  highlighted.value = -1
+  emit('search', text ?? '')
+})
 
 // --- синхронизация с modelValue ---
 
@@ -490,6 +516,7 @@ function dialogDropdownHost(dialog: HTMLElement): HTMLElement {
 }
 
 function openDropdown() {
+  if (props.disabled) return
   const dialog = rootEl.value?.closest<HTMLElement>('.q-dialog')
   dropdownHost.value = dialog ? dialogDropdownHost(dialog) : 'body'
   isOpen.value = true
@@ -529,14 +556,32 @@ function calcDropdownStyle() {
   const vertical = openBelow
     ? { top: `${rect.bottom}px`, maxHeight: `${spaceBelow - gap}px` }
     : { top: 'auto', bottom: `${window.innerHeight - rect.top}px`, maxHeight: `${spaceAbove - gap}px` }
-  const horizontal =
-    window.innerWidth - rect.left >= 12.5 * rem
-      ? { left: `${rect.left}px` }
-      : { left: 'auto', right: `${window.innerWidth - rect.right}px` }
+  // список не шире окна; слева — от поля, сдвиг внутрь окна — после замера ширины списка
+  const maxWidth = window.innerWidth - 2 * gap
 
   // положение считается от измеренного поля, поэтому в пикселях
-  dropdownStyle.value = { position: 'fixed', minWidth: `${rect.width}px`, ...vertical, ...horizontal }
+  dropdownStyle.value = {
+    position: 'fixed',
+    minWidth: `${Math.min(rect.width, maxWidth)}px`,
+    maxWidth: `${maxWidth}px`,
+    left: `${rect.left}px`,
+    ...vertical,
+  }
+  void nextTick(() => fitHorizontally(rect.left, gap))
 }
+
+/** Список не помещается в окно справа или слева — сдвигается внутрь окна на нужное расстояние. */
+function fitHorizontally(left: number, gap: number) {
+  const el = dropdownEl.value
+  if (!el) return
+  const x = Math.max(gap, Math.min(left, window.innerWidth - gap - el.offsetWidth))
+  if (x !== left) dropdownStyle.value = { ...dropdownStyle.value, left: `${x}px` }
+}
+
+// варианты пришли или сменились при открытом списке — ширина списка другая: положение пересчитывается
+watch(options, () => {
+  if (isOpen.value) void nextTick(calcDropdownStyle)
+})
 
 // --- выбор ---
 
@@ -547,6 +592,9 @@ function onOptionClick(item: ChoiceItem | undefined) {
     selected.value = [item]
     emitChange()
     closeDropdown()
+    // мобильный режим — свойство самого списка, у любого CbList: после выбора фокус уходит из поля — иначе поле
+    // остаётся подсвеченным и держит экранную клавиатуру
+    if (isMobile.value) blurInside()
   } else if (isSelected(item)) {
     selected.value = selected.value.filter((s) => s.id !== item.id)
     emitChange()
@@ -556,11 +604,27 @@ function onOptionClick(item: ChoiceItem | undefined) {
   }
 }
 
+/** Снять фокус, если он в поле или в выпадающем списке; поле ввода — в любом случае. */
+function blurInside() {
+  singleInput.value?.blur()
+  const el = document.activeElement
+  if (el instanceof HTMLElement && (rootEl.value?.contains(el) || dropdownEl.value?.contains(el))) el.blur()
+}
+
 function removeItem(item: ChoiceItem) {
   if (isDisabled(item)) return
   selected.value = selected.value.filter((s) => s.id !== item.id)
   emitChange()
 }
+
+/** Поставить фокус в поле ввода: список при этом не открывается. Недоступное поле фокус не получает. */
+function focus() {
+  if (props.disabled) return
+  if (props.single) singleInput.value?.focus()
+  else multiInput.value?.focus()
+}
+
+defineExpose({ focus })
 
 // недоступное значение снять нельзя, поэтому «очистить» оставляет именно его
 function clearAll() {
@@ -687,7 +751,7 @@ onBeforeUnmount(() => {
   border: 0.0625rem solid $zs-border-input;
   border-radius: 0.3rem;
   background: #fff;
-  font-size: 0.9rem;
+  font-size: var(--zs-control-font-size);
   cursor: pointer;
 
   // фокус в поле виден и при закрытом списке: под слотом value курсора ввода нет
@@ -695,6 +759,15 @@ onBeforeUnmount(() => {
   .cb-list:not(.cb-list--no-search) &:focus-within {
     border-color: $primary;
     box-shadow: 0 0 0 0.0625rem $primary;
+  }
+}
+
+.cb-list--disabled .cb-list__field {
+  opacity: 0.45;
+  cursor: default;
+
+  input {
+    cursor: default;
   }
 }
 
@@ -799,6 +872,13 @@ onBeforeUnmount(() => {
     background: $zs-border-row;
     color: $zs-text-muted;
   }
+}
+
+// крестик сброса в самом поле (single) — размера из переменных; у чипов он остаётся маленьким
+.cb-list__field > .cb-list__clear {
+  width: var(--zs-clear-size);
+  height: var(--zs-clear-size);
+  font-size: var(--zs-clear-font-size);
 }
 
 .cb-list__clear--hidden {

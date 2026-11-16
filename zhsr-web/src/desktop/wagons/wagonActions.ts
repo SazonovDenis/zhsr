@@ -3,6 +3,7 @@ import { t } from '@/boot/i18n'
 import { LocationType, RoleType } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
 import { roleReason } from '@/shared/roleReason'
+import { currentUser, hasRole } from '@/shared/user'
 import { placeCode, placeKind, placeStation, stationPlaceList, wagonTransferPlace } from '@/shared/transferPlace'
 
 /**
@@ -72,4 +73,24 @@ export function wagonTransfers(w: WagonRow): WagonTransfer[] {
 /** Почему нельзя ввести вагон (Ф-ВАГ-01): вводит администратор; пусто — можно. */
 export function addWagonReason(): string {
   return roleReason([], 'Вводит администратор')
+}
+
+/** Станция вагона: сама станция, станция депо или парка отстоя; вагон в рейсе или станция не задана — null. */
+export function wagonStation(w: WagonRow): number | null {
+  const place = wagonTransferPlace(w.locationType, w.place)
+  return place ? placeStation(place) : null
+}
+
+/**
+ * Почему нельзя сменить ответственного за вагон без акта (Ф-ВАГ-07); пусто — можно. Меняет мастер депо станции вагона;
+ * администратор может всё. Вагон в рейсе и вагон, ждущий приёма по акту, — нельзя.
+ */
+export function changeResponsibleReason(w: WagonRow): string {
+  if (w.locationType === LocationType.TRIP) return t('Вагон в рейсе')
+  if (w.pendingTransfer) return t('Вагон ждёт приёма по акту — ответственного выбирают в акте')
+  const u = currentUser.value
+  if (hasRole(u, RoleType.ADMIN)) return ''
+  const station = wagonStation(w)
+  if (hasRole(u, RoleType.MASTER) && station !== null && station === u?.depotStation) return ''
+  return t('Меняет мастер депо станции вагона')
 }

@@ -1,10 +1,11 @@
 <template>
   <div class="text-photos">
-    <div class="text-photos__text" :class="{ 'text-photos__text--open': canOpen }" @click="open">
+    <div v-if="hasText" class="text-photos__text" :class="{ 'text-photos__text--open': canOpen }" @click="open">
       <slot />
     </div>
-    <div v-if="all.length > 0" class="text-photos__photos">
-      <PhotoStrip v-if="photos.length > 0" :photos="photos" :all="all" :caption="caption" small vertical />
+    <!-- без текста фото — в ряд во всю ширину, прижаты вправо; с текстом — столбиком справа -->
+    <div v-if="all.length > 0" class="text-photos__photos" :class="{ 'text-photos__photos--row': !hasText }">
+      <PhotoStrip v-if="photos.length > 0" :photos="photos" :all="all" :caption="caption" small :vertical="hasText" />
       <slot name="photos" :all="all" :caption="caption" />
     </div>
   </div>
@@ -23,11 +24,16 @@ import type { PhotoCaption } from './requestView'
  * Текст и фото одной записью: текст (слот default) слева, миниатюры столбиком справа. Так показываются описание заявки,
  * примечания и фото в истории, в том числе ожидающие отправки. photos — фото на сервере; pending — ожидающие отправки,
  * они выводятся в слоте photos. Нажатие на текст или миниатюру открывает просмотр: листаются все фото записи, поверх
- * фото — caption.
+ * фото — caption. hasText — есть ли текст; нет — миниатюры в ряд во всю ширину записи, прижаты вправо.
  */
 const props = withDefaults(
-  defineProps<{ photos?: RequestPhoto[]; pending?: RequestPhoto[]; caption?: PhotoCaption | null }>(),
-  { photos: () => [], pending: () => [], caption: null },
+  defineProps<{
+    photos?: RequestPhoto[]
+    pending?: RequestPhoto[]
+    caption?: PhotoCaption | null
+    hasText?: boolean
+  }>(),
+  { photos: () => [], pending: () => [], caption: null, hasText: true },
 )
 
 const all = computed(() => [...props.photos, ...props.pending])
@@ -60,5 +66,19 @@ function open() {
   flex-direction: column;
   align-items: flex-end;
   gap: 0.5rem;
+
+  // без текста: ряд во всю ширину, миниатюры прижаты вправо
+  &--row {
+    flex: 1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: flex-start;
+
+    // перенесённые строки миниатюр — тоже справа
+    :deep(.photo-strip) {
+      justify-content: flex-end;
+    }
+  }
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
   <div ref="frameEl" class="desktop-frame">
     <div class="desktop-frame__content q-pt-sm q-px-md q-pb-md">
-      <header class="desktop-frame__header q-mb-md">
+      <header class="desktop-frame__header q-mb-sm">
         <button v-if="back" type="button" class="desktop-frame__back q-pa-none" :title="t('Назад')" @click="back">
           <SvgIcon name="arrow-back" size="1.1rem" />
         </button>
@@ -158,28 +158,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   }
 }
 
+// «Назад» — как крестик закрытия диалога (DialogHeader): серая кнопка без рамки
 .desktop-frame__back {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 1.9rem;
+  height: 1.9rem;
   // до заголовка — 0.8rem, а не общий промежуток шапки
   margin-right: -0.3rem;
-  border: 0.0625rem solid $zs-border-input;
+  border: 0;
   border-radius: 0.3rem;
-  background: #fff;
-  color: $zs-text;
+  background: $zs-bg-button-soft;
   cursor: pointer;
-
-  &:hover {
-    background: $zs-bg-button-soft;
-  }
 }
 
 .desktop-frame__header :deep(.desktop-frame__title),
 .desktop-frame__title {
+  // заголовок в слоте header — h1 страницы: отступы сверху и снизу вдвое меньше браузерных (0.67em ≈ 1rem)
+  margin: 0.5rem 0;
   font-size: 1.5rem;
   font-weight: 700;
   line-height: 1.3;

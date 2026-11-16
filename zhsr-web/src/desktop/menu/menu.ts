@@ -25,9 +25,19 @@ export interface MenuGroup extends MenuItem {
   items: MenuItem[]
 }
 
+/** Группа администрирования: пункты и подгруппы пунктов (раскрыта всегда одна подгруппа). */
+export interface AdminMenu extends MenuItem {
+  items: (MenuItem | MenuGroup)[]
+}
+
 export interface Menu {
   items: MenuItem[]
-  admin: MenuGroup
+  admin: AdminMenu
+}
+
+/** Подгруппа ли пункт администрирования. */
+export function isMenuGroup(item: MenuItem | MenuGroup): item is MenuGroup {
+  return 'items' in item
 }
 
 export const menu = menuJson as Menu
@@ -39,5 +49,5 @@ export function menuEvent(item: MenuItem): `menu-${string}` {
 
 /** Все пункты меню, включая пункты групп. */
 export function allMenuItems(): MenuItem[] {
-  return [...menu.items, ...menu.admin.items]
+  return [...menu.items, ...menu.admin.items.flatMap((item) => (isMenuGroup(item) ? item.items : [item]))]
 }

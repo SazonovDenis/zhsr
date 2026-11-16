@@ -90,36 +90,59 @@ public class RequestRights {
      * @throws ApiException 403 - не может
      */
     public void checkAssign(CurrentUser user, RequestRow r) {
-        if (FINAL_STATUSES.contains(r.getRequestStatusType()) || !(isMyMaster(user, r) || isAdmin(user))) {
-            throw ApiException.forbidden("Назначить исполнителя может мастер депо станции вагона");
+        if (FINAL_STATUSES.contains(r.getRequestStatusType())
+            || !(isMyMaster(user, r) || isMyLnp(user, r) || isAdmin(user))) {
+            throw ApiException.forbidden("Назначить исполнителя может мастер депо станции вагона и ЛНП рейса вагона");
         }
     }
 
     /**
-     * Выбрать исполнителя при подаче заявки может мастер депо (Ф-ЗАЯ-02).
+     * Выбрать исполнителя при подаче заявки может мастер депо и ЛНП - по вагону своего рейса (Ф-ЗАЯ-02).
      *
+     * @param wagonTrip рейс, в составе которого вагон заявки сейчас; null - вагон не в рейсе
      * @throws ApiException 403 - не может
      */
-    public void checkAssignOnCreate(CurrentUser user) {
-        if (!(user.hasRole(RoleType.MASTER) || isAdmin(user))) {
-            throw ApiException.forbidden("Назначить исполнителя при подаче может мастер депо");
+    public void checkAssignOnCreate(CurrentUser user, Long wagonTrip) {
+        boolean lnp = user.trip() != null && user.trip().duty() == CrewDuty.LNP && wagonTrip != null
+                      && wagonTrip == user.trip().id();
+        if (!(user.hasRole(RoleType.MASTER) || lnp || isAdmin(user))) {
+            throw ApiException.forbidden("Назначить исполнителя при подаче может мастер депо и ЛНП рейса вагона");
         }
     }
 
     /**
      * Исправить заявку может автор в течение {@link #EDIT_PERIOD} после подачи, пока не сменились исполнитель и
-     * статус (Ф-ЗАЯ-07).
+     * статус (Ф-ЗАЯ-07); администратор - и чужую.
      *
      * @throws ApiException 403 - не может
      */
     public void checkEdit(CurrentUser user, RequestRow r, OffsetDateTime now) {
-        if (r.getCreatedByUsr().getId() != user.id()) {
+        if (!isAuthor(user, r) && !isAdmin(user)) {
             throw ApiException.forbidden("Исправить может только автор заявки");
         }
         if (r.getRequestStatusType() != RequestStatus.NEW || r.getExecutorUsr() != null
                 || now.isAfter(r.getCreatedDt().plus(EDIT_PERIOD))) {
             throw ApiException.forbidden(
                     "Исправить можно в течение 10 минут после подачи, пока не сменились исполнитель и статус");
+        }
+    }
+
+    /**
+     * Исправить примечание или удалить фото может автор в течение {@link #EDIT_PERIOD} после создания; администратор
+     * - и чужое (Ф-ЗАЯ-05).
+     *
+     * @param author  автор примечания или фото
+     * @param created время создания примечания или фото
+     * @param what    что запрещено - начало текста отказа: «Исправить примечание», «Удалить фото»
+     * @throws ApiException 403 - не может
+     */
+    public void checkOwnChange(CurrentUser user, long author, OffsetDateTime created, OffsetDateTime now,
+                               String what) {
+        if (author != user.id() && !isAdmin(user)) {
+            throw ApiException.forbidden(what + " может только автор");
+        }
+        if (now.isAfter(created.plus(EDIT_PERIOD))) {
+            throw ApiException.forbidden(what + " можно в течение 10 минут после создания");
         }
     }
 
@@ -163,6 +186,13 @@ public class RequestRights {
      */
     private static boolean atMyDepot(CurrentUser user, RequestRow r) {
         return r.getWagonTrip() == null && r.getWagonStation() != null && r.getWagonStation().equals(user.depotStation());
+    }
+
+    /**
+     * ЛНП рейса, в составе которого вагон заявки сейчас.
+     */
+    private static boolean isMyLnp(CurrentUser user, RequestRow r) {
+        return inMyTrip(user, r) && user.trip().duty() == CrewDuty.LNP;
     }
 
     /**

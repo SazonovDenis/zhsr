@@ -21,8 +21,6 @@ public class Route {
     private LocalDate dbeg;
     /** null - маршрут действует */
     private LocalDate dend;
-    /** время в пути, мин */
-    private int duration;
     private Integer conductorHours;
     private Integer lnpHours;
     private Integer pemHours;

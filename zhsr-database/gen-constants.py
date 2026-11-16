@@ -26,7 +26,6 @@ TS = os.path.join(ROOT, 'zhsr-web', 'src', 'shared', 'constants', 'systemDicts.t
 SYSTEM_DICTS = {
     'act_status_type': ('ActStatus', 'Статус акта', None),
     'category_type': ('ConductorCategory', 'Категория проводника', None),
-    'coupling_type': ('CouplingType', 'Отцепка или прицепка', None),
     'crew_duty_type': ('CrewDuty', 'Должность члена бригады на рейсе', 'CrewDuty'),
     'location_type': ('LocationType', 'Вид расположения вагона', 'LocationKind'),
     'request_status_type': ('RequestStatus', 'Статус заявки на ремонт', 'RequestStatus'),

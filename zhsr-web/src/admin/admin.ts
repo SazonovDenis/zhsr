@@ -2,3 +2,8 @@
 export { default as AdminHomePage } from './home/AdminHomePage.vue'
 export { default as AdminTablePage } from './table/AdminTablePage.vue'
 export { default as AdminUsersPage } from './users/AdminUsersPage.vue'
+export { default as AdminCheckDictsPage } from './checks/AdminCheckDictsPage.vue'
+export { default as AdminCheckTemplatesPage } from './checks/AdminCheckTemplatesPage.vue'
+export { default as AdminCheckItemsPage } from './checks/AdminCheckItemsPage.vue'
+export { default as AdminEquipTemplatesPage } from './equip/AdminEquipTemplatesPage.vue'
+export { default as AdminEquipItemsPage } from './equip/AdminEquipItemsPage.vue'

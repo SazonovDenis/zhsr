@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+# Запустить: БД и хранилище, миграции, сервер, nginx. Образа нет (первый запуск) - скачивается.
+
+cd "$(dirname "$0")"
+
+[ -f .env ] || { echo "Нет .env - сначала setup.sh" >&2; exit 1; }
+mkdir -p ssl acme
+
+docker compose up -d
+docker compose ps -a

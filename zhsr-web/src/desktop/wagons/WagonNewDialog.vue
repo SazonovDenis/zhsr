@@ -35,6 +35,9 @@
       <FormField label="Изготовитель">
         <TextInput v-model="draft.maker" />
       </FormField>
+      <FormField label="Пробег на момент ввода, км">
+        <TextInput v-model="draft.initialRunKm" inputmode="numeric" />
+      </FormField>
     </FormSection>
 
     <FormSection title="Депо приписки" divided>
@@ -49,14 +52,7 @@
 
     <FormSection title="Начальное расположение и состояние" divided columns="repeat(2, minmax(0, 1fr))">
       <FormField label="Расположение" class="wagon-new__kind">
-        <CbSegment
-          v-model="draft.locationType"
-          class="wagon-new__segment"
-          single
-          required
-          :values="locationKinds"
-          :max-button-count="3"
-        />
+        <CbSegment v-model="draft.locationType" single required :values="locationKinds" :max-button-count="3" />
       </FormField>
       <FormField :label="refLabel">
         <CbList
@@ -105,7 +101,8 @@ import type { DictName } from '@/shared/dict/dicts'
 import { LocationType, WagonStatus } from '@/shared/constants/systemDicts'
 
 /**
- * Диалог «Ввод вагона»: паспорт, депо приписки, начальное расположение и состояние. Открывается через openDialog,
+ * Диалог «Ввод вагона» (Ф-ВАГ-01): паспорт с пробегом на момент ввода, депо приписки, начальное расположение и
+ * состояние. Открывается через openDialog,
  * результат — созданный вагон.
  */
 
@@ -125,6 +122,7 @@ const draft = reactive<WagonDraft>({
   place: null,
   wagonStatusType: null,
   dbeg: null,
+  initialRunKm: '0',
 })
 
 const running = ref(false)
@@ -158,6 +156,8 @@ function validate(): string {
   if (!draft.wagonType || !draft.modelType || !draft.depot || !draft.place || !draft.wagonStatusType || !draft.dbeg) {
     return t('Заполните все поля')
   }
+  if (!/^\d+$/.test(draft.initialRunKm.trim())) return t('Пробег — целое неотрицательное число, км')
+  if (draft.buildYear.trim() && !/^\d{4}$/.test(draft.buildYear.trim())) return t('Год постройки — четыре цифры')
   return ''
 }
 
@@ -179,9 +179,5 @@ async function save() {
 <style scoped lang="scss">
 .wagon-new__kind {
   grid-column: 1 / -1;
-}
-
-.wagon-new__segment {
-  align-self: flex-start;
 }
 </style>

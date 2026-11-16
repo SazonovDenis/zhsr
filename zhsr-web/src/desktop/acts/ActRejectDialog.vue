@@ -8,7 +8,7 @@
     @ok="save"
   >
     <FormField label="Причина">
-      <textarea v-model="reason" class="act-reject__input q-pa-sm" rows="4" />
+      <NoteInput v-model="reason" :rows="4" />
     </FormField>
   </FormDialog>
 </template>
@@ -20,6 +20,7 @@ import type { Transfer } from '@/api/transfers'
 import { rejectTransfer } from '@/api/transfers'
 import { t } from '@/boot/i18n'
 import FormDialog from '@/shared/components/dialog/FormDialog.vue'
+import NoteInput from '@/shared/components/form/NoteInput.vue'
 import FormField from '@/shared/components/form/FormField.vue'
 import type { ShownError } from '@/shared/errors'
 import { formError, shownError } from '@/shared/errors'
@@ -51,14 +52,4 @@ async function save() {
 }
 </script>
 
-<style scoped lang="scss">
-.act-reject__input {
-  width: 100%;
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.3rem;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.9rem;
-  resize: none;
-}
-</style>
+<style scoped lang="scss"></style>

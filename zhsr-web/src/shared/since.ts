@@ -7,14 +7,19 @@ import { formatDateTime } from '@/shared/format'
 export const nowMinute = ref(Date.now())
 setInterval(() => (nowMinute.value = Date.now()), 60_000)
 
-/** Длительность словами: «25 мин», «8 час 25 мин», «3 дн 4 час»; от 10 дней — без часов: «12 дн». Отрицательная — как ноль. */
+/**
+ * Длительность словами: «25 мин», «8 час 25 мин», «3 дн 4 час»; от 10 дней — без часов: «12 дн». Нулевые часы и минуты
+ * не пишутся: «14 час», «3 дн». Отрицательная — как ноль.
+ */
 export function spanText(ms: number): string {
   const minutes = Math.max(0, Math.floor(ms / 60_000))
   const days = Math.floor(minutes / 1440)
   const hours = Math.floor((minutes % 1440) / 60)
-  if (days >= 10) return t('{d} дн', { d: days })
+  const rest = minutes % 60
+  if (days >= 10 || (days > 0 && hours === 0)) return t('{d} дн', { d: days })
   if (days > 0) return t('{d} дн {h} час', { d: days, h: hours })
-  if (hours > 0) return t('{h} час {m} мин', { h: hours, m: minutes % 60 })
+  if (hours > 0 && rest === 0) return t('{h} час', { h: hours })
+  if (hours > 0) return t('{h} час {m} мин', { h: hours, m: rest })
   return t('{m} мин', { m: minutes })
 }
 

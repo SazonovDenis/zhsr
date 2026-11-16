@@ -37,7 +37,7 @@ id	check_list_template_item	wagon_type	required	num_min	num_max	critical	fault_t
 36	44		false			false	364	2025-01-01 00:00:00+05:00	
 37	45		false			false	326	2025-01-01 00:00:00+05:00	
 38	46		false			false	319	2025-01-01 00:00:00+05:00	
-39	47		false			false	317	2025-01-01 00:00:00+05:00	
+39	47		false			false	7	2025-01-01 00:00:00+05:00	
 40	49		false			false		2025-01-01 00:00:00+05:00	
 41	50		false			false		2025-01-01 00:00:00+05:00	
 42	51		false			false	402	2025-01-01 00:00:00+05:00	
@@ -91,3 +91,12 @@ id	check_list_template_item	wagon_type	required	num_min	num_max	critical	fault_t
 90	110		false			false	359	2025-01-01 00:00:00+05:00	
 91	111		false			false	409	2025-01-01 00:00:00+05:00	
 92	112		false			false	409	2025-01-01 00:00:00+05:00	
+93	114		false			false		2025-01-01 00:00:00+05:00	
+94	115		false			false		2025-01-01 00:00:00+05:00	
+95	116		false			false		2025-01-01 00:00:00+05:00	
+96	117		false			false		2025-01-01 00:00:00+05:00	
+97	118		false			false		2025-01-01 00:00:00+05:00	
+98	120		false			false		2025-01-01 00:00:00+05:00	
+99	121		false			false		2025-01-01 00:00:00+05:00	
+100	122		false			false		2025-01-01 00:00:00+05:00	
+101	123		false			true		2025-01-01 00:00:00+05:00	

@@ -45,8 +45,8 @@ export interface CrewNorm {
 }
 
 export function crewNorm(crew: TripCrew): CrewNorm {
-  // отцепленные вагоны в составе не едут
-  const live = crew.wagons.filter((w) => !w.detached)
+  // норма — по вагонам, которые едут в поезде
+  const live = crew.wagons.filter((w) => w.riding)
   const order = live.map((w) => w.number)
   const conductors = crew.crew.filter((m) => m.crewDutyType === CrewDuty.CONDUCTOR)
   const last = order.length - 1
@@ -124,7 +124,7 @@ export function slotOptions(
   slot: number,
   label: (m: CrewMember) => string,
 ): { user: number; label: string }[] {
-  const order = crew.wagons.filter((x) => !x.detached).map((x) => x.number)
+  const order = crew.wagons.filter((x) => x.riding).map((x) => x.number)
   const i = order.indexOf(w.number)
   const neighbours = [order[i - 1], order[i + 1]].filter((x): x is string => !!x)
   const current = w.conductors[slot]

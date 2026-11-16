@@ -33,6 +33,11 @@
         <span>{{ dictManager.getValue('Service', r.service) }}</span>
         <span>{{ t('Автор') }}</span>
         <span>{{ userName(r.createdByUsr) }}</span>
+        <!-- заявку создала Система по нарушению в чек-листе или по недостаче в описи — переход к ним -->
+        <template v-if="source">
+          <span>{{ t('Источник') }}</span>
+          <span><SoftLink :text="source.text" :params="{ name: source.name }" @click="openSource" /></span>
+        </template>
         <template v-if="receivedLate(r.createdDt, r.receivedDt)">
           <span>{{ t('Поступила на сервер') }}</span>
           <span>{{ formatDateTime(r.receivedDt) }}</span>
@@ -50,29 +55,35 @@
         </span>
       </SidePanelFields>
 
-      <!-- действия по заявке: видны все; нет прав или не тот статус — кнопка неактивна, причина во всплывающей подсказке -->
+      <!-- действия по заявке: видны все; нет прав или не тот статус — кнопка неактивна, причина во всплывающей подсказке;
+           исключение — «Исправить» -->
       <div class="request-panel__buttons">
         <template v-for="a in actions" :key="a.action">
-          <button
-            type="button"
-            class="request-panel__btn q-py-none q-px-md"
-            :class="`request-panel__btn--${a.kind}`"
-            :disabled="card.blocked.value || !!a.reason"
+          <!-- основное действие — синяя, опасное — красная, остальные — белые с рамкой -->
+          <q-btn
+            unelevated
+            no-caps
+            :outline="a.kind === 'secondary'"
+            :color="a.kind === 'primary' ? 'primary' : a.kind === 'danger' ? 'danger' : 'ink'"
+            :class="{ 'zs-soft-border': a.kind === 'secondary' }"
+            :disable="card.blocked.value || !!a.reason"
             :title="a.reason || undefined"
+            :label="a.title"
             @click="onAction(a.action)"
-          >
-            {{ a.title }}
-          </button>
+          />
         </template>
-        <button
-          type="button"
-          class="request-panel__btn q-py-none q-px-md"
-          :disabled="card.blocked.value || !card.editable.value"
-          :title="card.editable.value ? undefined : card.editHint.value"
+        <!-- исправить: кнопка есть, пока автор может исправить заявку; срок вышел — кнопка исчезает -->
+        <q-btn
+          v-if="card.editable.value"
+          unelevated
+          outline
+          no-caps
+          color="ink"
+          class="zs-soft-border"
+          :disable="card.blocked.value"
+          :label="t('Исправить')"
           @click="edit"
-        >
-          {{ t('Исправить') }}
-        </button>
+        />
       </div>
       <ErrorBox v-if="card.error.value" :error="card.error.value" class="request-panel__error q-py-sm q-px-md" />
 
@@ -80,6 +91,7 @@
         v-if="r.description || tree.photos.length > 0"
         :photos="tree.photos"
         :caption="{ meta: `${r.number} • ${formatDateTime(r.createdDt)}`, text: r.description }"
+        :has-text="!!r.description?.trim()"
       >
         <div class="request-panel__desc">{{ r.description }}</div>
       </TextPhotos>
@@ -97,6 +109,7 @@
 
 <script setup lang="ts">
 import { computed, toRef, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import type { RepairRequest, RequestAction } from '@/api/requests'
 import { t } from '@/boot/i18n'
@@ -109,6 +122,7 @@ import SoftLink from '@/shared/components/form/SoftLink.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { placeText } from '@/shared/wagonPlace'
 import { formatDateTime } from '@/shared/format'
+import { requestSource } from '@/shared/requests/requestSource'
 import TextPhotos from '@/shared/requests/TextPhotos.vue'
 import { historyTree } from '@/shared/requests/historyTree'
 import RequestHistory from '@/shared/requests/RequestHistory.vue'
@@ -156,9 +170,10 @@ async function onAction(action: RequestAction) {
     return
   }
   const result = await openDialog<{ text: string; photos: Blob[] }>(RequestTextDialog, {
-    title: def.title,
+    title: def.sheet?.title ?? def.title,
     placeholder: def.comment,
-    okText: 'Подтвердить',
+    okText: def.sheet?.okText ?? 'Подтвердить',
+    cancelText: def.sheet?.cancelText ?? 'Отмена',
     photos: !!def.photos,
     required: true,
   })
@@ -170,11 +185,20 @@ async function onAction(action: RequestAction) {
 }
 
 const r = computed(() => card.request.value)
+const source = computed(() => requestSource(r.value))
+const router = useRouter()
+
+/** Перейти к чек-листу или описи, по которым создана заявка: список с выбранной записью. */
+function openSource() {
+  const s = source.value
+  if (s) void router.push({ name: s.kind === 'check' ? 'checks' : 'equip', query: { id: String(s.id) } })
+}
 
 // исполнитель — во всплывающем окне, из сотрудников службы заявки
 async function assign() {
   const result = await openDialog<{ executor: number | null }>(RequestAssignDialog, {
     current: r.value?.executorUsr ?? null,
+    wagonNumber: r.value?.wagon.number ?? null,
     load: async () => {
       await card.loadStaff()
       return card.staff.value
@@ -192,6 +216,21 @@ async function addNote() {
     photos: true,
   })
   if (result) await card.addNote(result.text, result.photos)
+}
+
+// своё примечание автор исправляет во всплывающем окне; своё фото удаляет крестиком на миниатюре
+card.provideChanges((noteId, text) => void editNote(noteId, text))
+
+async function editNote(noteId: number, text: string) {
+  const result = await openDialog<{ text: string; photos: Blob[] }>(RequestTextDialog, {
+    title: 'Исправить примечание',
+    placeholder: 'Текст примечания',
+    okText: 'Сохранить',
+    required: true,
+    requiredText: 'Напишите примечание',
+    initial: text,
+  })
+  if (result) await card.saveNote(noteId, result.text)
 }
 
 async function edit() {
@@ -230,10 +269,8 @@ defineExpose({ ready, onAction, edit, assign, addNote })
 
 .request-panel__section-title {
   color: $zs-text-muted;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .request-panel__buttons {
@@ -249,50 +286,6 @@ defineExpose({ ready, onAction, edit, assign, addNote })
 .request-panel__reason {
   color: $zs-text-muted;
   font-size: 0.8rem;
-}
-
-.request-panel__btn {
-  height: var(--zs-control-height);
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.3rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background: $zs-bg-hover;
-  }
-
-  &--primary {
-    border-color: $primary;
-    background: $primary;
-    color: #fff;
-
-    &:hover:not(:disabled) {
-      background: $primary;
-      opacity: 0.9;
-    }
-  }
-
-  &--danger {
-    border-color: #b91c1c;
-    background: #b91c1c;
-    color: #fff;
-
-    &:hover:not(:disabled) {
-      background: #b91c1c;
-      opacity: 0.9;
-    }
-  }
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: default;
-  }
 }
 
 .request-panel__error {

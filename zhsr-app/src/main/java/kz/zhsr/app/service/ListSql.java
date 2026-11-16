@@ -34,14 +34,14 @@ final class ListSql {
     /**
      * Вагоны. Расположение: location_type и place - место по виду расположения (станция, депо, парк отстоя или рейс);
      * у вагона в рейсе - trip.
+     *
+     * @param limit не больше стольких строк; null - все
      */
-    static SqlQuery wagons(WagonFilter filter, Visibility.Access access, ListSort sort) {
+    static SqlQuery wagons(WagonFilter filter, Visibility.Access access, ListSort sort, Integer limit) {
         SqlWhere where = new SqlWhere();
         where.visible(
                 access.byDepot() ? (access.depot() == null ? "true" : "wagon.depot = :visDepot") : null,
-                access.allTripWagons()
-                        ? "wagon.id in (select trip_wagon.wagon from trip_wagon where trip_wagon.trip = :visTrip)"
-                        : null,
+                access.allTripWagons() ? "wagon.id in " + TRIP_WAGONS : null,
                 access.wagons().isEmpty() ? null : "wagon.id = any(:visWagons)",
                 access);
         if (filter.number() != null && !filter.number().isBlank()) {
@@ -65,23 +65,46 @@ final class ListSql {
                        wagon_info.location_type,
                        coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard, wagon_info.trip) as place,
                        wagon_info.trip, wagon_info.dbeg_location, wagon_info.wagon_status_type,
-                       wagon_info.dbeg_status, wagon.maker, wagon.build_year, wagon.dbeg, wagon.dend
+                       wagon_info.dbeg_status, wagon_info.responsible_usr, wagon_info.dbeg_responsible,
+                       wagon_info.run_km, wagon.maker, wagon.build_year, wagon.dbeg, wagon.dend
                 from wagon
                 join wagon_info on wagon_info.wagon = wagon.id
-                """, sort.orderBy(WAGON_SORT, "wagon.number, wagon.id"));
+                """, sort.orderBy(WAGON_SORT, "wagon.number, wagon.id") + (limit == null ? "" : "\nlimit " + limit));
     }
 
     /**
-     * Вагоны рейсов в статусе «план» и «выполняется» - второй проход списка вагонов: от рейсов (их немного, индекс
-     * ix_trip_active), а не от вагонов. Параметры planned, inProgress - состояния рейса.
+     * Вагоны поезда рейса: вагоны, которые не отцеплены до отправления рейса. Параметр visTrip.
+     */
+    private static final String TRIP_WAGONS = """
+            (select train_wagon.wagon from train_wagon
+             join trip on trip.train = train_wagon.train
+             where trip.id = :visTrip
+               and (train_wagon.dend is null or train_wagon.dend >= coalesce(trip.departed_dt, trip.planned_dt)))""";
+
+    /**
+     * Вагоны поездов рейсов в статусе «план» и «выполняется» - второй проход списка вагонов: от рейсов (их немного,
+     * индекс ix_trip_active), а не от вагонов. Вагон поезда рейса - не отцеплен до отправления рейса. Параметры
+     * planned, inProgress - состояния рейса.
      */
     static String activeTripWagons() {
         return """
-                select trip_wagon.wagon, trip_wagon.trip, trip.trip_status_type
+                select train_wagon.wagon, trip.id, trip.trip_status_type
                 from trip
-                join trip_wagon on trip_wagon.trip = trip.id
+                join train_wagon on train_wagon.train = trip.train
                 where trip.trip_status_type in (:planned, :inProgress)
+                  and (train_wagon.dend is null or train_wagon.dend >= coalesce(trip.departed_dt, trip.planned_dt))
                 order by trip.planned_dt
+                """;
+    }
+
+    /**
+     * Поезд каждого вагона сейчас: участие по факту без отцепки - второй проход списка вагонов.
+     */
+    static String currentTrains() {
+        return """
+                select train_wagon.wagon, train_wagon.train
+                from train_wagon
+                where train_wagon.dbeg is not null and train_wagon.dend is null
                 """;
     }
 
@@ -127,7 +150,7 @@ final class ListSql {
 
     private static final Map<String, String> TRIP_SORT = Map.of(
             "trainNumber", "route.train_number",
-            "duration", "route.duration",
+            "duration", RouteSql.DURATION,
             "plannedDt", "trip.planned_dt"
     );
 
@@ -152,15 +175,17 @@ final class ListSql {
         }
         if (filter.wagon() != null && !filter.wagon().isBlank()) {
             where.add("""
-                    exists (select 1 from trip_wagon
-                            join wagon on wagon.id = trip_wagon.wagon
-                            where trip_wagon.trip = trip.id and strpos(wagon.number, :wagon) > 0)""",
+                    exists (select 1 from train_wagon
+                            join wagon on wagon.id = train_wagon.wagon
+                            where train_wagon.train = trip.train and strpos(wagon.number, :wagon) > 0
+                              and (train_wagon.dend is null
+                                   or train_wagon.dend >= coalesce(trip.departed_dt, trip.planned_dt)))""",
                     "wagon", filter.wagon().trim());
         }
         if (filter.from() != null) {
             // рейс, идущий в периоде, виден и если отправился раньше from
             where.add("(trip.trip_status_type = " + TripStatus.IN_PROGRESS
-                    + " or trip.planned_dt + make_interval(mins => route.duration) >= :from)", "from", filter.from());
+                    + " or trip.planned_dt + make_interval(mins => " + RouteSql.DURATION + ") >= :from)", "from", filter.from());
         }
         if (filter.to() != null) {
             where.add("trip.planned_dt < :to", "to", filter.to());
@@ -168,19 +193,20 @@ final class ListSql {
         where.any("trip.trip_status_type", "states", filter.states());
 
         return where.query("""
-                select trip.id, route.train_number, trip.route, route.name, route.transport_type, route.route_kind,
-                       route.duration, trip.trip_status_type, trip.planned_dt, trip.departed_dt, trip.arrived_dt,
-                       trip.departure_marked_dt, trip.arrival_marked_dt
+                select trip.id, route.train_number, trip.route, trip.train, route.name, route.transport_type,
+                       route.route_kind,
+                       %s as duration, trip.trip_status_type, trip.planned_dt, trip.departed_dt,
+                       trip.arrived_dt, trip.departure_marked_dt, trip.arrival_marked_dt
                 from trip
                 join route on route.id = trip.route
-                """, sort.orderBy(TRIP_SORT, "trip.planned_dt, trip.id"));
+                """.formatted(RouteSql.DURATION), sort.orderBy(TRIP_SORT, "trip.planned_dt, trip.id"));
     }
 
     // --- маршруты
 
     private static final Map<String, String> ROUTE_SORT = Map.of(
             "trainNumber", "route.train_number",
-            "duration", "route.duration"
+            "duration", RouteSql.DURATION
     );
 
     /**
@@ -203,9 +229,9 @@ final class ListSql {
 
         return where.query("""
                 select route.id, route.train_number, route.name, route.route_kind, route.transport_type, route.dbeg,
-                       route.dend, route.duration, route.conductor_hours, route.lnp_hours, route.pem_hours
+                       route.dend, %s as duration, route.conductor_hours, route.lnp_hours, route.pem_hours
                 from route
-                """, sort.orderBy(ROUTE_SORT, "route.train_number, route.id"));
+                """.formatted(RouteSql.DURATION), sort.orderBy(ROUTE_SORT, "route.train_number, route.id"));
     }
 
     /**

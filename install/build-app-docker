@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+# Образы zhsr из build/ (сначала ./build-app) - под архитектуру этой машины, для проверки локально. Ключи - как у
+# ./build-app-docker-push (install/images.sh); без ключей - все образы.
+
+# все пути - от корня проекта
+cd "$(dirname "$0")/.."
+. install/images.sh
+
+for key in $KEYS; do
+    image=$(image_of "$key")
+    echo "=== $image"
+    install/docker-images/prepare-context "$image"
+    dir="install/docker-images/$image"
+    if [ "$image" = zhsr-database ]; then
+        docker build --target zhsr-database -t sazonovden/zhsr-database:latest "$dir"
+        docker build --target zhsr-database-demo -t sazonovden/zhsr-database-demo:latest "$dir"
+    else
+        docker build -t "sazonovden/$image:latest" "$dir"
+    fi
+    rm -rf "$dir/tmp"
+done

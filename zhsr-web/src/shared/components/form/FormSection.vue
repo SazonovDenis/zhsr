@@ -37,10 +37,8 @@ withDefaults(defineProps<{ title?: string; columns?: string; divided?: boolean }
   // отступ под подписью группы — на треть меньше промежутка между блоками (0.8rem)
   margin-bottom: calc(-0.8rem / 3);
   color: $zs-text-muted;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .form-section__body {

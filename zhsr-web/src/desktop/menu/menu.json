@@ -7,10 +7,22 @@
       "route": "wagons"
     },
     {
+      "id": "acts",
+      "label": "Передача",
+      "route": "acts",
+      "sub": true
+    },
+    {
       "id": "trips",
       "label": "Рейсы",
       "icon": "trips",
       "route": "trips"
+    },
+    {
+      "id": "trains",
+      "label": "Поезда",
+      "sub": true,
+      "route": "trains"
     },
     {
       "id": "routes",
@@ -25,10 +37,16 @@
       "route": "requests"
     },
     {
-      "id": "acts",
-      "label": "Передача",
-      "icon": "acts",
-      "route": "acts"
+      "id": "checks",
+      "label": "Чек-листы",
+      "icon": "checks",
+      "route": "checks"
+    },
+    {
+      "id": "equip",
+      "label": "Описи",
+      "icon": "equip",
+      "route": "equip"
     },
     {
       "id": "warranty",
@@ -52,24 +70,30 @@
         "route": "admin-users"
       },
       {
-        "id": "admin-depot",
-        "label": "Депо",
-        "route": "admin-depot"
-      },
-      {
-        "id": "admin-yard",
-        "label": "Парки отстоя",
-        "route": "admin-yard"
-      },
-      {
-        "id": "admin-station",
-        "label": "Станции",
-        "route": "admin-station"
-      },
-      {
-        "id": "admin-stage",
-        "label": "Перегоны",
-        "route": "admin-stage"
+        "id": "admin-group-routes",
+        "label": "Узлы",
+        "items": [
+          {
+            "id": "admin-station",
+            "label": "Станции",
+            "route": "admin-station"
+          },
+          {
+            "id": "admin-depot",
+            "label": "Депо",
+            "route": "admin-depot"
+          },
+          {
+            "id": "admin-yard",
+            "label": "Парки отстоя",
+            "route": "admin-yard"
+          },
+          {
+            "id": "admin-stage",
+            "label": "Перегоны",
+            "route": "admin-stage"
+          }
+        ]
       },
       {
         "id": "admin-wagon_type",
@@ -82,26 +106,50 @@
         "route": "admin-model_type"
       },
       {
-        "id": "admin-fault_group_type",
-        "label": "Группы неисправностей",
-        "route": "admin-fault_group_type"
+        "id": "admin-group-faults",
+        "label": "Неисправности",
+        "items": [
+          {
+            "id": "admin-faults",
+            "label": "Виды неисправностей",
+            "route": "admin-fault_type"
+          },
+          {
+            "id": "admin-fault_group_type",
+            "label": "Группы неисправностей",
+            "route": "admin-fault_group_type"
+          },
+          {
+            "id": "admin-fault_type_favorite",
+            "label": "Избранные",
+            "route": "admin-fault_type_favorite"
+          }
+        ]
       },
       {
-        "id": "admin-faults",
-        "label": "Неисправности",
-        "route": "admin-fault_type"
+        "id": "admin-group-checks",
+        "label": "Проверки",
+        "items": [
+          {
+            "id": "admin-check-dicts",
+            "label": "Шаблоны ответов",
+            "route": "admin-check-dicts"
+          },
+          {
+            "id": "admin-checklists",
+            "label": "Чек-листы",
+            "route": "admin-check-templates"
+          },
+          {
+            "id": "admin-inventory-lists",
+            "label": "Описи экипировки",
+            "route": "admin-equip-templates"
+          }
+        ]
       },
       {
         "id": "admin-schedule-norms",
         "label": "Нормы графика"
-      },
-      {
-        "id": "admin-checklists",
-        "label": "Чек-листы"
-      },
-      {
-        "id": "admin-inventory-lists",
-        "label": "Перечни описи"
       },
       {
         "id": "admin-journal",

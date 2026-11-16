@@ -3,15 +3,16 @@
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Рейсы') }}</h1>
       <div class="desktop-frame__actions">
-        <button
-          type="button"
-          class="zs-btn-primary"
-          :disabled="!!createReason"
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          :disable="!!createReason"
           :title="createReason || undefined"
           @click="addTrip"
         >
           {{ t('Создать рейс') }}
-        </button>
+        </q-btn>
       </div>
     </template>
 

@@ -7,6 +7,7 @@ import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.ActStatus;
 import kz.zhsr.app.constants.TripStatus;
 import kz.zhsr.app.dto.common.ListSort;
+import kz.zhsr.app.dto.ref.TrainRef;
 import kz.zhsr.app.dto.ref.TripRef;
 import kz.zhsr.app.dto.route.RouteFilter;
 import kz.zhsr.app.dto.route.RouteOption;
@@ -68,12 +69,34 @@ public class ListService {
      * Список вагонов (GET /wagons). По умолчанию - по номеру вагона.
      */
     public List<WagonRow> wagons(WagonFilter filter, ListSort sort) throws Exception {
-        List<WagonRow> rows = wagonRows(filter, sort, WagonRow.class);
+        List<WagonRow> rows = wagonRows(filter, sort, WagonRow.class, false);
         addWagonTripsAndTransfers(rows);
         if (filter.at() != null) {
             addWagonStateAt(rows, filter.at());
         }
         return rows;
+    }
+
+    /**
+     * Вагон по точному номеру, как строка списка вагонов (GET /wagons/by-number/{number}): видимость по роли - как у
+     * списка.
+     *
+     * @throws ApiException 404 - вагона нет; 403 - вагон не виден сотруднику
+     */
+    public WagonRow wagonByNumber(String number) throws Exception {
+        String value = number == null ? "" : number.trim();
+        WagonFilter filter = new WagonFilter(null, value, null, null, null, null, null);
+        List<WagonRow> rows = wagonRows(filter, new ListSort(null, false), WagonRow.class, false).stream()
+                .filter(w -> w.getNumber().equals(value))
+                .toList();
+        if (rows.isEmpty()) {
+            if (db.loadRec("wagon", Map.of("number", value)) == null) {
+                throw ApiException.notFound("Вагон № " + value + " не найден");
+            }
+            throw ApiException.forbidden("Вы не имеете доступа к данным по вагону " + value);
+        }
+        addWagonTripsAndTransfers(rows);
+        return rows.get(0);
     }
 
     /**
@@ -104,7 +127,7 @@ public class ListService {
     }
 
     /**
-     * Второй проход списка вагонов: рейсы «план» и «выполняется», в составе которых вагон, и акт, ожидающий приёма.
+     * Второй проход списка вагонов: поезд вагона, рейсы «план» и «выполняется» поезда вагона и акт, ожидающий приёма.
      * Грузятся от рейсов и актов (их немного), без списка вагонов, и раскладываются по строкам.
      */
     private void addWagonTripsAndTransfers(List<WagonRow> rows) throws Exception {
@@ -121,9 +144,15 @@ public class ListService {
             WagonRow row = byId.get(rec.getLong("wagon"));
             if (row != null) {
                 WagonTrip trip = new WagonTrip();
-                trip.setTrip(new TripRef(rec.getLong("trip")));
+                trip.setTrip(new TripRef(rec.getLong("id")));
                 trip.setTripStatusType(rec.getLong("trip_status_type"));
                 row.getTrips().add(trip);
+            }
+        }
+        for (DbRec rec : db.loadSql(ListSql.currentTrains(), Map.of())) {
+            WagonRow row = byId.get(rec.getLong("wagon"));
+            if (row != null) {
+                row.setTrain(new TrainRef(rec.getLong("train")));
             }
         }
         List<DbRec> acts = db.loadSql(ListSql.pendingTransferWagons(), Map.of("pending", ActStatus.PENDING));
@@ -143,10 +172,11 @@ public class ListService {
     }
 
     /**
-     * Вагоны как варианты выбора (GET /wagons/options): фильтр и видимость - как у списка вагонов.
+     * Вагоны как варианты выбора (GET /wagons/options): фильтр и видимость - как у списка вагонов; поиск по номеру -
+     * среди всех вагонов, без видимости по роли, не больше {@link #WAGON_SEARCH_LIMIT} строк.
      */
     public List<WagonOption> wagonOptions(WagonFilter filter, ListSort sort) throws Exception {
-        return wagonRows(filter, sort, WagonOption.class);
+        return wagonRows(filter, sort, WagonOption.class, true);
     }
 
     /**
@@ -179,14 +209,26 @@ public class ListService {
 
     // --- общее для списка и вариантов выбора
 
-    private <T extends WagonOption> List<T> wagonRows(WagonFilter filter, ListSort sort, Class<T> clazz) throws Exception {
+    /**
+     * Сколько вагонов отдаёт поиск по номеру в вариантах выбора: пришло ровно столько - фронт просит уточнить номер.
+     */
+    public static final int WAGON_SEARCH_LIMIT = 50;
+
+    /**
+     * Вагоны по фильтру. Номер сочетается с остальными фильтрами: отменяет их при поиске фронт. Видимость по роли
+     * действует всегда, кроме поиска по номеру в вариантах выбора: тот ищет среди всех вагонов, не больше
+     * {@link #WAGON_SEARCH_LIMIT} строк.
+     *
+     * @param pick варианты выбора (GET /wagons/options); false - полный список (GET /wagons)
+     */
+    private <T extends WagonOption> List<T> wagonRows(WagonFilter filter, ListSort sort, Class<T> clazz, boolean pick)
+            throws Exception {
         Visibility.Access access = visibility.access(currentUserService.get(), filter.depot());
-        // поиск по номеру отменяет все фильтры и отбор по роли: ищется среди всех вагонов (Ф-ВАГ-04)
-        if (filter.number() != null && !filter.number().isBlank()) {
-            filter = new WagonFilter(null, filter.number(), null, null, null, null, filter.at());
+        boolean search = pick && filter.number() != null && !filter.number().isBlank();
+        if (search) {
             access = new Visibility.Access(true, null, null, false, null, null);
         }
-        SqlQuery q = ListSql.wagons(filter, access, sort);
+        SqlQuery q = ListSql.wagons(filter, access, sort, search ? WAGON_SEARCH_LIMIT : null);
         List<T> res = db.loadSql(q.sql(), q.params(), clazz);
         refResolver.resolve(res);
         return res;
@@ -210,6 +252,7 @@ public class ListService {
             trip.setKm(RouteService.km(points));
             trip.setStops(RouteService.stops(points));
         }
+        refResolver.resolve(trips);
         return trips;
     }
 

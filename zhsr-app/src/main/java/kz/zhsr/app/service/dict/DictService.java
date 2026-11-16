@@ -38,7 +38,12 @@ public class DictService {
     }
 
     private static final Map<String, Def> DICTS = Map.of(
-            "WagonType", new Def("wagon_type", r -> rec(r, "text", r.getString("text"))),
+            // shortText - кратко, рядом с номером вагона: «54956 куп.»
+            "WagonType", new Def("wagon_type", r -> {
+                Map<String, Object> res = rec(r, "text", r.getString("text"));
+                res.put("shortText", r.getString("short_text"));
+                return res;
+            }),
             "WagonModel", new Def("model_type", r -> rec(r, "text", r.getString("text"))),
             "Depot", new Def("depot", r -> {
                 Map<String, Object> res = rec(r, "text", multiText(r.getString("name_ru"), r.getString("name_kk"),
@@ -150,11 +155,18 @@ public class DictService {
      */
     private List<Map<String, Object>> records(String name, Def def, List<DbRec> rows) throws Exception {
         Set<Long> hubs = name.equals("Station") ? UtDb.uniqueValues(db.loadList("depot", null), "station") : Set.of();
+        // неисправность в избранном: порядок показа среди частых (fault_type_favorite.sort_order)
+        Map<Long, Object> favorites = name.equals("FaultType")
+                ? UtDb.flatLong(db.loadList("fault_type_favorite", null), "fault_type", "sort_order")
+                : Map.of();
         List<Map<String, Object>> res = new ArrayList<>(rows.size());
         for (DbRec row : rows) {
             Map<String, Object> rec = def.record().apply(row);
             if (name.equals("Station")) {
                 rec.put("hub", hubs.contains(row.getLong("id")));
+            }
+            if (name.equals("FaultType")) {
+                rec.put("favoriteOrder", favorites.get(row.getLong("id")));
             }
             res.add(rec);
         }

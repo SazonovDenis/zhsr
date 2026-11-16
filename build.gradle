@@ -18,8 +18,10 @@ subprojects {
     apply plugin: 'org.springframework.boot'
     apply plugin: 'io.spring.dependency-management'
 
+    // Java 22: библиотеки lib/kis-* собраны под Java 22; образы для сервера - на JRE 22 (install/docker-images)
     java {
-        sourceCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_22
+        targetCompatibility = JavaVersion.VERSION_22
     }
 
     // .env лежит в корне проекта

@@ -29,7 +29,7 @@ import type { RoutePoint } from '@/api/routes'
 import type { MapPoint, StageLine, StageLines } from '@/api/stages'
 import { fetchStageLines } from '@/api/stages'
 import { t } from '@/boot/i18n'
-import { formatHm } from '@/desktop/routes/duration'
+import { formatHm, runOf, stopOf } from '@/desktop/routes/duration'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -322,9 +322,10 @@ function hintContent(station: number): HTMLElement {
   ]
   // станции уже нет в points (правка в редакторе, рисунок пути ещё грузится заново) — только название
   if (point) lines.push({ text: index === 0 ? t('отправление') : t('{km} км', { km: point.km }), cls: '' })
-  if (point && point.runDuration > 0)
-    lines.push({ text: t('в пути {time}', { time: formatHm(point.runDuration) }), cls: '' })
-  if (point && point.stopDuration > 0) lines.push({ text: t('стоянка {n} мин', { n: point.stopDuration }), cls: '' })
+  const run = runOf(props.points, index)
+  const stop = point ? stopOf(point) : 0
+  if (point && run > 0) lines.push({ text: t('в пути {time}', { time: formatHm(run) }), cls: '' })
+  if (stop > 0) lines.push({ text: t('стоянка {n} мин', { n: stop }), cls: '' })
   const el = document.createElement('div')
   lines.forEach((line, i) => {
     const div = document.createElement('div')

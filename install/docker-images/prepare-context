@@ -1,0 +1,32 @@
+#!/bin/sh
+set -e
+
+# Файлы сборки образа - во временный install/docker-images/<образ>/tmp: Docker не берёт файлы вне каталога сборки.
+# Источник - build/ (./build-app); миграциям - ещё скрипт пересоздания БД и данные db-data (демо-данные - отдельно).
+#
+#   install/docker-images/prepare-context <образ>
+
+cd "$(dirname "$0")/../.."
+
+image=$1
+tmp="install/docker-images/$image/tmp"
+rm -rf "$tmp"
+mkdir -p "$tmp"
+
+case $image in
+  zhsr-app)
+    cp build/zhsr-app-0.0.1.jar "$tmp/" ;;
+  zhsr-database)
+    # app - образ миграций: jar, скрипт пересоздания БД, данные db-data/default; demo - демо-данные для образа
+    # zhsr-database-demo
+    mkdir -p "$tmp/app/prepare" "$tmp/app/db-data"
+    cp build/zhsr-database-0.0.1.jar "$tmp/app/"
+    cp prepare/db-reset "$tmp/app/prepare/"
+    cp -r db-data/default "$tmp/app/db-data/default"
+    rm -rf "$tmp/app/db-data/default/osm"
+    cp -r db-data/demo "$tmp/demo" ;;
+  zhsr-nginx)
+    cp -r build/web "$tmp/web" ;;
+  *)
+    echo "неизвестный образ: $image" >&2; exit 1 ;;
+esac

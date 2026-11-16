@@ -2,7 +2,8 @@
   <!-- клик по свободному месту меню сворачивает и разворачивает его; клики по пунктам до сюда не доходят -->
   <aside class="desktop-menu" :class="{ 'desktop-menu--collapsed': collapsed }" @click="onToggleClick">
     <div class="desktop-menu__brand q-pa-md">
-      <SvgIcon name="logo" size="1.6rem" />
+      <!-- знак без фона, вариант для тёмного меню -->
+      <SvgIcon name="logo-dark" size="1.6rem" />
       <span v-if="!collapsed" class="desktop-menu__brand-name">{{ t('Жолсерік') }}</span>
     </div>
 
@@ -39,31 +40,61 @@
           />
         </button>
         <template v-if="adminOpen && !collapsed">
-          <DesktopMenuItem
-            v-for="item in menu.admin.items"
-            :key="item.id"
-            :item="item"
-            indent
-            :active="isActive(item)"
-            :collapsed="collapsed"
-            :count="counters[item.id] ?? 0"
-            :disabled="!item.route"
-            @click.stop="bus.emit(menuEvent(item))"
-          />
+          <template v-for="item in menu.admin.items" :key="item.id">
+            <!-- подгруппа: раскрытие одной сворачивает другую -->
+            <template v-if="isMenuGroup(item)">
+              <button
+                type="button"
+                class="desktop-menu__subgroup q-py-none q-pr-md"
+                :title="t(item.label)"
+                @click.stop="toggleSubGroup(item.id)"
+              >
+                <span class="desktop-menu__label">{{ t(item.label) }}</span>
+                <SvgIcon
+                  name="chevron-down"
+                  size="0.7rem"
+                  class="desktop-menu__chevron"
+                  :class="{ 'desktop-menu__chevron--open': menuState.openSubGroup === item.id }"
+                />
+              </button>
+              <template v-if="menuState.openSubGroup === item.id">
+                <DesktopMenuItem
+                  v-for="sub in item.items"
+                  :key="sub.id"
+                  :item="sub"
+                  indent
+                  class="desktop-menu__deep"
+                  :active="isActive(sub)"
+                  :collapsed="collapsed"
+                  :count="counters[sub.id] ?? 0"
+                  :disabled="!sub.route"
+                  @click.stop="bus.emit(menuEvent(sub))"
+                />
+              </template>
+            </template>
+            <DesktopMenuItem
+              v-else
+              :item="item"
+              indent
+              :active="isActive(item)"
+              :collapsed="collapsed"
+              :count="counters[item.id] ?? 0"
+              :disabled="!item.route"
+              @click.stop="bus.emit(menuEvent(item))"
+            />
+          </template>
         </template>
       </div>
     </nav>
 
-    <div class="desktop-menu__space" />
-
-    <div v-if="user" class="desktop-menu__user q-pa-sm">
+    <div v-if="user" class="desktop-menu__user q-py-none q-px-sm">
       <DesktopUserMenu :user="user" :collapsed="collapsed" />
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import type { CurrentUser } from '@/api/session'
@@ -77,7 +108,7 @@ import { MENU_COLLAPSED_WIDTH, MENU_WIDTH, menuState } from './menuState'
 import DesktopMenuItem from './DesktopMenuItem.vue'
 import DesktopUserMenu from './DesktopUserMenu.vue'
 import type { MenuItem } from './menu'
-import { menu, menuEvent } from './menu'
+import { isMenuGroup, menu, menuEvent } from './menu'
 
 /**
  * Левое меню десктопной части.
@@ -148,6 +179,22 @@ function onAdminClick() {
   menuState.openGroup = adminOpen.value ? null : menu.admin.id
 }
 
+function toggleSubGroup(id: string) {
+  menuState.openSubGroup = menuState.openSubGroup === id ? null : id
+}
+
+// открыта страница из подгруппы — подгруппа раскрыта
+const activeSubGroup = computed(
+  () => menu.admin.items.find((item) => isMenuGroup(item) && item.items.some((sub) => isActive(sub)))?.id ?? null,
+)
+watch(
+  activeSubGroup,
+  (id) => {
+    if (id) menuState.openSubGroup = id
+  },
+  { immediate: true },
+)
+
 function isActive(item: MenuItem): boolean {
   return !!item.route && route.name === item.route
 }
@@ -159,8 +206,8 @@ function isActive(item: MenuItem): boolean {
   flex: none;
   flex-direction: column;
   width: v-bind(MENU_WIDTH);
-  overflow-x: hidden;
-  overflow-y: auto;
+  // прокручивается только список пунктов, меню пользователя внизу стоит на месте
+  overflow: hidden;
   background: var(--zs-header-bg);
   color: #fff;
   cursor: pointer;
@@ -186,18 +233,45 @@ function isActive(item: MenuItem): boolean {
 
 .desktop-menu__list {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 0.1rem;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  // пункты не сжимаются, когда их больше, чем помещается: список прокручивается
+  > * {
+    flex: none;
+  }
+
+  // полоса прокрутки на тёмном меню: тонкая, светлая, полупрозрачная, без фона и без кнопок
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+
+  &::-webkit-scrollbar {
+    width: 0.4rem;
+  }
+
+  &::-webkit-scrollbar-track,
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-button {
+    display: none;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border-radius: 0.2rem;
+    background: rgba(255, 255, 255, 0.25);
+  }
 }
 
 .desktop-menu__admin {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-}
-
-.desktop-menu__space {
-  flex: 1;
 }
 
 .desktop-menu__group {
@@ -234,6 +308,7 @@ function isActive(item: MenuItem): boolean {
 }
 
 .desktop-menu__user {
+  flex: none;
   border-top: 0.0625rem solid rgba(255, 255, 255, 0.15);
 }
 
@@ -244,5 +319,34 @@ function isActive(item: MenuItem): boolean {
   &--open {
     transform: rotate(180deg);
   }
+}
+
+// подгруппа администрирования: заголовок на уровне пунктов группы, её пункты — глубже
+.desktop-menu__subgroup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  flex: none;
+  height: 2rem;
+  padding-left: 2.7rem;
+  border: 0;
+  border-radius: 0.3rem;
+  background: none;
+  color: $zs-menu-fg;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+// пункты подгруппы — на ступень глубже её заголовка
+.desktop-menu__admin .desktop-menu__deep {
+  padding-left: 3.7rem;
 }
 </style>

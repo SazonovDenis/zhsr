@@ -5,10 +5,36 @@
 // кнопки в одном ряду берут высоту отсюда, поэтому всегда одного роста.
 :root {
   --zs-control-height: 2.3rem;
+  // шрифт текста в полях ввода и выпадающих списках
+  --zs-control-font-size: 0.9rem;
+  // крестик «очистить» в поле ввода и в выпадающем списке: размер и размер значка
+  --zs-clear-size: 1.1rem;
+  --zs-clear-font-size: 0.6rem;
+  // «глаз» в поле пароля: показать или скрыть введённое — размером с крестик
+  --zs-reveal-size: 1.2rem;
   // цифры дня в календаре Quasar (q-date рисует день кнопкой q-btn: 14px) и цифры барабанов времени — одного размера
   --zs-calendar-font-size: 0.9rem;
   // цвет заголовка: левое меню десктопа, верхняя строка телефона и выделенный пункт нижнего меню
   --zs-header-bg: #{$zs-menu-bg};
+}
+
+// двойное касание не масштабирует страницу (телефон): прокрутка и масштаб двумя пальцами остаются. Свойство не
+// наследуется, поэтому — на всех элементах; где задано своё (просмотр фото), действует своё
+* {
+  touch-action: manipulation;
+}
+
+// телефон (мобильная часть, её корень .pwa, и вход с телефона — .login-page--mobile): поля, списки и переключатели —
+// одной высоты, под палец; шрифт полей — 1rem: при меньшем iPhone увеличивает страницу при фокусе в поле. На body —
+// чтобы и в окнах, вынесенных из .pwa
+body:has(.pwa),
+body:has(.login-page--mobile) {
+  --zs-control-height: 2.8rem;
+  --zs-control-font-size: 1rem;
+  // крестик «очистить» — крупный, под палец, но заметно меньше высоты поля
+  --zs-clear-size: 1.8rem;
+  --zs-clear-font-size: 0.75rem;
+  --zs-reveal-size: 1.5rem;
 }
 
 body {
@@ -40,6 +66,82 @@ button {
   color: $zs-selected-fg !important;
 }
 
+// Свои цвета для q-btn — по правилу цветов Quasar: color="ink" даёт классы bg-ink (заливка) и text-ink (текст)
+// ink — обычный текст
+.text-ink {
+  color: $zs-text !important;
+}
+
+.bg-ink {
+  background: $zs-text !important;
+}
+
+// muted — второстепенный текст: «Выйти»
+.text-muted {
+  color: $zs-text-muted !important;
+}
+
+// ok — добавить: тёмно-зелёный
+.text-ok {
+  color: $zs-ok-fg !important;
+}
+
+// remove — удалить строку: «✕»
+.text-remove {
+  color: $zs-remove-fg !important;
+}
+
+// danger — опасное действие с заливкой: «Отклонить заявку»
+.text-danger {
+  color: $zs-danger !important;
+}
+
+.bg-danger {
+  background: $zs-danger !important;
+}
+
+// error — текст ошибки: «Отменить отметку об отправлении»
+.text-error {
+  color: $zs-error-fg !important;
+}
+
+// q-btn outline рисует рамку цветом текста; zs-soft-border — рамка светло-серая, как у полей
+.q-btn.zs-soft-border::before {
+  border-color: $zs-border-input;
+}
+
+// q-btn outline прозрачен; белая кнопка с рамкой — на белом фоне и на сером
+.q-btn--outline.zs-soft-border,
+.q-btn--outline.bg-white {
+  background: #fff !important;
+}
+
+// Кнопки телефона (PWA) — q-btn под палец, двух размеров: zs-pwa-btn — высотой поля телефона (кнопки листов выбора
+// и окон), zs-pwa-btn--lg — главное действие внизу экрана и в карточке
+.q-btn.zs-pwa-btn {
+  min-height: var(--zs-control-height);
+  border-radius: 0.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.q-btn.zs-pwa-btn--lg {
+  min-height: 3.5rem;
+  font-weight: 700;
+}
+
+// Подпись группы на странице телефона: «Все за период» в чек-листах, «Язык интерфейса» в профиле; справа может
+// стоять число. Промежуток между подписью и блоком под ней — 0.5rem, отступ под подписью — на треть меньше
+.zs-group-head {
+  margin-bottom: calc(-0.5rem / 3);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: $zs-text-muted;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 // номера, коды и другие моноширинные значения
 .zs-mono {
   font-family: $zs-font-mono;
@@ -49,36 +151,6 @@ button {
 .zs-sub {
   font-size: 0.8rem;
   color: $zs-text-muted;
-}
-
-// плашка состояния: цвета фона и текста задаются через style
-.zs-badge {
-  display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border-radius: 0.3rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-// основная кнопка заголовка фрейма: «Ввести вагон», «Создать рейс»
-.zs-btn-primary {
-  height: var(--zs-control-height);
-  padding: 0 1rem;
-  border: 0.0625rem solid $primary;
-  border-radius: 0.3rem;
-  background: $primary;
-  color: #fff;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
 }
 
 // Окно выбора даты и периода (PeriodPicker, DatePicker). Не scoped: на телефоне q-popup-proxy подменяет меню на

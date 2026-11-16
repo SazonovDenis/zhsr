@@ -1,7 +1,9 @@
 package kz.zhsr.app.dto.trip;
 
-import kz.zhsr.app.dto.ref.TripRef;
+import kz.zhsr.app.dto.ref.TrainRef;
 import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.train.TrainChange;
+import kz.zhsr.app.dto.train.TrainWagon;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -9,16 +11,20 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
- * Бригада рейса: рейс, состав по порядку, сотрудники бригады и акты отцепки и прицепки.
+ * Рейс, вагоны поезда рейса по порядку, бригада и прицепки и отцепки рейса.
  */
 @Getter
 @Setter
 public class TripCrew {
     private Trip trip;
+    /** вагоны поезда рейса на время рейса: по факту и по плану */
     private List<Wagon> wagons = List.of();
     private List<Member> crew = List.of();
-    /** акты, новые первыми */
-    private List<Act> acts = List.of();
+    /** прицепки и отцепки рейса: плановые и выполненные, по времени */
+    private List<TrainChange> changes = List.of();
+    /** плановые прицепки и отцепки, которые надо отметить до отправления: на станции отправления и вне рейса раньше
+     * отправления */
+    private List<TrainChange> pending = List.of();
 
     /**
      * Рейс.
@@ -29,6 +35,8 @@ public class TripCrew {
         private long id;
         /** маршрут (route) */
         private long route;
+        /** поезд рейса; null - поезд не назначен */
+        private TrainRef train;
         private String trainNumber;
         /** название маршрута */
         private String name;
@@ -55,42 +63,28 @@ public class TripCrew {
         private Long arrivalStation;
         /** остановки маршрута по порядку - id станций */
         private List<Long> stops = List.of();
+        /** остановки маршрута по порядку - route_station.id, по порядку stops */
+        private List<Long> routeStations = List.of();
+        /** время стоянки на остановках по расписанию рейса, по порядку stops */
+        private List<OffsetDateTime> stopTimes = List.of();
+        /**
+         * после прибытия назначен ответственный за вагоны (Ф-РЕЙ-04); false - не назначен, ответственные - проводники
+         * вагонов
+         */
+        private boolean responsibleAssigned;
+        /** ответственный за вагоны, назначенный после прибытия; null - «ответственный не назначен» или назначения нет */
+        private UserRef responsibleUsr;
     }
 
     /**
-     * Вагон состава.
+     * Вагон поезда рейса.
      */
     @Getter
     @Setter
-    public static class Wagon {
-        private String number;
-        private long wagonType;
-        /** пассажирский вагон: норма проводников требуется только для пассажирских вагонов */
-        private boolean passenger;
-        private long locationType;
-        /** место расположения по виду: станция, депо, парк отстоя или рейс */
-        private long place;
-        /** рейс, в составе которого вагон сейчас; null - вагон не в рейсе */
-        private TripRef trip;
-        /** вагон отцеплен актом и в составе не едет */
-        private boolean detached;
-    }
-
-    /**
-     * Акт отцепки или прицепки.
-     */
-    @Getter
-    @Setter
-    public static class Act {
-        private long id;
-        private String number;
-        private long couplingType;
-        /** станция остановки */
-        private long station;
-        /** номера вагонов */
-        private List<String> wagons = List.of();
-        private OffsetDateTime actDt;
-        private long actStatusType;
+    public static class Wagon extends TrainWagon {
+        /** вагон едет в поезде рейса: в рейсе в статусе «план» - на отправлении, иначе - сейчас; иначе отцеплен или
+         * прицепляется в пути */
+        private boolean riding;
     }
 
     /**

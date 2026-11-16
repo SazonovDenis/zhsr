@@ -23,10 +23,10 @@
       </div>
 
       <div class="route-edit__columns">
-        <div class="route-edit__column">
+        <div class="route-edit__column route-edit__column--stops">
           <div class="route-edit__section-title">{{ t('Остановки по порядку') }}</div>
-          <div class="route-edit__card q-pa-md">
-            <RouteStopsEditor v-model="stops" />
+          <div class="route-edit__card route-edit__stops-card q-pa-md">
+            <RouteStopsEditor v-model="stops" :readonly="readonly" />
           </div>
           <div class="route-edit__note">
             {{
@@ -37,38 +37,46 @@
           </div>
         </div>
 
-        <div class="route-edit__column">
+        <div class="route-edit__column route-edit__column--attrs">
           <div class="route-edit__section-title">{{ t('Атрибуты') }}</div>
+          <!-- правка недоступна (readonly) — вместо полей их значения текстом -->
           <div class="route-edit__card route-edit__form q-pa-md">
-            <FormSection columns="7rem minmax(0, 1fr)">
+            <FormSection columns="7rem 16rem">
               <FormField label="Номер поезда">
-                <TextInput v-model="form.train" mono />
+                <span v-if="readonly" class="route-edit__value route-edit__value--mono">{{ form.train }}</span>
+                <TextInput v-else v-model="form.train" mono />
               </FormField>
               <FormField label="Сообщение">
-                <TextInput v-model="form.name" placeholder="Например, Астана — Караганда" />
+                <span v-if="readonly" class="route-edit__value">{{ form.name }}</span>
+                <TextInput v-else v-model="form.name" placeholder="Например, Астана — Караганда" />
               </FormField>
             </FormSection>
 
-            <FormField label="Вид маршрута">
-              <CbSegment
-                v-model="form.kind"
-                class="route-edit__kind"
-                single
-                required
-                :values="dictChoices('RouteKind')"
-              />
-            </FormField>
-
+            <!-- дата ввода и вид маршрута — в одну строку; поля своей ширины, а не во всю форму -->
             <FormSection columns="repeat(2, max-content)">
               <FormField label="Дата ввода маршрута">
+                <span v-if="readonly" class="route-edit__value">{{ dateText(form.since) }}</span>
                 <DatePicker
+                  v-else
                   v-model="form.since"
                   date-text="Дата ввода маршрута"
                   :quick="['today', 'todayPlus1', 'todayPlus2', 'nextMonthStart']"
                 />
               </FormField>
+              <FormField label="Вид маршрута">
+                <span v-if="readonly" class="route-edit__value">{{
+                  dictManager.getValue('RouteKind', form.kind)
+                }}</span>
+                <CbSegment v-else v-model="form.kind" single required :values="dictChoices('RouteKind')" />
+              </FormField>
+            </FormSection>
+
+            <!-- поле даты — своей ширины, а не во всю форму -->
+            <FormSection columns="max-content">
               <FormField label="Дата завершения">
+                <span v-if="readonly" class="route-edit__value">{{ dateText(form.until) }}</span>
                 <DatePicker
+                  v-else
                   v-model="form.until"
                   date-text="Дата завершения"
                   :quick="['monthEnd', 'yearEnd', 'today']"
@@ -76,20 +84,18 @@
               </FormField>
             </FormSection>
 
-            <FormSection title="Время в пути и нормы часов" divided columns="repeat(2, minmax(0, 1fr))">
-              <!-- время в пути вводит пользователь; по остановкам (перегоны и стоянки) — подсказка и значение по умолчанию -->
-              <FormField label="Время в пути, ч:мм">
-                <TextInput v-model="form.duration" placeholder="ч:мм" @update:model-value="onDurationInput" />
-                <span class="route-edit__hint">{{ t('по остановкам — {time}', { time: durationText }) }}</span>
-              </FormField>
+            <FormSection title="Нормы часов" divided columns="repeat(3, 6rem)">
               <FormField label="Проводник, ч">
-                <TextInput v-model="form.hc" inputmode="numeric" />
+                <span v-if="readonly" class="route-edit__value">{{ form.hc || '—' }}</span>
+                <TextInput v-else v-model="form.hc" inputmode="numeric" />
               </FormField>
               <FormField label="ЛНП, ч">
-                <TextInput v-model="form.hl" inputmode="numeric" />
+                <span v-if="readonly" class="route-edit__value">{{ form.hl || '—' }}</span>
+                <TextInput v-else v-model="form.hl" inputmode="numeric" />
               </FormField>
               <FormField label="ПЭМ, ч">
-                <TextInput v-model="form.hp" inputmode="numeric" />
+                <span v-if="readonly" class="route-edit__value">{{ form.hp || '—' }}</span>
+                <TextInput v-else v-model="form.hp" inputmode="numeric" />
               </FormField>
             </FormSection>
 
@@ -120,7 +126,7 @@
 
 <script setup lang="ts">
 import { Notify } from 'quasar'
-import { computed, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, reactive, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { Route, RoutePoint, RouteStop } from '@/api/routes'
@@ -144,7 +150,7 @@ import { RoleType } from '@/shared/constants/systemDicts'
 import { roleReason } from '@/shared/roleReason'
 import { loadCurrentUser } from '@/shared/user'
 import DesktopFrame from '../frame/DesktopFrame.vue'
-import { formatHm, totalMinutes } from './duration'
+import { leaveOf } from './duration'
 import RouteStops from './RouteStops.vue'
 import RouteStopsEditor from './RouteStopsEditor.vue'
 
@@ -159,8 +165,15 @@ const props = defineProps<{ id: string }>()
 
 const router = useRouter()
 
-// маршрут правят администратор и планировщик вагонов (Ф-МАР-02); остальным кнопка неактивна, причина рядом
+// маршрут правят администратор и планировщик вагонов (Ф-МАР-02); остальным кнопка неактивна, причина рядом, а
+// остановки и атрибуты показаны текстом
 const saveReason = computed(() => roleReason([RoleType.WAGON_PLANNER], 'Правит планировщик вагонов'))
+const readonly = computed(() => !!saveReason.value)
+
+/** Дата ISO «2026-10-30» — «30.10.2026»; пусто — прочерк. */
+function dateText(iso: string): string {
+  return iso ? iso.slice(0, 10).split('-').reverse().join('.') : '—'
+}
 
 const route = shallowRef<Route | null>(null)
 // общее ожидание страницы: спиннер на месте маршрута — на всю цепочку загрузок
@@ -174,8 +187,6 @@ const form = reactive({
   kind: RouteKind.REGULAR,
   since: '',
   until: '',
-  // время в пути «ч:мм»
-  duration: '',
   hc: '',
   hl: '',
   hp: '',
@@ -214,18 +225,29 @@ const previewPoints = computed<RoutePoint[]>(() => {
         cursor = found.end
       }
     }
-    // время в пути остановки — от предыдущей остановки; часть его приходится на перегоны до станций следования
-    const passingMin = passing.reduce((sum, p) => sum + p.runDuration, 0)
     const last = i === filled.length - 1
-    result.push(...passing, {
+    result.push(...(prev ? passing.map((p) => passingTime(p, prev, stop)) : []), {
       ...stop,
       haveStop: true,
-      runDuration: Math.max(0, stop.runDuration - passingMin),
-      stopDuration: i === 0 || last ? 0 : stop.stopDuration,
+      arrivalMin: i === 0 ? null : stop.arrivalMin,
+      departureMin: last ? null : stop.departureMin,
     })
   })
   return result
 })
+
+/**
+ * Время станции следования между остановками from и to — по расстоянию между отправлением с from и прибытием на to,
+ * как считает сервер при сохранении; прибытие и отправление совпадают.
+ */
+function passingTime(p: RoutePoint, from: RouteStop, to: RouteStop): RoutePoint {
+  const start = leaveOf(from)
+  const end = to.arrivalMin
+  if (start == null || end == null) return { ...p, arrivalMin: null, departureMin: null }
+  const length = to.km - from.km
+  const time = start + (length > 0 ? Math.round(((end - start) * (p.km - from.km)) / length) : 0)
+  return { ...p, arrivalMin: time, departureMin: time }
+}
 
 /**
  * Станции следования между станциями from и to по маршруту до правки, начиная с места cursor: самый короткий кусок
@@ -250,13 +272,12 @@ function passingBetween(
   for (let i = first; i < end; i++) if (points[i]!.station === from.station) start = i
   const shift = from.km - points[start]!.km
   const passing = withoutLoops(points.slice(start + 1, end))
-  return { passing: passing.map((p) => ({ ...p, km: p.km + shift, haveStop: false, stopDuration: 0 })), end }
+  return { passing: passing.map((p) => ({ ...p, km: p.km + shift, haveStop: false })), end }
 }
 
 /**
  * Станции без петель: станция встретилась снова — всё, что было между её появлениями, и само повторное появление
- * выпадают. Время в пути выпавших перегонов не учитывается, расстояния следующих станций уменьшаются на длину петли:
- * путь короче.
+ * выпадают. Расстояния следующих станций уменьшаются на длину петли: путь короче.
  */
 function withoutLoops(points: RoutePoint[]): RoutePoint[] {
   const result: RoutePoint[] = []
@@ -275,22 +296,11 @@ function withoutLoops(points: RoutePoint[]): RoutePoint[] {
   return result
 }
 
-/** Остановки из точек маршрута: время в пути остановки — от предыдущей остановки, вместе со станциями следования. */
+/** Остановки из точек маршрута: станции следования не входят. */
 function toStops(points: RoutePoint[]): RouteStop[] {
-  const result: RouteStop[] = []
-  let runDuration = 0
-  for (const p of points) {
-    runDuration += p.runDuration
-    if (!p.haveStop) continue
-    result.push({
-      station: p.station,
-      km: p.km,
-      runDuration: result.length === 0 ? 0 : runDuration,
-      stopDuration: p.stopDuration,
-    })
-    runDuration = 0
-  }
-  return result
+  return points
+    .filter((p) => p.haveStop)
+    .map((p) => ({ station: p.station, km: p.km, arrivalMin: p.arrivalMin, departureMin: p.departureMin }))
 }
 
 function fill(r: Route) {
@@ -302,46 +312,20 @@ function fill(r: Route) {
     kind: r.routeKind,
     since: r.dbeg,
     until: r.dend ?? '',
-    duration: r.duration > 0 ? formatHm(r.duration) : '',
     hc: r.conductorHours === null ? '' : String(r.conductorHours),
     hl: r.lnpHours === null ? '' : String(r.lnpHours),
     hp: r.pemHours === null ? '' : String(r.pemHours),
   })
-  durationTouched = r.duration > 0
-  if (!durationTouched) form.duration = durationText.value
-}
-
-// время в пути не вводили (новый маршрут) — оно идёт за подсказкой по остановкам
-let durationTouched = false
-
-function onDurationInput() {
-  durationTouched = true
 }
 
 function back() {
   void router.push({ name: 'routes' })
 }
 
-/** Время в пути по остановкам, мин: путь от начальной станции до конечной вместе с промежуточными стоянками. */
-const routeMinutes = computed(() => totalMinutes(stops.value))
-
-/** «19:05» — часы и минуты, тот же формат, что у времени в пути на схеме маршрута */
-const durationText = computed(() => formatHm(routeMinutes.value))
-watch(routeMinutes, () => {
-  if (!durationTouched) form.duration = durationText.value
-})
-
 /** Норма часов: целое неотрицательное число; иначе null. */
 function hours(value: string): number | null {
   const text = value.trim()
   return /^\d+$/.test(text) ? Number(text) : null
-}
-
-/** Время в пути «ч:мм» → минуты; не «ч:мм» или 0 — null. */
-function durationMinutes(value: string): number | null {
-  const m = /^(\d+):([0-5]\d)$/.exec(value.trim())
-  const minutes = m ? Number(m[1]) * 60 + Number(m[2]) : 0
-  return minutes > 0 ? minutes : null
 }
 
 async function save() {
@@ -350,11 +334,6 @@ async function save() {
   const values = [form.hc, form.hl, form.hp].map(hours)
   if (!form.train || !form.name || !form.since) {
     error.value = formError(t('Заполните номер поезда, сообщение и дату ввода маршрута'))
-    return
-  }
-  const duration = durationMinutes(form.duration)
-  if (duration === null) {
-    error.value = formError(t('Укажите время в пути в виде ч:мм, например 19:05'))
     return
   }
   if (values.some((v) => v === null)) {
@@ -377,7 +356,6 @@ async function save() {
         routeKind: form.kind,
         dbeg: form.since,
         dend: form.until || null,
-        duration,
         conductorHours: hc!,
         lnpHours: hl!,
         pemHours: hp!,
@@ -435,7 +413,7 @@ void init()
 .route-edit__map {
   flex: none;
   align-self: stretch;
-  width: 12rem;
+  width: 16rem;
   margin: -0.8rem 0 -0.8rem -1rem;
 }
 
@@ -443,11 +421,13 @@ void init()
   width: 30rem;
 }
 
+// колонки — не уже своего содержимого, растут вместе (остановки — до своей наибольшей ширины); не помещаются рядом —
+// атрибуты ниже
 .route-edit__columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(21.3rem, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 1.3rem;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .route-edit__column {
@@ -455,16 +435,28 @@ void init()
   flex-direction: column;
   gap: 0.8rem;
   min-width: 0;
+
+  // остановки — от наименьшей ширины своей таблицы до наибольшей: ширину станции в таблице ограничивает
+  // RouteStopsEditor; свободное место сверх неё забирают атрибуты
+  &--stops {
+    flex: 1 1 auto;
+    width: min-content;
+    max-width: max-content;
+  }
+
+  // атрибуты — не уже своего содержимого, растут вместе с остановками
+  &--attrs {
+    flex: 1 1 auto;
+    max-width: 100%;
+  }
 }
 
 .route-edit__section-title {
   // отступ под подписью группы — на треть меньше промежутка между блоками (0.8rem)
   margin-bottom: calc(-0.8rem / 3);
   color: $zs-text-muted;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .route-edit__card {
@@ -473,22 +465,34 @@ void init()
   background: #fff;
 }
 
+// редактор остановок шире узкой колонки — прокрутка вбок внутри карточки
+.route-edit__stops-card {
+  overflow-x: auto;
+}
+
+// значение вместо поля при readonly: той же высоты, что и поле, — форма не меняет высоту
+.route-edit__value {
+  display: flex;
+  align-items: center;
+  min-height: var(--zs-control-height);
+  color: $zs-text;
+  font-size: var(--zs-control-font-size);
+  font-weight: 400;
+
+  &--mono {
+    font-family: $zs-font-mono;
+  }
+}
+
 .route-edit__form {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.route-edit__kind {
-  align-self: flex-start;
-}
-
-.route-edit__hint {
-  color: $zs-text-muted;
-  font-size: 0.8rem;
-}
-
+// примечание не влияет на ширину колонки: переносится по её ширине
 .route-edit__note {
+  contain: inline-size;
   color: $zs-text-muted;
   font-size: 0.8rem;
   line-height: 1.45;

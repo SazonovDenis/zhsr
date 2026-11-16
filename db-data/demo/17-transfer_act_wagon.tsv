@@ -1,0 +1,10 @@
+id	transfer_act	wagon	seq	with_property	note	wagon_location
+1	1	19	1	true		19
+2	1	20	2	true		20
+3	1	21	3	false	Без постельного белья	21
+4	2	22	1	true		22
+5	2	23	2	true		23
+6	3	6	1	false		
+7	4	7	1	true		
+8	5	15	1	true		
+9	5	17	2	true	После ТО	

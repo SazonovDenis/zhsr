@@ -9,14 +9,7 @@
   >
     <FormSection :title="table.title">
       <FormField v-for="f in fields" :key="f.col.name" :label="label(f.col)">
-        <CbSegment
-          v-if="f.col.type === 'BOOL'"
-          v-model="f.choice"
-          class="admin-row__segment"
-          single
-          required
-          :values="yesNo"
-        />
+        <CbSegment v-if="f.col.type === 'BOOL'" v-model="f.choice" single required :values="yesNo" />
         <CbList
           v-else-if="f.col.type === 'REF'"
           v-model="f.choice"
@@ -70,7 +63,7 @@ import FormSection from '@/shared/components/form/FormSection.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
 import { sortFields } from '../shared/adminFieldOrder'
-import { adminOptions } from './adminTables'
+import { adminOptions, SORT_ORDER } from './adminTables'
 
 /**
  * Диалог записи общего редактора: поля формы строятся по описанию таблицы. row = null — новая запись. У существующей
@@ -105,17 +98,20 @@ interface Field {
 }
 
 const fields = reactive<Field[]>(
-  sortFields(props.table.name, props.table.columns, (col) => col.name).map((col) => {
-    const value = props.row?.[col.name]
-    return {
-      col,
-      text: col.type !== 'BOOL' && col.type !== 'REF' ? textOf(value) : '',
-      choice: col.type === 'BOOL' ? (value === true ? 'yes' : 'no') : typeof value === 'number' ? value : null,
-      date: col.type === 'DATE' && typeof value === 'string' ? value : null,
-      choices: [],
-      load: null,
-    }
-  }),
+  // порядок показа в форме не вводится: его меняют кнопки перестановки в таблице, новой записи ставит сервер
+  sortFields(props.table.name, props.table.columns, (col) => col.name)
+    .filter((col) => col.name !== SORT_ORDER)
+    .map((col) => {
+      const value = props.row?.[col.name]
+      return {
+        col,
+        text: col.type !== 'BOOL' && col.type !== 'REF' ? textOf(value) : '',
+        choice: col.type === 'BOOL' ? (value === true ? 'yes' : 'no') : typeof value === 'number' ? value : null,
+        date: col.type === 'DATE' && typeof value === 'string' ? value : null,
+        choices: [],
+        load: null,
+      }
+    }),
 )
 
 const running = ref(false)
@@ -194,10 +190,6 @@ function message(e: unknown): ShownError {
 </script>
 
 <style scoped lang="scss">
-.admin-row__segment {
-  align-self: flex-start;
-}
-
 .admin-row__delete-btn {
   min-height: var(--zs-control-height);
   font-weight: 600;

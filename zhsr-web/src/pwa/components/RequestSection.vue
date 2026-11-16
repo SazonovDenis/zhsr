@@ -40,10 +40,8 @@ withDefaults(defineProps<{ title: string; requests: RepairRequest[]; queued?: Qu
   align-items: center;
   gap: 0.5rem;
   color: $zs-text-muted;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .request-section__count {

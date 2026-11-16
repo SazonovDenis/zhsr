@@ -28,7 +28,17 @@ const admin = () => import('@/admin/admin')
  * Таблицы общего редактора администрирования (их перечень и поля задаёт сервер: AdminTables). Маршрут таблицы —
  * admin-<таблица>, на него ссылается пункт меню.
  */
-const ADMIN_TABLES = ['depot', 'yard', 'station', 'stage', 'wagon_type', 'model_type', 'fault_group_type', 'fault_type']
+const ADMIN_TABLES = [
+  'depot',
+  'yard',
+  'station',
+  'stage',
+  'wagon_type',
+  'model_type',
+  'fault_group_type',
+  'fault_type',
+  'fault_type_favorite',
+]
 
 const routes: RouteRecordRaw[] = [
   {
@@ -77,6 +87,44 @@ const routes: RouteRecordRaw[] = [
         meta: { pair: 'requests', title: 'Редактирование заявки' },
         props: true,
         component: () => pwa().then((m) => m.PwaRequestWizardPage),
+      },
+      {
+        path: 'checks',
+        name: 'pwa-checks',
+        meta: { tabs: true, pair: 'checks', title: 'Описи и чек-листы' },
+        component: () => pwa().then((m) => m.PwaChecksPage),
+      },
+      {
+        path: 'checks/start',
+        name: 'pwa-check-start',
+        meta: { pair: 'checks', title: 'Описи и чек-листы' },
+        component: () => pwa().then((m) => m.PwaCheckStartPage),
+      },
+      {
+        path: 'checks/new',
+        name: 'pwa-check-new',
+        meta: { pair: 'checks', title: 'Чек-лист' },
+        component: () => pwa().then((m) => m.PwaCheckFillPage),
+      },
+      {
+        path: 'checks/:id',
+        name: 'pwa-check-list',
+        meta: { pair: 'checks', title: 'Чек-лист' },
+        props: true,
+        component: () => pwa().then((m) => m.PwaCheckListPage),
+      },
+      {
+        path: 'equip/:id',
+        name: 'pwa-equip-list',
+        meta: { pair: 'equip', title: 'Опись экипировки' },
+        props: true,
+        component: () => pwa().then((m) => m.PwaEquipListPage),
+      },
+      {
+        path: 'equip/new',
+        name: 'pwa-equip-new',
+        meta: { pair: 'equip', title: 'Опись экипировки' },
+        component: () => pwa().then((m) => m.PwaEquipFillPage),
       },
       {
         path: 'profile',
@@ -137,11 +185,33 @@ const routes: RouteRecordRaw[] = [
         component: () => desktop().then((m) => m.TripCouplingPage),
       },
       { path: 'routes', name: 'routes', component: () => desktop().then((m) => m.RoutesPage) },
+      { path: 'trains', name: 'trains', component: () => desktop().then((m) => m.TrainsPage) },
+      {
+        path: 'trains/:id',
+        name: 'train-form',
+        meta: { hideMenu: true },
+        props: true,
+        component: () => desktop().then((m) => m.TrainFormPage),
+      },
       {
         path: 'requests',
         name: 'requests',
         meta: { pair: 'pwa-requests' },
         component: () => desktop().then((m) => m.RequestsPage),
+      },
+      { path: 'checks', name: 'checks', component: () => desktop().then((m) => m.ChecksPage) },
+      {
+        path: 'checks/new',
+        name: 'check-new',
+        meta: { hideMenu: true },
+        component: () => desktop().then((m) => m.CheckFillPage),
+      },
+      { path: 'equip', name: 'equip', component: () => desktop().then((m) => m.EquipListsPage) },
+      {
+        path: 'equip/new',
+        name: 'equip-new',
+        meta: { hideMenu: true },
+        component: () => desktop().then((m) => m.EquipFillPage),
       },
       {
         path: 'routes/:id',
@@ -153,6 +223,35 @@ const routes: RouteRecordRaw[] = [
       // администрирование: пункты меню десктопной части, страницы загружаются чанком admin при первом переходе
       { path: 'admin', name: 'admin-home', component: () => admin().then((m) => m.AdminHomePage) },
       { path: 'admin/users', name: 'admin-users', component: () => admin().then((m) => m.AdminUsersPage) },
+      {
+        path: 'admin/check-dicts',
+        name: 'admin-check-dicts',
+        component: () => admin().then((m) => m.AdminCheckDictsPage),
+      },
+      {
+        path: 'admin/check-templates',
+        name: 'admin-check-templates',
+        component: () => admin().then((m) => m.AdminCheckTemplatesPage),
+      },
+      {
+        path: 'admin/check-templates/:id',
+        name: 'admin-check-template',
+        meta: { hideMenu: true },
+        props: true,
+        component: () => admin().then((m) => m.AdminCheckItemsPage),
+      },
+      {
+        path: 'admin/equip-templates',
+        name: 'admin-equip-templates',
+        component: () => admin().then((m) => m.AdminEquipTemplatesPage),
+      },
+      {
+        path: 'admin/equip-templates/:id',
+        name: 'admin-equip-template',
+        meta: { hideMenu: true },
+        props: true,
+        component: () => admin().then((m) => m.AdminEquipItemsPage),
+      },
       ...ADMIN_TABLES.map((table) => ({
         path: `admin/tables/${table}`,
         name: `admin-${table}`,

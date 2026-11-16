@@ -89,11 +89,6 @@
                                  referencedTableName="trip_status_type" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-fk_coupling_act_coupling_type" author="zhsr">
-        <addForeignKeyConstraint baseTableName="coupling_act" baseColumnNames="coupling_type" constraintName="fk_coupling_act_coupling_type"
-                                 referencedTableName="coupling_type" referencedColumnNames="id"/>
-    </changeSet>
-
     <!-- wagon_status -->
 
     <changeSet id="02-location-indexes-fk_wagon_status_wagon" author="zhsr">
@@ -118,6 +113,84 @@
     <!-- периоды вагона не пересекаются -->
     <changeSet id="02-location-indexes-ex_wagon_status_overlap" author="zhsr">
         <sql>alter table wagon_status add constraint ex_wagon_status_overlap exclude using gist (wagon with =, tstzrange(dbeg, dend) with &amp;&amp;)</sql>
+    </changeSet>
+
+    <!-- wagon_responsible -->
+
+    <changeSet id="02-location-indexes-fk_wagon_responsible_wagon" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_responsible" baseColumnNames="wagon" constraintName="fk_wagon_responsible_wagon"
+                                 referencedTableName="wagon" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_wagon_responsible_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_responsible" baseColumnNames="usr" constraintName="fk_wagon_responsible_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-ck_wagon_responsible_period" author="zhsr">
+        <sql>alter table wagon_responsible add constraint ck_wagon_responsible_period check (dend is null or dend &gt; dbeg)</sql>
+    </changeSet>
+
+    <!-- у вагона одна текущая запись -->
+    <changeSet id="02-location-indexes-ux_wagon_responsible_current" author="zhsr">
+        <sql>create unique index ux_wagon_responsible_current on wagon_responsible (wagon) where dend is null</sql>
+    </changeSet>
+
+    <!-- периоды вагона не пересекаются -->
+    <changeSet id="02-location-indexes-ex_wagon_responsible_overlap" author="zhsr">
+        <sql>alter table wagon_responsible add constraint ex_wagon_responsible_overlap exclude using gist (wagon with =, tstzrange(dbeg, dend) with &amp;&amp;)</sql>
+    </changeSet>
+
+    <!-- вагоны, за которые отвечает сотрудник -->
+    <changeSet id="02-location-indexes-ix_wagon_responsible_usr" author="zhsr">
+        <createIndex tableName="wagon_responsible" indexName="ix_wagon_responsible_usr">
+            <column name="usr"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- wagon_edit -->
+
+    <changeSet id="02-location-indexes-fk_wagon_edit_wagon" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_edit" baseColumnNames="wagon" constraintName="fk_wagon_edit_wagon"
+                                 referencedTableName="wagon" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_wagon_edit_created_by_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_edit" baseColumnNames="created_by_usr" constraintName="fk_wagon_edit_created_by_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_wagon_edit_wagon_location" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_edit" baseColumnNames="wagon_location" constraintName="fk_wagon_edit_wagon_location"
+                                 referencedTableName="wagon_location" referencedColumnNames="id" onDelete="SET NULL"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-uq_wagon_edit_wagon_location" author="zhsr">
+        <addUniqueConstraint tableName="wagon_edit" columnNames="wagon_location" constraintName="uq_wagon_edit_wagon_location"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_wagon_edit_wagon_status" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_edit" baseColumnNames="wagon_status" constraintName="fk_wagon_edit_wagon_status"
+                                 referencedTableName="wagon_status" referencedColumnNames="id" onDelete="SET NULL"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-uq_wagon_edit_wagon_status" author="zhsr">
+        <addUniqueConstraint tableName="wagon_edit" columnNames="wagon_status" constraintName="uq_wagon_edit_wagon_status"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_wagon_edit_wagon_responsible" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_edit" baseColumnNames="wagon_responsible" constraintName="fk_wagon_edit_wagon_responsible"
+                                 referencedTableName="wagon_responsible" referencedColumnNames="id" onDelete="SET NULL"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-uq_wagon_edit_wagon_responsible" author="zhsr">
+        <addUniqueConstraint tableName="wagon_edit" columnNames="wagon_responsible" constraintName="uq_wagon_edit_wagon_responsible"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-ix_wagon_edit_wagon" author="zhsr">
+        <createIndex tableName="wagon_edit" indexName="ix_wagon_edit_wagon">
+            <column name="wagon"/>
+        </createIndex>
     </changeSet>
 
     <!-- wagon_info: кэш удаляется вместе с вагоном -->
@@ -197,11 +270,33 @@
         </createIndex>
     </changeSet>
 
+    <changeSet id="02-location-indexes-fk_wagon_info_responsible_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_info" baseColumnNames="responsible_usr" constraintName="fk_wagon_info_responsible_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-ix_wagon_info_responsible_usr" author="zhsr">
+        <createIndex tableName="wagon_info" indexName="ix_wagon_info_responsible_usr">
+            <column name="responsible_usr"/>
+        </createIndex>
+    </changeSet>
+
     <!-- trip -->
 
     <changeSet id="02-location-indexes-fk_trip_route" author="zhsr">
         <addForeignKeyConstraint baseTableName="trip" baseColumnNames="route" constraintName="fk_trip_route"
                                  referencedTableName="route" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_trip_train" author="zhsr">
+        <addForeignKeyConstraint baseTableName="trip" baseColumnNames="train" constraintName="fk_trip_train"
+                                 referencedTableName="train" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-ix_trip_train" author="zhsr">
+        <createIndex tableName="trip" indexName="ix_trip_train">
+            <column name="train"/>
+        </createIndex>
     </changeSet>
 
     <changeSet id="02-location-indexes-fk_trip_departed_by_usr" author="zhsr">
@@ -226,69 +321,157 @@
         <sql>create index ix_trip_active on trip (trip_status_type) where trip_status_type in (1, 2)</sql>
     </changeSet>
 
-    <!-- trip_wagon: строки состава удаляются вместе с рейсом -->
+    <!-- train -->
 
-    <changeSet id="02-location-indexes-uq_trip_wagon_trip_wagon" author="zhsr">
-        <addUniqueConstraint tableName="trip_wagon" columnNames="trip, wagon" constraintName="uq_trip_wagon_trip_wagon"/>
+    <!-- обозначение уникально среди действующих поездов -->
+    <changeSet id="02-location-indexes-ux_train_name" author="zhsr">
+        <sql>create unique index ux_train_name on train (name) where dend is null</sql>
     </changeSet>
 
-    <changeSet id="02-location-indexes-fk_trip_wagon_trip" author="zhsr">
-        <addForeignKeyConstraint baseTableName="trip_wagon" baseColumnNames="trip" constraintName="fk_trip_wagon_trip"
-                                 referencedTableName="trip" referencedColumnNames="id" onDelete="CASCADE"/>
+    <changeSet id="02-location-indexes-ck_train_period" author="zhsr">
+        <sql>alter table train add constraint ck_train_period check (dend is null or dend &gt;= dbeg)</sql>
     </changeSet>
 
-    <changeSet id="02-location-indexes-fk_trip_wagon_wagon" author="zhsr">
-        <addForeignKeyConstraint baseTableName="trip_wagon" baseColumnNames="wagon" constraintName="fk_trip_wagon_wagon"
+    <!-- train_wagon: участия удаляются вместе с поездом -->
+
+    <changeSet id="02-location-indexes-fk_train_wagon_train" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon" baseColumnNames="train" constraintName="fk_train_wagon_train"
+                                 referencedTableName="train" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_train_wagon_wagon" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon" baseColumnNames="wagon" constraintName="fk_train_wagon_wagon"
                                  referencedTableName="wagon" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-fk_trip_wagon_depart_wagon_location" author="zhsr">
-        <addForeignKeyConstraint baseTableName="trip_wagon" baseColumnNames="depart_wagon_location" constraintName="fk_trip_wagon_depart_wagon_location"
+    <!-- отцепка - только после прицепки -->
+    <changeSet id="02-location-indexes-ck_train_wagon_period" author="zhsr">
+        <sql>alter table train_wagon add constraint ck_train_wagon_period check (dend is null or (dbeg is not null and dend &gt;= dbeg))</sql>
+    </changeSet>
+
+    <!-- вагон в каждый момент - не больше чем в одном поезде (по факту) -->
+    <changeSet id="02-location-indexes-ex_train_wagon_overlap" author="zhsr">
+        <sql>alter table train_wagon add constraint ex_train_wagon_overlap exclude using gist (wagon with =, tstzrange(dbeg, dend) with &amp;&amp;) where (dbeg is not null)</sql>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-ix_train_wagon_train" author="zhsr">
+        <sql>create index ix_train_wagon_train on train_wagon (train, seq)</sql>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-ix_train_wagon_wagon" author="zhsr">
+        <sql>create index ix_train_wagon_wagon on train_wagon (wagon)</sql>
+    </changeSet>
+
+    <!-- train_wagon_change: изменения удаляются вместе с участием -->
+
+    <changeSet id="02-location-indexes-fk_train_wagon_change_train_wagon" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_change" baseColumnNames="train_wagon" constraintName="fk_train_wagon_change_train_wagon"
+                                 referencedTableName="train_wagon" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_train_wagon_change_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_change" baseColumnNames="station" constraintName="fk_train_wagon_change_station"
+                                 referencedTableName="station" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_train_wagon_change_trip" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_change" baseColumnNames="trip" constraintName="fk_train_wagon_change_trip"
+                                 referencedTableName="trip" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_train_wagon_change_route_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_change" baseColumnNames="route_station" constraintName="fk_train_wagon_change_route_station"
+                                 referencedTableName="route_station" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_train_wagon_change_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_change" baseColumnNames="usr" constraintName="fk_train_wagon_change_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_train_wagon_change_wagon_location" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_change" baseColumnNames="wagon_location" constraintName="fk_train_wagon_change_wagon_location"
                                  referencedTableName="wagon_location" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-fk_trip_wagon_arrive_wagon_location" author="zhsr">
-        <addForeignKeyConstraint baseTableName="trip_wagon" baseColumnNames="arrive_wagon_location" constraintName="fk_trip_wagon_arrive_wagon_location"
-                                 referencedTableName="wagon_location" referencedColumnNames="id"/>
+    <changeSet id="02-location-indexes-uq_train_wagon_change_wagon_location" author="zhsr">
+        <addUniqueConstraint tableName="train_wagon_change" columnNames="wagon_location" constraintName="uq_train_wagon_change_wagon_location"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-uq_trip_wagon_depart_wagon_location" author="zhsr">
-        <addUniqueConstraint tableName="trip_wagon" columnNames="depart_wagon_location" constraintName="uq_trip_wagon_depart_wagon_location"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-uq_trip_wagon_arrive_wagon_location" author="zhsr">
-        <addUniqueConstraint tableName="trip_wagon" columnNames="arrive_wagon_location" constraintName="uq_trip_wagon_arrive_wagon_location"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-fk_trip_wagon_depart_wagon_status" author="zhsr">
-        <addForeignKeyConstraint baseTableName="trip_wagon" baseColumnNames="depart_wagon_status" constraintName="fk_trip_wagon_depart_wagon_status"
+    <changeSet id="02-location-indexes-fk_train_wagon_change_wagon_status" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_change" baseColumnNames="wagon_status" constraintName="fk_train_wagon_change_wagon_status"
                                  referencedTableName="wagon_status" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-fk_trip_wagon_arrive_wagon_status" author="zhsr">
-        <addForeignKeyConstraint baseTableName="trip_wagon" baseColumnNames="arrive_wagon_status" constraintName="fk_trip_wagon_arrive_wagon_status"
-                                 referencedTableName="wagon_status" referencedColumnNames="id"/>
+    <changeSet id="02-location-indexes-uq_train_wagon_change_wagon_status" author="zhsr">
+        <addUniqueConstraint tableName="train_wagon_change" columnNames="wagon_status" constraintName="uq_train_wagon_change_wagon_status"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-uq_trip_wagon_depart_wagon_status" author="zhsr">
-        <addUniqueConstraint tableName="trip_wagon" columnNames="depart_wagon_status" constraintName="uq_trip_wagon_depart_wagon_status"/>
+    <changeSet id="02-location-indexes-fk_train_wagon_change_wagon_responsible" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_change" baseColumnNames="wagon_responsible" constraintName="fk_train_wagon_change_wagon_responsible"
+                                 referencedTableName="wagon_responsible" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-uq_trip_wagon_arrive_wagon_status" author="zhsr">
-        <addUniqueConstraint tableName="trip_wagon" columnNames="arrive_wagon_status" constraintName="uq_trip_wagon_arrive_wagon_status"/>
+    <changeSet id="02-location-indexes-uq_train_wagon_change_wagon_responsible" author="zhsr">
+        <addUniqueConstraint tableName="train_wagon_change" columnNames="wagon_responsible" constraintName="uq_train_wagon_change_wagon_responsible"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-ix_trip_wagon_wagon" author="zhsr">
-        <createIndex tableName="trip_wagon" indexName="ix_trip_wagon_wagon">
-            <column name="wagon"/>
-        </createIndex>
+    <!-- вид изменения: 1 - прицепка, 2 - отцепка (TrainWagonChangeType) -->
+    <changeSet id="02-location-indexes-ck_train_wagon_change_change_type" author="zhsr">
+        <sql>alter table train_wagon_change add constraint ck_train_wagon_change_change_type check (change_type in (1, 2))</sql>
+    </changeSet>
+
+    <!-- статус: 1 - план, 2 - выполнено, 3 - отменено (TrainWagonChangeStatus); выполненное - с фактическим временем, плановое и отменённое - без него -->
+    <changeSet id="02-location-indexes-ck_train_wagon_change_status" author="zhsr">
+        <sql>alter table train_wagon_change add constraint ck_train_wagon_change_status check (status in (1, 2, 3) and (status = 2) = (fact_dt is not null))</sql>
+    </changeSet>
+
+    <!-- рейс и остановка его маршрута заданы вместе -->
+    <changeSet id="02-location-indexes-ck_train_wagon_change_trip" author="zhsr">
+        <sql>alter table train_wagon_change add constraint ck_train_wagon_change_trip check ((trip is null) = (route_station is null))</sql>
+    </changeSet>
+
+    <!-- запланированные изменения: для отметки факта и резерва вагонов -->
+    <changeSet id="02-location-indexes-ix_train_wagon_change_planned" author="zhsr">
+        <sql>create index ix_train_wagon_change_planned on train_wagon_change (train_wagon) where status = 1</sql>
+    </changeSet>
+
+    <!-- прицепки и отцепки рейса -->
+    <changeSet id="02-location-indexes-ix_train_wagon_change_trip" author="zhsr">
+        <sql>create index ix_train_wagon_change_trip on train_wagon_change (trip) where trip is not null</sql>
+    </changeSet>
+
+    <!-- wagon_run: пробег удаляется вместе с участием в поезде -->
+
+    <changeSet id="02-location-indexes-fk_wagon_run_wagon" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_run" baseColumnNames="wagon" constraintName="fk_wagon_run_wagon"
+                                 referencedTableName="wagon" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_wagon_run_trip" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_run" baseColumnNames="trip" constraintName="fk_wagon_run_trip"
+                                 referencedTableName="trip" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-fk_wagon_run_train_wagon" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_run" baseColumnNames="train_wagon" constraintName="fk_wagon_run_train_wagon"
+                                 referencedTableName="train_wagon" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <!-- одно участие в поезде - один участок в рейсе -->
+    <changeSet id="02-location-indexes-ux_wagon_run_trip_train_wagon" author="zhsr">
+        <sql>create unique index ux_wagon_run_trip_train_wagon on wagon_run (trip, train_wagon)</sql>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-ck_wagon_run_km" author="zhsr">
+        <sql>alter table wagon_run add constraint ck_wagon_run_km check (km &gt;= 0)</sql>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-ix_wagon_run_wagon" author="zhsr">
+        <sql>create index ix_wagon_run_wagon on wagon_run (wagon)</sql>
     </changeSet>
 
     <!-- trip_crew: бригада удаляется вместе с рейсом -->
-
-    <changeSet id="02-location-indexes-uq_trip_crew_trip_usr" author="zhsr">
-        <addUniqueConstraint tableName="trip_crew" columnNames="trip, usr" constraintName="uq_trip_crew_trip_usr"/>
-    </changeSet>
 
     <changeSet id="02-location-indexes-fk_trip_crew_trip" author="zhsr">
         <addForeignKeyConstraint baseTableName="trip_crew" baseColumnNames="trip" constraintName="fk_trip_crew_trip"
@@ -305,19 +488,24 @@
                                  referencedTableName="wagon" referencedColumnNames="id"/>
     </changeSet>
 
-    <changeSet id="02-location-indexes-fk_trip_crew_wagon2" author="zhsr">
-        <addForeignKeyConstraint baseTableName="trip_crew" baseColumnNames="wagon2" constraintName="fk_trip_crew_wagon2"
-                                 referencedTableName="wagon" referencedColumnNames="id"/>
-    </changeSet>
-
     <changeSet id="02-location-indexes-fk_trip_crew_usr" author="zhsr">
         <addForeignKeyConstraint baseTableName="trip_crew" baseColumnNames="usr" constraintName="fk_trip_crew_usr"
                                  referencedTableName="usr" referencedColumnNames="id"/>
     </changeSet>
 
-    <!-- начальник поезда и ПЭМ - не больше одного на рейс; id из crew_duty_type.tsv: 2 - начальник поезда, 3 - ПЭМ -->
+    <!-- сотрудник при одном вагоне (или без вагона) - одна строка рейса с одним заступлением -->
+    <changeSet id="02-location-indexes-ux_trip_crew_trip_usr_wagon" author="zhsr">
+        <sql>create unique index ux_trip_crew_trip_usr_wagon on trip_crew (trip, usr, coalesce(wagon, 0), coalesce(dbeg, '-infinity'))</sql>
+    </changeSet>
+
+    <!-- начальник поезда и ПЭМ - не больше одного на дежурстве в рейсе; id из crew_duty_type.tsv: 2 - начальник поезда,
+         3 - ПЭМ -->
     <changeSet id="02-location-indexes-ux_trip_crew_trip_crew_duty_type" author="zhsr">
-        <sql>create unique index ux_trip_crew_trip_crew_duty_type on trip_crew (trip, crew_duty_type) where crew_duty_type in (2, 3)</sql>
+        <sql>create unique index ux_trip_crew_trip_crew_duty_type on trip_crew (trip, crew_duty_type) where crew_duty_type in (2, 3) and dend is null</sql>
+    </changeSet>
+
+    <changeSet id="02-location-indexes-ck_trip_crew_period" author="zhsr">
+        <sql>alter table trip_crew add constraint ck_trip_crew_period check (dend is null or dbeg is null or dend &gt;= dbeg)</sql>
     </changeSet>
 
     <changeSet id="02-location-indexes-ix_trip_crew_usr" author="zhsr">
@@ -331,85 +519,6 @@
     <changeSet id="02-location-indexes-fk_act_cancellation_created_by_usr" author="zhsr">
         <addForeignKeyConstraint baseTableName="act_cancellation" baseColumnNames="created_by_usr" constraintName="fk_act_cancellation_created_by_usr"
                                  referencedTableName="usr" referencedColumnNames="id"/>
-    </changeSet>
-
-    <!-- coupling_act: строки удаляются вместе с актом -->
-
-    <changeSet id="02-location-indexes-uq_coupling_act_number" author="zhsr">
-        <addUniqueConstraint tableName="coupling_act" columnNames="number" constraintName="uq_coupling_act_number"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-fk_coupling_act_created_by_usr" author="zhsr">
-        <addForeignKeyConstraint baseTableName="coupling_act" baseColumnNames="created_by_usr" constraintName="fk_coupling_act_created_by_usr"
-                                 referencedTableName="usr" referencedColumnNames="id"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-fk_coupling_act_act_status_type" author="zhsr">
-        <addForeignKeyConstraint baseTableName="coupling_act" baseColumnNames="act_status_type" constraintName="fk_coupling_act_act_status_type"
-                                 referencedTableName="act_status_type" referencedColumnNames="id"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-fk_coupling_act_act_cancellation" author="zhsr">
-        <addForeignKeyConstraint baseTableName="coupling_act" baseColumnNames="act_cancellation" constraintName="fk_coupling_act_act_cancellation"
-                                 referencedTableName="act_cancellation" referencedColumnNames="id"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-uq_coupling_act_act_cancellation" author="zhsr">
-        <addUniqueConstraint tableName="coupling_act" columnNames="act_cancellation" constraintName="uq_coupling_act_act_cancellation"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-fk_coupling_act_trip" author="zhsr">
-        <addForeignKeyConstraint baseTableName="coupling_act" baseColumnNames="trip" constraintName="fk_coupling_act_trip"
-                                 referencedTableName="trip" referencedColumnNames="id"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-fk_coupling_act_route_station" author="zhsr">
-        <addForeignKeyConstraint baseTableName="coupling_act" baseColumnNames="route_station" constraintName="fk_coupling_act_route_station"
-                                 referencedTableName="route_station" referencedColumnNames="id"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-ix_coupling_act_trip" author="zhsr">
-        <createIndex tableName="coupling_act" indexName="ix_coupling_act_trip">
-            <column name="trip"/>
-        </createIndex>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-uq_coupling_act_wagon_coupling_act_wagon" author="zhsr">
-        <addUniqueConstraint tableName="coupling_act_wagon" columnNames="coupling_act, wagon" constraintName="uq_coupling_act_wagon_coupling_act_wagon"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-fk_coupling_act_wagon_coupling_act" author="zhsr">
-        <addForeignKeyConstraint baseTableName="coupling_act_wagon" baseColumnNames="coupling_act" constraintName="fk_coupling_act_wagon_coupling_act"
-                                 referencedTableName="coupling_act" referencedColumnNames="id" onDelete="CASCADE"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-fk_coupling_act_wagon_wagon" author="zhsr">
-        <addForeignKeyConstraint baseTableName="coupling_act_wagon" baseColumnNames="wagon" constraintName="fk_coupling_act_wagon_wagon"
-                                 referencedTableName="wagon" referencedColumnNames="id"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-fk_coupling_act_wagon_wagon_location" author="zhsr">
-        <addForeignKeyConstraint baseTableName="coupling_act_wagon" baseColumnNames="wagon_location" constraintName="fk_coupling_act_wagon_wagon_location"
-                                 referencedTableName="wagon_location" referencedColumnNames="id" onDelete="SET NULL"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-uq_coupling_act_wagon_wagon_location" author="zhsr">
-        <addUniqueConstraint tableName="coupling_act_wagon" columnNames="wagon_location" constraintName="uq_coupling_act_wagon_wagon_location"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-fk_coupling_act_wagon_wagon_status" author="zhsr">
-        <addForeignKeyConstraint baseTableName="coupling_act_wagon" baseColumnNames="wagon_status" constraintName="fk_coupling_act_wagon_wagon_status"
-                                 referencedTableName="wagon_status" referencedColumnNames="id" onDelete="SET NULL"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-uq_coupling_act_wagon_wagon_status" author="zhsr">
-        <addUniqueConstraint tableName="coupling_act_wagon" columnNames="wagon_status" constraintName="uq_coupling_act_wagon_wagon_status"/>
-    </changeSet>
-
-    <changeSet id="02-location-indexes-ix_coupling_act_wagon_wagon" author="zhsr">
-        <createIndex tableName="coupling_act_wagon" indexName="ix_coupling_act_wagon_wagon">
-            <column name="wagon"/>
-        </createIndex>
     </changeSet>
 
     <!-- transfer_act: строки удаляются вместе с актом -->
@@ -542,14 +651,13 @@
         <addUniqueConstraint tableName="transfer_act_wagon" columnNames="wagon_location" constraintName="uq_transfer_act_wagon_wagon_location"/>
     </changeSet>
 
-    <!-- coupling_act: акт проведён или отменён; id из act_status_type.tsv: 2 - проведён, 4 - отменён -->
-    <changeSet id="02-location-indexes-ck_coupling_act_act_status_type" author="zhsr">
-        <sql>alter table coupling_act add constraint ck_coupling_act_act_status_type check (act_status_type in (2, 4))</sql>
+    <changeSet id="02-location-indexes-fk_transfer_act_wagon_wagon_responsible" author="zhsr">
+        <addForeignKeyConstraint baseTableName="transfer_act_wagon" baseColumnNames="wagon_responsible" constraintName="fk_transfer_act_wagon_wagon_responsible"
+                                 referencedTableName="wagon_responsible" referencedColumnNames="id" onDelete="SET NULL"/>
     </changeSet>
 
-    <!-- статус "отменён" - только со ссылкой на акт отмены -->
-    <changeSet id="02-location-indexes-ck_coupling_act_cancelled" author="zhsr">
-        <sql>alter table coupling_act add constraint ck_coupling_act_cancelled check ((act_status_type = 4) = (act_cancellation is not null))</sql>
+    <changeSet id="02-location-indexes-uq_transfer_act_wagon_wagon_responsible" author="zhsr">
+        <addUniqueConstraint tableName="transfer_act_wagon" columnNames="wagon_responsible" constraintName="uq_transfer_act_wagon_wagon_responsible"/>
     </changeSet>
 
 </databaseChangeLog>

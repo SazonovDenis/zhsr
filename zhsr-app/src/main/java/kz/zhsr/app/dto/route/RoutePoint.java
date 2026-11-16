@@ -18,8 +18,8 @@ public class RoutePoint {
     private int km;
     /** остановка; иначе станция следования */
     private boolean haveStop;
-    /** время в пути от предыдущей станции, мин */
-    private int runDuration;
-    /** стоянка, мин */
-    private int stopDuration;
+    /** прибытие: минуты от полуночи дня отправления с начальной станции; null - у начальной станции */
+    private Integer arrivalMin;
+    /** отправление: минуты от полуночи дня отправления с начальной станции; null - у конечной станции */
+    private Integer departureMin;
 }

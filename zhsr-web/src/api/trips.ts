@@ -2,11 +2,14 @@ import type { TableSort } from '@/shared/components/table/types'
 import { dayStart, isoDateTime } from '@/shared/format'
 import { http } from './http'
 import type { UserRef } from './requests'
+import type { TrainChange, TrainRef, TrainWagon, WagonBusy } from './trains'
 import type { TripRef } from './wagons'
+import type { ResponsibleChoice } from '@/shared/wagons/responsible'
+import { responsibleUsr } from '@/shared/wagons/responsible'
 
 /**
- * API рейсов: список, создание, правка и отмена, формирование рейса (состав и бригада), отправление и прибытие,
- * отцепка и прицепка.
+ * API рейсов: список, создание, правка и отмена, формирование рейса (поезд и бригада), отправление и прибытие,
+ * прицепка и отцепка в рейсе. Вагоны поезда меняет api/trains.ts.
  */
 
 /** Пункт готовности рейса к отправлению: состав, бригада и другие. */
@@ -43,16 +46,18 @@ export interface TripFilter {
   states: number[]
   /** депо: маршрут рейса идёт через станцию депо; null — без ограничения (сервер может ограничить по роли) */
   depot?: number | null
-  /** часть номера вагона: вагон в составе рейса; остальные фильтры не отменяет */
+  /** часть номера вагона: вагон в поезде рейса; остальные фильтры не отменяет */
   wagon?: string
 }
 
-/** Новый рейс: маршрут и плановое отправление. Рейс создаётся в состоянии «План». */
+/** Новый рейс: маршрут, поезд и плановое отправление. Рейс создаётся в состоянии «План». */
 export interface TripDraft {
   /** маршрут — id маршрута (api/routes.ts); null — ещё не выбран */
   route: number | null
   /** плановое отправление, ISO; null — ещё не задано */
   plannedDt: string | null
+  /** поезд — id поезда (api/trains.ts); null — поезд не назначен */
+  train: number | null
 }
 
 /**
@@ -77,6 +82,8 @@ export interface TripOption {
   trainNumber: string
   /** маршрут — id маршрута (api/routes.ts) */
   route: number
+  /** поезд рейса; null — поезд не назначен */
+  train: TrainRef | null
   /** название маршрута: «Алматы — Астана» */
   name: string
   /** вид маршрута — id справочника RouteKind (константы RouteKind) */
@@ -109,6 +116,7 @@ export async function fetchTripOptions(filter: TripFilter): Promise<TripOption[]
 const draftBody = (draft: TripDraft) => ({
   route: draft.route,
   plannedDt: draft.plannedDt ? isoDateTime(new Date(draft.plannedDt)) : null,
+  train: draft.train,
 })
 
 /** Создать рейс в статусе «План». */
@@ -116,7 +124,7 @@ export async function createTrip(draft: TripDraft): Promise<TripRow> {
   return (await http.post<TripRow>('/trips', draftBody(draft))).data
 }
 
-/** Исправить маршрут и плановое отправление рейса в статусе «План». */
+/** Исправить маршрут, поезд и плановое отправление рейса в статусе «План». */
 export async function updateTrip(tripId: number, draft: TripDraft): Promise<TripRow> {
   return (await http.put<TripRow>(`/trips/${tripId}`, draftBody(draft))).data
 }
@@ -137,40 +145,16 @@ export interface CrewMember {
   wagons: string[]
 }
 
-/** Вагон состава в бригаде рейса. */
-export interface CrewWagon {
-  number: string
-  /** тип вагона — id справочника WagonType */
-  wagonType: number
-  /** пассажирский вагон: норма проводников требуется только для пассажирских вагонов */
-  passenger: boolean
-  /** вид расположения — id справочника LocationKind (константы LocationType) */
-  locationType: number
-  /** место расположения по виду: станция, депо, парк отстоя или рейс */
-  place: number
-  /** рейс, в составе которого вагон сейчас; null — вагон не в рейсе */
-  trip: TripRef | null
-  /** вагон отцеплен актом и в составе не едет */
-  detached: boolean
+/** Вагон поезда рейса. */
+export interface CrewWagon extends TrainWagon {
+  /**
+   * вагон едет в поезде рейса: в рейсе «план» — на отправлении, иначе — сейчас; иначе отцеплен или прицепляется в
+   * пути
+   */
+  riding: boolean
 }
 
-/** Акт отцепки или прицепки по рейсу. */
-export interface CouplingAct {
-  id: number
-  number: string
-  /** вид акта — константы CouplingType */
-  couplingType: number
-  /** станция остановки — id справочника Station */
-  station: number
-  /** номера вагонов */
-  wagons: string[]
-  /** когда составлен, ISO с часовым поясом */
-  actDt: string
-  /** состояние акта — константы ActStatus */
-  actStatusType: number
-}
-
-/** Вагон в акте отцепки или прицепки. */
+/** Вагон для прицепки или отцепки в рейсе. */
 export interface CouplingWagon {
   number: string
   /** тип вагона — id справочника WagonType */
@@ -180,18 +164,20 @@ export interface CouplingWagon {
   place: number
   /** состояние вагона — id справочника WagonState */
   wagonStatusType: number
-  /** другой активный рейс, в составе которого вагон; null — такого рейса нет */
-  otherTrip: TripRef | null
+  /** занятость вагона в другом поезде; null — вагон свободен */
+  busy: WagonBusy | null
   /** можно отцепить или прицепить; иначе показан, но отметить нельзя */
   available: boolean
 }
 
-/** Бригада рейса: рейс, состав по порядку и сотрудники бригады. */
+/** Рейс, вагоны поезда рейса по порядку, бригада и прицепки и отцепки рейса. */
 export interface TripCrew {
   trip: {
     id: number
     /** маршрут — id маршрута */
     route: number
+    /** поезд рейса; null — поезд не назначен */
+    train: TrainRef | null
     trainNumber: string
     /** маршрут: «Алматы — Астана» */
     name: string
@@ -215,17 +201,30 @@ export interface TripCrew {
     departureMarkedDt: string | null
     /** когда отмечено прибытие, ISO; null — не отмечено */
     arrivalMarkedDt: string | null
+    /**
+     * после прибытия назначен ответственный за вагоны; false — не назначен, ответственные — проводники вагонов
+     */
+    responsibleAssigned: boolean
+    /** ответственный за вагоны, назначенный после прибытия; null — «не назначен» или назначения нет */
+    responsibleUsr: UserRef | null
     /** станция отправления — id справочника Station; null — у маршрута нет остановок */
     departureStation: number | null
     /** станция прибытия — id справочника Station; null — у маршрута нет остановок */
     arrivalStation: number | null
     /** остановки маршрута по порядку — id справочника Station */
     stops: number[]
+    /** остановки маршрута — route_station.id, по порядку stops */
+    routeStations: number[]
+    /** время стоянки на остановках по расписанию рейса, ISO, по порядку stops */
+    stopTimes: string[]
   }
+  /** вагоны поезда на время рейса: по факту и по плану */
   wagons: CrewWagon[]
   crew: CrewMember[]
-  /** акты отцепки и прицепки, новые первыми */
-  acts: CouplingAct[]
+  /** прицепки и отцепки рейса: плановые и выполненные */
+  changes: TrainChange[]
+  /** плановые прицепки и отцепки, которые надо отметить до отправления */
+  pending: TrainChange[]
 }
 
 /** Проводник для набора в бригаду рейса (диалог «Проводники…»). */
@@ -283,19 +282,32 @@ export async function setTripDuty(tripId: number, duty: number, user: number | n
   return (await http.put<TripCrew>(`/trips/${tripId}/duty/${duty}`, { usr: user })).data
 }
 
-/** Состав рейса целиком, по порядку: вагон не из списка уходит из состава и снимается с проводников. */
-export async function setTripWagons(tripId: number, wagons: string[]): Promise<TripCrew> {
-  return (await http.put<TripCrew>(`/trips/${tripId}/wagons`, wagons)).data
-}
-
 /** Отметить отправление рейса. time — ISO с часовым поясом. */
 export async function markDeparture(tripId: number, time: string): Promise<TripCrew> {
   return (await http.post<TripCrew>(`/trips/${tripId}/depart`, { time })).data
 }
 
-/** Отметить прибытие рейса. time — ISO с часовым поясом. */
-export async function markArrival(tripId: number, time: string): Promise<TripCrew> {
-  return (await http.post<TripCrew>(`/trips/${tripId}/arrive`, { time })).data
+/**
+ * Отметить прибытие рейса. time — ISO с часовым поясом. responsible — ответственный за вагоны, выбранный при отметке:
+ * id сотрудника или «не назначен»; не выбран (null) — ответственный не меняется, до назначения (assignTripResponsible)
+ * им остаётся проводник.
+ */
+export async function markArrival(
+  tripId: number,
+  time: string,
+  responsible: ResponsibleChoice = null,
+): Promise<TripCrew> {
+  const body =
+    responsible === null ? { time } : { time, assignResponsible: true, responsibleUsr: responsibleUsr(responsible) }
+  return (await http.post<TripCrew>(`/trips/${tripId}/arrive`, body)).data
+}
+
+/**
+ * Назначить ответственного за вагоны прибывшего рейса — на все вагоны поезда на станции прибытия. responsibleUsr —
+ * сотрудник, null — ответственный не назначен.
+ */
+export async function assignTripResponsible(tripId: number, responsibleUsr: number | null): Promise<TripCrew> {
+  return (await http.post<TripCrew>(`/trips/${tripId}/responsible`, { responsibleUsr })).data
 }
 
 /** Исправить время отправления (10 минут после отметки). time — ISO с часовым поясом. */
@@ -318,7 +330,10 @@ export async function cancelArrival(tripId: number): Promise<TripCrew> {
   return (await http.delete<TripCrew>(`/trips/${tripId}/arrive`)).data
 }
 
-/** Вагоны для акта: для отцепки — едущие в составе, для прицепки — станции, её депо и парка отстоя. */
+/**
+ * Вагоны для прицепки или отцепки в рейсе: для отцепки — едущие в поезде, для прицепки — станции, её депо и парка
+ * отстоя. type — константы TrainWagonChangeType.
+ */
 export async function fetchCouplingWagons(
   tripId: number,
   type: number,
@@ -328,10 +343,22 @@ export async function fetchCouplingWagons(
   return (await http.get<CouplingWagon[]>(`/trips/${tripId}/coupling-wagons`, { params })).data
 }
 
-/** Провести акт отцепки или прицепки. */
+/** Прицепить или отцепить вагоны в рейсе сразу, без плана. */
 export async function coupleWagons(
   tripId: number,
-  act: { couplingType: number; station: number; orderInfo: string; reason: string; wagons: string[]; actDt: string },
+  body: {
+    /** константы TrainWagonChangeType */
+    changeType: number
+    /** промежуточная остановка маршрута — route_station.id */
+    routeStation: number
+    /** основания, примечания: приказ, причина */
+    comment: string
+    wagons: string[]
+    /** фактическое время, ISO */
+    time: string
+    /** ответственный за вагоны; null — не назначен */
+    responsibleUsr: number | null
+  },
 ): Promise<TripCrew> {
-  return (await http.post<TripCrew>(`/trips/${tripId}/coupling`, act)).data
+  return (await http.post<TripCrew>(`/trips/${tripId}/coupling`, body)).data
 }

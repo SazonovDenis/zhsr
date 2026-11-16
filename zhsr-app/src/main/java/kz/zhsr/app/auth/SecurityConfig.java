@@ -40,7 +40,7 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .securityContext(c -> c.securityContextRepository(securityContextRepository()))
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers("/session/login", "/session/logout", "/buildInfo", "/error").permitAll()
+                        .requestMatchers("/session/login", "/session/logout", "/session/demo", "/buildInfo", "/error").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint(SecurityConfig::loginRequired))
                 .addFilterAfter(new CurrentUserFilter(currentUserService), SecurityContextHolderFilter.class);

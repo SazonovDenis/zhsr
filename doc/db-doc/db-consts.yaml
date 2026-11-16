@@ -9,6 +9,26 @@ classes:
       - {name: REGULAR, value: '1', description: 'Регулярный маршрут: поезд по расписанию.'}
       - {name: ONE_TIME, value: '2', description: 'Разовый маршрут: поезд без расписания.'}
 
+  kz.zhsr.app.constants.TrainWagonChangeType:
+    file: zhsr-app/src/main/java/kz/zhsr/app/constants/TrainWagonChangeType.java
+    constants:
+      - {name: ATTACH, value: '1', description: 'Прицепка: вагон входит в поезд - на станции или в пути.'}
+      - {name: DETACH, value: '2', description: 'Отцепка: вагон выходит из поезда - на станции или в пути.'}
+
+  kz.zhsr.app.constants.TrainWagonChangeStatus:
+    file: zhsr-app/src/main/java/kz/zhsr/app/constants/TrainWagonChangeStatus.java
+    constants:
+      - {name: PLANNED, value: '1', description: 'План: изменение запланировано, журналы вагона не менялись.'}
+      - {name: DONE, value: '2', description: 'Выполнено: факт отмечен.'}
+      - {name: CANCELLED, value: '3', description: 'Отменено: план изменения отменён, изменение не состоялось, журналы вагона не менялись.'}
+
+  kz.zhsr.app.constants.CheckObject:
+    file: zhsr-app/src/main/java/kz/zhsr/app/constants/CheckObject.java
+    constants:
+      - {name: WAGON, value: '1', description: 'Вагон: check_list.wagon.'}
+      - {name: USR, value: '2', description: 'Сотрудник: check_list.checked_usr.'}
+      - {name: TRIP, value: '3', description: 'Рейс: check_list.trip.'}
+
   kz.zhsr.app.constants.CheckValueKind:
     file: zhsr-app/src/main/java/kz/zhsr/app/constants/CheckValueKind.java
     constants:

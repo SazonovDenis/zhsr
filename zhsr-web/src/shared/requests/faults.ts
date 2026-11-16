@@ -1,3 +1,4 @@
+import type { ChoiceItem } from '@/shared/components/choice/choice'
 import { Severity } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
 
@@ -25,17 +26,9 @@ export interface FaultServiceNode {
   name: string
   /** цвет метки службы */
   color: string
-  /** сколько неисправностей у службы без частых — они повторяют неисправности других групп по смыслу */
+  /** сколько неисправностей у службы */
   count: number
   groups: FaultGroupNode[]
-}
-
-/** Код группы частых неисправностей (FaultGroup — пополняемый справочник, привязка по коду): показывается первой. */
-export const FREQUENT_GROUP_CODE = 'FAV'
-
-/** id группы частых неисправностей; группы нет — null. */
-export function frequentGroupId(): number | null {
-  return dictManager.getList('FaultGroup').find((g) => g.code === FREQUENT_GROUP_CODE)?.id ?? null
 }
 
 /** Неисправности, которые можно выбрать: отключённые не предлагаются. */
@@ -53,7 +46,6 @@ export function faultTree(query = ''): FaultServiceNode[] {
   const q = isFaultSearch(query) ? query.trim().toLowerCase() : ''
   const groups = [...dictManager.getList('FaultGroup')].sort((a, b) => Number(a.sortOrder) - Number(b.sortOrder))
   const types = activeFaults()
-  const frequent = frequentGroupId()
   return dictManager
     .getList('Service')
     .map((service) => {
@@ -71,18 +63,50 @@ export function faultTree(query = ''): FaultServiceNode[] {
         id: service.id,
         name: dictManager.getValue('Service', service.id),
         color: (service.color as string | undefined) ?? '#62666d',
-        count: nodes.filter((g) => g.id !== frequent).reduce((n, g) => n + g.items.length, 0),
+        count: nodes.reduce((n, g) => n + g.items.length, 0),
         groups: nodes,
       }
     })
     .filter((s) => s.groups.length > 0)
 }
 
-/** Частые неисправности. */
+/**
+ * Дерево неисправностей вариантами CbList — для десктопа: строки службы и группы — заголовки (выбрать их нельзя,
+ * курсор с клавиатуры их пропускает), за ними неисправности. Поиск в CbList: неисправность находится и по названию
+ * группы и службы, заголовок виден, пока виден хоть один его пункт. Вид строки — data.kind: service, group, fault.
+ */
+export function faultChoices(): ChoiceItem[] {
+  const res: ChoiceItem[] = []
+  for (const s of faultTree()) {
+    const serviceNames = s.groups.flatMap((g) => g.items.map((f) => f.name))
+    res.push({
+      id: `s${s.id}`,
+      text: s.name,
+      disabled: true,
+      search: `${serviceNames.join(' ')} ${s.groups.map((g) => g.name).join(' ')}`,
+      data: { kind: 'service', color: s.color, count: s.count },
+    })
+    for (const g of s.groups) {
+      res.push({
+        id: `g${g.id}-${s.id}`,
+        text: g.name,
+        disabled: true,
+        search: `${g.items.map((f) => f.name).join(' ')} ${s.name}`,
+        data: { kind: 'group', count: g.items.length },
+      })
+      for (const f of g.items) {
+        res.push({ id: f.id, text: f.name, search: `${g.name} ${s.name}`, data: { kind: 'fault' } })
+      }
+    }
+  }
+  return res
+}
+
+/** Частые неисправности: неисправности в избранном (fault_type_favorite) по порядку показа. */
 export function frequentFaults(): FaultItem[] {
-  const frequent = frequentGroupId()
   return activeFaults()
-    .filter((f) => f.faultGroupType === frequent)
+    .filter((f) => f.favoriteOrder !== null && f.favoriteOrder !== undefined)
+    .sort((a, b) => Number(a.favoriteOrder) - Number(b.favoriteOrder))
     .map((f) => ({ id: f.id, name: dictManager.getValue('FaultType', f.id) }))
 }
 
@@ -98,7 +122,7 @@ export function faultDefaults(fault: number): { severity: number; service: numbe
   }
 }
 
-/** Неисправность с группой — для поиска и строки списка: «Окно дует • Частые неисправности». */
+/** Неисправность с группой — для поиска и строки списка: «Окно дует • Кузов». */
 export function faultWithGroup(fault: number): string {
   const rec = dictManager.getRec('FaultType', fault)
   return rec

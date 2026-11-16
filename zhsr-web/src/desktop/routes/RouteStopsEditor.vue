@@ -1,20 +1,26 @@
 <template>
+  <!-- readonly — правка недоступна: вместо полей — их значения текстом, кнопок правки нет -->
   <div class="stops-editor">
     <!-- заголовок и строки — одна общая сетка: колонки заголовка всегда совпадают с полями строк -->
     <div v-if="stops.length > 0" class="stops-editor__table">
       <span />
       <span class="stops-editor__head">{{ t('Станция') }}</span>
-      <span class="stops-editor__head stops-editor__right">{{ t('Км') }}</span>
-      <span class="stops-editor__head">{{ t('В пути, мин') }}</span>
+      <span class="stops-editor__head stops-editor__right">{{ t('Расстояние') }}</span>
+      <span class="stops-editor__head stops-editor__right q-pr-md">{{ t('В пути') }}</span>
+      <span class="stops-editor__head">{{ t('Время прибытия') }}</span>
       <span class="stops-editor__head">{{ t('Стоянка, мин') }}</span>
+      <span class="stops-editor__head">{{ t('Время отправления') }}</span>
       <span />
 
       <template v-for="(stop, index) in stops" :key="index">
         <span class="stops-editor__n">{{ index + 1 }}</span>
 
+        <span v-if="readonly" class="stops-editor__text">{{ dictManager.getValue('Station', stop.station) }}</span>
         <CbList
+          v-else
           class="stops-editor__station"
           single
+          no-clear
           placeholder="Выберите станцию…"
           :model-value="stop.station || null"
           :values="valuesFor(index)"
@@ -36,49 +42,92 @@
           </template>
         </CbList>
 
-        <span class="stops-editor__km">{{ stop.station ? stop.km : '' }}</span>
+        <!-- у начальной станции нет ни расстояния, ни времени в пути, ни прибытия; у конечной расстояние и время в пути —
+             итог маршрута, жирным -->
+        <span class="stops-editor__km" :class="{ 'stops-editor__final': isFinal(index) }">{{
+          index > 0 && stop.station ? t('{km} км', { km: stop.km }) : ''
+        }}</span>
 
-        <!-- у начальной станции нет ни пути до неё, ни стоянки; у конечной — стоянки -->
-        <TextInput
-          v-if="index > 0"
-          :model-value="String(stop.runDuration)"
-          inputmode="numeric"
-          @update:model-value="setMinutes(index, 'runDuration', $event)"
+        <!-- время в пути от отправления с начальной станции -->
+        <span class="stops-editor__km q-pr-md" :class="{ 'stops-editor__final': isFinal(index) }">{{
+          index > 0 ? elapsedText(stop) : ''
+        }}</span>
+
+        <!-- у конечной станции — только прибытие; часы — от полуночи дня отправления, следующие сутки — больше 24:
+             «26:55» -->
+        <span v-if="readonly" class="stops-editor__text">{{ index > 0 ? timeText(stop.arrivalMin) : '' }}</span>
+        <TimeInput
+          v-else-if="index > 0 && stop.arrivalMin !== null"
+          :model-value="stop.arrivalMin"
+          over-day
+          :nullable="false"
+          @update:model-value="setTime(index, 'arrivalMin', $event)"
         />
         <span v-else />
+
+        <span v-if="readonly" class="stops-editor__text">{{
+          index > 0 && index < stops.length - 1 && stop.arrivalMin !== null && stop.departureMin !== null
+            ? stopOf(stop)
+            : ''
+        }}</span>
         <TextInput
-          v-if="index > 0 && index < stops.length - 1"
-          :model-value="String(stop.stopDuration)"
+          v-else-if="index > 0 && index < stops.length - 1 && stop.arrivalMin !== null && stop.departureMin !== null"
+          :model-value="String(stopOf(stop))"
           inputmode="numeric"
-          @update:model-value="setMinutes(index, 'stopDuration', $event)"
+          @update:model-value="setStop(index, $event)"
+        />
+        <span v-else />
+        <span v-if="readonly" class="stops-editor__text">{{
+          index < stops.length - 1 ? timeText(stop.departureMin) : ''
+        }}</span>
+        <TimeInput
+          v-else-if="index < stops.length - 1 && stop.departureMin !== null"
+          :model-value="stop.departureMin"
+          over-day
+          :nullable="false"
+          @update:model-value="setTime(index, 'departureMin', $event)"
         />
         <span v-else />
 
-        <span class="stops-editor__buttons">
-          <button
-            type="button"
-            class="stops-editor__delete"
+        <span v-if="readonly" />
+        <span v-else class="stops-editor__buttons">
+          <!-- удалить — красная, добавить — тёмно-зелёная; обе квадратные: отступ вокруг иконки — до высоты поля -->
+          <q-btn
+            unelevated
+            outline
+            color="remove"
+            class="zs-soft-border"
+            icon="close"
+            padding="0.4rem"
             :title="t('Удалить остановку')"
-            :disabled="stops.length <= 1"
+            :disable="stops.length <= 1"
             @click="remove(index)"
-          >
-            ✕
-          </button>
-          <button
-            type="button"
-            class="stops-editor__insert q-py-none q-px-sm"
+          />
+          <q-btn
+            unelevated
+            outline
+            color="ok"
+            class="zs-soft-border"
+            icon="add"
+            padding="0.4rem"
             :title="t('Добавить станцию после этой')"
             @click="insert(index)"
-          >
-            {{ t('+ Станция') }}
-          </button>
+          />
         </span>
       </template>
     </div>
 
-    <button v-if="stops.length === 0" type="button" class="stops-editor__insert q-py-none q-px-sm" @click="insert(-1)">
-      {{ t('+ Начальная станция') }}
-    </button>
+    <q-btn
+      v-if="stops.length === 0 && !readonly"
+      unelevated
+      outline
+      no-caps
+      color="ok"
+      icon="add"
+      class="zs-soft-border self-start"
+      :label="t('Начальная станция')"
+      @click="insert(-1)"
+    />
 
     <div v-if="problem" class="stops-editor__problem q-pl-lg">{{ problem }}</div>
   </div>
@@ -93,8 +142,10 @@ import { t } from '@/boot/i18n'
 import type { ChoiceItem, ChoiceModel } from '@/shared/components/choice/choice'
 import CbList from '@/shared/components/choice/CbList.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
+import TimeInput from '@/shared/components/form/TimeInput.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { useLoad } from '@/shared/loadable'
+import { formatDuration, formatTime, stopOf } from './duration'
 
 /**
  * Редактор «Остановки по порядку». Правит список остановок в памяти (v-model); сохраняет маршрут владелец.
@@ -102,14 +153,23 @@ import { useLoad } from '@/shared/loadable'
  * - Станция остановки выбирается в CbList из станций, на которые можно перейти от предыдущей остановки (для
  *   первой — из узловых). Список загружается при открытии; в строке — станции следования по пути («через …») и
  *   расстояние от предыдущей остановки.
- * - Время в пути от предыдущей остановки при выборе станции подставляется по умолчанию (его отдаёт сервер вместе с
- *   расстоянием); пользователь может его изменить. Стоянку пользователь вводит сам.
- * - «+ Станция» вставляет пустую остановку после этой, ✕ удаляет остановку.
- * - После каждой правки расстояния пересчитываются (recalcStops); время в пути по умолчанию заново ставится только
- *   там, где сменилась станция или предыдущая остановка.
- * - Под списком — что не так с маршрутом: начальная и конечная станции должны быть узловыми.
+ * - Время остановки — минуты от полуночи дня отправления с начальной станции (1440 и больше — следующие сутки).
+ *   У начальной станции вводится отправление, у промежуточных — прибытие, стоянка и отправление, у конечной —
+ *   прибытие. Время вводится и показывается как «чч:мм», часы — от полуночи дня отправления: следующие сутки — часы
+ *   больше 24 («26:55»).
+ * - Времена связаны: прибытие сдвигает отправление (стоянка прежняя), стоянка — отправление, отправление — прибытие
+ *   (стоянка прежняя); следующие остановки сдвигаются на ту же разницу. «В пути» — время в пути от отправления с
+ *   начальной станции; у конечной станции расстояние и время в пути — итог маршрута, жирным.
+ * - «+» вставляет пустую остановку после этой, ✕ удаляет остановку.
+ * - После выбора станции и удаления остановки расстояния и времена пересчитываются (recalcStops): время в пути от
+ *   предыдущей остановки по умолчанию (по расстоянию) — там, где сменилась станция или предыдущая остановка.
+ * - Под списком — что не так с маршрутом: начальная и конечная станции должны быть узловыми, время по остановкам не
+ *   должно убывать.
  */
 const stops = defineModel<RouteStop[]>({ required: true })
+
+/** правка недоступна: значения показаны текстом, кнопок правки нет */
+const { readonly = false } = defineProps<{ readonly?: boolean }>()
 
 // станции для выбора загружаются для той остановки, у которой открыт список
 const openRow = ref(-1)
@@ -126,7 +186,21 @@ const problem = computed(() => {
   if (!isHub(filled[0]!.station) || !isHub(filled[filled.length - 1]!.station)) {
     return t('Начальная и конечная станции должны быть узловыми.')
   }
+  if (decreasing.value) return t('Время по остановкам не должно убывать.')
   return ''
+})
+
+/** Время по остановкам убывает: прибытие раньше отправления с предыдущей остановки или отправление раньше прибытия. */
+const decreasing = computed(() => {
+  let prev = -Infinity
+  for (const stop of stops.value) {
+    for (const time of [stop.arrivalMin, stop.departureMin]) {
+      if (time == null) continue
+      if (time < prev) return true
+      prev = time
+    }
+  }
+  return false
 })
 
 /** Предыдущая заполненная остановка: от неё считаются доступные станции. */
@@ -138,8 +212,8 @@ function previousOf(index: number): RouteStop | null {
   return null
 }
 
-function stationItem(station: number, km: number, runDuration: number, distance = 0, via: number[] = []): ChoiceItem {
-  return { id: station, text: dictManager.getValue('Station', station), data: { km, runDuration, distance, via } }
+function stationItem(station: number, km: number, distance = 0, via: number[] = []): ChoiceItem {
+  return { id: station, text: dictManager.getValue('Station', station), data: { km, distance, via } }
 }
 
 /** «через Алматы-1 → Отар» — станции следования между предыдущей остановкой и станцией. */
@@ -155,7 +229,7 @@ function viaText(item: ChoiceItem): string {
  */
 function valuesFor(index: number): ChoiceItem[] {
   const stop = stops.value[index]
-  const current = stop?.station ? [stationItem(stop.station, stop.km, stop.runDuration)] : []
+  const current = stop?.station ? [stationItem(stop.station, stop.km)] : []
   if (openRow.value !== index) return current
   const loaded = options.value
   return loaded.some((o) => o.id === stop?.station) ? loaded : [...current, ...loaded]
@@ -165,7 +239,7 @@ function valuesFor(index: number): ChoiceItem[] {
 const optionsLoad = useLoad(async () => {
   options.value = []
   const next = await fetchNextStations(previousOf(openRow.value))
-  options.value = next.map((n) => stationItem(n.station, n.km, n.runDuration, n.distance, n.via))
+  options.value = next.map((n) => stationItem(n.station, n.km, n.distance, n.via))
 })
 
 function loadOptions(index: number) {
@@ -183,11 +257,13 @@ async function update(next: RouteStop[], changed: number[]) {
 function choose(index: number, value: ChoiceModel) {
   if (typeof value !== 'number') return
   const data = options.value.find((o) => o.id === value)?.data
+  const old = stops.value[index]
+  // время остановки — прежнее (стоянка сохраняется), время в пути до неё сервер ставит по умолчанию
   const stop: RouteStop = {
     station: value,
     km: typeof data?.km === 'number' ? data.km : 0,
-    runDuration: typeof data?.runDuration === 'number' ? data.runDuration : 0,
-    stopDuration: stops.value[index]?.stopDuration ?? 0,
+    arrivalMin: old?.arrivalMin ?? null,
+    departureMin: old?.departureMin ?? null,
   }
   // у следующей остановки сменилась предыдущая — её время в пути тоже по умолчанию
   void update(
@@ -196,16 +272,60 @@ function choose(index: number, value: ChoiceModel) {
   )
 }
 
-function setMinutes(index: number, field: 'runDuration' | 'stopDuration', text: string) {
+type TimeField = 'arrivalMin' | 'departureMin'
+
+/** Время остановки текстом «чч:мм»; нет времени — пусто. */
+function timeText(minutes: number | null): string {
+  return minutes == null ? '' : formatTime(minutes)
+}
+
+/** Время в пути от отправления с начальной станции до прибытия на остановку — «3 ч 42 м». */
+function elapsedText(stop: RouteStop): string {
+  const start = stops.value[0]?.departureMin
+  return stop.arrivalMin == null || start == null ? '' : formatDuration(stop.arrivalMin - start)
+}
+
+/** Конечная ли остановка: её расстояние и время в пути — итог маршрута. */
+function isFinal(index: number): boolean {
+  return index > 0 && index === stops.value.length - 1
+}
+
+/** Остановки, где остановка index получила время changed, а следующие за ней сдвинуты на delta, мин. */
+function shifted(index: number, changed: RouteStop, delta: number): RouteStop[] {
+  const add = (v: number | null) => (v == null ? null : v + delta)
+  return stops.value.map((s, i) =>
+    i === index ? changed : i < index ? s : { ...s, arrivalMin: add(s.arrivalMin), departureMin: add(s.departureMin) },
+  )
+}
+
+function setTime(index: number, field: TimeField, time: number | null) {
+  const stop = stops.value[index]
+  if (time === null || !stop) return
+  // прибытие сдвигает отправление, отправление — прибытие: стоянка прежняя; у начальной станции прибытия нет, у
+  // конечной — отправления
+  const delta = time - (stop[field] ?? time)
+  const add = (v: number | null) => (v == null ? null : v + delta)
+  const changed =
+    field === 'arrivalMin'
+      ? { ...stop, arrivalMin: time, departureMin: add(stop.departureMin) }
+      : { ...stop, arrivalMin: add(stop.arrivalMin), departureMin: time }
+  stops.value = shifted(index, changed, delta)
+}
+
+/** Стоянка — отправление сдвигается, следующие остановки — на ту же разницу. */
+function setStop(index: number, text: string) {
+  const stop = stops.value[index]
+  if (!stop || stop.arrivalMin == null || stop.departureMin == null) return
   const value = Number.parseInt(text, 10)
-  const minutes = Number.isFinite(value) && value > 0 ? value : 0
-  stops.value = stops.value.map((s, i) => (i === index ? { ...s, [field]: minutes } : s))
+  const dwell = Number.isFinite(value) && value > 0 ? value : 0
+  const departure = stop.arrivalMin + dwell
+  stops.value = shifted(index, { ...stop, departureMin: departure }, departure - stop.departureMin)
 }
 
 function insert(index: number) {
   const next = [...stops.value]
-  // станция 0 — ещё не выбрана
-  next.splice(index + 1, 0, { station: 0, km: 0, runDuration: 0, stopDuration: 0 })
+  // станция 0 — ещё не выбрана; время поставит пересчёт после выбора станции
+  next.splice(index + 1, 0, { station: 0, km: 0, arrivalMin: null, departureMin: null })
   stops.value = next
 }
 
@@ -229,15 +349,18 @@ function remove(index: number) {
   gap: 0.5rem;
 }
 
-// номер, станция, км, в пути, стоянка, кнопки — заголовок и строки в одной сетке
+// номер, станция, расстояние, в пути, прибытие, стоянка, отправление, кнопки — заголовок и строки в одной сетке
+// станция — от 15 до 25rem: вся таблица — от 56 до 66rem
 .stops-editor__table {
   display: grid;
-  grid-template-columns: 1.3rem minmax(10rem, 1fr) 3.5rem 5rem 5rem auto;
+  grid-template-columns: 1.3rem minmax(15rem, 25rem) 5rem 5.5rem 5.5rem 4rem 5.5rem auto;
   align-items: center;
   gap: 0.5rem;
 }
 
+// заголовки в две строки и в одну — по нижнему краю, вплотную к полям
 .stops-editor__head {
+  align-self: end;
   color: $zs-text-muted;
   font-size: 0.8rem;
   font-weight: 500;
@@ -283,38 +406,24 @@ function remove(index: number) {
   white-space: nowrap;
 }
 
+// значение вместо поля при readonly: той же высоты, что и поле, — строки не меняют высоту
+.stops-editor__text {
+  display: flex;
+  align-items: center;
+  min-height: var(--zs-control-height);
+  color: $zs-text;
+  font-size: var(--zs-control-font-size);
+}
+
+// итог маршрута у конечной остановки: расстояние и время в пути
+.stops-editor__final {
+  color: $zs-text;
+  font-weight: 700;
+}
+
 .stops-editor__buttons {
   display: flex;
   gap: 0.5rem;
-}
-
-.stops-editor__delete,
-.stops-editor__insert {
-  flex: none;
-  height: var(--zs-control-height);
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.3rem;
-  background: #fff;
-  font: inherit;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-}
-
-.stops-editor__delete {
-  width: var(--zs-control-height);
-  color: #a12a1b;
-}
-
-.stops-editor__insert {
-  align-self: flex-start;
-  color: $primary;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .stops-editor__muted {

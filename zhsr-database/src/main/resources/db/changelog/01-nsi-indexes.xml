@@ -38,10 +38,6 @@
         <addUniqueConstraint tableName="crew_duty_type" columnNames="code" constraintName="uq_crew_duty_type_code"/>
     </changeSet>
 
-    <changeSet id="01-nsi-indexes-uq_coupling_type_code" author="zhsr">
-        <addUniqueConstraint tableName="coupling_type" columnNames="code" constraintName="uq_coupling_type_code"/>
-    </changeSet>
-
     <changeSet id="01-nsi-indexes-uq_act_status_type_code" author="zhsr">
         <addUniqueConstraint tableName="act_status_type" columnNames="code" constraintName="uq_act_status_type_code"/>
     </changeSet>
@@ -99,7 +95,7 @@
     </changeSet>
 
     <!-- deferrable: станции ссылаются на точки перегонов, а точки - через перегоны на станции; данные загружаются
-         одной транзакцией (install/db-reset), ссылка проверяется при её завершении -->
+         одной транзакцией (prepare/db-reset), ссылка проверяется при её завершении -->
     <changeSet id="01-nsi-indexes-fk_station_stage_point" author="zhsr">
         <addForeignKeyConstraint baseTableName="station" baseColumnNames="stage_point" constraintName="fk_station_stage_point"
                                  referencedTableName="stage_point" referencedColumnNames="id"
@@ -140,6 +136,10 @@
         <sql>alter table wagon add constraint ck_wagon_period check (dend is null or dend &gt;= dbeg)</sql>
     </changeSet>
 
+    <changeSet id="01-nsi-indexes-ck_wagon_initial_run_km" author="zhsr">
+        <sql>alter table wagon add constraint ck_wagon_initial_run_km check (initial_run_km &gt;= 0)</sql>
+    </changeSet>
+
     <changeSet id="01-nsi-indexes-fk_wagon_depot" author="zhsr">
         <addForeignKeyConstraint baseTableName="wagon" baseColumnNames="depot" constraintName="fk_wagon_depot"
                                  referencedTableName="depot" referencedColumnNames="id"/>
@@ -173,8 +173,9 @@
     </changeSet>
 
     <!-- остановки маршрута удаляются вместе с маршрутом -->
-    <changeSet id="01-nsi-indexes-ck_route_station_duration" author="zhsr">
-        <sql>alter table route_station add constraint ck_route_station_duration check (run_duration &gt;= 0 and stop_duration &gt;= 0)</sql>
+    <!-- время станции маршрута: хотя бы одно из двух; неотрицательное; отправление не раньше прибытия -->
+    <changeSet id="01-nsi-indexes-ck_route_station_time" author="zhsr">
+        <sql>alter table route_station add constraint ck_route_station_time check ((arrival_min is not null or departure_min is not null) and arrival_min &gt;= 0 and departure_min &gt;= 0 and departure_min &gt;= arrival_min)</sql>
     </changeSet>
 
     <changeSet id="01-nsi-indexes-fk_route_station_route" author="zhsr">
@@ -299,6 +300,17 @@
     <!-- у сотрудника в каждый момент не больше одной категории -->
     <changeSet id="01-nsi-indexes-ex_usr_category_overlap" author="zhsr">
         <sql>alter table usr_category add constraint ex_usr_category_overlap exclude using gist (usr with =, tstzrange(dbeg, dend) with &amp;&amp;)</sql>
+    </changeSet>
+
+    <!-- fault_type_favorite: неисправность в избранном - один раз; удаляется вместе с неисправностью -->
+
+    <changeSet id="01-nsi-indexes-uq_fault_type_favorite_fault_type" author="zhsr">
+        <addUniqueConstraint tableName="fault_type_favorite" columnNames="fault_type" constraintName="uq_fault_type_favorite_fault_type"/>
+    </changeSet>
+
+    <changeSet id="01-nsi-indexes-fk_fault_type_favorite_fault_type" author="zhsr">
+        <addForeignKeyConstraint baseTableName="fault_type_favorite" baseColumnNames="fault_type" constraintName="fk_fault_type_favorite_fault_type"
+                                 referencedTableName="fault_type" referencedColumnNames="id" onDelete="CASCADE"/>
     </changeSet>
 
 </databaseChangeLog>

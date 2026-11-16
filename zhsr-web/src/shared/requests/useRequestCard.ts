@@ -3,14 +3,16 @@ import type { Ref } from 'vue'
 import { computed, ref, shallowRef, watch } from 'vue'
 
 import { isNetworkError } from '@/api/http'
-import type { RepairRequest, RequestAction, RequestDetail, UserRef } from '@/api/requests'
+import type { RepairRequest, RequestAction, RequestDetail, RequestPhoto, StaffCandidate } from '@/api/requests'
 import {
   addRequestNote,
   addRequestPhoto,
   assignRequest,
+  deleteRequestPhoto,
   fetchRequest,
   fetchServiceStaff,
   runRequestAction,
+  updateRequestNote,
 } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
@@ -24,8 +26,10 @@ import { isoDateTime } from '@/shared/format'
 import { isOnline } from '@/shared/network'
 import { findCachedRow, loadCached } from '@/shared/offline/cache'
 import { queueAction, queueAssign, queuedDecision, queueNote, queuePhotos } from '@/shared/offline/outbox'
+import { useNow } from '@/shared/trips/tripTimes'
 import { currentUser } from '@/shared/user'
-import { ACTIONS, assignBlockReason, canAssign, canEdit, editBlockReason, requestActions } from './rights'
+import { provideRequestChanges } from './requestChanges'
+import { ACTIONS, assignBlockReason, canAssign, canChangeOwn, canEdit, requestActions, staffTrip } from './rights'
 
 /**
  * Карточка заявки — общее для правой панели десктопа и экрана заявки на телефоне: загрузка заявки, кнопки действий
@@ -46,7 +50,9 @@ export async function loadOffline(id: number): Promise<{ data: RequestDetail; st
     if (!isNetworkError(e)) throw e
     const row = await findCachedRow<RepairRequest>(isRequestList, id)
     if (!row) throw e
-    return { data: { ...row, statuses: [], executors: [], notes: [], photos: [] }, stale: true }
+    // без связи источник заявки (чек-лист, опись) неизвестен: в строке списка его нет
+    const empty = { checkList: null, checkListTemplate: null, equipList: null, equipListTemplate: null }
+    return { data: { ...row, statuses: [], executors: [], notes: [], photos: [], ...empty }, stale: true }
   }
 }
 
@@ -66,7 +72,7 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
   /** фото к действию с комментарием */
   const actionPhotos = ref<Blob[]>([])
 
-  const staff = shallowRef<UserRef[]>([])
+  const staff = shallowRef<StaffCandidate[]>([])
 
   async function load() {
     const current = id.value
@@ -100,6 +106,8 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
   watch(id, load, { immediate: true })
 
   const user = computed(() => currentUser.value)
+  // текущее время: кнопки исправления исчезают сами, когда срок вышел
+  const now = useNow()
 
   /** исполнитель, если он назначен и это другой сотрудник: «Взять в работу» тогда не основная кнопка и спрашивает
    * подтверждение; иначе пусто */
@@ -134,10 +142,7 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     const text = reassign.value ? 'Вы не можете переназначить: {reason}' : 'Вы не можете назначить: {reason}'
     return t(text, { reason: t(reason, { status }) })
   })
-  const editable = computed(() => !!request.value && !!user.value && canEdit(user.value, request.value))
-  const editHint = computed(() =>
-    request.value && user.value ? t(editBlockReason(user.value, request.value) || 'Исправить заявку') : '',
-  )
+  const editable = computed(() => !!request.value && !!user.value && canEdit(user.value, request.value, now.value))
   /** действие или назначение по заявке, которое ждёт отправки с телефона; null — нет */
   const waitingDecision = computed(() => (offline && request.value ? queuedDecision(request.value.id) : null))
   /**
@@ -161,10 +166,15 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     { immediate: true },
   )
 
-  /** Сотрудники службы; на телефоне без связи — сохранённый список: назначение без связи встаёт в очередь. */
-  async function serviceStaff(service: number): Promise<UserRef[]> {
-    if (!offline) return fetchServiceStaff(service)
-    return (await loadCached(`staff:${service}`, () => fetchServiceStaff(service))).data
+  /**
+   * Кому назначить: сотрудники службы; ЛНП — вся бригада рейса вагона (staffTrip). На телефоне без связи — сохранённый список:
+   * назначение без связи встаёт в очередь.
+   */
+  async function serviceStaff(service: number): Promise<StaffCandidate[]> {
+    const u = user.value
+    const trip = u ? staffTrip(u, request.value?.wagonTrip?.id ?? null) : null
+    if (!offline) return fetchServiceStaff(service, trip)
+    return (await loadCached(`staff-candidates:${service}:${trip ?? ''}`, () => fetchServiceStaff(service, trip))).data
   }
 
   /** Загрузить сотрудников службы заново: для выбора исполнителя; ошибку показывает вызывающий. */
@@ -256,7 +266,7 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     if (!request.value) return
     if (queueing()) {
       const id = request.value.id
-      const name = staff.value.find((u) => u.id === executor)?.name ?? ''
+      const name = staff.value.find((c) => c.usr.id === executor)?.usr.name ?? ''
       await queueDecided(() => queueAssign(id, executor, name, user.value?.id ?? 0))
       return
     }
@@ -295,6 +305,54 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     }
   }
 
+  /** исправить примечание и удалить фото можно только при связи и по карточке с сервера: иначе кнопок нет */
+  const canChange = () => !!request.value && !!user.value && !stale.value && isOnline.value
+
+  function canDeletePhoto(photo: RequestPhoto): boolean {
+    const p = canChange() ? request.value!.photos.find((x) => x.id === photo.id) : undefined
+    return !!p && canChangeOwn(user.value!, p.createdByUsr, p.createdDt, now.value)
+  }
+
+  function canEditNote(noteId: number): boolean {
+    const n = canChange() ? request.value!.notes.find((x) => x.id === noteId) : undefined
+    return !!n && canChangeOwn(user.value!, n.createdByUsr, n.createdDt, now.value)
+  }
+
+  /** Исправление и удаление: только при связи, в очередь не встают; ошибка — в карточке. */
+  async function runChange(work: () => Promise<RequestDetail>): Promise<boolean> {
+    if (running.value) return false
+    running.value = true
+    error.value = null
+    try {
+      changed(await work())
+      return true
+    } catch (e) {
+      error.value = shownError(e)
+      return false
+    } finally {
+      running.value = false
+    }
+  }
+
+  /** Исправить текст примечания; пустой текст не сохраняется. */
+  function saveNote(noteId: number, text: string): Promise<boolean> {
+    if (!text.trim()) return Promise.resolve(false)
+    return runChange(() => updateRequestNote(noteId, text.trim()))
+  }
+
+  /**
+   * Передать вниз по дереву исправление примечаний и удаление фото (requestChanges.ts). editNote — как страница
+   * открывает ввод нового текста: на десктопе — окно, на телефоне — лист снизу.
+   */
+  function provideChanges(editNote: (noteId: number, text: string) => void) {
+    provideRequestChanges({
+      canDeletePhoto,
+      deletePhoto: (photo) => void runChange(() => deleteRequestPhoto(photo.id)),
+      canEditNote,
+      editNote,
+    })
+  }
+
   return {
     request,
     loading,
@@ -316,12 +374,13 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     staff,
     loadStaff,
     editable,
-    editHint,
     load,
     start,
     confirm,
     cancel,
     assign,
     addNote,
+    saveNote,
+    provideChanges,
   }
 }

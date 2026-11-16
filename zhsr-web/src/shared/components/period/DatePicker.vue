@@ -241,9 +241,22 @@ function codeOf(day: string | null): QuickDate | null {
 const shortCodes = computed(() => props.quick.slice(0, props.shortCount))
 
 // Выбранная кнопка короткого ряда выводится из самой даты: значение может прийти и снаружи
+/**
+ * День, который сейчас показывает поле: пока пользователь печатает, — из набранного текста (полная дата с годом из
+ * четырёх цифр; иначе дня нет), иначе — из значения. По нему подсвечивается быстрый вариант: очистил поле или набрал
+ * другую дату — подсветка меняется сразу, ещё до применения.
+ */
+const shownDay = computed(() => {
+  if (!editing.value) return split(model.value)[0]
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})(?:\s|$)/.exec(draftText.value.trim())
+  if (!m) return null
+  const day = `${m[1]}.${m[2]}.${m[3]}`
+  // несуществующая дата (31.02) после разбора даёт другой день
+  return date.formatDate(date.extractDate(day, DATE_FORMAT), DATE_FORMAT) === day ? day : null
+})
+
 const shortModel = computed(() => {
-  const [day] = split(model.value)
-  const code = codeOf(day)
+  const code = codeOf(shownDay.value)
   return code && shortCodes.value.includes(code) ? code : null
 })
 
@@ -417,6 +430,8 @@ function onEsc(e: KeyboardEvent) {
 
 /** Клик в коротком ряду: быстрый вариант применяется сразу; повторный клик по выбранному при clearable — очистка. */
 function onShortClick(value: string) {
+  // выбор кнопкой заменяет набранный текст
+  cancelTyped()
   if (value === shortModel.value) {
     if (props.clearable) model.value = null
     return

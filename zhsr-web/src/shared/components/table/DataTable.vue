@@ -285,6 +285,16 @@ function onRowClick(row: Row) {
   emit('row-click', row)
 }
 
+// список перечитан, а выбранной строки в нём нет (её убрал фильтр, её удалили) — выбор снимается: правая панель не
+// показывает запись, которой нет в списке
+watch(
+  () => props.rows,
+  (rows) => {
+    const key = props.selected
+    if (key !== null && !rows.some((row) => keyOf(row) === key)) emit('update:selected', null)
+  },
+)
+
 // выбранная строка могла оказаться за пределами видимой области (выбор пришёл снаружи) — прокручиваем к ней
 watch(
   () => props.selected,

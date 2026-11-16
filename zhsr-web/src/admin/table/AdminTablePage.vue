@@ -3,7 +3,7 @@
     <template #header>
       <h1 class="desktop-frame__title">{{ t(def?.title ?? '') }}</h1>
       <div class="desktop-frame__actions">
-        <button type="button" class="zs-btn-primary" :disabled="!def" @click="edit(null)">{{ t('Добавить') }}</button>
+        <q-btn unelevated no-caps color="primary" :disable="!def" @click="edit(null)">{{ t('Добавить') }}</q-btn>
       </div>
     </template>
 
@@ -35,7 +35,7 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 
 import type { AdminRow, AdminTable } from '@/api/admin'
-import { fetchAdminRows } from '@/api/admin'
+import { fetchAdminRows, moveSortOrder } from '@/api/admin'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
 import { openDialog } from '@/shared/components/dialog/openDialog'
@@ -49,7 +49,8 @@ import DesktopFrame from '@/desktop/frame/DesktopFrame.vue'
 import AdminPager from '../shared/AdminPager.vue'
 import { useAdminList } from '../shared/useAdminList'
 import AdminRowDialog from './AdminRowDialog.vue'
-import { adminColumns, adminTable, forgetAdminOptions } from './adminTables'
+import { provideSortOrder } from '../shared/sortOrder'
+import { adminColumns, adminTable, forgetAdminOptions, SORT_ORDER } from './adminTables'
 
 /**
  * Общий редактор таблицы администрирования: поиск, страницы, сортировка по колонкам. «Добавить» и двойной клик по
@@ -68,6 +69,28 @@ const columns = computed(() => (def.value ? adminColumns(def.value) : []))
 
 const list = useAdminList((query) => fetchAdminRows(props.table, query), busy)
 
+// перестановка строк кнопками в колонке «Порядок показа»: только при сортировке по нему (по умолчанию — по нему)
+provideSortOrder<AdminRow>({
+  reason: () => {
+    const sort = list.query.sort
+    return sort?.field === SORT_ORDER && !sort.desc
+      ? ''
+      : t('Переставлять строки можно при сортировке по порядку показа')
+  },
+  canMove: (row, up) => {
+    const rows = list.rows.value
+    const i = rows.indexOf(row)
+    const lastPage = (list.query.page + 1) * list.query.size >= list.total.value
+    return up ? !(list.query.page === 0 && i === 0) : !(lastPage && i === rows.length - 1)
+  },
+  move: async (row, up) => {
+    await moveSortOrder(props.table, row.id, up)
+    forgetAdminOptions(props.table)
+    selectedId.value = row.id
+    await list.load()
+  },
+})
+
 // отключённая запись — зачёркнутая строка; поле disabled есть в строке, своей колонки у него нет
 const isDisabled = (row: AdminRow) => row.disabled === true
 
@@ -82,6 +105,11 @@ async function open(name: string) {
     def.value = await busy.run(adminTable(name))
     if (!def.value) {
       loadError.value = { text: t('Таблица не редактируется в администрировании'), request: '' }
+      return
+    }
+    // таблица с порядком показа по умолчанию отсортирована по нему — значок сортировки на колонке «Порядок»
+    if (def.value.columns.some((c) => c.name === SORT_ORDER)) {
+      list.query.sort = { field: SORT_ORDER, desc: false }
       return
     }
     await list.load()

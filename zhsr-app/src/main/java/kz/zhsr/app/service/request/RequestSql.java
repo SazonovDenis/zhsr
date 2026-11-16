@@ -248,9 +248,36 @@ final class RequestSql {
      */
     static String notes() {
         return """
-                select created_dt, received_dt, created_by_usr, note
+                select id, created_dt, received_dt, created_by_usr, note
                 from repair_request_note
                 where repair_request = :id
+                """;
+    }
+
+    /**
+     * Чек-лист, по нарушению в котором создана заявка. Параметр: id. Колонки id, check_list_template; строк нет - заявка
+     * не из чек-листа.
+     */
+    static String checkSource() {
+        return """
+                select check_list.id, check_list.check_list_template
+                from check_list
+                where check_list.id in (select check_list_value.check_list from check_list_value
+                                        where check_list_value.repair_request = :id)
+                limit 1
+                """;
+    }
+
+    /**
+     * Опись, по недостаче в которой создана заявка. Параметр: id. Колонки id, equip_list_template; строк нет - заявка
+     * не из описи.
+     */
+    static String equipSource() {
+        return """
+                select equip_list.id, equip_list.equip_list_template
+                from equip_list
+                where equip_list.repair_request = :id
+                limit 1
                 """;
     }
 
@@ -288,6 +315,24 @@ final class RequestSql {
                   and usr.id in (select usr_role.usr from usr_role
                                  join role_type on role_type.id = usr_role.role_type
                                  where role_type.service = :service)
+                order by usr.full_name
+                """;
+    }
+
+    /**
+     * Бригада рейса - кому ЛНП назначает заявку: все сотрудники бригады; in_service - сотрудник службы заявки.
+     * Параметры: service, trip.
+     */
+    static String crewStaff() {
+        return """
+                select trip_crew.usr, trip_crew.crew_duty_type, trip_crew.wagon,
+                       trip_crew.usr in (select usr_role.usr from usr_role
+                                         join role_type on role_type.id = usr_role.role_type
+                                         where role_type.service = :service) as in_service
+                from trip_crew
+                join usr on usr.id = trip_crew.usr
+                where trip_crew.trip = :trip and trip_crew.dend is null
+                  and usr.disabled = false
                 order by usr.full_name
                 """;
     }

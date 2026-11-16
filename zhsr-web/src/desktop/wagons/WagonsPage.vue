@@ -3,15 +3,16 @@
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Вагоны') }}</h1>
       <div class="desktop-frame__actions">
-        <button
-          type="button"
-          class="zs-btn-primary"
-          :disabled="!!addReason"
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          :disable="!!addReason"
           :title="addReason || undefined"
           @click="addWagon"
         >
           {{ t('Ввести вагон') }}
-        </button>
+        </q-btn>
       </div>
     </template>
 
@@ -73,7 +74,7 @@
     />
 
     <template #right>
-      <WagonPanel :wagon="selected" @close="panel.close" />
+      <WagonPanel :wagon="selected" @close="panel.close" @changed="replaceRow" />
     </template>
   </DesktopFrame>
 </template>
@@ -85,7 +86,7 @@ import { useRouter } from 'vue-router'
 import type { TripOption } from '@/api/trips'
 import { fetchTripOptions } from '@/api/trips'
 import type { WagonRow, WagonFilter } from '@/api/wagons'
-import { fetchWagons } from '@/api/wagons'
+import { fetchWagons, wagonQuery } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import CbButton from '@/shared/components/choice/CbButton.vue'
 import CbList from '@/shared/components/choice/CbList.vue'
@@ -163,10 +164,15 @@ const tripChoices = computed(() => trips.value.map((trip) => tripOptionItem(trip
 // ошибка загрузки показывается на месте строк таблицы
 const loadError = ref<ShownError | null>(null)
 
+/** Вагон после правки в панели — на место прежней строки. */
+function replaceRow(w: WagonRow) {
+  rows.value = rows.value.map((r) => (r.id === w.id ? w : r))
+}
+
 async function load() {
   loadError.value = null
   try {
-    rows.value = await busy.run(fetchWagons(filter, sort.value))
+    rows.value = await busy.run(fetchWagons(wagonQuery(filter), sort.value))
   } catch (e) {
     rows.value = []
     loadError.value = shownError(e)

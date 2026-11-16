@@ -12,6 +12,7 @@ import java.time.OffsetDateTime;
 @Getter
 @Setter
 public class RequestNote {
+    private long id;
     private OffsetDateTime createdDt;
     private OffsetDateTime receivedDt;
     private UserRef createdByUsr;

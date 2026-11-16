@@ -1,0 +1,38 @@
+#!/bin/bash
+# Команды образа zhsr-database. Параметры - /app/.env (смонтирован).
+#   migrate         - миграции структуры БД (по умолчанию: при каждом запуске приложения)
+#   reset [--demo]  - пересоздать БД с данными db-data/default (prepare/db-reset), создать бакет S3_BUCKET;
+#                     с --demo (только образ zhsr-database-demo) - и демо-данные, и фото демо-заявок
+#                     db-data/demo/img -> demo/img/ в хранилище
+set -euo pipefail
+cd /app
+
+case "${1:-migrate}" in
+  migrate)
+    exec $DB_MIGRATE
+    ;;
+  reset)
+    shift
+    for a in "$@"; do
+      if [ "$a" = --demo ] && [ ! -d db-data/demo ]; then
+        echo "в образе zhsr-database нет демо-данных - они в образе zhsr-database-demo" >&2
+        exit 1
+      fi
+    done
+    set -a; . ./.env; set +a
+    # адрес хранилища для mc: http://ключ:секрет@хост:порт
+    export MC_HOST_zhsr="${S3_ENDPOINT/:\/\//://$S3_ACCESS_KEY:$S3_SECRET_KEY@}"
+    mc mb --ignore-existing "zhsr/$S3_BUCKET"
+    prepare/db-reset "$@"
+    for a in "$@"; do
+      if [ "$a" = --demo ]; then
+        mc cp --quiet db-data/demo/img/*.jpg "zhsr/$S3_BUCKET/demo/img/" > /dev/null
+        echo "--- фото демо-заявок в хранилище: $(ls db-data/demo/img/*.jpg | wc -l)"
+      fi
+    done
+    ;;
+  *)
+    echo "неизвестная команда: $1 (migrate | reset [--demo])" >&2
+    exit 1
+    ;;
+esac

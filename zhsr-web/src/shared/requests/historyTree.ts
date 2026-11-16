@@ -23,6 +23,8 @@ export interface RequestEvent {
   executor?: UserRef | null
   /** комментарий к действию или текст примечания */
   text?: string
+  /** id примечания с текстом text на сервере: по нему примечание исправляется */
+  noteId?: number
   photos: RequestPhoto[]
   /** примечание и фото: время поступления на сервер, ISO */
   receivedAt?: string
@@ -54,6 +56,7 @@ interface Moment {
   /** задан — запись журнала исполнителей есть; null внутри — назначение снято */
   executor?: { usr: UserRef | null }
   note?: string
+  noteId?: number
   photos: RequestPhoto[]
   receivedAt?: string
 }
@@ -95,6 +98,7 @@ function serverMoments(d: RequestDetail): { root: Moment; moments: Moment[] } {
     const free = found && found !== root && found.note === undefined
     const moment = free ? found : add({ at: n.createdDt, by: n.createdByUsr, photos: [] })
     moment.note = n.note
+    moment.noteId = n.id
     moment.receivedAt = n.receivedDt
   }
   for (const p of [...d.photos].sort(byTime)) {
@@ -141,6 +145,7 @@ function serverEvents(d: RequestDetail, moments: Moment[]): RequestEvent[] {
       by: m.by,
       photos: m.photos,
       ...(m.note === undefined ? {} : { text: m.note }),
+      ...(m.noteId === undefined ? {} : { noteId: m.noteId }),
       ...(m.receivedAt === undefined ? {} : { receivedAt: m.receivedAt }),
     }
     if (m.status === undefined && !m.executor) {

@@ -64,7 +64,7 @@ import type { PhotoCaption } from './requestView'
 
 /**
  * Просмотр фото на весь экран поверх страницы: фото вписано в экран, между фото — стрелки, клавиши ←/→ и свайп, Escape
- * и крестик закрывают. На телефоне кнопка «назад» закрывает просмотр (см. dialogHistory). Открывается через openDialog;
+ * и крестик закрывают. На телефоне и в мобильной части кнопка «назад» закрывает просмотр (см. dialogHistory). Открывается через openDialog;
  * в photos — только фото с файлом, index — какое показать первым. caption — текст поверх фото без фона: кто и когда
  * сверху, текст снизу; нажатие на фото скрывает и снова показывает его.
  */
@@ -112,7 +112,8 @@ watch(
   () => props.show,
   (show) => {
     if (show) {
-      if (isMobile.value) dialogHistory.push(historyEntry)
+      // мобильная часть (.pwa) — и в браузере компьютера, где экран не сенсорный
+      if (isMobile.value || document.querySelector('.pwa')) dialogHistory.push(historyEntry)
     } else {
       dialogHistory.pop(historyEntry)
     }

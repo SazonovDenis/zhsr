@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+
+# Пересоздать данные с нуля: хранилище файлов и БД (с данными db-data/default), затем запустить приложение.
+#   ./app-reset          - без демо-данных
+#   ./app-reset --demo   - с демо-данными и фото демо-заявок
+# Все данные на сервере пропадают.
+
+cd "$(dirname "$0")"
+
+[ -f .env ] || { echo "Нет .env - сначала setup.sh" >&2; exit 1; }
+
+echo '--- остановка сервера и nginx'
+docker compose stop zhsr-nginx zhsr-app
+
+echo '--- хранилище файлов: удаление и пустое'
+docker compose rm -sf zhsr-s3
+docker volume rm -f zhsr_s3_data > /dev/null
+docker compose up -d zhsr-db zhsr-s3
+
+# демо-данные - в отдельном образе zhsr-database-demo
+service=zhsr-database
+for a in "$@"; do
+  if [ "$a" = --demo ]; then service=zhsr-database-demo; fi
+done
+
+echo '--- БД: пересоздание с данными'
+docker compose pull "$service"
+docker compose run --rm "$service" reset "$@"
+
+./app-start

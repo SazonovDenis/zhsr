@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+
+# Первая подготовка сервера с машины разработчика: каталог DEPLOY_DIR, пакет install/base, Docker, swap, .env со
+# случайными паролями (install/base/setup.sh под sudo). Дальше - ./remote-reset --demo.
+
+# все пути - от корня проекта
+cd "$(dirname "$0")/.."
+. install/remote.sh
+
+$SSH "sudo mkdir -p '$DEPLOY_DIR' && sudo chown \$(id -u):\$(id -g) '$DEPLOY_DIR'"
+sync_base
+$SSH "cd '$DEPLOY_DIR' && sudo ./setup.sh"
+
+echo "Готово"

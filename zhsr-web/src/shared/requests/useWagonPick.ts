@@ -6,7 +6,7 @@ import type { RequestWagon } from '@/api/wagons'
 import { fetchTripWagons, findWagons } from '@/api/wagons'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
-import { loadCached, readCached } from '@/shared/offline/cache'
+import { loadCached } from '@/shared/offline/cache'
 import { dictManager } from '@/shared/dict/DictManager'
 
 /** Ключ сохранённого на телефоне состава рейса. */
@@ -24,6 +24,12 @@ export async function saveTripWagons(tripId: number): Promise<void> {
   }
 }
 
+/** Состав рейса; offline — без связи берётся сохранённый на телефоне (saveTripWagons). */
+export async function loadTripWagons(tripId: number, offline: boolean): Promise<RequestWagon[]> {
+  if (!offline) return fetchTripWagons(tripId)
+  return (await loadCached(tripWagonsKey(tripId), () => fetchTripWagons(tripId))).data
+}
+
 /**
  * Выбор вагона в заявке (Ф-ЗАЯ-01) — общее для десктопной и мобильной частей.
  *
@@ -31,7 +37,7 @@ export async function saveTripWagons(tripId: number): Promise<void> {
  *   номер поезда и маршрут рейса из данных пользователя.
  * - Пользователь снял фильтр или ввёл цифры номера — поиск по номеру среди всех вагонов (findWagons); фильтр по рейсу
  *   при поиске по номеру не действует.
- * - offline — мобильная часть: состав рейса берётся с телефона, если связи нет; поиск идёт по сохранённому составу.
+ * - offline — мобильная часть: состав рейса берётся с телефона, если связи нет; поиск по номеру без связи — ошибка.
  *   Заранее состав сохраняет saveTripWagons.
  */
 export function useWagonPick(user: () => CurrentUser | null, offline = false) {
@@ -62,15 +68,9 @@ export function useWagonPick(user: () => CurrentUser | null, offline = false) {
     return (await loadCached(tripWagonsKey(id), () => fetchTripWagons(id))).data
   }
 
-  async function search(number: string): Promise<RequestWagon[]> {
-    try {
-      return await findWagons(number)
-    } catch (e) {
-      if (!offline || !isNetworkError(e)) throw e
-      // без связи — поиск по сохранённому составу рейса
-      const saved = (await readCached<RequestWagon[]>(tripWagonsKey(trip.value?.id ?? ''))) ?? []
-      return saved.filter((w) => w.number.includes(number))
-    }
+  // поиск по номеру — только при связи: без связи — ошибка на месте списка
+  function search(number: string): Promise<RequestWagon[]> {
+    return findWagons(number)
   }
 
   /** ошибка загрузки списка вагонов; показывается на месте списка, клик — повтор (load) */

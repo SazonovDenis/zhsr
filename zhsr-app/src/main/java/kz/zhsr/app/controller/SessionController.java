@@ -45,6 +45,12 @@ public class SessionController {
         return sessionService.user();
     }
 
+    /** БД с демо-данными - быстрый вход на странице входа; без входа. */
+    @GetMapping("/session/demo")
+    public boolean demo() throws Exception {
+        return sessionService.demo();
+    }
+
     @GetMapping("/session/state")
     public CurrentState state() throws Exception {
         return sessionService.state();

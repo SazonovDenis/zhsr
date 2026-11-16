@@ -24,6 +24,12 @@ $zs-text-faint: #8a8e95;
 // ошибка: блок ошибки (ErrorBox), всплывашка ошибки (notifyError), тексты ошибок
 $zs-error-bg: #fbe5e1;
 $zs-error-fg: #8f2416;
+// опасное действие (кнопка с заливкой) и «удалить строку» (знак ✕)
+$zs-danger: #b91c1c;
+$zs-remove-fg: #a12a1b;
+// «в порядке»: пункт чек-листа или описи без нарушения
+$zs-ok-fg: #15803d;
+$zs-ok-bg: #dcfce7;
 
 // рамки и фоны
 $zs-border: #d9dbdf;
@@ -39,6 +45,9 @@ $zs-bg-button-soft: #eef0f3;
 $zs-selected-bg: #e3e9fa;
 $zs-selected-border: #bfccf0;
 $zs-selected-fg: #14224d;
+
+// сделанное в ленте истории заявки; предстоящее — $zs-border
+$zs-progress-done: #2e9d6a;
 
 // левое меню
 $zs-menu-bg: #14224d;
@@ -85,12 +94,30 @@ $zs-font-mono: 'IBM Plex Mono', monospace;
 
 // шаги отступов Quasar (q-pa-*, q-ma-*, q-gutter-*, q-col-gutter-*) — в rem, не точнее десятых: свои отступы
 // в стилях не пишутся, только этими классами
-$space-none: (x: 0, y: 0);
-$space-xs: (x: 0.3rem, y: 0.3rem);
-$space-sm: (x: 0.5rem, y: 0.5rem);
-$space-md: (x: 1rem, y: 1rem);
-$space-lg: (x: 1.5rem, y: 1.5rem);
-$space-xl: (x: 3rem, y: 3rem);
+$space-none: (
+  x: 0,
+  y: 0,
+);
+$space-xs: (
+  x: 0.3rem,
+  y: 0.3rem,
+);
+$space-sm: (
+  x: 0.5rem,
+  y: 0.5rem,
+);
+$space-md: (
+  x: 1rem,
+  y: 1rem,
+);
+$space-lg: (
+  x: 1.5rem,
+  y: 1.5rem,
+);
+$space-xl: (
+  x: 3rem,
+  y: 3rem,
+);
 $flex-gutter-xs: 0.3rem;
 $flex-gutter-sm: 0.5rem;
 $flex-gutter-md: 1rem;

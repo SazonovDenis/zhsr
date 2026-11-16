@@ -111,3 +111,15 @@ id	check_list_template	parent_item	text_ru	text_kk	text_en	value_kind	check_dict
 110	5	108	Внутри: накипь	Ішінде: қақ	Inside: scale	3	1	2	false
 111	5	108	Снаружи: видимые известковые отложения	Сыртында: көрінетін әк шөгінділері	Outside: visible limescale	3	1	3	false
 112	5	108	Неприятный запах	Жағымсыз иіс	Unpleasant odour	3	1	4	false
+113	6		Бригада	Бригада	Crew			1	false
+114	6	113	Бригада укомплектована по плану	Бригада жоспар бойынша жасақталған	Crew staffed as planned	3	2	1	false
+115	6	113	Бригада прошла медосмотр	Бригада медициналық тексеруден өтті	Crew passed the medical check	3	2	2	false
+116	6	113	Бригада прошла инструктаж	Бригада нұсқаулықтан өтті	Crew passed the briefing	3	2	3	false
+117	6	113	Поездной электромеханик на дежурстве	Поездың электромеханигі кезекшілікте	Train electrician on duty	3	2	4	false
+118	6	113	Персоналу выданы перчатки и маски	Қызметкерлерге қолғап пен маска берілді	Staff given gloves and masks	3	2	5	false
+119	6		Состав	Құрам	Train			2	false
+120	6	119	Вагоны экипированы	Вагондар жабдықталған	Wagons equipped	3	2	1	false
+121	6	119	Вагоны убраны	Вагондар жиналған	Wagons cleaned	3	2	2	false
+122	6	119	Уборщики доступны в пути	Жинаушылар сапарда қолжетімді	Cleaners available during the trip	3	2	3	false
+123	6	119	Критичные замечания по вагонам устранены	Вагондар бойынша сыни ескертулер жойылды	Critical wagon remarks resolved	3	2	4	false
+124	6	119	Замечания	Ескертулер	Remarks	1		5	false

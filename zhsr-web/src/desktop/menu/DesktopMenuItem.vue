@@ -66,9 +66,11 @@ defineProps<{
     font-weight: 600;
   }
 
+  // подпись вложенного пункта — ровно под подписью пункта с иконкой: отступ q-px-md (1rem) + иконка (1.1rem) + промежуток
+  // (0.6rem)
   &--indent {
     height: 2rem;
-    padding-left: 2.4rem;
+    padding-left: 2.7rem;
     font-size: 0.8rem;
     font-weight: 400;
   }

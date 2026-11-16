@@ -1,100 +1,68 @@
 <template>
-  <PwaPage :title="pageTitle" :back="cancel">
-    <template #subtitle>
-      <div class="wizard__bars">
+  <!-- шаг вагона: страница не прокручивается, прокручивается только список вагонов -->
+  <PwaPage :title="pageTitle" :back="cancel" :fill="stepName === 'wagon'">
+    <!-- прогресс шагов — у нижнего края шапки -->
+    <template #bottom>
+      <div class="wizard__bars q-px-sm">
         <span v-for="i in 3" :key="i" class="wizard__bar" :class="{ 'wizard__bar--on': i - 1 <= step }" />
       </div>
     </template>
     <!-- главное показывающее страницы: общий спиннер на всю цепочку загрузок -->
     <LoadSpinner v-if="busy.active.value" />
 
-    <!-- шаг 1: неисправность -->
-    <template v-if="step === 0">
-      <div class="wizard__label">{{ t('Неисправность') }}</div>
-      <input v-model="faultQuery" class="wizard__input" :placeholder="t('Поиск словами: «окно дует»')" />
-      <div v-if="!searching" class="wizard__chips">
-        <button
-          v-for="f in frequent"
-          :key="f.id"
-          type="button"
-          class="wizard__chip q-py-none q-px-md"
-          :class="{ 'wizard__chip--on': draft.faultType === f.id }"
-          @click="pickFault(f.id)"
-        >
-          {{ f.name }}
-        </button>
-      </div>
-      <div class="wizard__tree">
-        <template v-for="c in tree" :key="c.id">
-          <button type="button" class="wizard__cat q-py-none q-px-md" @click="toggleService(c.id)">
-            <span class="wizard__cat-mark" :style="{ background: c.color }" />
-            <span class="wizard__grow">{{ c.name }}</span>
-            <span class="wizard__count">{{ c.count }}</span>
-            <SvgIcon name="chevron-down" size="0.8rem" :class="{ 'wizard__chevron--closed': !serviceOpen(c.id) }" />
-          </button>
-          <template v-if="serviceOpen(c.id)">
-            <template v-for="g in c.groups" :key="g.id">
-              <button type="button" class="wizard__group q-py-none q-pr-md q-pl-lg" @click="toggleGroup(g.id)">
-                <span class="wizard__grow">{{ g.name }}</span>
-                <span class="wizard__count">{{ g.items.length }}</span>
-                <SvgIcon name="chevron-down" size="0.8rem" :class="{ 'wizard__chevron--closed': !groupOpen(g.id) }" />
-              </button>
-              <template v-if="groupOpen(g.id)">
-                <button
-                  v-for="f in g.items"
-                  :key="f.id"
-                  type="button"
-                  class="wizard__fault q-py-sm q-pr-md q-pl-xl"
-                  :class="{ 'wizard__fault--on': draft.faultType === f.id }"
-                  @click="pickFault(f.id)"
-                >
-                  <span class="wizard__grow">{{ f.name }}</span>
-                  <span v-if="draft.faultType === f.id" class="wizard__check">✓</span>
-                </button>
-              </template>
-            </template>
-          </template>
-        </template>
-        <div v-if="tree.length === 0" class="wizard__empty q-py-lg q-px-md">{{ t('Ничего не найдено') }}</div>
+    <!-- шаг неисправности -->
+    <template v-if="stepName === 'fault'">
+      <!-- неисправность — тот же комбобокс, что на десктопе: дерево «служба → группа → неисправность» в списке -->
+      <div class="wizard__fault-step">
+        <FaultPicker :model-value="draft.faultType || null" @update:model-value="onFaultList" />
+        <!-- частые: выбор в списке их скрывает; нажатая кнопка повторным нажатием не отжимается -->
+        <CbButton
+          v-if="!faultFromList"
+          :model-value="draft.faultType || null"
+          single
+          required
+          wrap
+          :columns="2"
+          :values="frequent.map((f) => ({ id: f.id, text: f.name }))"
+          @update:model-value="onFaultPick(typeof $event === 'number' ? $event : null)"
+        />
       </div>
     </template>
 
-    <!-- шаг 2: детали -->
-    <template v-if="step === 1">
+    <!-- шаг деталей -->
+    <template v-if="stepName === 'details'">
       <div class="wizard__field">
         <span class="wizard__label">{{ t('Критичность') }}</span>
-        <div class="wizard__chips">
-          <button
-            v-for="s in severities"
-            :key="s.id"
-            type="button"
-            class="wizard__chip q-py-none q-px-md"
-            :class="{ 'wizard__chip--on': draft.severityType === s.id }"
-            @click="draft.severityType = Number(s.id)"
-          >
-            {{ s.text }}
-          </button>
-        </div>
-      </div>
-      <div class="wizard__field">
-        <span class="wizard__label">{{ t('Служба') }}</span>
-        <span>{{ goesTo }}</span>
+        <CbSegment
+          :model-value="draft.severityType"
+          single
+          required
+          :values="severities"
+          :max-button-count="4"
+          @update:model-value="draft.severityType = Number($event)"
+        />
       </div>
       <div v-if="canChooseExecutor" class="wizard__field">
         <span class="wizard__label">{{ t('Исполнитель') }}</span>
-        <select v-model="draft.executorUsr" class="wizard__select q-py-none q-px-md">
-          <option :value="null">{{ t('Не назначать — возьмёт любой сотрудник службы') }}</option>
-          <option v-for="u in staff" :key="u.id" :value="u.id">{{ userName(u) }}</option>
-        </select>
+        <CbList
+          :model-value="draft.executorUsr"
+          single
+          placeholder="Не назначать — возьмёт любой сотрудник службы"
+          :values="staffChoices"
+          @update:model-value="draft.executorUsr = typeof $event === 'number' ? $event : null"
+        >
+          <template #option="{ item }">
+            <StaffOption
+              :name="item.text ?? ''"
+              :candidate="(item.data?.candidate as StaffCandidate) ?? null"
+              :wagon-number="wagonNumber || null"
+            />
+          </template>
+        </CbList>
       </div>
       <div class="wizard__field">
         <span class="wizard__label">{{ t('Описание') }}</span>
-        <textarea
-          v-model="draft.description"
-          class="wizard__textarea q-pa-md"
-          rows="3"
-          :placeholder="t('Например: в 3-м купе не закрывается окно')"
-        />
+        <NoteInput v-model="draft.description" placeholder="Например: в 3-м купе не закрывается окно" />
       </div>
       <div class="wizard__field">
         <span class="wizard__label">{{ t('Фото • {n} из 5', { n: draft.photos.length }) }}</span>
@@ -102,94 +70,15 @@
       </div>
     </template>
 
-    <!-- шаг 3: вагон -->
-    <template v-if="step === 2">
-      <div class="wizard__label">{{ t('Вагон') }}</div>
-      <button
-        v-if="pick.myWagon.value"
-        type="button"
-        class="wizard__mine q-pa-md"
-        :class="{ 'wizard__mine--on': draft.wagon === pick.myWagon.value.id }"
-        @click="chooseWagon(pick.myWagon.value)"
-      >
-        <span class="wizard__mine-text">
-          <span class="wizard__caption">{{ t('Мой вагон') }}</span>
-          <span class="wizard__mine-number zs-mono">{{ pick.myWagon.value.number }}</span>
-          <span class="wizard__muted">{{ dictManager.getValue('WagonType', pick.myWagon.value.wagonType) }}</span>
-        </span>
-        <span v-if="draft.wagon === pick.myWagon.value.id" class="wizard__check">✓</span>
-      </button>
-
-      <div v-if="pick.myWagon.value" class="wizard__caption">{{ t('Другой вагон') }}</div>
-      <div v-if="pick.hasTrip.value" class="wizard__chips">
-        <button
-          type="button"
-          class="wizard__chip wizard__chip--small q-py-none q-px-md"
-          :class="{
-            'wizard__chip--on': pick.tripOn.value,
-            'wizard__chip--faded': pick.tripOn.value && !!pick.query.value,
-          }"
-          @click="pick.tripOn.value = !pick.tripOn.value"
-        >
-          {{ t('Рейс {trip}', { trip: pick.tripLabel.value }) }}
-          <span v-if="pick.tripOn.value">✕</span>
-        </button>
-      </div>
-      <input
-        :value="pick.query.value"
-        class="wizard__input wizard__input--number"
-        inputmode="numeric"
-        :placeholder="t('Цифры номера вагона')"
-        @input="onDigits"
-      />
-      <div class="wizard__list">
-        <button
-          v-for="w in pick.wagons.value"
-          :key="w.number"
-          type="button"
-          class="wizard__wagon q-py-none q-px-md"
-          :class="{ 'wizard__wagon--on': draft.wagon === w.id }"
-          @click="chooseWagon(w)"
-        >
-          <span class="wizard__wagon-number zs-mono">{{ w.number }}</span>
-          <span class="wizard__grow wizard__muted">{{ dictManager.getValue('WagonType', w.wagonType) }}</span>
-          <span v-if="draft.wagon === w.id" class="wizard__check">✓</span>
-        </button>
-        <LoadSpinner v-if="pick.loading.value && pick.wagons.value.length === 0" size="1.5rem" />
-        <ErrorBox v-else-if="pick.error.value" :error="pick.error.value" :retry="pick.load" />
-        <div v-else-if="!pick.loading.value && pick.wagons.value.length === 0" class="wizard__empty q-py-lg q-px-md">
-          {{ t('Вагоны не найдены') }}
-        </div>
-      </div>
-      <div class="wizard__field">
-        <span class="wizard__label">{{ t('Рейс') }}</span>
-        <select v-model="draft.trip" class="wizard__select q-py-none q-px-md">
-          <option :value="null">{{ t('Без рейса') }}</option>
-          <option v-for="tr in tripOptions" :key="tr.id" :value="tr.id">{{ tr.text }}</option>
-        </select>
-      </div>
-      <div v-if="draft.faultType" class="wizard__goes q-pa-md">
-        <span class="wizard__caption">{{ t('Уйдёт') }}</span>
-        <span class="wizard__goes-to">{{ goesTo }}</span>
-      </div>
+    <!-- шаг вагона — три режима ввода; смена режима очищает выбранный вагон и цифры -->
+    <template v-if="stepName === 'wagon'">
+      <WagonModePicker :user="currentUser" :selected="selectedWagon" @pick="onWagonPick" />
     </template>
 
     <div v-if="error" class="wizard__error q-py-sm q-px-md">{{ error }}</div>
 
     <template #bar>
-      <div class="wizard__nav">
-        <button type="button" class="wizard__btn q-py-none q-px-md" @click="back">
-          {{ step === 0 ? t('Отмена') : t('Назад') }}
-        </button>
-        <button
-          type="button"
-          class="wizard__btn wizard__btn--primary q-py-none q-px-md"
-          :disabled="!canNext || running"
-          @click="next"
-        >
-          {{ step < 2 ? t('Далее') : id ? t('Сохранить') : t('Отправить') }}
-        </button>
-      </div>
+      <BottomBar :actions="navActions" @action="(key) => (key === 'back' ? back() : next())" />
     </template>
   </PwaPage>
 </template>
@@ -200,18 +89,17 @@ import { computed, reactive, ref, shallowRef, toRaw, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { isNetworkError } from '@/api/http'
-import type { RequestDraft, UserRef } from '@/api/requests'
+import type { RequestDraft, StaffCandidate } from '@/api/requests'
 import { createRequest, fetchServiceStaff, updateRequest } from '@/api/requests'
 import type { TripRef, RequestWagon } from '@/api/wagons'
 import { t } from '@/boot/i18n'
+import NoteInput from '@/shared/components/form/NoteInput.vue'
 import { randomGuid } from '@/shared/db/db'
 import { dictChoices } from '@/shared/dict/dictChoices'
 import { dictManager } from '@/shared/dict/DictManager'
 import { provideBusy } from '@/shared/busy'
-import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { notifyError } from '@/shared/errors'
-import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { isOnline } from '@/shared/network'
 import type { DraftView } from '@/shared/offline/outbox'
 import {
@@ -225,21 +113,28 @@ import {
   withQueuedEdit,
 } from '@/shared/offline/outbox'
 import { isoDateTime } from '@/shared/format'
-import { faultDefaults, faultTree, frequentFaults, frequentGroupId, isFaultSearch } from '@/shared/requests/faults'
-import { ServiceType, Severity } from '@/shared/constants/systemDicts'
+import FaultPicker from '@/shared/requests/FaultPicker.vue'
+import { faultDefaults, frequentFaults } from '@/shared/requests/faults'
+import { Severity } from '@/shared/constants/systemDicts'
+import CbButton from '@/shared/components/choice/CbButton.vue'
+import CbList from '@/shared/components/choice/CbList.vue'
+import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
 import { faultName } from '@/shared/requests/requestView'
-import { canAssignOnCreate } from '@/shared/requests/rights'
+import { canAssignOnCreate, staffTrip } from '@/shared/requests/rights'
 import { loadOffline } from '@/shared/requests/useRequestCard'
-import { useWagonPick } from '@/shared/requests/useWagonPick'
 import { currentUser, loadCurrentUser, userName } from '@/shared/user'
+import type { BottomBarAction } from '../components/BottomBar.vue'
+import BottomBar from '../components/BottomBar.vue'
 import PwaPage from '../components/PwaPage.vue'
-import { tripRefText } from '@/shared/trips/tripRefText'
+import WagonModePicker from '../components/WagonModePicker.vue'
+import StaffOption from '@/shared/requests/StaffOption.vue'
+import { sortStaff } from '@/shared/requests/staff'
 
 /**
- * Подача заявки на телефоне в 3 шага (Ф-ЗАЯ-01): неисправность, детали (критичность, описание, фото), вагон
- * (мой вагон, состав рейса или поиск по номеру) и рейс. Критичность подставляется из неисправности, служба определяется ею, рейс —
- * из вагона; всё можно изменить. Без связи заявка встаёт в очередь на телефоне и отправится сама.
+ * Подача заявки на телефоне в 3 шага (Ф-ЗАЯ-01): вагон (мой вагон, состав рейса или поиск по номеру), неисправность,
+ * детали (критичность, исполнитель, описание, фото); при исправлении вагон — последним шагом. Критичность подставляется из неисправности и её можно изменить;
+ * служба определяется неисправностью, рейс — вагоном: в форме их нет. Без связи заявка встаёт в очередь на телефоне и отправится сама.
  *
  * Задан id — исправление заявки (Ф-ЗАЯ-07): поля заполнены из заявки. Без связи исправление встаёт в очередь на
  * телефоне и отправится само. Id «local-…» — заявка из очереди: она ещё не на сервере, исправляется прямо в очереди.
@@ -251,6 +146,13 @@ const router = useRouter()
 const busy = provideBusy()
 
 const step = ref(0)
+// порядок шагов: подача — вагон, неисправность, детали; исправление — вагон последним: чаще исправляют неисправность и
+// описание
+const stepName = computed(() =>
+  props.id
+    ? (['fault', 'details', 'wagon'] as const)[step.value]
+    : (['wagon', 'fault', 'details'] as const)[step.value],
+)
 
 // вагон 0 и неисправность 0 — ещё не выбраны
 const draft = reactive<RequestDraft>({
@@ -268,8 +170,8 @@ const wagonType = ref(0)
 
 // на шаге деталей в заголовке — выбранная неисправность
 const pageTitle = computed(() => {
-  if (step.value === 1 && draft.faultType) return faultName(draft.faultType)
-  return step.value === 0 ? t('Вид неисправности') : t('Вагон и рейс')
+  if (stepName.value === 'details' && draft.faultType) return faultName(draft.faultType)
+  return stepName.value === 'wagon' ? t('Место неисправности') : t('Вид неисправности')
 })
 
 const running = ref(false)
@@ -278,22 +180,25 @@ const error = ref('')
 // исправляется заявка из очереди на телефоне: на сервере её ещё нет
 const isQueued = computed(() => props.id.startsWith('local-'))
 
-// --- шаг 1: неисправность ---
+// --- шаг неисправности ---
 
-const faultQuery = ref('')
-const searching = computed(() => isFaultSearch(faultQuery.value))
-const tree = computed(() => faultTree(faultQuery.value))
+// частые — неисправности в избранном; дерево «служба → группа → неисправность» — в списке FaultPicker
 const frequent = computed(() => frequentFaults())
-// раскрыты по умолчанию технические неисправности и частые; при поиске раскрыто всё найденное
-const openServices = ref<number[]>([ServiceType.TECHNICAL])
-// группа частых неисправностей раскрывается, когда справочники загружены (onMounted)
-const openGroups = ref<number[]>([])
-const serviceOpen = (id: number) => searching.value || openServices.value.includes(id)
-const groupOpen = (id: number) => searching.value || openGroups.value.includes(id)
 
-const flip = (list: number[], id: number) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
-const toggleService = (id: number) => (openServices.value = flip(openServices.value, id))
-const toggleGroup = (id: number) => (openGroups.value = flip(openGroups.value, id))
+// неисправность выбрана в списке (комбобоксе): частые скрыты, пока её не стёрли
+const faultFromList = ref(false)
+
+function onFaultList(id: number | null) {
+  faultFromList.value = id !== null
+  onFaultPick(id)
+}
+
+// неисправность в поле выбора: выбрана — как кнопкой частых, стёрта — не выбрана ни одна частая
+function onFaultPick(id: number | null) {
+  // 0 — неисправность не выбрана
+  if (id === null) draft.faultType = 0
+  else pickFault(id)
+}
 
 // неисправность выбрана — критичность по умолчанию из неё
 function pickFault(id: number) {
@@ -301,32 +206,68 @@ function pickFault(id: number) {
   draft.severityType = faultDefaults(id).severity
 }
 
-// --- шаг 2: детали ---
+// --- шаг деталей ---
 
 const severities = computed(() => [...dictChoices('Severity')].reverse().map((c) => ({ ...c, text: c.text ?? '' })))
 // служба определяется неисправностью
 const service = computed(() => (draft.faultType ? faultDefaults(draft.faultType).service : null))
 
-const canChooseExecutor = computed(() => !props.id && !!currentUser.value && canAssignOnCreate(currentUser.value))
-const staff = shallowRef<UserRef[]>([])
+// выбранный вагон: от его рейса зависит, может ли ЛНП выбрать исполнителя
+const pickedWagon = shallowRef<RequestWagon | null>(null)
+// ЛНП выбирает исполнителя по вагону своего рейса: вагон выбран на первом шаге (не выбран — считается вагоном текущего
+// рейса пользователя); вагон не из рейса ЛНП — поля нет
+const canChooseExecutor = computed(() => {
+  const user = currentUser.value
+  if (props.id || !user) return false
+  const wagonTrip = pickedWagon.value ? (pickedWagon.value.trip?.id ?? null) : (user.trip?.id ?? null)
+  return canAssignOnCreate(user, wagonTrip)
+})
+const staff = shallowRef<StaffCandidate[]>([])
+// у сотрудника бригады рейса справа — должность и вагоны (StaffOption); предпочтительные — первыми
+const staffChoices = computed(() =>
+  sortStaff(staff.value, wagonNumber.value || null).map((c) => ({
+    id: c.usr.id,
+    text: userName(c.usr),
+    data: { candidate: c },
+  })),
+)
+// ЛНП выбирает исполнителя из бригады рейса вагона (пока вагон не выбран — своего рейса), мастер депо — из всех
+// сотрудников службы
+const executorTrip = computed(() => {
+  const user = currentUser.value
+  if (!user) return null
+  return staffTrip(user, pickedWagon.value ? (pickedWagon.value.trip?.id ?? null) : (user.trip?.id ?? null))
+})
 watch(
-  () => (canChooseExecutor.value ? service.value : null),
-  async (id) => {
+  // источники по отдельности: watch сравнивает каждый, а не новый массив — иначе любой пересчёт стирал выбранного
+  // исполнителя
+  [() => (canChooseExecutor.value ? service.value : null), executorTrip],
+  async ([id, trip]) => {
     draft.executorUsr = null
-    staff.value = id && isOnline.value ? await fetchServiceStaff(id) : []
+    staff.value = id && isOnline.value ? await fetchServiceStaff(id, trip) : []
   },
 )
 
-// --- шаг 3: вагон и рейс ---
+// --- шаг вагона ---
 
-const pick = useWagonPick(() => currentUser.value, true)
-const pickedWagon = shallowRef<RequestWagon | null>(null)
 const requestTrip = shallowRef<TripRef | null>(null)
 
-function onDigits(e: Event) {
-  const input = e.target as HTMLInputElement
-  input.value = input.value.replace(/\D/g, '')
-  pick.query.value = input.value
+// выбранный вагон для выбора вагона (WagonModePicker): номер и тип — из черновика
+const selectedWagon = computed(() =>
+  draft.wagon ? { id: draft.wagon, number: wagonNumber.value, wagonType: wagonType.value } : null,
+)
+
+function onWagonPick(w: RequestWagon | null) {
+  if (w) chooseWagon(w)
+  else clearWagon()
+}
+
+function clearWagon() {
+  draft.wagon = 0
+  draft.trip = null
+  wagonNumber.value = ''
+  wagonType.value = 0
+  pickedWagon.value = null
 }
 
 function chooseWagon(w: RequestWagon) {
@@ -337,20 +278,6 @@ function chooseWagon(w: RequestWagon) {
   draft.trip = w.trip?.id ?? null
 }
 
-// рейс: рейс вагона, текущий рейс пользователя, рейс исправляемой заявки
-const tripOptions = computed(() => {
-  const list: { id: number; text: string }[] = []
-  const add = (id: number, text: string) => {
-    if (!list.some((x) => x.id === id)) list.push({ id, text })
-  }
-  const wagonTrip = pickedWagon.value?.trip
-  if (wagonTrip) add(wagonTrip.id, tripRefText(wagonTrip))
-  const u = currentUser.value?.trip
-  if (u) add(u.id, `${u.trainNumber} • ${u.name}`)
-  if (requestTrip.value) add(requestTrip.value.id, tripRefText(requestTrip.value))
-  return list
-})
-
 // выбранный рейс для показа, пока черновик в очереди; у рейса пользователя плановое отправление — его отправление
 function chosenTrip(): TripRef | null {
   const u = currentUser.value?.trip
@@ -359,11 +286,23 @@ function chosenTrip(): TripRef | null {
   return trip ? { id: trip.id, trainNumber: trip.trainNumber, name: trip.name, plannedDt: trip.plannedDt } : null
 }
 
-const goesTo = computed(() => (service.value ? dictManager.getValue('Service', service.value) : ''))
-
 // --- шаги ---
 
-const canNext = computed(() => [!!draft.faultType, true, !!draft.wagon][step.value])
+const canNext = computed(() => {
+  if (stepName.value === 'wagon') return !!draft.wagon
+  return stepName.value === 'fault' ? !!draft.faultType : true
+})
+
+// кнопки мастера: назад по шагам (с первого — отмена) и далее (на последнем — отправить или сохранить)
+const navActions = computed<BottomBarAction[]>(() => [
+  { key: 'back', title: step.value === 0 ? 'Отмена' : 'Назад', align: 'left' },
+  {
+    key: 'next',
+    title: step.value < 2 ? 'Далее' : props.id ? 'Сохранить' : 'Отправить',
+    kind: 'primary',
+    disabled: !canNext.value || running.value,
+  },
+])
 
 function back() {
   if (step.value === 0) cancel()
@@ -379,7 +318,6 @@ async function next() {
   if (!canNext.value) return
   if (step.value < 2) {
     step.value++
-    if (step.value === 2) void pick.load()
     return
   }
   await submit()
@@ -463,6 +401,8 @@ async function fillDraft() {
     description: queued?.draft.description ?? r!.description,
     executorUsr: queued?.draft.executorUsr ?? null,
   })
+  // неисправность заявки не из частых — как выбранная в списке: частые скрыты
+  faultFromList.value = !frequent.value.some((f) => f.id === draft.faultType)
   wagonNumber.value = queued?.wagonNumber ?? r!.wagon.number
   wagonType.value = queued?.wagonType ?? r!.wagon.wagonType
   requestTrip.value = queued ? toRaw(queued.trip) : r!.trip
@@ -473,8 +413,6 @@ void busy
   .run(async () => {
     // дерево неисправностей — главное показывающее шага 1: без групп и видов неисправностей его не показать
     await Promise.all([dictManager.prepareDicts('FaultGroup', 'FaultType'), loadCurrentUser().catch(notifyError)])
-    const frequentGroup = frequentGroupId()
-    if (frequentGroup !== null) openGroups.value = [frequentGroup]
     if (props.id) {
       try {
         await fillDraft()
@@ -484,13 +422,6 @@ void busy
     }
   })
   .catch(notifyError)
-
-// список вагонов — свой контрол, страница его не ждёт; новая заявка — по умолчанию вагон проводника
-if (!props.id) {
-  void pick.load().then(() => {
-    if (pick.myWagon.value && !draft.wagon) chooseWagon(pick.myWagon.value)
-  })
-}
 </script>
 
 <style scoped lang="scss">
@@ -501,18 +432,17 @@ if (!props.id) {
 }
 
 .wizard__bar {
-  height: 0.3rem;
+  height: 0.2rem;
   border-radius: 0.1rem;
   background: $zs-border;
 
+  // пройденные шаги и текущий — цветом кнопки
   &--on {
     background: $primary;
   }
 }
 
-.wizard__input,
-.wizard__select,
-.wizard__textarea {
+.wizard__input {
   width: 100%;
   border: 0.0625rem solid $zs-border-input;
   border-radius: 0.3rem;
@@ -527,8 +457,7 @@ if (!props.id) {
   }
 }
 
-.wizard__input,
-.wizard__select {
+.wizard__input {
   height: 3.3rem;
 }
 
@@ -536,16 +465,10 @@ if (!props.id) {
   font-size: 1.1rem;
 }
 
-.wizard__textarea {
-  resize: none;
-}
-
 .wizard__caption {
   color: $zs-text-muted;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 // подпись группы на странице (не внутри кнопки или строки)
@@ -554,124 +477,14 @@ div.wizard__caption {
   margin-bottom: calc(-1rem / 3);
 }
 
-.wizard__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
+// частые неисправности: сетка в две колонки, текст переносится по словам внутри кнопки — без пустого места
 
-.wizard__chip {
-  min-height: 2.8rem;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 62.5rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.9rem;
-  text-align: left;
-  cursor: pointer;
-
-  &--small {
-    min-height: 2.1rem;
-    font-size: 0.8rem;
-  }
-
-  &--on {
-    border-color: $primary;
-    background: $primary;
-    color: #fff;
-  }
-
-  &--faded {
-    opacity: 0.45;
-  }
-}
-
-.wizard__tree,
-.wizard__list {
+// шаг неисправности: поле выбора и частые — плотнее, чем блоки страницы
+.wizard__fault-step {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.3rem;
-  background: #fff;
-}
-
-.wizard__cat,
-.wizard__group,
-.wizard__fault,
-.wizard__wagon {
-  display: flex;
-  align-items: center;
   gap: 0.5rem;
-  border: 0;
-  border-top: 0.0625rem solid $zs-border-row;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.wizard__cat {
-  min-height: 2.8rem;
-  background: $zs-bg-header;
-  font-size: 0.9rem;
-  font-weight: 700;
-
-  &:first-child {
-    border-top: 0;
-  }
-}
-
-.wizard__cat-mark {
-  flex: none;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 0.1rem;
-}
-
-.wizard__group {
-  min-height: 2.5rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.wizard__fault {
-  min-height: 2.4rem;
-  font-size: 0.8rem;
-  line-height: 1.3;
-
-  &--on {
-    background: $zs-selected-bg;
-    font-weight: 600;
-  }
-}
-
-.wizard__chevron--closed {
-  transform: rotate(-90deg);
-}
-
-.wizard__grow {
-  flex: 1;
-  min-width: 0;
-}
-
-.wizard__count {
-  color: $zs-text-muted;
-  font-size: 0.8rem;
-  font-weight: 400;
-}
-
-.wizard__check {
-  color: $primary;
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.wizard__empty {
-  color: $zs-text-muted;
-  font-size: 0.9rem;
+  margin-top: -0.5rem;
 }
 
 .wizard__field {
@@ -690,105 +503,11 @@ div.wizard__label {
   margin-bottom: -0.5rem;
 }
 
-.wizard__mine {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  border: 0.1rem solid $zs-border;
-  border-radius: 0.4rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &--on {
-    border-color: $primary;
-    background: $zs-row-selected-bg;
-  }
-}
-
-.wizard__mine-text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-
-.wizard__mine-number {
-  font-size: 1.3rem;
-  font-weight: 700;
-}
-
-.wizard__muted {
-  color: $zs-text-muted;
-  font-size: 0.9rem;
-}
-
-.wizard__wagon {
-  min-height: 3.3rem;
-
-  &:first-child {
-    border-top: 0;
-  }
-
-  &--on {
-    background: $zs-row-selected-bg;
-  }
-}
-
-.wizard__wagon-number {
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.wizard__goes {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  border-radius: 0.4rem;
-  background: $zs-row-selected-bg;
-}
-
-.wizard__goes-to {
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-
 .wizard__error {
+  flex: none;
   border-radius: 0.3rem;
   background: $zs-error-bg;
   color: $zs-error-fg;
   font-size: 0.8rem;
-}
-
-.wizard__nav {
-  display: flex;
-  gap: 0.6rem;
-}
-
-.wizard__btn {
-  min-height: 3.5rem;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.4rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-
-  &--primary {
-    flex: 1;
-    border: 0;
-    background: $primary;
-    color: #fff;
-    font-size: 1.1rem;
-    font-weight: 700;
-  }
-
-  &:disabled {
-    opacity: 0.4;
-  }
 }
 </style>

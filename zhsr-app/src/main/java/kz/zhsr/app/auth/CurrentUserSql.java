@@ -1,5 +1,7 @@
 package kz.zhsr.app.auth;
 
+import kz.zhsr.app.service.RouteSql;
+
 /**
  * SQL {@link CurrentUserService}: запросы с соединениями и условиями, которые не покрываются методами Db.
  * Параметры запросов - в описании каждого метода.
@@ -36,28 +38,41 @@ final class CurrentUserSql {
 
     /**
      * Рейс сотрудника из рейсов его бригады в статусе status, первый по order (выражение сортировки из кода, не от
-     * пользователя). Поля: id, train_number, name (маршрута), trip_status_type, crew_duty_type, wagon и wagon2 (вагоны
-     * проводника), number и number2 (номера этих вагонов), departure (фактическое или плановое отправление), arrival
-     * (плановое прибытие: плановое отправление плюс время в пути маршрута, route.duration), planned_dt, departed_dt,
-     * arrived_dt, departure_marked_dt, arrival_marked_dt. Параметры: usr, status.
+     * пользователя). Поля: id, train_number, name (маршрута), trip_status_type, crew_duty_type, departure
+     * (фактическое или плановое отправление), arrival (плановое прибытие: плановое отправление плюс время в пути
+     * маршрута по его станциям), planned_dt, departed_dt, arrived_dt, departure_marked_dt, arrival_marked_dt.
+     * Параметры: usr, status.
      */
     static String trip(String order) {
         return """
                 select trip.id, route.train_number, route.name, trip.trip_status_type, trip_crew.crew_duty_type,
-                       trip_crew.wagon, wagon.number, trip_crew.wagon2,
-                       (select second_wagon.number from wagon second_wagon where second_wagon.id = trip_crew.wagon2) as number2,
                        coalesce(trip.departed_dt, trip.planned_dt) as departure,
-                       trip.planned_dt + make_interval(mins => route.duration) as arrival,
+                       trip.planned_dt + make_interval(mins => %2$s) as arrival,
                        trip.planned_dt, trip.departed_dt, trip.arrived_dt, trip.departure_marked_dt,
                        trip.arrival_marked_dt
                 from trip_crew
                 join trip on trip.id = trip_crew.trip
                 join route on route.id = trip.route
-                left join wagon on wagon.id = trip_crew.wagon
                 where trip_crew.usr = :usr and trip.trip_status_type = :status
-                order by %s
+                order by %1$s, trip_crew.id
                 limit 1
-                """.formatted(order);
+                """.formatted(order, RouteSql.DURATION);
+    }
+
+    /**
+     * Вагоны, за которыми закреплён сотрудник в рейсе: действующие строки бригады (незакрытые или закрытые прибытием
+     * рейса), по порядку строк. Параметры: usr, trip.
+     */
+    static String tripWagons() {
+        return """
+                select trip_crew.wagon, wagon.number
+                from trip_crew
+                join trip on trip.id = trip_crew.trip
+                join wagon on wagon.id = trip_crew.wagon
+                where trip_crew.usr = :usr and trip_crew.trip = :trip
+                  and (trip_crew.dend is null or trip_crew.dend = trip.arrived_dt)
+                order by trip_crew.id
+                """;
     }
 
 }

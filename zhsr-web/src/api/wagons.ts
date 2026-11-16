@@ -1,11 +1,11 @@
 import type { TableSort } from '@/shared/components/table/types'
 import type { UserRef } from './requests'
+import type { TrainRef } from './trains'
 import { LocationType } from '@/shared/constants/systemDicts'
 import { http } from './http'
 
 /**
- * API вагонов. Список (GET /wagons) и варианты выбора (GET /wagons/options) — с сервера; ввод вагона сервер пока не
- * умеет: createWagon — заготовка.
+ * API вагонов: список (GET /wagons), варианты выбора (GET /wagons/options), ввод вагона (POST /wagons), журнал.
  */
 
 /** Вагон как вариант выбора (подбор вагона в заявке): вагон, тип и где он сейчас. */
@@ -34,6 +34,12 @@ export interface WagonRow extends WagonOption {
   wagonStatusType: number
   /** с какого времени вагон в этом состоянии, ISO с часовым поясом */
   dbegStatus: string
+  /** текущий ответственный за вагон; null — не назначен */
+  responsibleUsr: UserRef | null
+  /** с какого времени ответственный назначен, ISO с часовым поясом */
+  dbegResponsible: string
+  /** общий пробег, км: пробег на момент ввода плюс пробеги в рейсах */
+  runKm: number
   /** изготовитель; null — не указан */
   maker: string | null
   /** год постройки; null — не указан */
@@ -42,7 +48,9 @@ export interface WagonRow extends WagonOption {
   dbeg: string | null
   /** вывод из эксплуатации, ISO-дата; null — вагон в эксплуатации */
   dend: string | null
-  /** рейсы в состоянии «план» и «выполняется», в составе которых вагон, по плановому отправлению */
+  /** поезд, в котором вагон сейчас; null — вагон не в поезде */
+  train: TrainRef | null
+  /** рейсы поезда вагона в состоянии «план» и «выполняется», по плановому отправлению */
   trips: WagonTrip[]
   /** акт, ожидающий приёма по вагону; null — нет */
   pendingTransfer: WagonPendingTransfer | null
@@ -85,6 +93,15 @@ export interface WagonFilter {
   at?: string | null
 }
 
+/**
+ * Фильтр запроса списка: при поиске по номеру — только номер и момент at, остальные фильтры не применяются (Ф-ВАГ-04);
+ * их отменяет фронт, сервер сочетает номер с остальными фильтрами. Видимость по роли сервер применяет всегда.
+ */
+export function wagonQuery(filter: WagonFilter): WagonFilter {
+  if (!filter.number.trim()) return filter
+  return { number: filter.number, station: null, trip: null, locationKinds: [], states: [], at: filter.at ?? null }
+}
+
 /** Новый вагон: паспорт (wagon), депо приписки, начальное расположение и состояние. */
 export interface WagonDraft {
   number: string
@@ -104,6 +121,8 @@ export interface WagonDraft {
   wagonStatusType: number | null
   /** ввод в эксплуатацию, ISO-дата; null — ещё не задан */
   dbeg: string | null
+  /** пробег на момент ввода, км — текст поля, целое неотрицательное */
+  initialRunKm: string
 }
 
 /**
@@ -113,16 +132,35 @@ export async function fetchWagons(filter: WagonFilter, sort: TableSort | null): 
   return (await http.get<WagonRow[]>('/wagons', { params: { ...filter, sort: sort?.field, desc: sort?.desc } })).data
 }
 
+/**
+ * Вагон по точному номеру, как строка списка вагонов. Вагона нет — ошибка «Вагон № … не найден»; вагон не виден
+ * пользователю по роли — «Вы не имеете доступа к данным по вагону …».
+ */
+/**
+ * Сменить ответственного за вагон без акта (Ф-ВАГ-07): мастер депо станции вагона или администратор. responsibleUsr —
+ * сотрудник, null — ответственный не назначен. Ответ — вагон после смены.
+ */
+export async function changeWagonResponsible(id: number, responsibleUsr: number | null): Promise<WagonRow> {
+  return (await http.post<WagonRow>(`/wagons/${id}/responsible`, { responsibleUsr })).data
+}
+
+export async function fetchWagonByNumber(number: string): Promise<WagonRow> {
+  return (await http.get<WagonRow>(`/wagons/by-number/${encodeURIComponent(number)}`)).data
+}
+
 /** Вагоны как варианты выбора: фильтр — как у списка вагонов. */
 export async function fetchWagonOptions(filter: WagonFilter): Promise<WagonOption[]> {
   return (await http.get<WagonOption[]>('/wagons/options', { params: filter })).data
 }
 
-/** Ввести вагон. Сервер пока не умеет: ошибка с текстом для пользователя. */
-export function createWagon(draft: WagonDraft): Promise<WagonRow> {
-  // return (await http.post<WagonRow>('/wagons', draft)).data
-  void draft
-  return Promise.reject(new Error('Ввод вагона пока не поддерживается сервером'))
+/** Ввести вагон (Ф-ВАГ-01): год постройки и пробег уходят числами; пустой год — не указан. */
+export async function createWagon(draft: WagonDraft): Promise<WagonRow> {
+  const body = {
+    ...draft,
+    buildYear: draft.buildYear.trim() ? Number(draft.buildYear) : null,
+    initialRunKm: Number(draft.initialRunKm),
+  }
+  return (await http.post<WagonRow>('/wagons', body)).data
 }
 
 /** Рейс в данных. */
@@ -162,7 +200,15 @@ export async function fetchTripWagons(tripId: number): Promise<RequestWagon[]> {
   return wagons.map(requestWagon)
 }
 
-/** Поиск вагона по цифрам номера среди всех вагонов — когда фильтр по рейсу снят. */
+/**
+ * Сколько вагонов отдаёт поиск по номеру среди всех вагонов (сервер, ListService.WAGON_SEARCH_LIMIT): пришло ровно
+ * столько — номер надо уточнить.
+ */
+export const WAGON_SEARCH_LIMIT = 50
+
+/**
+ * Поиск вагона по цифрам номера среди всех вагонов, без видимости по роли; не больше WAGON_SEARCH_LIMIT вагонов.
+ */
 export async function findWagons(number: string): Promise<RequestWagon[]> {
   const wagons = await fetchWagonOptions({ number, station: null, trip: null, locationKinds: [], states: [] })
   return wagons.map(requestWagon)
@@ -193,6 +239,10 @@ export const JournalBasis = {
   ATTACH: 5,
   DEPARTURE: 6,
   ARRIVAL: 7,
+  /** проверка вагона по чек-листу: расположение и состояние не меняет */
+  CHECK: 8,
+  /** опись экипировки вагона: расположение и состояние не меняет */
+  EQUIP: 9,
 } as const
 
 /** Расположение вагона в записи журнала. */
@@ -205,7 +255,10 @@ export interface WagonPlace {
   trip: TripRef | null
 }
 
-/** Строка журнала вагона (Ф-ВАГ-05): записи расположения и состояния, открытые одним документом в одно время. */
+/**
+ * Строка журнала вагона (Ф-ВАГ-05): записи расположения, состояния и ответственного, открытые одним документом в одно
+ * время.
+ */
 export interface WagonJournalRow {
   /** время события, ISO с часовым поясом */
   dbeg: string
@@ -221,16 +274,37 @@ export interface WagonJournalRow {
   prevWagonStatusType: number | null
   /** событие сменило состояние */
   statusChanged: boolean
+  /** ответственный после события; null — не назначен */
+  responsibleUsr: UserRef | null
+  /** ответственный до события; null — не назначен, не менялся или это первая запись */
+  prevResponsibleUsr: UserRef | null
+  /** событие назначило ответственного */
+  responsibleChanged: boolean
   /** основание — константы JournalBasis */
   basisType: number
-  /** номер акта приёма-передачи, отцепки или прицепки; иначе null */
+  /** номер акта приёма-передачи; иначе null */
   actNumber: string | null
   /** рейс отправления, прибытия, отцепки или прицепки; иначе null */
   basisTrip: TripRef | null
   /** кто провёл документ; null — документа нет */
   byUsr: UserRef | null
-  /** причина из акта отцепки или прицепки; null — нет */
+  /** основания, примечания из документа: прицепки, отцепки, ручной правки; null — нет */
   comment: string | null
+  /** проверка вагона — id; есть только у основания CHECK */
+  checkList: number | null
+  /** шаблон чек-листа — у основания CHECK */
+  checkListTemplate: { id: number; textRu: string; textKk: string | null; textEn: string | null } | null
+  /** опись — id; есть только у основания EQUIP */
+  equipList: number | null
+  /** шаблон описи — у основания EQUIP */
+  equipListTemplate: { id: number; textRu: string; textKk: string | null; textEn: string | null } | null
+  /** число нарушений проверки или описи — у оснований CHECK и EQUIP */
+  violationCount: number | null
+  /** основание-документ: прицепка или отцепка в рейсе (DETACH, ATTACH) — id train_wagon_change, акт приёма-передачи
+   * (TRANSFER) — id акта; иначе null */
+  act: number | null
+  /** текущий сотрудник может отменить основание: акт (Ф-АКТ-06), прицепку или отцепку (Ф-АКТ-01) */
+  canCancel: boolean
 }
 
 /**

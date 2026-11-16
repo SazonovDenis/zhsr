@@ -1,13 +1,13 @@
 package kz.zhsr.app.service;
 
 /**
- * SQL формирования рейса, отправления и прибытия ({@link TripService}).
+ * SQL формирования рейса, бригады, отправления и прибытия ({@link TripService}) и прицепки в рейсе
+ * ({@link CouplingService}).
  */
 final class TripSql {
 
-    // плановое прибытие: плановое отправление плюс время в пути маршрута (route.duration, мин; вводит пользователь)
-    private static final String ARRIVAL = """
-            trip.planned_dt + make_interval(mins => route.duration) as arrival""";
+    // плановое прибытие: плановое отправление плюс время в пути маршрута (по станциям маршрута, мин)
+    private static final String ARRIVAL = "trip.planned_dt + make_interval(mins => " + RouteSql.DURATION + ") as arrival";
 
     // старший проводник: текущая категория сотрудника usr
     private static final String SENIOR = """
@@ -19,82 +19,85 @@ final class TripSql {
     }
 
     /**
-     * Первое изменение вагонов рейса после отметки отправления или прибытия, кроме записей, которые открыла сама
-     * отметка: номер вагона и время. mark - колонки trip_wagon с этими записями: "depart" или "arrive". Параметры:
-     * trip, since - время отметки.
+     * Первое изменение после отметки отправления или прибытия: записи журналов вагонов, которые были в поезде в момент
+     * отметки, прицепки и отцепки поезда и строки бригады рейса - позже отметки; номер вагона (ФИО сотрудника
+     * бригады) и время. Записи, которые открыла сама отметка, начинаются временем отметки и не попадают. Не попадают и
+     * назначения ответственного за вагоны рейса после прибытия - записи ответственного без документа (прицепки и
+     * отцепки, акта, ручной правки): отмена прибытия снимает их сама. Параметры: train, trip, since - время отметки.
      */
-    static String changesAfter(String mark) {
+    static String changesAfter() {
+        String inTrain = """
+                train_wagon.train = :train and train_wagon.dbeg <= :since
+                  and (train_wagon.dend is null or train_wagon.dend > :since)""";
         return """
                 select wagon.number, wagon_location.dbeg
-                from trip_wagon
-                join wagon_location on wagon_location.wagon = trip_wagon.wagon
-                join wagon on wagon.id = trip_wagon.wagon
-                where trip_wagon.trip = :trip and wagon_location.dbeg > :since
-                  and wagon_location.id is distinct from trip_wagon.%1$s_wagon_location
+                from train_wagon
+                join wagon_location on wagon_location.wagon = train_wagon.wagon
+                join wagon on wagon.id = train_wagon.wagon
+                where %1$s and wagon_location.dbeg > :since
                 union all
                 select wagon.number, wagon_status.dbeg
-                from trip_wagon
-                join wagon_status on wagon_status.wagon = trip_wagon.wagon
-                join wagon on wagon.id = trip_wagon.wagon
-                where trip_wagon.trip = :trip and wagon_status.dbeg > :since
-                  and wagon_status.id is distinct from trip_wagon.%1$s_wagon_status
+                from train_wagon
+                join wagon_status on wagon_status.wagon = train_wagon.wagon
+                join wagon on wagon.id = train_wagon.wagon
+                where %1$s and wagon_status.dbeg > :since
+                union all
+                select wagon.number, wagon_responsible.dbeg
+                from train_wagon
+                join wagon_responsible on wagon_responsible.wagon = train_wagon.wagon
+                join wagon on wagon.id = train_wagon.wagon
+                where %1$s and wagon_responsible.dbeg > :since
+                  and (exists (select 1 from train_wagon_change
+                               where train_wagon_change.wagon_responsible = wagon_responsible.id)
+                    or exists (select 1 from transfer_act_wagon
+                               where transfer_act_wagon.wagon_responsible = wagon_responsible.id)
+                    or exists (select 1 from wagon_edit where wagon_edit.wagon_responsible = wagon_responsible.id))
+                union all
+                select wagon.number, train_wagon_change.fact_dt
+                from train_wagon_change
+                join train_wagon on train_wagon.id = train_wagon_change.train_wagon
+                join wagon on wagon.id = train_wagon.wagon
+                where train_wagon.train = :train and train_wagon_change.fact_dt > :since
+                union all
+                select usr.full_name, trip_crew.dbeg
+                from trip_crew
+                join usr on usr.id = trip_crew.usr
+                where trip_crew.trip = :trip and trip_crew.dbeg > :since
                 order by dbeg
                 limit 1
-                """.formatted(mark);
+                """.formatted(inTrain);
     }
 
     /**
-     * Рейс с маршрутом. Параметр: id.
+     * Рейс с маршрутом и поездом. Параметр: id.
      */
     static String trip() {
         return """
-                select trip.id, trip.route, route.train_number, route.name, trip.trip_status_type,
-                       route.transport_type, route.duration, trip.planned_dt, trip.departed_dt, trip.arrived_dt,
-                       trip.departure_marked_dt, trip.arrival_marked_dt,
+                select trip.id, trip.route, trip.train, route.train_number, route.name, trip.trip_status_type,
+                       route.transport_type, %1$s as duration, trip.planned_dt, trip.departed_dt,
+                       trip.arrived_dt, trip.departure_marked_dt, trip.arrival_marked_dt,
                        coalesce(trip.departed_dt, trip.planned_dt) as departure,
-                       %s
+                       %2$s
                 from trip
                 join route on route.id = trip.route
                 where trip.id = :id
-                """.formatted(ARRIVAL);
+                """.formatted(RouteSql.DURATION, ARRIVAL);
     }
 
     /**
-     * Состав рейса по порядку, с типом вагона и текущим расположением; last_coupling - вид последнего проведённого
-     * акта по вагону в этом рейсе. Параметры: trip, done - состояние акта «проведён».
-     */
-    static String composition() {
-        return """
-                select trip_wagon.id, trip_wagon.wagon, trip_wagon.seq, wagon.number, wagon.wagon_type, wagon_type.code,
-                       wagon_info.location_type, wagon_info.station, wagon_info.trip, wagon_info.wagon_status_type,
-                       coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard, wagon_info.trip) as place,
-                       (select coupling_act.coupling_type
-                        from coupling_act_wagon
-                        join coupling_act on coupling_act.id = coupling_act_wagon.coupling_act
-                        where coupling_act.trip = trip_wagon.trip and coupling_act_wagon.wagon = trip_wagon.wagon
-                          and coupling_act.act_status_type = :done
-                        order by coupling_act.id desc
-                        limit 1) as last_coupling
-                from trip_wagon
-                join wagon on wagon.id = trip_wagon.wagon
-                join wagon_type on wagon_type.id = wagon.wagon_type
-                join wagon_info on wagon_info.wagon = wagon.id
-                where trip_wagon.trip = :trip
-                order by trip_wagon.seq, trip_wagon.id
-                """;
-    }
-
-    /**
-     * Бригада рейса. Параметры: trip, senior - категория «старший проводник».
+     * Действующие строки бригады рейса: в рейсе в статусе «план» и «выполняется» - незакрытые, в закончившемся - и
+     * закрытые прибытием. Параметры: trip, senior - категория «старший проводник», arrived - время прибытия рейса
+     * (null - рейс не прибыл).
      */
     static String crew() {
         return """
-                select trip_crew.id, trip_crew.usr, trip_crew.crew_duty_type, trip_crew.wagon, trip_crew.wagon2,
+                select trip_crew.id, trip_crew.usr, trip_crew.crew_duty_type, trip_crew.wagon,
                        %s
                 from trip_crew
                 join usr on usr.id = trip_crew.usr
                 where trip_crew.trip = :trip
-                order by usr.full_name, trip_crew.id
+                  and (trip_crew.dend is null or trip_crew.dend = cast(:arrived as timestamptz))
+                order by usr.full_name, trip_crew.usr, trip_crew.id
                 """.formatted(SENIOR);
     }
 
@@ -139,31 +142,24 @@ final class TripSql {
      */
     static String otherTrips() {
         return """
-                select trip_crew.usr, trip_crew.trip, route.train_number, route.name, trip.planned_dt,
-                       coalesce(trip.arrived_dt, trip.planned_dt + make_interval(mins => route.duration)) as arrival
+                select distinct trip_crew.usr, trip_crew.trip, route.train_number, route.name, trip.planned_dt,
+                       coalesce(trip.arrived_dt, trip.planned_dt + make_interval(mins => %s)) as arrival
                 from trip_crew
                 join trip on trip.id = trip_crew.trip
                 join route on route.id = trip.route
                 where trip_crew.usr = any(:usrs) and trip_crew.trip <> :trip
                   and trip.trip_status_type = any(:states)
-                """;
+                """.formatted(RouteSql.DURATION);
     }
 
     /**
-     * Вагоны станции, её депо и парка отстоя для прицепки; other_trip - другой активный рейс, в составе которого
-     * вагон. Параметры: trip, station, states.
+     * Вагоны станции, её депо и парка отстоя для прицепки. Параметр: station.
      */
     static String attachCandidates() {
         return """
-                select wagon.number, wagon.wagon_type, wagon_info.location_type,
+                select wagon.id, wagon.number, wagon.wagon_type, wagon_info.location_type,
                        coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard) as place,
-                       wagon_info.wagon_status_type,
-                       (select trip.id
-                        from trip_wagon
-                        join trip on trip.id = trip_wagon.trip
-                        where trip_wagon.wagon = wagon.id and trip.id <> :trip
-                          and trip.trip_status_type = any(:states)
-                        limit 1) as other_trip
+                       wagon_info.wagon_status_type
                 from wagon
                 join wagon_info on wagon_info.wagon = wagon.id
                 left join depot on depot.id = wagon_info.depot
@@ -175,60 +171,24 @@ final class TripSql {
     }
 
     /**
-     * Акты отцепки и прицепки рейса, новые первыми. Параметр: trip.
+     * Время в пути маршрута, мин. Параметр: route.
      */
-    static String acts() {
+    static String routeDuration() {
+        return "select %s as duration from route where route.id = :route".formatted(RouteSql.DURATION);
+    }
+
+    /**
+     * Рейсы поезда с началом и концом: фактическим или плановым. Параметры: train, states.
+     */
+    static String trainTrips() {
         return """
-                select coupling_act.id, coupling_act.number, coupling_act.coupling_type, route_station.station,
-                       coupling_act.act_dt, coupling_act.act_status_type
-                from coupling_act
-                join route_station on route_station.id = coupling_act.route_station
-                where coupling_act.trip = :trip
-                order by coupling_act.id desc
-                """;
-    }
-
-    /**
-     * Номера вагонов актов рейса. Параметр: trip.
-     */
-    static String actWagons() {
-        return """
-                select coupling_act_wagon.coupling_act, wagon.number
-                from coupling_act_wagon
-                join coupling_act on coupling_act.id = coupling_act_wagon.coupling_act
-                join wagon on wagon.id = coupling_act_wagon.wagon
-                where coupling_act.trip = :trip
-                order by coupling_act_wagon.coupling_act, coupling_act_wagon.seq
-                """;
-    }
-
-    /**
-     * Следующий номер для акта отцепки или прицепки.
-     */
-    static String nextActId() {
-        return "select coalesce(max(coupling_act.id), 0) + 1 as next_id from coupling_act";
-    }
-
-    /**
-     * Последняя позиция состава рейса. Параметр: trip.
-     */
-    static String lastSeq() {
-        return "select coalesce(max(trip_wagon.seq), 0) as last_seq from trip_wagon where trip_wagon.trip = :trip";
-    }
-
-    /**
-     * Вагоны из списка, которые входят в состав другого активного рейса. Параметры: wagons, trip, states.
-     */
-    static String busyWagons() {
-        return """
-                select wagon.number
-                from trip_wagon
-                join trip on trip.id = trip_wagon.trip
-                join wagon on wagon.id = trip_wagon.wagon
-                where trip_wagon.wagon = any(:wagons) and trip_wagon.trip <> :trip
-                  and trip.trip_status_type = any(:states)
-                order by wagon.number
-                """;
+                select trip.id, route.train_number, route.name,
+                       coalesce(trip.departed_dt, trip.planned_dt) as beg,
+                       coalesce(trip.arrived_dt, trip.planned_dt + make_interval(mins => %s)) as fin
+                from trip
+                join route on route.id = trip.route
+                where trip.train = :train and trip.trip_status_type = any(:states)
+                """.formatted(RouteSql.DURATION);
     }
 
 }

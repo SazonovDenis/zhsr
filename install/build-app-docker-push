@@ -1,0 +1,37 @@
+#!/bin/sh
+set -e
+
+# Сборка и публикация образов zhsr в Docker Hub под amd64 и arm64 (Graviton): sazonovden/<образ>:latest.
+# Перед этим - ./build-app с теми же ключами и один раз docker login. Многоархитектурный образ собирает и публикует
+# buildx за один шаг. Ключи - install/images.sh; без ключей - все образы.
+#   ./build-app-docker-push app        - сервер (zhsr-app)
+#   ./build-app-docker-push database   - миграции (zhsr-database) и демо-данные (zhsr-database-demo)
+#   ./build-app-docker-push web        - фронт и nginx (zhsr-nginx)
+
+# все пути - от корня проекта
+cd "$(dirname "$0")/.."
+. install/images.sh
+
+# сборщик buildx, умеющий несколько архитектур; создаётся один раз
+docker buildx inspect zhsr-multiarch > /dev/null 2>&1 || docker buildx create --name zhsr-multiarch --use > /dev/null
+docker buildx use zhsr-multiarch
+
+push() {
+    docker buildx build --platform linux/amd64,linux/arm64 "$@" --push
+}
+
+for key in $KEYS; do
+    image=$(image_of "$key")
+    echo "=== $image"
+    install/docker-images/prepare-context "$image"
+    dir="install/docker-images/$image"
+    if [ "$image" = zhsr-database ]; then
+        # два образа из одного Dockerfile: миграции и они же с демо-данными
+        push --target zhsr-database -t sazonovden/zhsr-database:latest "$dir"
+        echo "=== zhsr-database-demo"
+        push --target zhsr-database-demo -t sazonovden/zhsr-database-demo:latest "$dir"
+    else
+        push -t "sazonovden/$image:latest" "$dir"
+    fi
+    rm -rf "$dir/tmp"
+done

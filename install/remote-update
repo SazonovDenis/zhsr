@@ -1,0 +1,49 @@
+#!/bin/sh
+set -e
+
+# Обновление на сервере до опубликованных образов (после ./build-app-docker-push), с машины разработчика.
+#   ./remote-update                  - все части приложения
+#   ./remote-update app database ... - только указанные: ключи app, database, web (install/images.sh)
+# Изменилась структура БД (changeSet) - не обновление, а ./remote-reset: БД пересоздаётся с нуля.
+
+# все пути - от корня проекта
+cd "$(dirname "$0")/.."
+. install/images.sh
+. install/remote.sh
+
+# сервисы в порядке обновления: сначала миграции БД, nginx - последним (порядок ALL_KEYS), как бы ни шли ключи
+SERVICES=""
+for key in $ALL_KEYS; do
+    case " $KEYS " in
+      *" $key "*) SERVICES="$SERVICES $(image_of "$key")" ;;
+    esac
+done
+
+sync_base
+
+# Команды на сервере; одинарных кавычек внутри быть не должно
+REMOTE_SCRIPT='
+set -e
+cd "$1"
+shift
+mkdir -p ssl acme
+for SERVICE in "$@"; do
+  echo "=== $SERVICE"
+  docker compose pull "$SERVICE"
+  docker compose up -d --no-deps --force-recreate "$SERVICE"
+  # миграции нужны серверу до его запуска: ждём, пока zhsr-database отработает
+  if [ "$SERVICE" = "zhsr-database" ]; then
+    EXIT_CODE=$(docker wait zhsr-database)
+    if [ "$EXIT_CODE" != "0" ]; then
+      echo "Ошибка миграций БД (код $EXIT_CODE), журнал: ./app-logs zhsr-database" >&2
+      exit 1
+    fi
+  fi
+done
+docker image prune -f > /dev/null
+docker compose ps -a
+'
+
+$SSH "sh -c '$REMOTE_SCRIPT' remote-update '$DEPLOY_DIR' $SERVICES"
+
+echo "Готово"

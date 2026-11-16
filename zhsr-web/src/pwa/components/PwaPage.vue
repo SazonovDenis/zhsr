@@ -1,6 +1,6 @@
 <template>
   <div class="pwa-page">
-    <div ref="body" class="pwa-page__body" :class="{ 'pwa-page__body--white': white }">
+    <div ref="body" class="pwa-page__body" :class="{ 'pwa-page__body--white': white, 'pwa-page__body--fill': fill }">
       <div v-if="back || title || stale" class="pwa-page__head">
         <div v-if="back || title" class="pwa-page__head-row q-pa-sm">
           <button v-if="back" type="button" class="pwa-page__back q-pa-none" :title="t('Назад')" @click="back">
@@ -17,8 +17,11 @@
         <div v-if="stale" class="pwa-page__stale q-py-xs q-px-sm">
           {{ t('Нет связи — показаны сохранённые данные') }}
         </div>
+        <!-- низ шапки во всю ширину: например, полоски шагов ввода -->
+        <slot name="bottom" />
       </div>
-      <div class="pwa-page__content q-py-md q-px-sm">
+      <!-- fill: отступы сверху, снизу и между блоками — как по бокам -->
+      <div class="pwa-page__content q-px-sm" :class="fill ? 'q-py-sm' : 'q-py-md'">
         <slot />
       </div>
     </div>
@@ -40,7 +43,7 @@ import SvgIcon from '@/shared/icons/SvgIcon.vue'
 /**
  * Экран мобильной части: шапка с кнопкой «назад» (задан back), заголовком и подзаголовком (subtitle или слот subtitle),
  * прокручиваемое тело (слот default) и нижняя панель кнопок (слот bar) — она стоит внизу экрана и не прокручивается.
- * Слот fab — плавающая кнопка в правом нижнем углу тела.
+ * Слот fab — плавающая кнопка в правом нижнем углу тела. Слот bottom — полоса у нижнего края шапки во всю ширину.
  * Шапка прилипает к верху при прокрутке. Показаны сохранённые данные (stale) — внизу шапки во всю ширину полоса об этом;
  * у страницы без заголовка шапка состоит из одной этой полосы.
  */
@@ -52,8 +55,13 @@ withDefaults(
     stale?: boolean
     /** тело белое, серый фон — только в шапке */
     white?: boolean
+    /**
+     * тело не прокручивается, содержимое занимает всю высоту экрана: прокручивается только блок самой страницы
+     * (у него flex: 1, min-height: 0, overflow-y: auto) — например, список вагонов
+     */
+    fill?: boolean
   }>(),
-  { title: '', subtitle: '', back: null, stale: false, white: false },
+  { title: '', subtitle: '', back: null, stale: false, white: false, fill: false },
 )
 
 // прокручиваемое тело — странице, которая запоминает прокрутку
@@ -141,6 +149,23 @@ defineExpose({ body })
   gap: 1rem;
 }
 
+.pwa-page__body--fill {
+  display: flex;
+  flex-direction: column;
+  overflow-y: hidden;
+
+  // шапка не сжимается: место отдаёт содержимое
+  .pwa-page__head {
+    flex: none;
+  }
+
+  .pwa-page__content {
+    flex: 1;
+    gap: 0.5rem;
+    min-height: 0;
+  }
+}
+
 .pwa-page__fab {
   position: absolute;
   right: 0.8rem;
@@ -153,7 +178,8 @@ defineExpose({ body })
   flex: none;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 0.8rem 0.5rem calc(1rem + env(safe-area-inset-bottom));
+  // отступ вокруг кнопок одинаковый со всех сторон; снизу — ещё и вырез экрана (safe-area)
+  padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom));
   border-top: 0.0625rem solid $zs-border;
   background: #fff;
 }

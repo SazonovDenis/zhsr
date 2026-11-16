@@ -10,68 +10,42 @@
     @ok="save"
   >
     <FormSection title="Вагон">
-      <WagonPickField v-model="wagonNumber" @pick="onWagon" />
+      <RequestWagonField v-model="draft.wagon" :initial="r?.wagon ?? null" @pick="onWagon" />
     </FormSection>
 
     <FormSection title="Неисправность" divided>
-      <CbList
-        v-model="draft.faultType"
-        single
-        placeholder="Поиск словами: «окно дует»"
-        :values="faultChoices"
-        :source="dictSource('FaultType')"
-        @update:model-value="onFault"
-      >
-        <template #option="{ item }">
-          <div class="request-dialog__fault">
-            <span>{{ item.text }}</span>
-            <span class="zs-sub">{{ item.data?.group }}</span>
-          </div>
-        </template>
-      </CbList>
-      <div class="request-dialog__frequent">
-        <span class="request-dialog__frequent-label q-mr-xs">{{ t('Частые') }}</span>
-        <button
-          v-for="f in frequent"
-          :key="f.id"
-          type="button"
-          class="request-dialog__chip zs-focusable q-py-none q-px-sm"
-          :class="{ 'request-dialog__chip--on bg-selected text-selected': draft.faultType === f.id }"
-          @click="pickFault(f.id)"
-        >
-          {{ f.name }}
-        </button>
-      </div>
+      <FaultPicker v-model="draft.faultType" @update:model-value="onFault" />
     </FormSection>
 
     <FormSection divided columns="repeat(2, minmax(0, 1fr))">
       <FormField label="Критичность" class="request-dialog__wide">
         <CbSegment v-model="draft.severityType" single required :values="severities" :max-button-count="4" />
       </FormField>
-      <FormField label="Служба">
-        <span>{{ serviceName }}</span>
-      </FormField>
-      <FormField label="Рейс">
-        <CbList v-model="draft.trip" single placeholder="Без рейса" :values="tripChoices" :source="tripLoad" />
-      </FormField>
-      <FormField v-if="canChooseExecutor" label="Исполнитель" class="request-dialog__wide">
+      <!-- поле есть всегда, если пользователь вообще назначает при подаче: иначе оно появлялось бы и пропадало по
+           выбору вагона, и форма дёргалась; назначить сейчас нельзя — поле недоступно, причина во всплывающей подсказке -->
+      <FormField v-if="executorShown" label="Исполнитель" class="request-dialog__wide">
         <CbList
           v-model="draft.executorUsr"
           single
           placeholder="Не назначать — возьмёт любой сотрудник службы"
           :values="staffChoices"
-        />
+          :disabled="!canChooseExecutor"
+          :title="canChooseExecutor ? undefined : t('Назначить можно, если выбран вагон вашего рейса')"
+        >
+          <template #option="{ item }">
+            <StaffOption
+              :name="item.text ?? ''"
+              :candidate="(item.data?.candidate as StaffCandidate) ?? null"
+              :wagon-number="wagonNumber || null"
+            />
+          </template>
+        </CbList>
       </FormField>
     </FormSection>
 
     <FormSection divided>
       <FormField label="Описание">
-        <textarea
-          v-model="draft.description"
-          class="request-dialog__textarea zs-focusable q-pa-sm"
-          rows="3"
-          :placeholder="t('Например: в 3-м купе не закрывается окно')"
-        />
+        <NoteInput v-model="draft.description" placeholder="Например: в 3-м купе не закрывается окно" />
       </FormField>
       <FormField :label="request ? 'Добавить фото' : 'Фото'">
         <PhotoPicker v-model="draft.photos" />
@@ -83,36 +57,36 @@
 <script setup lang="ts">
 import { computed, reactive, ref, shallowRef, watch } from 'vue'
 
-import type { RepairRequest, RequestDraft, UserRef } from '@/api/requests'
+import type { RepairRequest, RequestDraft, StaffCandidate } from '@/api/requests'
 import { createRequest, fetchServiceStaff, updateRequest } from '@/api/requests'
-import type { TripOption } from '@/api/trips'
-import { fetchTripOptions } from '@/api/trips'
 import type { RequestWagon } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import type { ShownError } from '@/shared/errors'
 import { formError, shownError } from '@/shared/errors'
 import CbList from '@/shared/components/choice/CbList.vue'
 import CbSegment from '@/shared/components/choice/CbSegment.vue'
-import type { ChoiceItem, ChoiceModel } from '@/shared/components/choice/choice'
+import type { ChoiceModel } from '@/shared/components/choice/choice'
 import { provideBusy } from '@/shared/busy'
 import FormDialog from '@/shared/components/dialog/FormDialog.vue'
+import NoteInput from '@/shared/components/form/NoteInput.vue'
 import FormField from '@/shared/components/form/FormField.vue'
 import FormSection from '@/shared/components/form/FormSection.vue'
-import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
-import { Severity, TripStatus } from '@/shared/constants/systemDicts'
+import { dictChoices } from '@/shared/dict/dictChoices'
+import { CrewDuty, RoleType, Severity } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
-import { useLoad } from '@/shared/loadable'
-import { faultDefaults, frequentFaults } from '@/shared/requests/faults'
+import { faultDefaults } from '@/shared/requests/faults'
+import FaultPicker from '@/shared/requests/FaultPicker.vue'
 import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
-import { canAssignOnCreate } from '@/shared/requests/rights'
-import { currentUser, loadCurrentUser, userName } from '@/shared/user'
-import WagonPickField from './WagonPickField.vue'
-import { tripRefText } from '@/shared/trips/tripRefText'
+import { canAssignOnCreate, staffTrip } from '@/shared/requests/rights'
+import { currentUser, hasRole, loadCurrentUser, userName } from '@/shared/user'
+import StaffOption from '@/shared/requests/StaffOption.vue'
+import { sortStaff } from '@/shared/requests/staff'
+import RequestWagonField from './RequestWagonField.vue'
 
 /**
  * Диалог «Новая заявка» (Ф-ЗАЯ-01) и «Исправление заявки» (Ф-ЗАЯ-07, задан request): вагон, неисправность,
- * критичность, рейс, описание и фото. Критичность подставляется из неисправности, служба определяется ею, рейс — из вагона;
- * все поля можно изменить. Мастер депо при подаче может сразу назначить исполнителя. Открывается через openDialog,
+ * критичность, описание и фото. Критичность подставляется из неисправности и её можно изменить; служба определяется
+ * неисправностью, рейс — вагоном: в форме их нет. Без смены вагона рейс исправляемой заявки остаётся прежним. Мастер депо при подаче может сразу назначить исполнителя. Открывается через openDialog,
  * результат — поданная или исправленная заявка.
  */
 const props = withDefaults(defineProps<{ request?: RepairRequest | null }>(), { request: null })
@@ -138,50 +112,45 @@ const draft = reactive<
   photos: [],
   executorUsr: null,
 })
-// номер вагона в поле выбора; вагон заявки (draft.wagon) — выбранный из списка: номер исправлен вручную — не выбран
-const wagonNumber = ref(r?.wagon.number ?? '')
-let pickedNumber = wagonNumber.value
-watch(wagonNumber, (number) => {
-  if (number !== pickedNumber) draft.wagon = null
-})
 
 const running = ref(false)
 // ошибка формы: проверки (formError) или запроса (shownError, запрос второй строкой); null — ошибки нет
 const error = ref<ShownError | null>(null)
 
-// неисправности: все, поиск — и по названию группы; в строке списка группа второй строкой
-const faultChoices = computed<ChoiceItem[]>(() =>
-  dictManager
-    .getList('FaultType')
-    .filter((f) => f.disabled !== true)
-    .map((f) => {
-      const group = dictManager.getValue('FaultGroup', f.faultGroupType as number | null)
-      return { id: f.id, text: dictManager.getValue('FaultType', f.id), search: group, data: { group } }
-    }),
-)
-const frequent = computed(() => frequentFaults())
 const severities = computed(() => [...dictChoices('Severity')].reverse())
 // служба определяется неисправностью
 const service = computed(() => (draft.faultType ? faultDefaults(draft.faultType).service : null))
-const serviceName = computed(() => (service.value ? dictManager.getValue('Service', service.value) : ''))
 
-// рейсы: идущие и планируемые; рейс заявки есть в списке, даже если он уже закончился
-const trips = shallowRef<TripOption[]>([])
-const tripChoices = computed<ChoiceItem[]>(() => {
-  const list: ChoiceItem[] = trips.value.map((trip) => ({ id: trip.id, text: `${trip.trainNumber} • ${trip.name}` }))
-  if (r?.trip && !list.some((c) => c.id === r.trip!.id)) list.unshift({ id: r.trip.id, text: tripRefText(r.trip) })
-  return list
+// рейс выбранного вагона: ЛНП выбирает исполнителя по вагону своего рейса
+const wagonTrip = ref<number | null>(null)
+const canChooseExecutor = computed(
+  () => !r && !!currentUser.value && canAssignOnCreate(currentUser.value, draft.wagon ? wagonTrip.value : null),
+)
+// поле исполнителя: мастер депо и администратор назначают всегда, ЛНП — только по вагону своего рейса
+const executorShown = computed(() => {
+  const u = currentUser.value
+  if (r || !u) return false
+  return hasRole(u, RoleType.MASTER) || hasRole(u, RoleType.ADMIN) || u.trip?.crewDutyType === CrewDuty.LNP
 })
+const staff = shallowRef<StaffCandidate[]>([])
+// номер выбранного вагона: у кого из бригады этот вагон — жирным и выше в списке
+const wagonNumber = ref(r?.wagon.number ?? '')
+// у сотрудника бригады рейса справа — должность и вагоны (StaffOption); предпочтительные — первыми
+const staffChoices = computed(() =>
+  sortStaff(staff.value, wagonNumber.value || null).map((c) => ({
+    id: c.usr.id,
+    text: userName(c.usr),
+    data: { candidate: c },
+  })),
+)
 
-const canChooseExecutor = computed(() => !r && !!currentUser.value && canAssignOnCreate(currentUser.value))
-const staff = shallowRef<UserRef[]>([])
-const staffChoices = computed(() => staff.value.map((u) => ({ id: u.id, text: userName(u) })))
-
+// ЛНП выбирает исполнителя из бригады рейса вагона, мастер депо — из всех сотрудников службы
 watch(
-  () => (canChooseExecutor.value ? service.value : null),
-  async (id) => {
+  // источники по отдельности: watch сравнивает каждый, а не новый массив — иначе любой пересчёт стирал исполнителя
+  [() => (canChooseExecutor.value ? service.value : null), wagonTrip],
+  async ([id, trip]) => {
     draft.executorUsr = null
-    staff.value = id ? await fetchServiceStaff(id) : []
+    staff.value = id && currentUser.value ? await fetchServiceStaff(id, staffTrip(currentUser.value, trip)) : []
   },
 )
 
@@ -190,8 +159,9 @@ const hint = computed(() =>
 )
 
 function onWagon(w: RequestWagon) {
-  pickedNumber = w.number
-  draft.wagon = w.id
+  wagonNumber.value = w.number
+  wagonTrip.value = w.trip?.id ?? null
+  // рейс заявки — рейс, в составе которого вагон сейчас
   draft.trip = w.trip?.id ?? null
 }
 
@@ -199,11 +169,6 @@ function onWagon(w: RequestWagon) {
 function onFault(value: ChoiceModel) {
   if (typeof value !== 'number') return
   draft.severityType = faultDefaults(value).severity
-}
-
-function pickFault(id: number) {
-  draft.faultType = id
-  onFault(id)
 }
 
 // ошибка подготовки формы — в поле ошибки диалога
@@ -217,18 +182,6 @@ void busy.run(async () => {
     error.value = shownError(e)
   }
 })
-
-// рейсы — варианты выпадающего списка «Рейс»: своя загрузка, форма её не ждёт; ошибка — в самом списке
-const tripLoad = useLoad(async () => {
-  trips.value = await fetchTripOptions({
-    route: null,
-    station: null,
-    from: null,
-    to: null,
-    states: [TripStatus.IN_PROGRESS, TripStatus.PLANNED],
-  })
-})
-void tripLoad.run()
 
 async function save() {
   if (!draft.wagon || !draft.faultType || !draft.severityType) {
@@ -256,57 +209,5 @@ async function save() {
 <style scoped lang="scss">
 .request-dialog__wide {
   grid-column: 1 / -1;
-}
-
-.request-dialog__fault {
-  display: flex;
-  flex-direction: column;
-  max-width: 30rem;
-}
-
-.request-dialog__frequent {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.request-dialog__frequent-label {
-  color: $zs-text-muted;
-  font-size: 0.8rem;
-}
-
-.request-dialog__chip {
-  height: 1.9rem;
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.9rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-
-  &:hover:not(.request-dialog__chip--on) {
-    background: $zs-bg-hover;
-  }
-
-  &--on {
-    border-color: $zs-selected-border;
-  }
-}
-
-.request-dialog__textarea {
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.3rem;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.9rem;
-  resize: vertical;
-
-  &:focus {
-    border-color: $primary;
-    outline: none;
-    box-shadow: 0 0 0 0.0625rem $primary;
-  }
 }
 </style>

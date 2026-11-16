@@ -60,12 +60,17 @@
           <FormField label="Время акта">
             <DatePicker v-model="time" with-time date-text="Время акта" />
           </FormField>
-          <div v-if="toCode" class="transfer__mode q-py-sm q-px-md" :class="{ 'transfer__mode--none': !mode }">
-            {{ modeText }}
-          </div>
           <FormField v-if="mode === 'immediate'" label="Кто сдал вагоны">
             <CbList v-model="giver" single placeholder="Выберите…" :values="giverChoices" :source="giverLoad" />
           </FormField>
+          <!-- ответственный за вагоны акта ("кому") назначается сразу, при оформлении: сотрудники депо станции и бригады
+               рейсов поезда вагонов -->
+          <FormField label="Ответственный за вагоны">
+            <ResponsiblePicker v-model="responsible" :station="station" :wagons="selected" :disabled="!station" />
+          </FormField>
+          <div v-if="toCode" class="transfer__mode q-py-sm q-px-md" :class="{ 'transfer__mode--none': !mode }">
+            {{ modeText }}
+          </div>
           <ErrorBox v-if="error" :error="error" />
         </FormSection>
 
@@ -80,9 +85,9 @@
 
       <div class="transfer__footer q-pt-md">
         <span class="zs-sub">{{ okHint }}</span>
-        <button type="button" class="zs-btn-primary" :disabled="!canSave" @click="save">
+        <q-btn unelevated no-caps color="primary" :disable="!canSave" @click="save">
           {{ t(okText) }}
-        </button>
+        </q-btn>
       </div>
     </div>
   </DesktopFrame>
@@ -124,6 +129,9 @@ import {
   transferPlaceText,
 } from '@/shared/transferPlace'
 import { currentUser, hasRole, loadCurrentUser, userName } from '@/shared/user'
+import type { ResponsibleChoice } from '@/shared/wagons/responsible'
+import { responsibleUsr } from '@/shared/wagons/responsible'
+import ResponsiblePicker from '@/shared/wagons/ResponsiblePicker.vue'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { wagonsColumns } from '../wagons/wagonsColumns'
 import CellTransferProperty from './cells/CellTransferProperty.vue'
@@ -292,6 +300,7 @@ const okHint = computed(() => {
   if (!work.value) return t('Выберите вид работ')
   if (!time.value) return t('Укажите время акта')
   if (immediate.value && !giver.value) return t('Выберите, кто сдал вагоны')
+  if (responsible.value === null) return t('Выберите ответственного за вагоны')
   if (selected.value.length === 0) return t('Отметьте вагоны')
   return ''
 })
@@ -301,6 +310,9 @@ const back = () => {
   if (window.history.state?.back) router.back()
   else void router.push({ name: 'acts' })
 }
+
+// ответственный за вагоны акта; null — ещё не выбран
+const responsible = ref<ResponsibleChoice>(null)
 
 // кто сдал — свой выпадающий список, страница его не ждёт; ошибка — в самом списке
 const givers = shallowRef<UserRef[]>([])
@@ -379,6 +391,7 @@ async function save() {
       transferredByUsr: giver.value,
       transferredDt: time.value!,
       wagons: selected.value.map((number) => ({ number, withProperty: chosen.value[number]! })),
+      responsibleUsr: responsibleUsr(responsible.value),
     })
     Notify.create({
       message:
@@ -458,10 +471,8 @@ async function save() {
 
 .transfer__caption {
   color: $zs-text-muted;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .transfer__footer {

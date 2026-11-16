@@ -29,7 +29,6 @@ public class SystemDicts implements ApplicationRunner {
     public static final List<Class<?>> CLASSES = List.of(
             ActStatus.class,
             ConductorCategory.class,
-            CouplingType.class,
             CrewDuty.class,
             LocationType.class,
             RequestStatus.class,

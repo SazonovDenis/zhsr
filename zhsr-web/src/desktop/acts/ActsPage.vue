@@ -3,15 +3,16 @@
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Акты передачи') }}</h1>
       <div class="desktop-frame__actions">
-        <button
-          type="button"
-          class="zs-btn-primary"
-          :disabled="!!transferReason"
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          :disable="!!transferReason"
           :title="transferReason || undefined"
           @click="newAct"
         >
           {{ t('Оформить передачу') }}
-        </button>
+        </q-btn>
       </div>
     </template>
 
@@ -69,24 +70,40 @@
           <ErrorBox v-if="actionError" :error="actionError" />
           <!-- приём: кнопки видны всегда; принять нельзя — неактивны, причина во всплывающей подсказке -->
           <div class="acts__actions">
-            <button
-              type="button"
-              class="zs-btn-primary"
-              :disabled="running || !!receiveReason"
+            <q-btn
+              unelevated
+              no-caps
+              color="primary"
+              :disable="running || !!receiveReason"
               :title="receiveReason || undefined"
               @click="accept(selected)"
             >
               {{ t('Принять вагоны') }}
-            </button>
-            <button
-              type="button"
-              class="acts__btn q-py-none q-px-md"
-              :disabled="running || !!receiveReason"
+            </q-btn>
+            <q-btn
+              unelevated
+              outline
+              no-caps
+              color="primary"
+              class="zs-soft-border"
+              :disable="running || !!receiveReason"
               :title="receiveReason || undefined"
               @click="reject(selected)"
             >
               {{ t('Отказать в приёме') }}
-            </button>
+            </q-btn>
+            <q-btn
+              unelevated
+              outline
+              no-caps
+              color="primary"
+              class="zs-soft-border"
+              :disable="running || !!cancelReasonOf(selected)"
+              :title="cancelReasonOf(selected) || undefined"
+              @click="cancelAct(selected)"
+            >
+              {{ t('Отменить акт') }}
+            </q-btn>
           </div>
         </template>
       </SidePanel>
@@ -100,7 +117,7 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { Transfer } from '@/api/transfers'
-import { acceptTransfer, fetchTransfers, transferFrom, transferTo } from '@/api/transfers'
+import { fetchTransfers, transferFrom, transferTo } from '@/api/transfers'
 import { t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
 import { provideBusy } from '@/shared/busy'
@@ -123,9 +140,11 @@ import DesktopFrame from '../frame/DesktopFrame.vue'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import { useSidePanel } from '../frame/useSidePanel'
+import ActAcceptDialog from './ActAcceptDialog.vue'
+import ActCancelDialog from './ActCancelDialog.vue'
 import ActRejectDialog from './ActRejectDialog.vue'
 
-/** Акты приёма-передачи между депо, станцией и парком отстоя (Ф-АКТ-02): список, оформление новых, приём вагонов и отказ. По умолчанию — ожидают приёма. */
+/** Акты приёма-передачи между депо, станцией и парком отстоя (Ф-АКТ-02): список, оформление новых, приём вагонов, отказ и отмена акта (Ф-АКТ-06). По умолчанию — ожидают приёма. */
 const router = useRouter()
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок
 const busy = provideBusy()
@@ -170,8 +189,16 @@ const receiveReason = computed(() => (selected.value ? receiveReasonOf(selected.
 const rowMenu: RowMenuItem<Transfer>[] = [
   { label: 'Принять вагоны', disabled: receiveReasonOf, run: (act) => void accept(act) },
   { label: 'Отказать в приёме', disabled: receiveReasonOf, run: (act) => void reject(act) },
+  { label: 'Отменить акт', disabled: cancelReasonOf, run: (act) => void cancelAct(act) },
   { label: 'Оформить передачу', separator: true, disabled: () => transferReason.value, run: newAct },
 ]
+
+/** Почему акт не отменить: уже отменён или отменяет другой сотрудник; пусто — можно. */
+function cancelReasonOf(act: Transfer): string {
+  if (act.canCancel) return ''
+  if (act.actStatusType === ActStatus.CANCELLED) return t('Акт уже отменён')
+  return t('Акт отменяет тот, кто сдал или принял вагоны, или администратор')
+}
 
 /** Почему вагоны по акту не принять: не тот статус или принимает другой сотрудник; пусто — можно. */
 function receiveReasonOf(act: Transfer): string {
@@ -210,18 +237,20 @@ function newAct() {
 
 async function accept(act: Transfer | null) {
   if (!act) return
-  actionError.value = null
-  running.value = true
-  try {
-    await acceptTransfer(act.id)
-    Notify.create({ message: t('Вагоны приняты'), type: 'positive', position: 'bottom' })
-    bus.emit('state-refresh')
-    await load()
-  } catch (e) {
-    actionError.value = shownError(e)
-  } finally {
-    running.value = false
-  }
+  const done = await openDialog<Transfer>(ActAcceptDialog, { act })
+  if (!done) return
+  Notify.create({ message: t('Вагоны приняты'), type: 'positive', position: 'bottom' })
+  bus.emit('state-refresh')
+  await load()
+}
+
+async function cancelAct(act: Transfer | null) {
+  if (!act) return
+  const done = await openDialog<true>(ActCancelDialog, { actId: act.id, number: act.number })
+  if (!done) return
+  Notify.create({ message: t('Акт отменён'), position: 'bottom' })
+  bus.emit('state-refresh')
+  await load()
 }
 
 async function reject(act: Transfer | null) {
@@ -256,17 +285,5 @@ async function reject(act: Transfer | null) {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-}
-
-.acts__btn {
-  height: var(--zs-control-height);
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.3rem;
-  background: #fff;
-  color: $primary;
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
 }
 </style>

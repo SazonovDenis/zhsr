@@ -165,6 +165,31 @@
         <sql>alter table check_list_value add constraint ck_check_list_value_one check (num_nonnulls(value_string, value_number, check_dict_value) &lt;= 1)</sql>
     </changeSet>
 
+    <!-- check_list_template -->
+
+    <!-- константы CheckObject: 1 - вагон, 2 - сотрудник, 3 - рейс -->
+    <changeSet id="04-check-indexes-ck_check_list_template_check_object" author="zhsr">
+        <sql>alter table check_list_template add constraint ck_check_list_template_check_object check (check_object in (1, 2, 3))</sql>
+    </changeSet>
+
+    <!-- check_list_value_photo: фото удаляются вместе со значением -->
+
+    <changeSet id="04-check-indexes-fk_check_list_value_photo_check_list_value" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_value_photo" baseColumnNames="check_list_value" constraintName="fk_check_list_value_photo_check_list_value"
+                                 referencedTableName="check_list_value" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="04-check-indexes-fk_check_list_value_photo_created_by_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="check_list_value_photo" baseColumnNames="created_by_usr" constraintName="fk_check_list_value_photo_created_by_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="04-check-indexes-ix_check_list_value_photo_check_list_value" author="zhsr">
+        <createIndex tableName="check_list_value_photo" indexName="ix_check_list_value_photo_check_list_value">
+            <column name="check_list_value"/>
+        </createIndex>
+    </changeSet>
+
     <!-- equip_list_template -->
 
     <changeSet id="04-check-indexes-fk_equip_list_template_fault_type" author="zhsr">
@@ -270,6 +295,24 @@
     </changeSet>
     <changeSet id="04-check-indexes-ck_equip_list_value_quantity" author="zhsr">
         <sql>alter table equip_list_value add constraint ck_equip_list_value_quantity check (quantity_actual &gt;= 0 and (quantity_required is null or quantity_required &gt;= 0))</sql>
+    </changeSet>
+
+    <!-- equip_list_value_photo: фото удаляются вместе со значением -->
+
+    <changeSet id="04-check-indexes-fk_equip_list_value_photo_equip_list_value" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list_value_photo" baseColumnNames="equip_list_value" constraintName="fk_equip_list_value_photo_equip_list_value"
+                                 referencedTableName="equip_list_value" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="04-check-indexes-fk_equip_list_value_photo_created_by_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="equip_list_value_photo" baseColumnNames="created_by_usr" constraintName="fk_equip_list_value_photo_created_by_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="04-check-indexes-ix_equip_list_value_photo_equip_list_value" author="zhsr">
+        <createIndex tableName="equip_list_value_photo" indexName="ix_equip_list_value_photo_equip_list_value">
+            <column name="equip_list_value"/>
+        </createIndex>
     </changeSet>
 
 </databaseChangeLog>

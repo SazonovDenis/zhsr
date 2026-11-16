@@ -4,7 +4,7 @@
     :title="trip ? 'Редактирование рейса' : 'Создание рейса'"
     :ok-text="trip ? 'Сохранить' : 'Создать рейс'"
     width="40rem"
-    hint="Рейс создаётся в статусе «План». Станция отправления — первая остановка маршрута, прибытия — последняя."
+    hint="Рейс создаётся в статусе «План». Станция отправления — первая остановка маршрута, прибытия — последняя. Рейс без поезда не отправляется."
     :running="running"
     :error="error"
     @ok="save"
@@ -26,38 +26,65 @@
         />
       </FormField>
     </FormSection>
+
+    <FormSection>
+      <!-- поезд, занятый в пересекающемся рейсе, виден, но не выбирается -->
+      <FormField label="Поезд">
+        <CbList
+          v-model="draft.train"
+          single
+          placeholder="Поезд не назначен"
+          :values="trainChoices"
+          :source="trainsLoad"
+        />
+        <SoftLink text="Собрать новый поезд" class="trip-new__new-route" @click="newTrain" />
+      </FormField>
+    </FormSection>
   </FormDialog>
 </template>
 
 <script setup lang="ts">
 import { date } from 'quasar'
-import { reactive, ref, shallowRef } from 'vue'
+import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { RouteOption } from '@/api/routes'
 import { fetchRouteOptions } from '@/api/routes'
+import type { TrainOption, TrainRow } from '@/api/trains'
+import { fetchTrainOptions } from '@/api/trains'
 import type { TripRow, TripDraft } from '@/api/trips'
 import { createTrip, updateTrip } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import type { ShownError } from '@/shared/errors'
 import { formError, shownError } from '@/shared/errors'
 import { provideBusy } from '@/shared/busy'
+import CbList from '@/shared/components/choice/CbList.vue'
+import type { ChoiceItem } from '@/shared/components/choice/choice'
 import FormDialog from '@/shared/components/dialog/FormDialog.vue'
+import { openDialog } from '@/shared/components/dialog/openDialog'
+import { dictManager } from '@/shared/dict/DictManager'
+import { isoDateTime } from '@/shared/format'
+import { useLoad } from '@/shared/loadable'
+import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import FormField from '@/shared/components/form/FormField.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
 import FormSection from '@/shared/components/form/FormSection.vue'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
 import { openRouteNew } from '../routes/openRouteNew'
 import RouteSelect from '../routes/RouteSelect.vue'
+import TrainNameDialog from '../trains/TrainNameDialog.vue'
 
 /**
- * Диалог «Создание рейса» и «Редактирование рейса» (задан trip): маршрут и плановое отправление. Открывается через
- * openDialog, результат — созданный или исправленный рейс. Нужного маршрута нет — «Создать новый маршрут» закрывает диалог и открывает «Новый маршрут».
+ * Диалог «Создание рейса» и «Редактирование рейса» (задан trip): маршрут, плановое отправление и поезд. Открывается
+ * через openDialog, результат — созданный или исправленный рейс. Нужного маршрута нет — «Создать новый маршрут»
+ * закрывает диалог и открывает «Новый маршрут». Нужного поезда нет — «Собрать новый поезд» создаёт поезд и выбирает
+ * его. Поезда грузятся своим списком при смене маршрута и времени: поезд, занятый в пересекающемся рейсе, не выбирается.
  */
 
-const props = withDefaults(defineProps<{ trip?: { id: number; route: number; plannedDt: string } | null }>(), {
-  trip: null,
-})
+const props = withDefaults(
+  defineProps<{ trip?: { id: number; route: number; plannedDt: string; train: number | null } | null }>(),
+  { trip: null },
+)
 
 const show = defineModel<boolean>('show', { default: false })
 // ожидание диалога: спиннер в подвале (FormDialog) — на всю цепочку загрузок формы
@@ -69,6 +96,7 @@ const router = useRouter()
 const draft = reactive<TripDraft>({
   route: props.trip?.route ?? null,
   plannedDt: props.trip ? date.formatDate(props.trip.plannedDt, 'YYYY-MM-DDTHH:mm') : null,
+  train: props.trip?.train ?? null,
 })
 const routes = shallowRef<RouteOption[]>([])
 
@@ -90,6 +118,45 @@ void busy.run(async () => {
 function newRoute() {
   show.value = false
   void openRouteNew(router)
+}
+
+// поезда для выбора: занятость считается на время рейса — плановое отправление плюс время в пути маршрута
+const trains = shallowRef<TrainOption[]>([])
+const trainsLoad = useLoad(async () => {
+  const route = routes.value.find((r) => r.id === draft.route)
+  const start = draft.plannedDt ? new Date(draft.plannedDt) : null
+  const from = start ? isoDateTime(start) : null
+  const to = start && route ? isoDateTime(new Date(start.getTime() + route.duration * 60000)) : null
+  const [list] = await Promise.all([
+    fetchTrainOptions(from, to, props.trip?.id ?? null),
+    dictManager.prepareDict('Station'),
+  ])
+  trains.value = list
+})
+watch(
+  () => [draft.route, draft.plannedDt, routes.value],
+  () => void trainsLoad.run(),
+  { immediate: true },
+)
+
+/** Строка поезда: обозначение, число вагонов и их станция; занятый — с рейсом и недоступен. */
+const trainChoices = computed<ChoiceItem[]>(() =>
+  trains.value.map((tr) => {
+    const where = tr.station ? ` • ${dictManager.getValue('Station', tr.station)}` : ''
+    const busy = tr.busyTrip ? ` • ${t('занят: рейс {trip}', { trip: tripRefDatedText(tr.busyTrip) })}` : ''
+    return {
+      id: tr.id,
+      text: `${tr.name} • ${t('{n} вагонов', tr.wagons.length)}${where}${busy}`,
+      disabled: !!tr.busyTrip,
+    }
+  }),
+)
+
+async function newTrain() {
+  const created = await openDialog<TrainRow>(TrainNameDialog)
+  if (!created) return
+  await trainsLoad.run()
+  draft.train = created.id
 }
 
 async function save() {

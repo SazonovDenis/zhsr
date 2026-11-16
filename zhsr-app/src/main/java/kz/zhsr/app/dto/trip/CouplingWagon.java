@@ -1,11 +1,11 @@
 package kz.zhsr.app.dto.trip;
 
-import kz.zhsr.app.dto.ref.TripRef;
+import kz.zhsr.app.dto.train.WagonBusy;
 import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Вагон в акте отцепки или прицепки.
+ * Вагон для прицепки или отцепки в рейсе.
  */
 @Getter
 @Setter
@@ -15,8 +15,8 @@ public class CouplingWagon {
     private long locationType;
     private long place;
     private long wagonStatusType;
-    /** другой активный рейс, в составе которого вагон; null - такого рейса нет */
-    private TripRef otherTrip;
+    /** занятость вагона в другом поезде; null - вагон свободен */
+    private WagonBusy busy;
     /** можно отцепить или прицепить; иначе показан, но отметить нельзя */
     private boolean available;
 }

@@ -5,43 +5,58 @@ import type { CouplingWagon, TripCrew } from '@/api/trips'
 import { coupleWagons, fetchCouplingWagons, fetchTripCrew } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import type { Busy } from '@/shared/busy'
-import { CouplingType, LocationType } from '@/shared/constants/systemDicts'
+import { LocationType } from '@/shared/constants/systemDicts'
+import { TrainWagonChangeType } from '@/shared/constants/TrainWagonChange'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { isoDateTime } from '@/shared/format'
 import { currentUser, loadCurrentUser } from '@/shared/user'
 import { placeText } from '@/shared/wagonPlace'
-import { tripRefText } from '@/shared/trips/tripRefText'
+import type { ResponsibleChoice } from '@/shared/wagons/responsible'
+import { responsibleUsr } from '@/shared/wagons/responsible'
+import { tripRefDatedText } from '@/shared/trips/tripRefText'
 
 /**
- * Акт отцепки или прицепки (Ф-АКТ-01) — общее для экранов десктопа и телефона: рейс, промежуточные остановки, приказ,
- * причина, список вагонов и проведение акта. Станция по умолчанию — станция пользователя, если она среди промежуточных
- * остановок. Проверки — на сервере.
+ * Прицепка или отцепка в рейсе сразу, без плана (Ф-АКТ-01) — общее для экранов десктопа и телефона: рейс,
+ * промежуточные остановки, основания и примечания (приказ, причина), ответственный за вагоны, список вагонов и
+ * оформление. Остановка по умолчанию — станция пользователя, если она среди промежуточных остановок. Ответственный
+ * выбирается обязательно: сотрудник или «не назначен». Проверки — на сервере.
  */
 export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
-  const type = attach ? CouplingType.ATTACH : CouplingType.DETACH
+  const type = attach ? TrainWagonChangeType.ATTACH : TrainWagonChangeType.DETACH
   const crew = shallowRef<TripCrew | null>(null)
   const wagons = shallowRef<CouplingWagon[]>([])
-  const station = ref<number | null>(null)
-  const order = ref('')
-  const reason = ref('')
+  // остановка маршрута — route_station.id: станция может встречаться в маршруте дважды
+  const stop = ref<number | null>(null)
+  const comment = ref('')
   // значение DatePicker и поля времени телефона; на сервер уходит с поясом
   const time = ref<string | null>(date.formatDate(new Date(), 'YYYY-MM-DDTHH:mm'))
   const selected = ref<string[]>([])
+  // ответственный за вагоны акта; null — ещё не выбран
+  const responsible = ref<ResponsibleChoice>(null)
   const error = ref<ShownError | null>(null)
   const running = ref(false)
 
+  /** Промежуточные остановки маршрута: id — route_station.id, текст — станция. */
   const stops = computed(() => {
-    const list = crew.value?.trip.stops ?? []
-    return list.slice(1, -1).map((id) => ({ id, text: dictManager.getValue('Station', id) }))
+    const trip = crew.value?.trip
+    if (!trip) return []
+    return trip.routeStations
+      .map((id, i) => ({ id, station: trip.stops[i]!, text: dictManager.getValue('Station', trip.stops[i]) }))
+      .slice(1, -1)
   })
+
+  /** Станция выбранной остановки — id справочника Station; не выбрана — null. */
+  const station = computed(() => stops.value.find((s) => s.id === stop.value)?.station ?? null)
 
   const whereText = (w: CouplingWagon) =>
     w.locationType === LocationType.TRIP
-      ? t('в составе')
-      : w.otherTrip
-        ? `${placeText(w.locationType, w.place)} • ${t('в составе рейса {trip}', { trip: tripRefText(w.otherTrip) })}`
+      ? t('в поезде')
+      : w.busy
+        ? `${placeText(w.locationType, w.place)} • ${t('в поезде {train}', { train: w.busy.train.name })}${
+            w.busy.trip ? `, ${t('рейс {trip}', { trip: tripRefDatedText(w.busy.trip) })}` : ''
+          }`
         : w.available
           ? placeText(w.locationType, w.place)
           : `${placeText(w.locationType, w.place)} • ${t('сначала передача на станцию')}`
@@ -62,9 +77,8 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
           dictManager.prepareDicts('Station', 'Depot', 'Yard', 'WagonType'),
         ])
         crew.value = data
-        const inner = data.trip.stops.slice(1, -1)
         const own = currentUser.value?.depotStation ?? user.depotStation
-        station.value = own !== null && inner.includes(own) ? own : null
+        stop.value = stops.value.find((s) => s.station === own)?.id ?? null
         await loadWagons()
       })
     } catch (e) {
@@ -72,9 +86,9 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
     }
   }
 
-  /** Сменить станцию: для прицепки список вагонов — этой станции. */
-  async function setStation(id: number | null) {
-    station.value = id
+  /** Сменить остановку (route_station.id): для прицепки список вагонов — станции остановки. */
+  async function setStop(id: number | null) {
+    stop.value = id
     if (!attach) return
     error.value = null
     try {
@@ -87,8 +101,9 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
   const chosen = computed(() => wagons.value.filter((w) => selected.value.includes(w.number)))
   const canSubmit = computed(
     () =>
-      !!station.value &&
+      !!stop.value &&
       !!time.value &&
+      responsible.value !== null &&
       chosen.value.length > 0 &&
       chosen.value.every((w) => w.available) &&
       !running.value,
@@ -96,7 +111,7 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
 
   /** Вагон стоит в депо или парке отстоя: прицепить нельзя, можно вернуть на станцию актом приёма-передачи. */
   const returnable = (w: CouplingWagon) =>
-    attach && !w.otherTrip && (w.locationType === LocationType.DEPOT || w.locationType === LocationType.YARD)
+    attach && !w.busy && (w.locationType === LocationType.DEPOT || w.locationType === LocationType.YARD)
 
   /** Все отмеченные вагоны стоят в одном депо или парке отстоя: откуда вернуть их на станцию; иначе null. */
   const returnFrom = computed(() => {
@@ -106,19 +121,19 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
     return first.locationType === LocationType.DEPOT ? { depot: first.place } : { yard: first.place }
   })
 
-  /** Провести акт. @return true — проведён */
+  /** Прицепить или отцепить. @return true — оформлено */
   async function submit(): Promise<boolean> {
-    if (!station.value) return false
+    if (!stop.value) return false
     error.value = null
     running.value = true
     try {
       await coupleWagons(tripId, {
-        couplingType: type,
-        station: station.value,
-        orderInfo: order.value,
-        reason: reason.value,
+        changeType: type,
+        routeStation: stop.value,
+        comment: comment.value,
         wagons: selected.value,
-        actDt: isoDateTime(new Date(time.value!)),
+        time: isoDateTime(new Date(time.value!)),
+        responsibleUsr: responsibleUsr(responsible.value),
       })
       return true
     } catch (e) {
@@ -132,17 +147,18 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
   return {
     crew,
     wagons,
+    stop,
     station,
-    order,
-    reason,
+    comment,
     time,
     selected,
+    responsible,
     error,
     running,
     stops,
     whereText,
     load,
-    setStation,
+    setStop,
     canSubmit,
     submit,
     returnable,

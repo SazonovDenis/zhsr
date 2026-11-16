@@ -11,13 +11,13 @@ import java.util.List;
  * @param routeKind      вид маршрута (константы RouteKind)
  * @param dbeg           дата начала действия
  * @param dend           дата окончания действия; null - действует
- * @param duration       время в пути, мин
  * @param conductorHours норма часов проводника
  * @param lnpHours       норма часов ЛНП
  * @param pemHours       норма часов ПЭМ
  * @param points         точки маршрута по порядку, как в редакторе: остановки и известные станции следования; между
- *                       соседними точками без перегона сервер прокладывает кратчайший путь. km точек сервер считает
- *                       сам; runDuration - от предыдущей точки, stopDuration - стоянка
+ *                       соседними точками без перегона сервер прокладывает кратчайший путь. km точек и время станций
+ *                       следования сервер считает сам; у остановок arrivalMin, departureMin - время прибытия и
+ *                       отправления
  */
 public record RouteSave(
         String trainNumber,
@@ -25,7 +25,6 @@ public record RouteSave(
         Integer routeKind,
         LocalDate dbeg,
         LocalDate dend,
-        Integer duration,
         Integer conductorHours,
         Integer lnpHours,
         Integer pemHours,

@@ -1,14 +1,15 @@
 package kz.zhsr.app.controller;
 
 import kz.zhsr.app.dto.common.ListSort;
-import kz.zhsr.app.dto.ref.UserRef;
 import kz.zhsr.app.dto.request.RequestActionBody;
 import kz.zhsr.app.dto.request.RequestCounts;
 import kz.zhsr.app.dto.request.RequestDetail;
 import kz.zhsr.app.dto.request.RequestDraft;
 import kz.zhsr.app.dto.request.RequestExecutorBody;
 import kz.zhsr.app.dto.request.RequestFilter;
+import kz.zhsr.app.dto.request.RequestNoteBody;
 import kz.zhsr.app.dto.request.RequestRow;
+import kz.zhsr.app.dto.request.StaffCandidate;
 import kz.zhsr.app.service.request.RequestAction;
 import kz.zhsr.app.service.request.RequestService;
 import kz.zhsr.app.service.storage.FileStorage;
@@ -17,6 +18,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -94,6 +96,16 @@ public class RequestController {
         return requestService.addNote(id, text, clientDt, clientGuid, photos);
     }
 
+    @PutMapping("/requests/notes/{noteId}")
+    public RequestDetail updateNote(@PathVariable long noteId, @RequestBody RequestNoteBody body) throws Exception {
+        return requestService.updateNote(noteId, body.text());
+    }
+
+    @DeleteMapping("/requests/photos/{photoId}")
+    public RequestDetail deletePhoto(@PathVariable long photoId) throws Exception {
+        return requestService.deletePhoto(photoId);
+    }
+
     @PostMapping("/requests/{id}/photos")
     public void addPhoto(@PathVariable long id, @RequestPart("photo") MultipartFile photo,
                          @RequestParam(value = "clientDt", required = false)
@@ -115,8 +127,9 @@ public class RequestController {
     }
 
     @GetMapping("/services/{service}/staff")
-    public List<UserRef> serviceStaff(@PathVariable long service) throws Exception {
-        return requestService.serviceStaff(service);
+    public List<StaffCandidate> serviceStaff(@PathVariable long service, @RequestParam(required = false) Long trip)
+            throws Exception {
+        return requestService.serviceStaff(service, trip);
     }
 
 }

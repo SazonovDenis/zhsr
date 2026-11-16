@@ -18,7 +18,7 @@ public class RouteOption {
     private String name;
     /** вид маршрута (константы RouteKind) */
     private int routeKind;
-    /** время в пути, мин; вводит пользователь */
+    /** время в пути, мин: по станциям маршрута */
     private int duration;
     /** длина маршрута, км: километраж последней станции маршрута */
     private int km;

@@ -10,21 +10,34 @@
         :class="{ 'pick-sheet__item--on': picked === o.id }"
         :disabled="o.disabled"
         @click="picked = o.id"
+        @dblclick="pickNow(o)"
       >
-        <span>{{ o.name }}</span>
-        <span v-if="o.hint" class="pick-sheet__hint" :class="{ 'pick-sheet__hint--warn': o.warn }">{{ o.hint }}</span>
+        <!-- слот option — свой вид строки варианта -->
+        <slot name="option" :option="o">
+          <span>{{ o.name }}</span>
+          <span v-if="o.hint" class="pick-sheet__hint" :class="{ 'pick-sheet__hint--warn': o.warn }">{{ o.hint }}</span>
+        </slot>
       </button>
     </div>
     <template #buttons>
-      <button type="button" class="pick-sheet__btn q-py-none q-px-md" @click="show = false">{{ t('Отмена') }}</button>
-      <button
-        type="button"
-        class="pick-sheet__btn pick-sheet__btn--primary q-py-none q-px-md"
-        :disabled="!!error || disabled"
+      <q-btn
+        unelevated
+        outline
+        no-caps
+        color="ink"
+        class="pick-sheet__btn zs-pwa-btn zs-soft-border"
+        :label="t('Отмена')"
+        @click="show = false"
+      />
+      <q-btn
+        unelevated
+        no-caps
+        color="primary"
+        class="pick-sheet__btn pick-sheet__btn--primary zs-pwa-btn"
+        :disable="!!error || disabled"
+        :label="t(okText)"
         @click="confirm"
-      >
-        {{ t(okText) }}
-      </button>
+      />
     </template>
   </BottomSheet>
 </template>
@@ -50,7 +63,7 @@ export interface PickOption<T> {
 
 /**
  * Назначение: лист снизу со списком вариантов и кнопками «Отмена» и «Назначить». Выбор — нажатием на строку, применяется
- * кнопкой: событие pick(id). selected — что выбрано при открытии. error — вместо списка, например нет связи; retry —
+ * кнопкой: событие pick(id). selected — что выбрано при открытии. Двойное касание варианта — выбор и применение сразу. Слот option — свой вид строки варианта. error — вместо списка, например нет связи; retry —
  * повторить загрузку.
  */
 const props = withDefaults(
@@ -82,6 +95,13 @@ function confirm() {
   show.value = false
   emit('pick', picked.value)
 }
+
+// двойное касание варианта — выбор и применение сразу, как кнопкой
+function pickNow(o: PickOption<T>) {
+  if (o.disabled || props.disabled || props.error) return
+  picked.value = o.id
+  confirm()
+}
 </script>
 
 <style scoped lang="scss">
@@ -111,10 +131,9 @@ function confirm() {
   }
 
   &--on {
-    border-color: $primary;
+    border-color: $zs-selected-border;
     background: $zs-selected-bg;
     color: $zs-selected-fg;
-    font-weight: 600;
   }
 }
 
@@ -135,26 +154,12 @@ function confirm() {
   font-size: 0.8rem;
 }
 
+// кнопки — q-btn размера zs-pwa-btn; здесь только доли ширины в ряду
 .pick-sheet__btn {
   flex: 1;
-  min-height: 2.8rem;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.4rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  cursor: pointer;
 
   &--primary {
     flex: 2;
-    border-color: $primary;
-    background: $primary;
-    color: #fff;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: default;
   }
 }
 </style>

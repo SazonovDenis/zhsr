@@ -2,13 +2,16 @@ import { Notify } from 'quasar'
 import { useRouter } from 'vue-router'
 
 import type { TripCrew, TripRow } from '@/api/trips'
+import { assignTripResponsible, cancelArrival, cancelDeparture, fetchTripCrew } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import type { RowAction } from '@/shared/components/table/rowMenu'
 import { CrewDuty, RoleType, TripStatus } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
+import { notifyError } from '@/shared/errors'
 import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
 import { markEditable, useNow } from '@/shared/trips/tripTimes'
+import ResponsibleAssignDialog from '../wagons/ResponsibleAssignDialog.vue'
 import TripCancelDialog from './TripCancelDialog.vue'
 import TripMarkDialog from './TripMarkDialog.vue'
 import TripNewDialog from './TripNewDialog.vue'
@@ -21,15 +24,20 @@ export const TRIP_ACTION_LABELS = [
   'Отметить прибытие',
   'Исправить отправление',
   'Исправить прибытие',
+  'Отменить отправление',
+  'Отменить прибытие',
+  'Ответственный за вагоны',
   'Отцепка',
   'Прицепка',
+  'Отметить прицепку',
   'Отменить рейс',
 ]
 
 const FIX_REASON = 'Исправить можно в течение 10 минут после отметки'
+const CANCEL_REASON = 'Отменить можно в течение 10 минут после отметки'
 const PLANNER_REASON = 'Только планировщик вагонов'
 const MARK_REASON = 'Отмечает ЛНП этого рейса'
-const COUPLE_REASON = 'Акт составляет ЛНП этого рейса или мастер депо'
+const COUPLE_REASON = 'Прицепку и отцепку в рейсе оформляет ЛНП этого рейса или мастер депо'
 
 /** Почему действие недоступно: сначала нет прав (rights — права есть, reason — текст), затем status; пусто — доступно. */
 const why = (rights: boolean, reason: string, status: string) => (rights ? status : t(reason))
@@ -65,7 +73,8 @@ export function useTripActions(changed: () => void) {
     const canMark = isChief || isAdmin
     // редактирует и отменяет рейс планировщик вагонов
     const isPlanner = isAdmin || hasRole(u, RoleType.WAGON_PLANNER)
-    // акт составляют начальник поезда этого рейса и мастер депо станции маршрута; станцию проверяет сервер
+    // прицепку и отцепку в рейсе оформляют начальник поезда этого рейса и мастер депо станции маршрута; станцию
+    // проверяет сервер
     const canCouple = canMark || hasRole(u, RoleType.MASTER)
     const fixDeparture = markEditable(trip.departureMarkedDt, now.value)
     const fixArrival = markEditable(trip.arrivalMarkedDt, now.value)
@@ -98,6 +107,22 @@ export function useTripActions(changed: () => void) {
         run: () => void mark(trip, false, true),
       },
       {
+        label: 'Отменить отправление',
+        reason: why(canMark, MARK_REASON, status(TripStatus.IN_PROGRESS) || (fixDeparture ? '' : t(CANCEL_REASON))),
+        run: () => void cancelMark(trip, true),
+      },
+      {
+        label: 'Отменить прибытие',
+        reason: why(canMark, MARK_REASON, status(TripStatus.DONE) || (fixArrival ? '' : t(CANCEL_REASON))),
+        run: () => void cancelMark(trip, false),
+      },
+      // после прибытия ЛНП назначает ответственного за вагоны поезда (Ф-РЕЙ-04)
+      {
+        label: 'Ответственный за вагоны',
+        reason: why(canMark, MARK_REASON, status(TripStatus.DONE)),
+        run: () => void assignResponsible(trip),
+      },
+      {
         label: 'Отцепка',
         reason: why(canCouple, COUPLE_REASON, status(TripStatus.IN_PROGRESS)),
         run: () => couple(trip, 'detach'),
@@ -106,6 +131,12 @@ export function useTripActions(changed: () => void) {
         label: 'Прицепка',
         reason: why(canCouple, COUPLE_REASON, status(TripStatus.IN_PROGRESS)),
         run: () => couple(trip, 'attach'),
+      },
+      // плановые прицепки и отцепки рейса отмечаются в формировании рейса: список и кнопки «Отметить» там
+      {
+        label: 'Отметить прицепку',
+        reason: why(canMark, MARK_REASON, status(TripStatus.PLANNED, TripStatus.IN_PROGRESS)),
+        run: () => openForm(trip),
       },
       {
         label: 'Отменить рейс',
@@ -125,7 +156,7 @@ export function useTripActions(changed: () => void) {
 
   async function edit(trip: TripRow) {
     const saved = await openDialog<TripRow>(TripNewDialog, {
-      trip: { id: trip.id, route: trip.route, plannedDt: trip.plannedDt },
+      trip: { id: trip.id, route: trip.route, plannedDt: trip.plannedDt, train: trip.train?.id ?? null },
     })
     if (saved) changed()
   }
@@ -151,6 +182,43 @@ export function useTripActions(changed: () => void) {
     if (!result) return
     Notify.create({ message: result.message, type: 'positive', position: 'bottom' })
     void loadCurrentUser(true)
+    changed()
+  }
+
+  // отменить отметку — без окна, как на телефоне: 10 минут после отметки; ошибка — всплывашкой
+  async function cancelMark(trip: TripRow, depart: boolean) {
+    try {
+      await (depart ? cancelDeparture : cancelArrival)(trip.id)
+    } catch (e) {
+      notifyError(e)
+      return
+    }
+    Notify.create({
+      message: depart ? t('Отправление отменено') : t('Прибытие отменено'),
+      type: 'positive',
+      position: 'bottom',
+    })
+    void loadCurrentUser(true)
+    changed()
+  }
+
+  // ответственный за вагоны прибывшего рейса — во всплывающем окне, как исполнитель заявки; текущий — из формирования
+  async function assignResponsible(trip: TripRow) {
+    try {
+      const crew = await fetchTripCrew(trip.id)
+      const result = await openDialog<{ usr: number | null }>(ResponsibleAssignDialog, {
+        station: null,
+        trip: trip.id,
+        current: crew.trip.responsibleUsr,
+        reassign: crew.trip.responsibleAssigned,
+      })
+      if (!result) return
+      await assignTripResponsible(trip.id, result.usr)
+    } catch (e) {
+      notifyError(e)
+      return
+    }
+    Notify.create({ message: t('Ответственный назначен'), type: 'positive', position: 'bottom' })
     changed()
   }
 

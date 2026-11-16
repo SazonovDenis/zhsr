@@ -49,7 +49,7 @@ public record CurrentUser(
      * @param name      название маршрута рейса
      * @param state     состояние рейса (trip_status_type)
      * @param departure отправление: фактическое, если было, иначе плановое
-     * @param arrival   плановое прибытие: плановое отправление плюс время в пути маршрута (route.duration)
+     * @param arrival   плановое прибытие: плановое отправление плюс время в пути маршрута (по его станциям)
      * @param duty      должность сотрудника в бригаде рейса: crew_duty_type.id (константы CrewDuty)
      * @param wagons    вагоны, за которыми закреплён сотрудник в рейсе (trip_crew.wagon); пусто - не закреплён
      * @param wagonNumbers номера этих вагонов, по порядку wagons

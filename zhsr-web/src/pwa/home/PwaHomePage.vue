@@ -45,15 +45,31 @@
         }}</router-link>
       </div>
       <!-- отметку можно отменить, пока её можно исправить: 10 минут после неё -->
-      <button
+      <q-btn
         v-if="fixDeparture || fixArrival"
-        type="button"
-        class="today__cancel-mark q-py-sm q-px-md"
-        :disabled="markRunning"
+        unelevated
+        outline
+        no-caps
+        color="error"
+        class="bg-white text-weight-bold q-py-sm q-px-md"
+        :disable="markRunning"
+        :label="fixDeparture ? t('Отменить отметку об отправлении') : t('Отменить отметку о прибытии')"
         @click="cancelMark(fixDeparture)"
-      >
-        {{ fixDeparture ? t('Отменить отметку об отправлении') : t('Отменить отметку о прибытии') }}
-      </button>
+      />
+      <!-- после прибытия ЛНП назначает ответственного за вагоны поезда — как исполнителя заявки: строка и ссылка,
+           выбор в листе снизу; до назначения отвечают проводники -->
+      <div v-if="crew && crew.trip.tripStatusType === TripStatus.DONE" class="today__responsible">
+        <span>{{ t('Ответственный за вагоны') }}</span>
+        <span>
+          {{ responsibleText(crew.trip) }}
+          <SoftLink
+            v-if="isChief"
+            :text="crew.trip.responsibleAssigned ? 'Переназначить' : 'Назначить'"
+            class="q-ml-sm"
+            @click="openAssign"
+          />
+        </span>
+      </div>
       <SoftLink v-if="switchTo" :text="switchText" class="today__switch" @click="showOtherTrip = !showOtherTrip" />
     </div>
 
@@ -75,6 +91,22 @@
           <span>{{ memberName(CrewDuty.PEM) }}</span>
         </div>
         <SoftLink text="Формирование" class="today__crew-link" @click="router.push({ name: 'pwa-trip' })" />
+        <!-- плановые прицепки и отцепки рейса: ЛНП отмечает факт или отменяет план; без прав и связи кнопок нет -->
+        <div v-if="plannedChanges.length > 0" class="today__plans q-mt-md">
+          <div class="zs-sub">{{ t('Прицепки и отцепки по плану') }}</div>
+          <div v-for="c in plannedChanges" :key="c.id" class="today__plan q-py-xs">
+            <span class="zs-mono">{{ c.number }}</span>
+            <span>{{ changeText(c) }}</span>
+            <template v-if="c.canMark && isOnline">
+              <button type="button" class="today__plan-btn q-pa-none" @click="openChangeMark(c)">
+                {{ t('Отметить прицепку') }}
+              </button>
+              <button type="button" class="today__plan-btn q-pa-none" @click="cancelPlan(c)">
+                {{ t('Отменить план') }}
+              </button>
+            </template>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -103,17 +135,39 @@
       :empty="t(s.empty)"
     />
 
+    <!-- назначение ответственного за вагоны прибывшего рейса -->
+    <PickSheet
+      v-model:show="assignOpen"
+      :title="t(crew?.trip.responsibleAssigned ? 'Переназначить ответственного' : 'Назначить ответственного')"
+      :ok-text="crew?.trip.responsibleAssigned ? 'Переназначить' : 'Назначить'"
+      :options="assignOptions"
+      :selected="crew?.trip.responsibleUsr?.id ?? null"
+      :error="assignError"
+      :retry="loadAssign"
+      @pick="assignResponsible($event)"
+    />
+
     <!-- отметка отправления или прибытия: календарь во весь экран, без заголовка -->
     <CalendarDialog
       v-model="markTime"
-      :show="marking !== null"
+      :show="marking !== null || markingChange !== null"
       with-time
-      :label="marking ? 'Дата отправления' : 'Дата прибытия'"
+      :label="markingChange ? 'Время прицепки или отцепки' : marking ? 'Дата отправления' : 'Дата прибытия'"
       :running="markRunning"
       :ok-text="fixing ? 'Сохранить время' : 'Подтвердить'"
-      @update:show="(v) => !v && (marking = null)"
+      @update:show="(v) => !v && ((marking = null), (markingChange = null))"
       @confirm="confirmMark"
     >
+      <!-- прицепка и отцепка в пути: ответственный за вагон — из бригады рейса или сотрудников депо станции -->
+      <div v-if="markingChange && trip?.tripStatusType === TripStatus.IN_PROGRESS" class="q-mb-sm">
+        <div class="zs-sub q-mb-xs">{{ t('Ответственный за вагон') }}</div>
+        <ResponsiblePicker
+          v-model="markResponsible"
+          :station="markingChange.station"
+          :trip="trip.id"
+          :wagons="[markingChange.number]"
+        />
+      </div>
       <ErrorBox v-if="markError" :error="markError" />
     </CalendarDialog>
   </PwaPage>
@@ -126,8 +180,11 @@ import { useRouter } from 'vue-router'
 
 import type { RepairRequest } from '@/api/requests'
 import { fetchRequests, requestFilter } from '@/api/requests'
+import type { TrainChange } from '@/api/trains'
+import { cancelChangePlan, markChange } from '@/api/trains'
 import type { TripRow, TripCrew } from '@/api/trips'
 import {
+  assignTripResponsible,
   cancelArrival,
   cancelDeparture,
   fetchTripCrew,
@@ -144,7 +201,7 @@ import { provideBusy } from '@/shared/busy'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import type { ShownError } from '@/shared/errors'
-import { notifyError, shownError } from '@/shared/errors'
+import { formError, notifyError, shownError } from '@/shared/errors'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { formatDateTime, isoDateTime } from '@/shared/format'
 import { isOnline } from '@/shared/network'
@@ -152,11 +209,17 @@ import { loadCached } from '@/shared/offline/cache'
 import type { QueuedRequest } from '@/shared/offline/outbox'
 import { outboxAsRequest, queuedRequests, withQueuedEdit } from '@/shared/offline/outbox'
 import { CrewDuty, RequestStatus, RoleType, ServiceType, TripStatus } from '@/shared/constants/systemDicts'
+import { TrainWagonChangeType } from '@/shared/constants/TrainWagonChange'
 import { canAccept, canWork } from '@/shared/requests/rights'
 import { currentUser, hasRole, loadCurrentUser, userName } from '@/shared/user'
+import type { ResponsibleCandidate, ResponsibleChoice } from '@/shared/wagons/responsible'
+import { fetchResponsibles, responsibleUsr, responsibleWho } from '@/shared/wagons/responsible'
+import ResponsiblePicker from '@/shared/wagons/ResponsiblePicker.vue'
 import { crewNorm, normDone } from '@/shared/trips/crewNorm'
 import { delayText, markEditable, useNow } from '@/shared/trips/tripTimes'
 import CalendarDialog from '../components/CalendarDialog.vue'
+import type { PickOption } from '../components/PickSheet.vue'
+import PickSheet from '../components/PickSheet.vue'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
 import PwaPage from '../components/PwaPage.vue'
 import { showOtherTrip } from './homeState'
@@ -184,6 +247,7 @@ const switchText = computed(() =>
 
 const requests = shallowRef<RepairRequest[]>([])
 const router = useRouter()
+// проверки и описи: телефон показывает только доступные кнопки
 
 const stale = ref(false)
 const error = ref<ShownError | null>(null)
@@ -226,15 +290,115 @@ const markRunning = ref(false)
 
 // исправляется время уже сделанной отметки
 const fixing = ref(false)
+// ответственный за вагон при прицепке и отцепке в пути; null — ещё не выбран
+const markResponsible = ref<ResponsibleChoice>(null)
+
+/** Ответственный за вагоны прибывшего рейса словами: сотрудник, «не назначен» или «проводники вагонов». */
+function responsibleText(tr: TripCrew['trip']): string {
+  if (!tr.responsibleAssigned) return t('проводники вагонов')
+  return tr.responsibleUsr ? userName(tr.responsibleUsr) : t('не назначен')
+}
+
+// после прибытия: выбор ответственного за вагоны в листе снизу — как исполнитель заявки; null — не назначен
+const assignOpen = ref(false)
+const assignCandidates = shallowRef<ResponsibleCandidate[]>([])
+const assignError = ref<ShownError | null>(null)
+const assignOptions = computed<PickOption<number | null>[]>(() => [
+  { id: null, name: t('Не назначен') },
+  ...assignCandidates.value.map((c) => ({ id: c.id, name: userName(c), hint: responsibleWho(c) })),
+])
+
+// кандидаты — с сервера: ошибка показывается прямо в листе
+async function loadAssign() {
+  const current = crew.value
+  if (!current) return
+  assignError.value = null
+  try {
+    assignCandidates.value = await fetchResponsibles(null, current.trip.id)
+  } catch (e) {
+    assignError.value = shownError(e)
+  }
+}
+
+function openAssign() {
+  assignOpen.value = true
+  void loadAssign()
+}
+
+async function assignResponsible(usr: number | null) {
+  const current = crew.value
+  if (!current) return
+  try {
+    crew.value = await assignTripResponsible(current.trip.id, usr)
+  } catch (e) {
+    notifyError(e)
+  }
+}
 
 function openMark(depart: boolean) {
   markTime.value = date.formatDate(new Date(), 'YYYY-MM-DDTHH:mm')
   markError.value = null
+  markResponsible.value = null
   fixing.value = false
   marking.value = depart
 }
 
+// плановые прицепки и отцепки рейса ЛНП: из формирования рейса
+const plannedChanges = computed(() => (crew.value?.changes ?? []).filter((c) => c.factDt === null))
+const markingChange = ref<TrainChange | null>(null)
+
+/** Плановая прицепка или отцепка словами: «прицепка: Караганда, 12.11 08:00». */
+const changeText = (c: TrainChange) =>
+  t(c.changeType === TrainWagonChangeType.ATTACH ? 'прицепка: {where}, {time}' : 'отцепка: {where}, {time}', {
+    where: dictManager.getValue('Station', c.station),
+    time: formatDateTime(c.plannedDt),
+  })
+
+function openChangeMark(c: TrainChange) {
+  markTime.value = date.formatDate(new Date(), 'YYYY-MM-DDTHH:mm')
+  markError.value = null
+  markResponsible.value = null
+  fixing.value = false
+  markingChange.value = c
+}
+
+// отменить план — кнопкой в списке, без окна; ошибка — всплывашкой
+async function cancelPlan(c: TrainChange) {
+  markRunning.value = true
+  try {
+    await cancelChangePlan(c.id)
+    await load()
+  } catch (e) {
+    notifyError(e)
+  } finally {
+    markRunning.value = false
+  }
+}
+
+async function confirmChangeMark(c: TrainChange) {
+  const inTrip = trip.value?.tripStatusType === TripStatus.IN_PROGRESS
+  if (inTrip && markResponsible.value === null) {
+    markError.value = formError(t('Выберите ответственного за вагон'))
+    return
+  }
+  markRunning.value = true
+  markError.value = null
+  try {
+    await markChange(c.id, isoDateTime(new Date(markTime.value!)), responsibleUsr(markResponsible.value))
+    markingChange.value = null
+    await load()
+  } catch (e) {
+    markError.value = shownError(e)
+  } finally {
+    markRunning.value = false
+  }
+}
+
 async function confirmMark() {
+  if (markingChange.value) {
+    await confirmChangeMark(markingChange.value)
+    return
+  }
   const current = trip.value
   if (!current) return
   markRunning.value = true
@@ -242,7 +406,8 @@ async function confirmMark() {
   try {
     const value = isoDateTime(new Date(markTime.value!))
     if (fixing.value) await (marking.value ? retimeDeparture : retimeArrival)(current.id, value)
-    else await (marking.value ? markDeparture : markArrival)(current.id, value)
+    else if (marking.value) await markDeparture(current.id, value)
+    else await markArrival(current.id, value)
     marking.value = null
     await loadCurrentUser(true)
     await load()
@@ -353,7 +518,7 @@ async function load() {
   try {
     await busy.run(async () => {
       // справочник неисправностей для строк заявок — параллельно с пользователем
-      const [u] = await Promise.all([loadCurrentUser(), dictManager.prepareDict('FaultType')])
+      const [u] = await Promise.all([loadCurrentUser(), dictManager.prepareDicts('FaultType', 'WagonType', 'Station')])
       const result = await loadCached('today', () => fetchRequests(requestFilter('all', { closed: false })))
       requests.value = result.data
       stale.value = result.stale
@@ -395,6 +560,18 @@ void load()
 </script>
 
 <style scoped lang="scss">
+// ответственный за вагоны: подпись слева, значение и ссылка справа — как строка атрибутов карточки заявки
+.today__responsible {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+  font-size: 0.8rem;
+
+  > :first-child {
+    color: $zs-text-muted;
+  }
+}
+
 .today__trip {
   display: flex;
   flex-direction: column;
@@ -534,11 +711,24 @@ void load()
   align-self: flex-end;
 }
 
-.today__cancel-mark {
-  border: 0.0625rem solid $zs-error-fg;
-  border-radius: 0.3rem;
-  background: #fff;
-  color: $zs-error-fg;
+.today__plans {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.9rem;
+}
+
+.today__plan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.today__plan-btn {
+  border: 0;
+  background: none;
+  color: $primary;
   font: inherit;
   font-weight: 600;
   cursor: pointer;

@@ -27,7 +27,7 @@
         :label="t('Сменить пароль')"
         :loading="running"
       />
-      <button type="button" class="password-page__logout" @click="exit">{{ t('Выйти') }}</button>
+      <q-btn flat dense no-caps color="muted" class="self-center" @click="exit">{{ t('Выйти') }}</q-btn>
     </form>
   </q-page>
 </template>
@@ -129,19 +129,5 @@ async function exit() {
 .password-page__submit {
   min-height: var(--zs-control-height);
   font-weight: 600;
-}
-
-.password-page__logout {
-  align-self: center;
-  border: 0;
-  background: none;
-  color: $zs-text-muted;
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-
-  &:hover {
-    text-decoration: underline;
-  }
 }
 </style>

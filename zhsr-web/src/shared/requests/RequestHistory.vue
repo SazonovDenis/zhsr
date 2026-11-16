@@ -14,6 +14,12 @@
         <template v-if="node.queued.length > 0" #photos="scope">
           <slot name="pending" v-bind="scope" :node="node" />
         </template>
+        <SoftLink
+          v-if="noteEditable(node.event)"
+          text="Исправить примечание"
+          class="request-history__edit"
+          @click="changes!.editNote(node.event.noteId!, node.event.text ?? '')"
+        />
       </RequestHistoryItem>
       <slot v-else name="queued" :node="node" :line="lineOf(i)" />
     </template>
@@ -33,21 +39,30 @@ import { computed } from 'vue'
 
 import type { RequestPhoto } from '@/api/requests'
 import { t } from '@/boot/i18n'
+import SoftLink from '@/shared/components/form/SoftLink.vue'
 import { formatDateTime } from '@/shared/format'
 import { userName } from '@/shared/user'
 import type { HistoryNode, RequestEvent } from './historyTree'
 import RequestHistoryItem from './RequestHistoryItem.vue'
+import { useRequestChanges } from './requestChanges'
 import { eventTitle, futureSteps, receivedLate } from './requestView'
 
 /**
  * История заявки лентой по готовому дереву (historyTree); в конце серым — шаги, которые заявке ещё предстоят (status =
  * null — их нет). Группировки здесь нет: что с чем показывать, решает дерево. Узел только из очереди выводится слотом
  * queued; ожидающие фото записи сервера — слотом pending, их адреса — в pending. large — крупнее, для телефона.
+ * Под своим примечанием автор видит ссылку «Исправить примечание», пока не вышел срок (requestChanges.ts).
  */
 const props = withDefaults(
   defineProps<{ nodes: HistoryNode[]; status: number | null; large?: boolean; pending?: RequestPhoto[] }>(),
   { large: false, pending: () => [] },
 )
+
+const changes = useRequestChanges()
+
+function noteEditable(e: RequestEvent): boolean {
+  return !!changes && e.noteId !== undefined && changes.canEditNote(e.noteId)
+}
 
 const future = computed(() => (props.status === null ? [] : futureSteps(props.status)))
 
@@ -75,6 +90,11 @@ function lineOf(i: number): 'none' | 'solid' | 'future' {
 </script>
 
 <style scoped lang="scss">
+.request-history__edit {
+  align-self: flex-start;
+  margin-top: 0.3rem;
+}
+
 .request-history {
   display: flex;
   flex-direction: column;

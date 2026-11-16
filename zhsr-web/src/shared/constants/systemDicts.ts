@@ -30,14 +30,6 @@ export const ConductorCategory = {
   SENIOR: 4,
 } as const
 
-/** Отцепка или прицепка: id coupling_type */
-export const CouplingType = {
-  /** Отцепка */
-  DETACH: 1,
-  /** Прицепка */
-  ATTACH: 2,
-} as const
-
 /** Должность члена бригады на рейсе: id crew_duty_type */
 export const CrewDuty = {
   /** Проводник - может быть закреплён за вагоном */

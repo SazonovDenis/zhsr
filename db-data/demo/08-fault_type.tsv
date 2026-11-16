@@ -1,10 +1,8 @@
 id	code	name	fault_group_type	severity_type	service	disabled
-1	FAV-1	Не греет отопление	1	3	1	false
-2	FAV-2	Окно дует	1	2	1	false
-3	FAV-3	Не работает замок в туалете	1	2	1	false
-4	FAV-4	Течь воды в туалете из-под потолка	1	4	1	false
-5	FAV-5	Нет аварийного освещения	1	3	1	false
-6	FAV-6	Не работают биотуалеты	1	3	1	false
+2	B-20	Окно дует	2	2	1	false
+3	N-20	Не работает замок в туалете	13	2	1	false
+4	H-20	Течь воды в туалете из-под потолка	8	4	1	false
+6	H-21	Не работают биотуалеты	8	3	1	false
 7	B-1	Трещина стекла окна	2	2	1	false
 8	B-2	Не открывается форточка	2	2	1	false
 9	B-3	Не закрывается окно	2	2	1	false
@@ -295,18 +293,9 @@ id	code	name	fault_group_type	severity_type	service	disabled
 294	DIN-BB	Основание, вибрация под вагоном	2	3	1	false
 295	DIN-BC	Продольная стена	2	2	1	false
 296	NORM-SHORT	Недостача экипировки по норме		2	3	false
-297	BED_01	Отсутствуют постельные принадлежности	1	2	3	false
-298	BRAKE_01	Неисправность тормозной системы	1	4	1	false
-299	CLEAN_01	Загрязнение купе	1	1	2	false
-300	DOOR_01	Неисправна дверь	1	2	1	false
-301	FIRE_01	Отсутствует огнетушитель	1	4	3	false
-302	HEAT_01	Не работает отопление	1	3	1	false
-303	HVAC_01	Кондиционер не работает	1	3	1	false
-304	LIGHT_01	Отсутствует освещение	1	2	1	false
-305	LOCK_01	Сломан замок купе	1	2	1	false
-306	SHELF_01	Сломана верхняя полка	1	2	1	false
-307	TOILET_01	Засорён туалет	1	3	2	false
-308	WATER_01	Нет питьевой воды	1	3	3	false
+298	BRAKE_01	Неисправность тормозной системы	16	4	1	false
+301	FIRE_01	Отсутствует огнетушитель	21	4	3	false
+307	TOILET_01	Засорён туалет	28	3	2	false
 309	DIN-MB	Шлифование	12	1	1	false
 310	DIN-SG	Межвагонные соединения	17	3	1	false
 311	INV-002	Вешалки-плечики: отсутствует	22	2	3	false
@@ -315,7 +304,6 @@ id	code	name	fault_group_type	severity_type	service	disabled
 314	DIN-BF	Торцевая стена	2	2	1	false
 315	DIN-BG	Сварные и дополнительные детали	2	2	1	false
 316	DIN-BH	Подвесной потолок	2	1	1	false
-317	DIN-CB	Окна	3	2	1	false
 318	DIN-CC	Пол	3	2	1	false
 319	DIN-CD	Внутренние панели	3	1	1	false
 320	DIN-CE	Перегородки	3	2	1	false

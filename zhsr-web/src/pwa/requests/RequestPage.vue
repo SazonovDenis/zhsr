@@ -20,7 +20,7 @@
     <template v-if="r">
       <div class="card__badges">
         <QueuedRefusal v-if="queuedItem?.refused" :item="queuedItem" />
-        <span v-else-if="queuedItem" class="zs-badge card__queued">{{ t('Ожидает отправки') }}</span>
+        <StatusBadge v-else-if="queuedItem" tone="wait">{{ t('Ожидает отправки') }}</StatusBadge>
         <DictBadge v-else :id="r.requestStatusType" dict="RequestStatus" />
         <span :style="severityStyle(r.severityType)">{{ dictManager.getValue('Severity', r.severityType) }}</span>
         <SoftLink
@@ -39,6 +39,7 @@
         :photos="tree.photos"
         :pending="pendingOwn"
         :caption="{ meta: subtitle, text: r.description }"
+        :has-text="!!r.description?.trim()"
       >
         <div class="card__top-main">
           <div v-if="r.description" class="card__desc">{{ r.description }}</div>
@@ -62,6 +63,11 @@
           <span>{{ dictManager.getValue('Service', r.service) }}</span>
           <span>{{ t('Автор') }}</span>
           <span>{{ userName(r.createdByUsr) }}</span>
+          <!-- заявку создала Система по нарушению в чек-листе или по недостаче в описи — переход к ним -->
+          <template v-if="source">
+            <span>{{ t('Источник') }}</span>
+            <span><SoftLink :text="source.text" :params="{ name: source.name }" @click="openSource" /></span>
+          </template>
           <template v-if="receivedLate(r.createdDt, r.receivedDt)">
             <span>{{ t('Поступила на сервер') }}</span>
             <span>{{ formatDateTime(r.receivedDt) }}</span>
@@ -84,19 +90,23 @@
       <section v-if="card.waitingDecision.value" class="card__section q-pt-md q-px-sm q-pb-none">
         <div class="card__need-net">{{ t('Действие ждёт отправки — новое можно сделать после неё') }}</div>
       </section>
-      <section v-else-if="actions.length > 0" class="card__section q-pt-md q-px-sm q-pb-none">
+      <!-- кнопки — с одинаковым отступом со всех сторон -->
+      <section v-else-if="actions.length > 0" class="card__section card__section--buttons q-pa-sm">
         <div class="card__buttons">
-          <button
+          <!-- основное действие — синяя, опасное — красная, остальные — белые с рамкой -->
+          <q-btn
             v-for="a in actions"
             :key="a.action"
-            type="button"
-            class="card__btn q-py-none q-px-md"
-            :class="`card__btn--${a.kind}`"
-            :disabled="card.blocked.value"
+            unelevated
+            no-caps
+            :outline="a.kind === 'secondary'"
+            :color="a.kind === 'primary' ? 'primary' : a.kind === 'danger' ? 'danger' : 'ink'"
+            class="card__btn zs-pwa-btn zs-pwa-btn--lg"
+            :class="{ 'zs-soft-border': a.kind === 'secondary' }"
+            :disable="card.blocked.value"
+            :label="a.title"
             @click="onAction(a.action)"
-          >
-            {{ a.title }}
-          </button>
+          />
         </div>
       </section>
 
@@ -121,27 +131,30 @@
   <!-- комментарий к действию -->
   <BottomSheet
     :show="!!card.pending.value"
-    :title="card.pendingDef.value ? t(card.pendingDef.value.title) : ''"
+    :title="card.pendingDef.value ? t(card.pendingDef.value.sheet?.title ?? card.pendingDef.value.title) : ''"
     @update:show="(v) => !v && card.cancel()"
   >
-    <textarea
-      v-model="card.comment.value"
-      class="card__textarea q-pa-md"
-      rows="4"
-      :placeholder="card.pendingDef.value?.comment ? t(card.pendingDef.value.comment) : ''"
-    />
+    <NoteInput v-model="card.comment.value" :rows="4" :placeholder="card.pendingDef.value?.comment ?? ''" />
     <PhotoPicker v-if="card.pendingDef.value?.photos" v-model="card.actionPhotos.value" large compress />
     <template #buttons>
-      <button type="button" class="card__btn q-py-none q-px-md" @click="card.cancel">{{ t('Отмена') }}</button>
-      <button
-        type="button"
-        class="card__btn card__btn--grow q-py-none q-px-md"
-        :class="card.pendingDef.value?.kind === 'danger' ? 'card__btn--danger' : 'card__btn--primary'"
-        :disabled="!card.comment.value.trim() || card.blocked.value"
+      <q-btn
+        unelevated
+        outline
+        no-caps
+        color="ink"
+        class="card__btn zs-pwa-btn zs-pwa-btn--lg zs-soft-border"
+        :label="t(card.pendingDef.value?.sheet?.cancelText ?? 'Отмена')"
+        @click="card.cancel"
+      />
+      <q-btn
+        unelevated
+        no-caps
+        :color="card.pendingDef.value?.kind === 'danger' ? 'danger' : 'primary'"
+        class="card__btn card__btn--grow zs-pwa-btn zs-pwa-btn--lg"
+        :disable="!card.comment.value.trim() || card.blocked.value"
+        :label="t(card.pendingDef.value?.sheet?.okText ?? 'Подтвердить')"
         @click="card.confirm"
-      >
-        {{ t('Подтвердить') }}
-      </button>
+      />
     </template>
   </BottomSheet>
 
@@ -151,10 +164,23 @@
       {{ t('Исполнитель заявки — {name}. Взять её в работу вместо него?', { name: card.foreignExecutor.value }) }}
     </div>
     <template #buttons>
-      <button type="button" class="card__btn q-py-none q-px-md" @click="takeOpen = false">{{ t('Отмена') }}</button>
-      <button type="button" class="card__btn card__btn--grow card__btn--primary q-py-none q-px-md" @click="confirmTake">
-        {{ t('Взять в работу') }}
-      </button>
+      <q-btn
+        unelevated
+        outline
+        no-caps
+        color="ink"
+        class="card__btn zs-pwa-btn zs-pwa-btn--lg zs-soft-border"
+        :label="t('Отмена')"
+        @click="takeOpen = false"
+      />
+      <q-btn
+        unelevated
+        no-caps
+        color="primary"
+        class="card__btn card__btn--grow zs-pwa-btn zs-pwa-btn--lg"
+        :label="t('Взять в работу')"
+        @click="confirmTake"
+      />
     </template>
   </BottomSheet>
 
@@ -169,22 +195,65 @@
     :retry="loadAssign"
     :disabled="card.blocked.value"
     @pick="card.assign($event)"
-  />
+  >
+    <!-- у сотрудника бригады рейса справа — должность и вагоны, совпадения с заявкой жирным -->
+    <template #option="{ option }">
+      <StaffOption :name="option.name" :candidate="candidateOf(option.id)" :wagon-number="r?.wagon.number ?? null" />
+    </template>
+  </PickSheet>
 
   <!-- примечание к заявке: текст и фото -->
   <BottomSheet v-model:show="noteOpen" :title="t('Примечание к заявке')">
-    <textarea v-model="noteText" class="card__textarea q-pa-md" rows="4" :placeholder="t('Текст примечания')" />
+    <NoteInput v-model="noteText" :rows="4" placeholder="Текст примечания" />
     <PhotoPicker v-model="notePhotos" large compress />
     <template #buttons>
-      <button type="button" class="card__btn q-py-none q-px-md" @click="closeNote">{{ t('Отмена') }}</button>
-      <button
-        type="button"
-        class="card__btn card__btn--grow card__btn--primary q-py-none q-px-md"
-        :disabled="(!noteText.trim() && notePhotos.length === 0) || card.noteBlocked.value"
+      <q-btn
+        unelevated
+        outline
+        no-caps
+        color="ink"
+        class="card__btn zs-pwa-btn zs-pwa-btn--lg zs-soft-border"
+        :label="t('Отмена')"
+        @click="closeNote"
+      />
+      <q-btn
+        unelevated
+        no-caps
+        color="primary"
+        class="card__btn card__btn--grow zs-pwa-btn zs-pwa-btn--lg"
+        :disable="(!noteText.trim() && notePhotos.length === 0) || card.noteBlocked.value"
+        :label="t('Добавить')"
         @click="saveNote"
-      >
-        {{ t('Добавить') }}
-      </button>
+      />
+    </template>
+  </BottomSheet>
+
+  <!-- исправление своего примечания -->
+  <BottomSheet
+    :show="editNoteId !== null"
+    :title="t('Исправить примечание')"
+    @update:show="(v) => !v && closeEditNote()"
+  >
+    <NoteInput v-model="editNoteText" :rows="4" placeholder="Текст примечания" />
+    <template #buttons>
+      <q-btn
+        unelevated
+        outline
+        no-caps
+        color="ink"
+        class="card__btn zs-pwa-btn zs-pwa-btn--lg zs-soft-border"
+        :label="t('Отмена')"
+        @click="closeEditNote"
+      />
+      <q-btn
+        unelevated
+        no-caps
+        color="primary"
+        class="card__btn card__btn--grow zs-pwa-btn zs-pwa-btn--lg"
+        :disable="!editNoteText.trim() || card.running.value"
+        :label="t('Сохранить')"
+        @click="saveEditNote"
+      />
     </template>
   </BottomSheet>
 </template>
@@ -195,10 +264,12 @@ import { useRouter } from 'vue-router'
 
 import type { RepairRequest, RequestAction } from '@/api/requests'
 import { t } from '@/boot/i18n'
+import StatusBadge from '@/shared/components/StatusBadge.vue'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import { bus } from '@/shared/bus'
 import { provideBusy } from '@/shared/busy'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
+import NoteInput from '@/shared/components/form/NoteInput.vue'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -207,6 +278,9 @@ import { shownError } from '@/shared/errors'
 import { formatDateTime } from '@/shared/format'
 import type { QueuedRequest } from '@/shared/offline/outbox'
 import PickSheet from '../components/PickSheet.vue'
+import { requestSource } from '@/shared/requests/requestSource'
+import StaffOption from '@/shared/requests/StaffOption.vue'
+import { sortStaff } from '@/shared/requests/staff'
 import QueuedItem from '../components/QueuedItem.vue'
 import QueuedPhoto from '../components/QueuedPhoto.vue'
 import QueuedRefusal from '../components/QueuedRefusal.vue'
@@ -276,6 +350,14 @@ watch(
 )
 
 const detail = computed(() => card.request.value)
+const source = computed(() => (queuedItem.value ? null : requestSource(detail.value)))
+
+/** Перейти к просмотру чек-листа или описи, по которым создана заявка. */
+function openSource() {
+  const s = source.value
+  if (s)
+    void router.push({ name: s.kind === 'check' ? 'pwa-check-list' : 'pwa-equip-list', params: { id: String(s.id) } })
+}
 
 // история с сервера; без связи её нет, остаются только записи, ожидающие отправки
 const historyStatus = computed(() => (detail.value && !card.stale.value ? detail.value.requestStatusType : null))
@@ -306,12 +388,16 @@ function confirmTake() {
   card.start('TAKE')
 }
 
-// исполнитель — из сотрудников службы заявки; текущий исполнитель есть в списке всегда
+// кому назначить: предпочтительные первыми (sortStaff); текущий исполнитель есть в списке всегда
 const staffOptions = computed(() => {
-  const list = card.staff.value
+  const list = sortStaff(card.staff.value, r.value?.wagon.number ?? null).map((c) => c.usr)
   const current = detail.value?.executorUsr
   return current && !list.some((u) => u.id === current.id) ? [current, ...list] : list
 })
+
+function candidateOf(id: number | null) {
+  return card.staff.value.find((c) => c.usr.id === id) ?? null
+}
 
 // выбор исполнителя в листе снизу; null — не назначен
 const assignOpen = ref(false)
@@ -357,6 +443,24 @@ async function saveNote() {
     return
   }
   if (await card.addNote(noteText.value, notePhotos.value)) closeNote()
+}
+
+// своё примечание автор исправляет в листе снизу; своё фото удаляет крестиком на миниатюре
+const editNoteId = ref<number | null>(null)
+const editNoteText = ref('')
+
+card.provideChanges((noteId, text) => {
+  editNoteId.value = noteId
+  editNoteText.value = text
+})
+
+function closeEditNote() {
+  editNoteId.value = null
+  editNoteText.value = ''
+}
+
+async function saveEditNote() {
+  if (editNoteId.value !== null && (await card.saveNote(editNoteId.value, editNoteText.value))) closeEditNote()
 }
 
 function edit() {
@@ -417,17 +521,17 @@ function goBack() {
   font-size: 0.8rem;
 }
 
-.card__queued {
-  background: #fff1cc;
-  color: #6b4700;
-}
-
 .card__section {
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
   margin: 0 -0.5rem;
   border-top: 0.0625rem solid $zs-border;
+}
+
+// отступ под кнопками — промежуток между разделами страницы (1rem) уменьшен до отступа по бокам (0.5rem)
+.card__section--buttons {
+  margin-bottom: -0.5rem;
 }
 
 .card__section > .card__section-title,
@@ -444,10 +548,8 @@ function goBack() {
 
 .card__section-title {
   color: $zs-text-muted;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .card__attrs {
@@ -467,36 +569,12 @@ function goBack() {
   gap: 0.5rem;
 }
 
+// кнопки карточки — q-btn с размером zs-pwa-btn--lg; здесь только раскладка в ряду
 .card__btn {
   flex: 1 1 40%;
-  min-height: 3.3rem;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.4rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
 
   &--grow {
     flex: 1;
-  }
-
-  &--primary {
-    border: 0;
-    background: $primary;
-    color: #fff;
-  }
-
-  &--danger {
-    border: 0;
-    background: #b91c1c;
-    color: #fff;
-  }
-
-  &:disabled {
-    opacity: 0.45;
   }
 }
 
@@ -506,20 +584,5 @@ function goBack() {
 
 .bottom-sheet__buttons .card__btn--grow {
   flex: 1;
-}
-
-.card__textarea {
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.3rem;
-  background: $zs-bg-header;
-  color: $zs-text;
-  font: inherit;
-  font-size: 1rem;
-  resize: none;
-
-  &:focus {
-    border-color: $primary;
-    outline: none;
-  }
 }
 </style>

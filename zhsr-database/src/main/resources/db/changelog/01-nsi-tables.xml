@@ -191,21 +191,6 @@
         </createTable>
     </changeSet>
 
-    <!-- отцепка, прицепка -->
-    <changeSet id="01-nsi-tables-coupling_type" author="zhsr">
-        <createTable tableName="coupling_type">
-            <column name="id" type="bigint">
-                <constraints primaryKey="true" nullable="false"/>
-            </column>
-            <column name="text" type="varchar(255)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="code" type="varchar(20)">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-    </changeSet>
-
     <!-- статус акта: отцепки, прицепки, приёма-передачи -->
     <changeSet id="01-nsi-tables-act_status_type" author="zhsr">
         <createTable tableName="act_status_type">
@@ -260,6 +245,10 @@
             <column name="text" type="varchar(255)">
                 <constraints nullable="false"/>
             </column>
+            <!-- кратко - рядом с номером вагона в строке списка: «54956 куп.» -->
+            <column name="short_text" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
             <column name="code" type="varchar(20)">
                 <constraints nullable="false"/>
             </column>
@@ -307,6 +296,10 @@
             </column>
             <column name="dend" type="date"/>
             <column name="depot" type="bigint"/>
+            <!-- пробег на момент ввода в эксплуатацию, км; общий пробег - wagon_info.run_km -->
+            <column name="initial_run_km" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
             <column name="data" type="jsonb"/>
         </createTable>
     </changeSet>
@@ -320,10 +313,6 @@
                 <constraints nullable="false"/>
             </column>
             <column name="name" type="varchar(255)">
-                <constraints nullable="false"/>
-            </column>
-            <!-- время в пути, мин -->
-            <column name="duration" type="integer">
                 <constraints nullable="false"/>
             </column>
             <column name="conductor_hours" type="integer"/>
@@ -366,14 +355,12 @@
             <column name="have_stop" type="boolean">
                 <constraints nullable="false"/>
             </column>
-            <!-- время в пути от предыдущей станции маршрута, мин; у начальной станции 0 -->
-            <column name="run_duration" type="integer">
-                <constraints nullable="false"/>
-            </column>
-            <!-- стоянка, мин; у станций следования, начальной и конечной станций 0 -->
-            <column name="stop_duration" type="integer">
-                <constraints nullable="false"/>
-            </column>
+            <!-- время прибытия: минуты от полуночи дня отправления с начальной станции, 1440 и больше - следующие сутки;
+                 у начальной станции пусто -->
+            <column name="arrival_min" type="integer"/>
+            <!-- время отправления: минуты от полуночи дня отправления с начальной станции, 1440 и больше - следующие сутки;
+                 у конечной станции пусто; у станции следования равно времени прибытия -->
+            <column name="departure_min" type="integer"/>
         </createTable>
     </changeSet>
 
@@ -461,6 +448,21 @@
             </column>
             <!-- отключён: не предлагается при подаче заявки; тип неисправности с заявками не удаляется, а отключается -->
             <column name="disabled" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- избранная неисправность: показывается первой при подаче заявки ("Частые"); sort_order - порядок показа -->
+    <changeSet id="01-nsi-tables-fault_type_favorite" author="zhsr">
+        <createTable tableName="fault_type_favorite">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="fault_type" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="sort_order" type="integer" defaultValueNumeric="0">
                 <constraints nullable="false"/>
             </column>
         </createTable>
@@ -566,11 +568,15 @@
         </createTable>
     </changeSet>
 
-    <!-- идентификатор серверной БД: одна строка, её пишет install/db-reset при пересоздании БД -->
+    <!-- идентификатор серверной БД: одна строка, её пишет prepare/db-reset при пересоздании БД; demo - БД загружена
+         с демо-данными (prepare/db-reset с ключом demo): страница входа показывает быстрый вход демо-пользователями -->
     <changeSet id="01-nsi-tables-db_info" author="zhsr">
         <createTable tableName="db_info">
             <column name="db_guid" type="varchar(100)">
                 <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="demo" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
             </column>
         </createTable>
     </changeSet>

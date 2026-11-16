@@ -1,0 +1,43 @@
+#!/bin/sh
+set -e
+
+# Сборка для сервера -> build/. Ключи - что собрать (install/images.sh); без ключей - всё, build/ очищается целиком.
+#   ./build-app            - всё
+#   ./build-app app        - только jar сервера
+#   ./build-app database   - только jar миграций; данные db-data берутся при публикации образа, сборки не требуют
+#   ./build-app web        - только фронт (PWA)
+# Дальше - ./build-app-docker-push с теми же ключами.
+
+# все пути - от корня проекта
+cd "$(dirname "$0")/.."
+. install/images.sh
+
+if [ $# -eq 0 ]; then
+    ./gradlew clean
+    rm -rf ./build
+fi
+mkdir -p ./build
+
+for key in $KEYS; do
+    echo "=== $key"
+    case $key in
+      app)
+        ./gradlew :zhsr-app:bootJar
+        cp zhsr-app/build/libs/zhsr-app-0.0.1.jar build/ ;;
+      database)
+        ./gradlew :zhsr-database:bootJar
+        cp zhsr-database/build/libs/zhsr-database-0.0.1.jar build/ ;;
+      web)
+        # Quasar требует Node 22+: в окружении скрипта может стоять старый node - берём Node 22 из nvm, если он есть
+        if ! node -v 2>/dev/null | grep -q '^v2[2-9]'; then
+            nvm_node=$(ls -d "$HOME"/.nvm/versions/node/v22* 2>/dev/null | sort -V | tail -1)
+            [ -z "$nvm_node" ] || PATH="$nvm_node/bin:$PATH"
+        fi
+        echo "node $(node -v)"
+        (cd zhsr-web && npm install --no-audit --no-fund && npm run build)
+        rm -rf build/web
+        cp -r zhsr-web/dist/pwa build/web ;;
+    esac
+done
+
+echo "Готово: build/"

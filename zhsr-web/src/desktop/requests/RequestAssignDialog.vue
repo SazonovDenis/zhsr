@@ -15,9 +15,10 @@
         type="button"
         class="request-assign__item q-py-xs q-px-md"
         :class="{ 'request-assign__item--on': picked === o.id }"
+        data-dialog-pick
         @click="picked = o.id"
       >
-        {{ o.name }}
+        <StaffOption :name="o.name" :candidate="o.candidate" :wagon-number="wagonNumber" />
       </button>
     </div>
   </FormDialog>
@@ -26,37 +27,51 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef } from 'vue'
 
-import type { UserRef } from '@/api/requests'
+import type { StaffCandidate, UserRef } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import FormDialog from '@/shared/components/dialog/FormDialog.vue'
 import type { DialogAction } from '@/shared/components/dialog/types'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
+import StaffOption from '@/shared/requests/StaffOption.vue'
+import { sortStaff } from '@/shared/requests/staff'
 import { currentUser, userName } from '@/shared/user'
 
 /**
  * Назначение исполнителя заявки во всплывающем окне — как на телефоне: список сотрудников службы и «Не назначен»,
- * выбор нажатием, применение кнопкой «Назначить»; «Назначить себя» — сразу назначить текущего пользователя, если он есть
- * в списке. load — загрузить сотрудников службы; current — исполнитель сейчас.
+ * выбор нажатием, применение кнопкой «Назначить» или двойным кликом по сотруднику; «Назначить себя» — сразу назначить текущего пользователя, если он есть
+ * в списке. load — загрузить, кому можно назначить; current — исполнитель сейчас; wagonNumber — номер вагона заявки. У
+ * сотрудника бригады рейса справа — должность и вагоны, совпадения с заявкой жирным; предпочтительные — первыми.
  * Результат — событие done с id сотрудника (null — снять назначение). Открывается через openDialog.
  */
-const props = defineProps<{ current: UserRef | null; load: () => Promise<UserRef[]> }>()
+const props = defineProps<{
+  current: UserRef | null
+  load: () => Promise<StaffCandidate[]>
+  wagonNumber: string | null
+}>()
 
 const show = defineModel<boolean>('show', { default: false })
 const emit = defineEmits<{ done: [result: { executor: number | null }] }>()
 
-const staff = shallowRef<UserRef[]>([])
+const staff = shallowRef<StaffCandidate[]>([])
 const loading = ref(true)
 const error = ref<ShownError | null>(null)
 const picked = ref<number | null>(props.current?.id ?? null)
 
 // текущий исполнитель есть в списке, даже если он из другой службы
 const options = computed(() => {
-  const list: { id: number | null; name: string }[] = staff.value.map((u) => ({ id: u.id, name: userName(u) }))
+  type Option = { id: number | null; name: string; candidate: StaffCandidate | null }
+  const list: Option[] = sortStaff(staff.value, props.wagonNumber).map((c) => ({
+    id: c.usr.id,
+    name: userName(c.usr),
+    candidate: c,
+  }))
   const current = props.current
-  if (current && !list.some((u) => u.id === current.id)) list.unshift({ id: current.id, name: userName(current) })
-  return [{ id: null, name: t('Не назначен') }, ...list]
+  if (current && !list.some((u) => u.id === current.id)) {
+    list.unshift({ id: current.id, name: userName(current), candidate: null })
+  }
+  return [{ id: null, name: t('Не назначен'), candidate: null }, ...list]
 })
 
 void props
@@ -92,6 +107,7 @@ const extraActions = computed<DialogAction[]>(() => [
 }
 
 .request-assign__item {
+  display: flex;
   border: 0.0625rem solid $zs-border;
   border-radius: 0.4rem;
   background: #fff;
@@ -104,7 +120,6 @@ const extraActions = computed<DialogAction[]>(() => [
     border-color: $primary;
     background: $zs-selected-bg;
     color: $zs-selected-fg;
-    font-weight: 600;
   }
 }
 </style>

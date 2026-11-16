@@ -84,12 +84,18 @@ public class AdminService {
         AdminTable table = table(tableName);
         Map<String, Object> values = values(table, body);
         normalize(table, values);
+        // порядок показа в форме не вводится: новая запись - последней
+        if (hasSortOrder(table) && values.get(AdminTables.SORT_ORDER) == null) {
+            values.put(AdminTables.SORT_ORDER, nextSortOrder(table.name()));
+        }
+        Boolean favorite = favorite(table, values);
         long id;
         try {
             id = db.insertRec(table.name(), values);
         } catch (Exception e) {
             throw DbErrors.translate(e);
         }
+        setFavorite(id, favorite);
         changed(table);
         return row(table, id);
     }
@@ -101,12 +107,18 @@ public class AdminService {
         row(table, id);
         Map<String, Object> values = values(table, body);
         normalize(table, values);
+        // порядок показа в форме не вводится, его меняют кнопки перестановки: не пришёл - прежний
+        if (values.get(AdminTables.SORT_ORDER) == null) {
+            values.remove(AdminTables.SORT_ORDER);
+        }
+        Boolean favorite = favorite(table, values);
         values.put("id", id);
         try {
             db.updateRec(table.name(), values);
         } catch (Exception e) {
             throw DbErrors.translate(e);
         }
+        setFavorite(id, favorite);
         changed(table);
         return row(table, id);
     }
@@ -185,6 +197,14 @@ public class AdminService {
      */
     private List<Map<String, Object>> withRefTexts(AdminTable table, List<DbRec> recs) throws Exception {
         List<Map<String, Object>> rows = recs.stream().map(AdminService::toMap).toList();
+        if (AdminTables.isVirtual(table.name(), AdminTables.FAVORITE) && !rows.isEmpty()) {
+            Set<Long> favorites = UtDb.uniqueValues(db.loadList("fault_type_favorite",
+                    Map.of("fault_type", rows.stream().map(r -> ((Number) r.get("id")).longValue()).toList())),
+                    "fault_type");
+            for (Map<String, Object> row : rows) {
+                row.put(AdminTables.FAVORITE, favorites.contains(((Number) row.get("id")).longValue()));
+            }
+        }
         for (AdminColumn c : table.columns()) {
             if (!AdminTables.REF.equals(c.type())) {
                 continue;
@@ -203,6 +223,48 @@ public class AdminService {
             }
         }
         return rows;
+    }
+
+    /**
+     * Убрать из значений поле «в избранном» неисправности: его нет в таблице fault_type.
+     *
+     * @return значение поля; null - у таблицы такого поля нет
+     */
+    private static Boolean favorite(AdminTable table, Map<String, Object> values) {
+        if (!AdminTables.isVirtual(table.name(), AdminTables.FAVORITE)) {
+            return null;
+        }
+        return Boolean.TRUE.equals(values.remove(AdminTables.FAVORITE));
+    }
+
+    /**
+     * Неисправность в избранном: новая запись fault_type_favorite - последней по порядку показа; снята - запись
+     * удаляется.
+     *
+     * @param favorite null - поля нет, ничего не делать
+     */
+    private void setFavorite(long faultType, Boolean favorite) throws Exception {
+        if (favorite == null) {
+            return;
+        }
+        boolean exists = db.loadRec("fault_type_favorite", Map.of("fault_type", faultType)) != null;
+        if (favorite && !exists) {
+            db.insertRec("fault_type_favorite",
+                    Map.of("fault_type", faultType, AdminTables.SORT_ORDER, nextSortOrder("fault_type_favorite")));
+        } else if (!favorite && exists) {
+            db.deleteRec("fault_type_favorite", Map.of("fault_type", faultType));
+        }
+    }
+
+    /** Порядок показа новой записи - последней: на 10 больше наибольшего в таблице. */
+    private int nextSortOrder(String tableName) throws Exception {
+        int last = db.loadList(tableName, Map.of()).stream()
+                     .mapToInt(r -> r.getInt(AdminTables.SORT_ORDER)).max().orElse(0);
+        return last + 10;
+    }
+
+    private static boolean hasSortOrder(AdminTable table) {
+        return table.columns().stream().anyMatch(c -> c.name().equals(AdminTables.SORT_ORDER));
     }
 
     private void changed(AdminTable table) throws Exception {
@@ -230,11 +292,15 @@ public class AdminService {
 
     private static String sortColumn(AdminTable table, String sort) {
         if (sort == null || sort.isBlank()) {
-            return table.columns().get(0).name();
+            // по умолчанию - порядок показа, если он есть у таблицы
+            return hasSortOrder(table)
+                    ? AdminTables.SORT_ORDER
+                    : table.columns().get(0).name();
         }
         for (AdminColumn c : table.columns()) {
             if (c.name().equals(sort) && c.listed()) {
-                return c.name();
+                // поле-ссылка - по тексту записи, на которую оно ссылается, а не по её id
+                return AdminTables.REF.equals(c.type()) ? AdminSql.refSort(table, c) : c.name();
             }
         }
         throw ApiException.badRequest("Сортировка по полю '" + sort + "' не поддерживается");
@@ -242,13 +308,14 @@ public class AdminService {
 
     /**
      * Значения полей записи из тела запроса: все поля таблицы, приведённые к типу колонки. Поле, которого нет в теле, -
-     * пусто. Обязательное пустое поле или длинная строка - ошибка 400.
+     * пусто. Обязательное пустое поле или длинная строка - ошибка 400; порядок показа может быть пустым - его ставит
+     * сервер (create, update).
      */
     static Map<String, Object> values(AdminTable table, Map<String, Object> body) {
         Map<String, Object> values = new LinkedHashMap<>();
         for (AdminColumn c : table.columns()) {
             Object value = convert(c, body == null ? null : body.get(c.name()));
-            if (value == null && c.required()) {
+            if (value == null && c.required() && !c.name().equals(AdminTables.SORT_ORDER)) {
                 throw ApiException.badRequest("Заполните поле «" + c.title() + "»");
             }
             values.put(c.name(), value);

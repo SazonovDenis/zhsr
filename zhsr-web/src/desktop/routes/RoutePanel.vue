@@ -18,22 +18,28 @@
         <span>{{ t('Время в пути') }}</span>
         <span>{{ formatHm(route.duration) }}</span>
         <span>{{ t('Нормы часов') }}</span>
-        <span>
-          {{ t('проводник {c}, ЛНП {l}, ПЭМ {p}', { c: route.conductorHours, l: route.lnpHours, p: route.pemHours }) }}
+        <!-- нормы — друг под другом: проводник, ЛНП, ПЭМ -->
+        <span class="route-panel__norms">
+          <span>{{ t('проводник {n}', { n: route.conductorHours }) }}</span>
+          <span>{{ t('ЛНП {n}', { n: route.lnpHours }) }}</span>
+          <span>{{ t('ПЭМ {n}', { n: route.pemHours }) }}</span>
         </span>
       </SidePanelFields>
 
       <!-- без прав кнопка видна, но неактивна, причина во всплывающей подсказке -->
       <div class="route-panel__actions">
-        <button
-          type="button"
-          class="route-panel__edit q-py-none q-px-md"
-          :disabled="!!editReason"
+        <q-btn
+          unelevated
+          outline
+          no-caps
+          color="ink"
+          class="zs-soft-border"
+          :disable="!!editReason"
           :title="editReason || undefined"
           @click="emit('edit')"
         >
           {{ t('Редактировать') }}
-        </button>
+        </q-btn>
       </div>
 
       <!-- остановки — списком или на карте (переключатель); прокручиваются только они, атрибуты над ними на месте -->
@@ -147,24 +153,17 @@ const period = computed(() => {
 </script>
 
 <style scoped lang="scss">
+.route-panel__norms {
+  display: flex;
+  flex-direction: column;
+}
+
 .route-panel__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
   margin: -0.3rem 0 -0.9rem;
-}
-
-.route-panel__edit {
-  height: 2rem;
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.3rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
 }
 
 // остановки занимают всё место панели под атрибутами
@@ -193,10 +192,8 @@ const period = computed(() => {
   background: none;
   color: $zs-text-muted;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   cursor: pointer;
 
   &--active {

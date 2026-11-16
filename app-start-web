@@ -8,5 +8,5 @@ cd "$(dirname "$0")"
 ./app-stop-web
 
 cd ./zhsr-web
-xterm -geometry 180x50+0+500 -title "zhsr-web" -e "npm run dev" &
+xterm  -hold -geometry 180x50+0+500 -title "zhsr-web" -e "npm run dev" &
 echo $! > ../.zhsr-web.pid

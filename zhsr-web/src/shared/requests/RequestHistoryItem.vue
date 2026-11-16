@@ -19,6 +19,7 @@
         :photos="photos"
         :pending="pending"
         :caption="{ meta, text }"
+        :has-text="!!text?.trim()"
       >
         <span v-if="text" class="history-item__text">{{ text }}</span>
         <template v-if="$slots.photos" #photos="scope"><slot name="photos" v-bind="scope" /></template>
@@ -71,9 +72,9 @@ withDefaults(
   flex: none;
   width: 0.6rem;
   height: 0.6rem;
-  border: 0.1rem solid $primary;
+  border: 0.1rem solid $zs-progress-done;
   border-radius: 50%;
-  background: $primary;
+  background: $zs-progress-done;
 
   &--future {
     border-color: $zs-border;
@@ -84,10 +85,13 @@ withDefaults(
 .history-item__line {
   flex: 1;
   width: 0.1rem;
-  background: $primary;
+  background: $zs-progress-done;
 
+  // к предстоящим шагам — серым пунктиром
   &--future {
-    background: $zs-border;
+    width: 0;
+    border-left: 0.1rem dashed $zs-border;
+    background: none;
   }
 }
 

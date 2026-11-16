@@ -58,7 +58,7 @@
 import { computed, provide, reactive, ref, shallowRef, watch } from 'vue'
 
 import type { WagonFilter, WagonRow } from '@/api/wagons'
-import { fetchWagons } from '@/api/wagons'
+import { fetchWagons, wagonQuery } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
 import CbButton from '@/shared/components/choice/CbButton.vue'
@@ -154,7 +154,7 @@ provide(WAGON_PICK, { isPicked: (w) => picked.value.has(w.number), toggle, fit }
 async function load() {
   loadError.value = null
   try {
-    rows.value = await busy.run(fetchWagons(filter, sort.value))
+    rows.value = await busy.run(fetchWagons(wagonQuery(filter), sort.value))
   } catch (e) {
     rows.value = []
     loadError.value = shownError(e)

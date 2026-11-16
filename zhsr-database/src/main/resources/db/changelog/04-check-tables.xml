@@ -62,7 +62,8 @@
         </createTable>
     </changeSet>
 
-    <!-- шаблон чек-листа: приёмка вагона, медосмотр, инструктаж и т. п. -->
+    <!-- шаблон чек-листа: приёмка вагона, медосмотр, инструктаж и т. п.;
+         check_object - что проверяют по чек-листу: константы CheckObject в коде (1 - вагон, 2 - сотрудник, 3 - рейс) -->
     <changeSet id="04-check-tables-check_list_template" author="zhsr">
         <createTable tableName="check_list_template">
             <column name="id" type="bigint" autoIncrement="true">
@@ -73,6 +74,9 @@
             </column>
             <column name="text_kk" type="varchar(255)"/>
             <column name="text_en" type="varchar(255)"/>
+            <column name="check_object" type="integer">
+                <constraints nullable="false"/>
+            </column>
             <column name="sort_order" type="integer" defaultValueNumeric="0">
                 <constraints nullable="false"/>
             </column>
@@ -157,8 +161,9 @@
     </changeSet>
 
     <!-- заполненный чек-лист; что проверяли: вагон (wagon), рейс (trip), сотрудник (checked_usr) - медосмотр,
-         инструктаж; created_by_usr - кто проводил проверку; completed_dt - когда проверка завершена,
-         пусто - черновик -->
+         инструктаж; created_by_usr - кто проводил проверку; created_dt - когда проверка начата; completed_dt - когда
+         чек-лист последний раз сохранён ("Проверка окончена"): чек-лист приходит на сервер только завершённым, автор
+         исправляет его в течение 10 минут после сохранения -->
     <changeSet id="04-check-tables-check_list" author="zhsr">
         <createTable tableName="check_list">
             <column name="id" type="bigint" autoIncrement="true">
@@ -176,7 +181,9 @@
             <column name="created_dt" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
-            <column name="completed_dt" type="timestamptz"/>
+            <column name="completed_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
     </changeSet>
 
@@ -204,6 +211,34 @@
                 <constraints nullable="false"/>
             </column>
             <column name="repair_request" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+    <!-- фото к значению пункта чек-листа: файл в хранилище файлов (S3), storage_key - ключ файла в бакете; заявка по
+         нарушению получает ссылку на тот же файл (repair_request_photo.storage_key), файл не копируется -->
+    <changeSet id="04-check-tables-check_list_value_photo" author="zhsr">
+        <createTable tableName="check_list_value_photo">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="check_list_value" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="storage_key" type="varchar(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="size_bytes" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by_usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="received_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
     </changeSet>
 
@@ -296,7 +331,9 @@
     </changeSet>
 
     <!-- заполненная опись экипировки вагона: текущий факт - что лежит в вагоне; created_by_usr - кто составил опись;
-         completed_dt - когда опись завершена, пусто - черновик; repair_request - заявка по недостаче -->
+         created_dt - когда опись начата; completed_dt - когда опись последний раз сохранена: опись приходит на сервер
+         только завершённой, автор исправляет её в течение 10 минут после сохранения; repair_request - заявка по
+         недостаче -->
     <changeSet id="04-check-tables-equip_list" author="zhsr">
         <createTable tableName="equip_list">
             <column name="id" type="bigint" autoIncrement="true">
@@ -315,14 +352,16 @@
             <column name="created_dt" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
-            <column name="completed_dt" type="timestamptz"/>
+            <column name="completed_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
             <column name="repair_request" type="bigint"/>
         </createTable>
     </changeSet>
 
     <!-- значение пункта описи: quantity_actual - фактически в вагоне; quantity_required - требуется по нормативу на момент описи,
          пусто - норматива нет; equip_list_item_norm - норматив, по которому посчитано требуемое количество;
-         violation - фактическое количество нарушает норматив -->
+         violation - фактическое количество нарушает норматив; comment - примечание проводящего опись -->
     <changeSet id="04-check-tables-equip_list_value" author="zhsr">
         <createTable tableName="equip_list_value">
             <column name="id" type="bigint" autoIncrement="true">
@@ -340,6 +379,35 @@
             <column name="quantity_required" type="numeric(12,3)"/>
             <column name="equip_list_item_norm" type="bigint"/>
             <column name="violation" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="comment" type="text"/>
+        </createTable>
+    </changeSet>
+
+    <!-- фото к значению пункта описи: файл в хранилище файлов (S3), storage_key - ключ файла в бакете; заявка по
+         недостаче получает ссылку на тот же файл (repair_request_photo.storage_key), файл не копируется -->
+    <changeSet id="04-check-tables-equip_list_value_photo" author="zhsr">
+        <createTable tableName="equip_list_value_photo">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="equip_list_value" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="storage_key" type="varchar(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="size_bytes" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by_usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="received_dt" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
         </createTable>

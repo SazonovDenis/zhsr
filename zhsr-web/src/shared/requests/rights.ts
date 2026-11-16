@@ -1,4 +1,4 @@
-import type { RepairRequest, RequestAction } from '@/api/requests'
+import type { RepairRequest, RequestAction, UserRef } from '@/api/requests'
 import type { CurrentUser } from '@/api/session'
 import { CrewDuty, RequestStatus, RoleType } from '@/shared/constants/systemDicts'
 
@@ -20,8 +20,11 @@ export const OPEN_STATUSES: number[] = [
   RequestStatus.DEFERRED,
 ]
 
-/** Сколько минут после подачи автор может исправить заявку (Ф-ЗАЯ-07). */
+/** Сколько минут после создания автор может исправить заявку, примечание или удалить фото (Ф-ЗАЯ-05, Ф-ЗАЯ-07). */
 const EDIT_MINUTES = 10
+
+/** Не вышел ли срок исправления записи, созданной в createdDt; now — текущее время, мс. */
+const inEditPeriod = (createdDt: string, now: number) => now - new Date(createdDt).getTime() <= EDIT_MINUTES * 60_000
 
 export interface ActionDef {
   /** текст кнопки на русском; переводится при показе */
@@ -34,6 +37,9 @@ export interface ActionDef {
   photos?: boolean
   /** граф статусов: из каких статусов действие выполняется — константы RequestStatus; как на сервере (RequestAction) */
   from: number[]
+  /** окно комментария на русском: заголовок, кнопка подтверждения и кнопка отказа; не задано — название действия,
+   * «Подтвердить» и «Отмена» */
+  sheet?: { title: string; okText: string; cancelText: string }
 }
 
 const S = RequestStatus
@@ -76,6 +82,7 @@ export const ACTIONS: Record<RequestAction, ActionDef> = {
     comment: 'Укажите причину',
     photos: true,
     from: [S.NEW, S.ASSIGNED, S.DEFERRED],
+    sheet: { title: 'Отмена заявки', okText: 'Отменить заявку', cancelText: 'Не отменять' },
   },
 }
 
@@ -91,6 +98,11 @@ function inMyTrip(user: CurrentUser, r: RepairRequest): boolean {
 /** Вагон заявки не в рейсе и стоит на станции депо пользователя. */
 function atMyDepot(user: CurrentUser, r: RepairRequest): boolean {
   return !r.wagonTrip && !!r.wagonStation && r.wagonStation === user.depotStation
+}
+
+/** ЛНП рейса, в составе которого вагон заявки сейчас. */
+function isMyLnp(user: CurrentUser, r: RepairRequest): boolean {
+  return inMyTrip(user, r) && user.trip!.crewDutyType === CrewDuty.LNP
 }
 
 /** Мастер депо, которому подчиняется заявка: вагон на станции его депо. */
@@ -221,7 +233,9 @@ export function canAssign(user: CurrentUser, r: RepairRequest): boolean {
  * Почему пользователь не может назначить исполнителя — коротко, на русском (в тексте статуса {status}); пусто — может.
  */
 export function assignBlockReason(user: CurrentUser, r: RepairRequest): string {
-  if (!isMyMaster(user, r) && !isAdmin(user)) return 'назначает мастер депо станции вагона'
+  if (!isMyMaster(user, r) && !isMyLnp(user, r) && !isAdmin(user)) {
+    return 'назначают мастер депо станции вагона и ЛНП рейса вагона'
+  }
   if (FINAL_STATUSES.includes(r.requestStatusType)) return 'заявка в статусе «{status}»'
   return ''
 }
@@ -231,18 +245,40 @@ export function assignBlockReason(user: CurrentUser, r: RepairRequest): string {
  * Проверка только для показа кнопки: окончательно её делает сервер.
  */
 export function canEdit(user: CurrentUser, r: RepairRequest, now = Date.now()): boolean {
-  if (r.createdByUsr.id !== user.id || r.requestStatusType !== RequestStatus.NEW || r.executorUsr) return false
-  return now - new Date(r.createdDt).getTime() <= EDIT_MINUTES * 60_000
+  if (r.createdByUsr.id !== user.id && !isAdmin(user)) return false
+  if (r.requestStatusType !== RequestStatus.NEW || r.executorUsr) return false
+  return inEditPeriod(r.createdDt, now)
 }
 
-/** Почему исправить нельзя — подсказка на кнопке; пусто — можно. Текст на русском, переводится при показе. */
-export function editBlockReason(user: CurrentUser, r: RepairRequest): string {
-  if (r.createdByUsr.id !== user.id) return 'Исправить может только автор заявки'
-  if (canEdit(user, r)) return ''
+/** Почему исправить нельзя — пояснение в меню строки; пусто — можно. Текст на русском, переводится при показе. */
+export function editBlockReason(user: CurrentUser, r: RepairRequest, now = Date.now()): string {
+  if (r.createdByUsr.id !== user.id && !isAdmin(user)) return 'Исправить может только автор заявки'
+  if (canEdit(user, r, now)) return ''
   return 'Исправить можно в течение 10 минут после подачи, пока не сменились исполнитель и статус'
 }
 
-/** Мастер депо может выбрать исполнителя при подаче заявки (Ф-ЗАЯ-02). */
-export function canAssignOnCreate(user: CurrentUser): boolean {
-  return has(user, RoleType.MASTER) || isAdmin(user)
+/**
+ * Исправить примечание или удалить фото может автор в течение 10 минут после создания (Ф-ЗАЯ-05); администратор — и
+ * чужое. Проверка только для показа кнопки: окончательно её делает сервер.
+ */
+export function canChangeOwn(user: CurrentUser, author: UserRef | null, createdDt: string, now: number): boolean {
+  return (author?.id === user.id || isAdmin(user)) && inEditPeriod(createdDt, now)
+}
+
+/**
+ * Из кого пользователь выбирает исполнителя (Ф-ЗАЯ-02): мастер депо и администратор — из всех сотрудников службы
+ * (null), ЛНП — из бригады рейса вагона (id рейса).
+ */
+export function staffTrip(user: CurrentUser, wagonTrip: number | null): number | null {
+  return has(user, RoleType.MASTER) || isAdmin(user) ? null : wagonTrip
+}
+
+/**
+ * Выбрать исполнителя при подаче заявки может мастер депо и ЛНП — по вагону своего рейса (Ф-ЗАЯ-02).
+ *
+ * @param wagonTrip рейс, в составе которого выбранный вагон сейчас; null — вагон не в рейсе или не выбран
+ */
+export function canAssignOnCreate(user: CurrentUser, wagonTrip: number | null): boolean {
+  const lnp = user.trip?.crewDutyType === CrewDuty.LNP && wagonTrip !== null && wagonTrip === user.trip.id
+  return has(user, RoleType.MASTER) || lnp || isAdmin(user)
 }

@@ -26,8 +26,8 @@
           <span class="route-stops__dot" />
           <span class="route-stops__name">{{ stationName(item.point) }}</span>
         </span>
-        <span v-if="item.point.stopDuration > 0" class="route-stops__sub">
-          {{ t('стоянка {n} мин', { n: item.point.stopDuration }) }}
+        <span v-if="stopOf(item.point) > 0" class="route-stops__sub">
+          {{ t('стоянка {n} мин', { n: stopOf(item.point) }) }}
         </span>
         <span class="route-stops__sub route-stops__km">{{ kmText(item.point, index) }}</span>
       </div>
@@ -69,7 +69,7 @@
         </span>
         <span class="route-stops__time">{{ formatDuration(item.runDuration) }}</span>
         <span class="route-stops__stop q-pa-none">
-          {{ item.point.stopDuration > 0 ? t('{m} мин', { m: item.point.stopDuration }) : '' }}
+          {{ stopOf(item.point) > 0 ? t('{m} мин', { m: stopOf(item.point) }) : '' }}
         </span>
       </template>
     </div>
@@ -85,7 +85,7 @@ import type { RoutePoint } from '@/api/routes'
 import { t } from '@/boot/i18n'
 import { dictManager } from '@/shared/dict/DictManager'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
-import { formatHm } from './duration'
+import { formatHm, runOf, stopOf } from './duration'
 
 /**
  * Отображение станций маршрута по макету: станции по порядку с расстоянием от начала маршрута, временем в пути и
@@ -131,24 +131,25 @@ const items = computed<Item[]>(() => {
   const result: Item[] = []
   let gap: { kind: 'gap'; count: number; runDuration: number; passDuration: number } | null = null
 
-  for (const point of props.points) {
+  props.points.forEach((point, index) => {
+    const run = runOf(props.points, index)
     if (!point.haveStop && collapsed.value) {
       if (!gap) {
         gap = { kind: 'gap', count: 0, runDuration: 0, passDuration: 0 }
         result.push(gap)
       }
       gap.count++
-      gap.runDuration += point.runDuration
-      gap.passDuration += point.runDuration
-      continue
+      gap.runDuration += run
+      gap.passDuration += run
+      return
     }
     if (gap) {
       // путь от последней свёрнутой станции до этой остановки — тоже часть времени над свёрнутым блоком
-      gap.runDuration += point.runDuration
+      gap.runDuration += run
       gap = null
     }
-    result.push({ kind: point.haveStop ? 'stop' : 'pass', point, runDuration: point.runDuration })
-  }
+    result.push({ kind: point.haveStop ? 'stop' : 'pass', point, runDuration: run })
+  })
   return result
 })
 

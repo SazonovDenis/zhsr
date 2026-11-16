@@ -5,6 +5,10 @@ import type { Column } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
 import { onSessionReset } from '@/shared/sessionState'
 import { sortFields } from '../shared/adminFieldOrder'
+import { sortOrderColumn } from '../shared/sortOrder'
+
+/** Порядок показа: у таблицы с этим полем — сортировка по нему по умолчанию и кнопки перестановки строк. */
+export const SORT_ORDER = 'sort_order'
 
 /**
  * Описания таблиц общего редактора и варианты полей-ссылок: загружаются с сервера один раз за сеанс страницы.
@@ -51,14 +55,20 @@ export function adminColumns(table: AdminTable): Column<AdminRow>[] {
   return defineColumns<AdminRow>(
     sortFields(table.name, table.columns, (col) => col.name)
       .filter((col) => col.listed)
-      .map((col) => ({
-        field: col.type === 'REF' ? `${col.name}_text` : col.name,
-        title: col.title,
-        sortable: true,
-        sortField: col.name,
-        align: col.type === 'INT' || col.type === 'DECIMAL' ? 'right' : 'left',
-        format: (value: unknown) => formatValue(col, value),
-      })),
+      // порядок показа — первой колонкой
+      .sort((a, b) => Number(b.name === SORT_ORDER) - Number(a.name === SORT_ORDER))
+      .map((col) =>
+        col.name === SORT_ORDER
+          ? { ...sortOrderColumn<AdminRow>(SORT_ORDER), sortField: SORT_ORDER }
+          : {
+              field: col.type === 'REF' ? `${col.name}_text` : col.name,
+              title: col.title,
+              sortable: true,
+              sortField: col.name,
+              align: col.type === 'INT' || col.type === 'DECIMAL' ? 'right' : 'left',
+              format: (value: unknown) => formatValue(col, value),
+            },
+      ),
   )
 }
 

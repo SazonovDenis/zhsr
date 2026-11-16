@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -87,14 +88,14 @@ public class RouteService {
         rec.put("route_kind", draft.routeKind());
         rec.put("transport_type", TransportType.PASSENGER);
         rec.put("dbeg", draft.dbeg());
-        rec.put("duration", 0);
         return route(db.insertRec("route", rec));
     }
 
     /**
      * Сохранить маршрут из редактора (Ф-МАР-01, Ф-МАР-02). Между соседними точками без перегона прокладывается
      * кратчайший путь по маршрутной сети - его станции становятся станциями следования; километраж - нарастающим итогом
-     * по перегонам пути. Если по маршруту есть рейсы, меняется только дата окончания действия.
+     * по перегонам пути; время станций следования - по расстоянию между соседними остановками. Если по маршруту есть
+     * рейсы, меняется только дата окончания действия.
      *
      * @throws ApiException 400 - маршрут не проходит проверки Ф-МАР-01; 404 - маршрута нет
      */
@@ -125,9 +126,6 @@ public class RouteService {
             throw ApiException.badRequest("Укажите вид маршрута и дату ввода");
         }
         checkKind(body.routeKind());
-        if (body.duration() == null || body.duration() <= 0) {
-            throw ApiException.badRequest("Укажите время в пути");
-        }
         for (Integer h : new Integer[]{body.conductorHours(), body.lnpHours(), body.pemHours()}) {
             if (h != null && h < 0) {
                 throw ApiException.badRequest("Нормы часов - целые неотрицательные числа");
@@ -146,7 +144,6 @@ public class RouteService {
         rec.put("route_kind", body.routeKind());
         rec.put("dbeg", body.dbeg());
         rec.put("dend", body.dend());
-        rec.put("duration", body.duration());
         rec.put("conductor_hours", body.conductorHours());
         rec.put("lnp_hours", body.lnpHours());
         rec.put("pem_hours", body.pemHours());
@@ -155,9 +152,16 @@ public class RouteService {
         db.deleteRec("route_station", Map.of("route", id));
         int seq = 1;
         for (RoutePoint p : points) {
-            db.insertRec("route_station", Map.of("route", id, "seq", seq++, "station", p.getStation(), "km", p.getKm(),
-                    "have_stop", p.isHaveStop(), "run_duration", p.getRunDuration(),
-                    "stop_duration", p.getStopDuration()));
+            // время у начальной и конечной станций пусто - Map.of пустых значений не принимает
+            Map<String, Object> station = new HashMap<>();
+            station.put("route", id);
+            station.put("seq", seq++);
+            station.put("station", p.getStation());
+            station.put("km", p.getKm());
+            station.put("have_stop", p.isHaveStop());
+            station.put("arrival_min", p.getArrivalMin());
+            station.put("departure_min", p.getDepartureMin());
+            db.insertRec("route_station", station);
         }
         return route(id);
     }
@@ -184,26 +188,50 @@ public class RouteService {
 
     /**
      * Пересчитать остановки после правки в редакторе: расстояния от начала маршрута - у всех, по кратчайшему пути
-     * между соседними остановками; время в пути по умолчанию - только у остановок changed.
+     * между соседними остановками; время в пути от предыдущей остановки по умолчанию - только у остановок changed,
+     * у остальных - прежнее. Время прибытия и отправления - заново от отправления с начальной станции: стоянки
+     * прежние; у начальной станции нет прибытия, у конечной - отправления.
      *
      * @throws ApiException 400 - соседние остановки не связаны маршрутной сетью
      */
     public List<RouteStop> recalc(RecalcStops body) throws Exception {
         RouteNetwork.Graph graph = network.load();
         Set<Integer> changed = new HashSet<>(body.changed());
-        List<RouteStop> res = new ArrayList<>(body.stops().size());
+        List<RouteStop> stops = body.stops();
+        List<RouteStop> res = new ArrayList<>(stops.size());
         int km = 0;
-        for (int i = 0; i < body.stops().size(); i++) {
-            RouteStop stop = body.stops().get(i);
-            int distance = 0;
-            if (i > 0) {
-                distance = distance(graph, body.stops().get(i - 1).station(), stop.station());
+        // отправление с предыдущей остановки: до пересчёта и после
+        Integer oldPrev = null;
+        int prev = 0;
+        for (int i = 0; i < stops.size(); i++) {
+            RouteStop stop = stops.get(i);
+            boolean last = i == stops.size() - 1;
+            Integer arrival = null;
+            Integer departure;
+            if (i == 0) {
+                departure = stop.departureMin() != null ? stop.departureMin()
+                        : stop.arrivalMin() != null ? stop.arrivalMin() : 0;
+            } else {
+                int distance = distance(graph, stops.get(i - 1).station(), stop.station());
                 km += distance;
+                int run = !changed.contains(i) && stop.arrivalMin() != null && oldPrev != null
+                        ? Math.max(0, stop.arrivalMin() - oldPrev) : defaultRunDuration(distance);
+                arrival = prev + run;
+                departure = last ? null : arrival + dwell(stop);
             }
-            int run = i == 0 ? 0 : changed.contains(i) ? defaultRunDuration(distance) : stop.runDuration();
-            res.add(new RouteStop(stop.station(), km, run, stop.stopDuration()));
+            res.add(new RouteStop(stop.station(), km, arrival, departure));
+            oldPrev = stop.departureMin() != null ? stop.departureMin() : stop.arrivalMin();
+            prev = departure != null ? departure : arrival;
         }
         return res;
+    }
+
+    /**
+     * Стоянка остановки, мин: отправление минус прибытие; без одного из них - 0.
+     */
+    private static int dwell(RouteStop stop) {
+        return stop.arrivalMin() != null && stop.departureMin() != null
+                ? Math.max(0, stop.departureMin() - stop.arrivalMin()) : 0;
     }
 
     /**
@@ -242,9 +270,9 @@ public class RouteService {
 
     /**
      * Путь маршрута по точкам редактора: между соседними точками без перегона - станции следования кратчайшего пути;
-     * километраж - по перегонам; время в пути участка между остановками, где добавлены станции, делится по расстоянию.
-     * Проверки Ф-МАР-01: не меньше двух остановок, начальная и конечная - остановки на узловых станциях, одна станция
-     * дважды подряд - нельзя.
+     * километраж - по перегонам; время станций следования - по расстоянию между соседними остановками. Проверки
+     * Ф-МАР-01: не меньше двух остановок, начальная и конечная - остановки на узловых станциях, одна станция дважды
+     * подряд - нельзя; время остановок задано и не убывает.
      *
      * @throws ApiException 400 - путь не проходит проверки
      */
@@ -252,6 +280,7 @@ public class RouteService {
         if (input.stream().filter(RoutePoint::isHaveStop).count() < 2) {
             throw ApiException.badRequest("У маршрута должно быть не меньше двух остановок");
         }
+        checkTimes(input.stream().filter(RoutePoint::isHaveStop).toList());
         RoutePoint first = input.get(0);
         RoutePoint last = input.get(input.size() - 1);
         RouteNetwork.Graph graph = network.load();
@@ -260,15 +289,13 @@ public class RouteService {
             throw ApiException.badRequest("Начальная и конечная станции маршрута - только узловые");
         }
 
-        // точки с проложенными путями; added - участок между остановками получил новые станции
+        // точки с проложенными путями; время станций следования - после, по расстоянию
         List<RoutePoint> path = new ArrayList<>();
-        List<Boolean> added = new ArrayList<>();
         int km = 0;
         for (int i = 0; i < input.size(); i++) {
             RoutePoint p = input.get(i);
             if (i == 0) {
-                path.add(new RoutePoint(p.getStation(), 0, true, 0, 0));
-                added.add(false);
+                path.add(new RoutePoint(p.getStation(), 0, true, null, p.getDepartureMin()));
                 continue;
             }
             long prev = input.get(i - 1).getStation();
@@ -284,51 +311,67 @@ public class RouteService {
                 long at = prev;
                 for (long via : way.via()) {
                     km += graph.stage(at, via);
-                    path.add(new RoutePoint(via, km, false, 0, 0));
-                    added.add(true);
+                    path.add(new RoutePoint(via, km, false, null, null));
                     at = via;
                 }
                 stage = graph.stage(at, p.getStation());
             }
             km += stage;
             boolean lastPoint = i == input.size() - 1;
-            int stopDuration = p.isHaveStop() && !lastPoint ? p.getStopDuration() : 0;
-            path.add(new RoutePoint(p.getStation(), km, p.isHaveStop(), p.getRunDuration(), stopDuration));
-            added.add(false);
+            path.add(p.isHaveStop()
+                    ? new RoutePoint(p.getStation(), km, true, p.getArrivalMin(), lastPoint ? null : p.getDepartureMin())
+                    : new RoutePoint(p.getStation(), km, false, null, null));
         }
-        return spreadRunDuration(path, added);
+        return spreadTimes(path);
     }
 
     /**
-     * Время в пути участка между остановками, где добавлены станции следования, - заново по расстоянию: сумма времени
-     * участка сохраняется.
+     * Время остановок: у начальной - отправление, у конечной - прибытие, у промежуточных - оба; прибытие не раньше
+     * отправления с предыдущей остановки, отправление не раньше прибытия.
+     *
+     * @throws ApiException 400 - время не задано или убывает
      */
-    private static List<RoutePoint> spreadRunDuration(List<RoutePoint> path, List<Boolean> added) {
+    private static void checkTimes(List<RoutePoint> stops) {
+        int prev = -1;
+        for (int i = 0; i < stops.size(); i++) {
+            RoutePoint p = stops.get(i);
+            boolean first = i == 0;
+            boolean last = i == stops.size() - 1;
+            if ((!first && p.getArrivalMin() == null) || (!last && p.getDepartureMin() == null)) {
+                throw ApiException.badRequest("Укажите время прибытия и отправления каждой остановки");
+            }
+            for (Integer time : new Integer[]{first ? null : p.getArrivalMin(), last ? null : p.getDepartureMin()}) {
+                if (time == null) {
+                    continue;
+                }
+                if (time < prev) {
+                    throw ApiException.badRequest("Время прибытия и отправления по остановкам не должно убывать");
+                }
+                prev = time;
+            }
+        }
+    }
+
+    /**
+     * Время станций следования: между отправлением с предыдущей остановки и прибытием на следующую - по расстоянию;
+     * прибытие и отправление станции следования совпадают.
+     */
+    private static List<RoutePoint> spreadTimes(List<RoutePoint> path) {
         List<RoutePoint> res = new ArrayList<>(path);
         int start = 0;
         for (int i = 1; i < path.size(); i++) {
             if (!path.get(i).isHaveStop()) {
                 continue;
             }
-            boolean hasAdded = false;
-            int total = 0;
-            for (int j = start + 1; j <= i; j++) {
-                hasAdded |= added.get(j);
-                total += path.get(j).getRunDuration();
-            }
-            if (hasAdded) {
-                int length = path.get(i).getKm() - path.get(start).getKm();
-                int used = 0;
-                for (int j = start + 1; j < i; j++) {
-                    RoutePoint p = path.get(j);
-                    int segment = p.getKm() - path.get(j - 1).getKm();
-                    int run = length > 0 ? Math.round((float) total * segment / length) : 0;
-                    used += run;
-                    res.set(j, new RoutePoint(p.getStation(), p.getKm(), false, run, 0));
-                }
-                RoutePoint stop = path.get(i);
-                res.set(i, new RoutePoint(stop.getStation(), stop.getKm(), true, Math.max(0, total - used),
-                        stop.getStopDuration()));
+            RoutePoint from = path.get(start);
+            RoutePoint to = path.get(i);
+            int length = to.getKm() - from.getKm();
+            int run = to.getArrivalMin() - from.getDepartureMin();
+            for (int j = start + 1; j < i; j++) {
+                RoutePoint p = path.get(j);
+                int time = from.getDepartureMin()
+                        + (length > 0 ? Math.round((float) run * (p.getKm() - from.getKm()) / length) : 0);
+                res.set(j, new RoutePoint(p.getStation(), p.getKm(), false, time, time));
             }
             start = i;
         }
@@ -370,7 +413,6 @@ public class RouteService {
                 && Objects.equals(trim(body.name()), r.getName())
                 && Objects.equals(body.routeKind(), r.getRouteKind())
                 && Objects.equals(body.dbeg(), r.getDbeg())
-                && Objects.equals(body.duration(), r.getDuration())
                 && Objects.equals(body.conductorHours(), r.getConductorHours())
                 && Objects.equals(body.lnpHours(), r.getLnpHours())
                 && Objects.equals(body.pemHours(), r.getPemHours())
@@ -378,11 +420,11 @@ public class RouteService {
     }
 
     /**
-     * Остановки по порядку: станция, время в пути и стоянка - для сравнения маршрутов.
+     * Остановки по порядку: станция, время прибытия и отправления - для сравнения маршрутов.
      */
-    private static List<List<Long>> stopsOf(List<RoutePoint> points) {
+    private static List<List<Object>> stopsOf(List<RoutePoint> points) {
         return points.stream().filter(RoutePoint::isHaveStop)
-                .map(p -> List.of(p.getStation(), (long) p.getStopDuration())).toList();
+                .map(p -> Arrays.<Object>asList(p.getStation(), p.getArrivalMin(), p.getDepartureMin())).toList();
     }
 
     /**

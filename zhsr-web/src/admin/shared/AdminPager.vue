@@ -1,12 +1,28 @@
 <template>
   <span class="admin-pager">
     <span>{{ text }}</span>
-    <button type="button" class="admin-pager__btn" :disabled="page === 0" :title="t('Назад')" @click="page--">
-      <q-icon name="chevron_left" size="1.3rem" />
-    </button>
-    <button type="button" class="admin-pager__btn" :disabled="last" :title="t('Вперёд')" @click="page++">
-      <q-icon name="chevron_right" size="1.3rem" />
-    </button>
+    <q-btn
+      unelevated
+      outline
+      dense
+      color="ink"
+      class="zs-soft-border"
+      icon="chevron_left"
+      :disable="page === 0"
+      :title="t('Назад')"
+      @click="page--"
+    />
+    <q-btn
+      unelevated
+      outline
+      dense
+      color="ink"
+      class="zs-soft-border"
+      icon="chevron_right"
+      :disable="last"
+      :title="t('Вперёд')"
+      @click="page++"
+    />
   </span>
 </template>
 
@@ -38,23 +54,5 @@ const text = computed(() => {
   align-items: center;
   gap: 0.3rem;
   white-space: nowrap;
-}
-
-.admin-pager__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.8rem;
-  height: 1.8rem;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.3rem;
-  background: #fff;
-  color: inherit;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
 }
 </style>

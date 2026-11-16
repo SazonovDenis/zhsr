@@ -34,6 +34,8 @@ public class TransferRow {
     private List<Wagon> wagons = List.of();
     /** текущий сотрудник может принять или отклонить акт */
     private boolean canReceive;
+    /** текущий сотрудник может отменить акт (Ф-АКТ-06) */
+    private boolean canCancel;
 
     /**
      * Вагон акта.
@@ -43,5 +45,7 @@ public class TransferRow {
     public static class Wagon {
         private String number;
         private boolean withProperty;
+        /** ответственный, назначенный актом (wagon_responsible.usr); null - не назначен */
+        private UserRef usr;
     }
 }

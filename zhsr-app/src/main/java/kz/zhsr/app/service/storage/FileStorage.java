@@ -7,7 +7,7 @@ import org.springframework.stereotype.*;
 import java.io.*;
 
 /**
- * Хранилище файлов S3 (MinIO): один бакет s3.bucket, файл - по ключу. Бакет создаёт install/storage-reset. При старте
+ * Хранилище файлов S3 (MinIO): один бакет s3.bucket, файл - по ключу. Бакет создаёт prepare/storage-reset. При старте
  * хранилище проверяется: недоступно или бакета нет - приложение не стартует.
  */
 @Service

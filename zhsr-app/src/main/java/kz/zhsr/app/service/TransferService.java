@@ -32,7 +32,8 @@ import java.util.stream.Collectors;
  * передаётся. Передаёт: со станции - приёмщик, из депо или парка отстоя - мастер депо. Принимает: на станцию -
  * приёмщик, в депо или парк отстоя - мастер депо. Обе стороны работают только на станции своего депо. Акт передающей стороны ждёт приёма; акт принимающей стороны проводится сразу, с
  * указанием, кто сдал. Администратор может всё, его акт проводится сразу. Расположение вагонов меняется только при
- * приёме.
+ * приёме. Ответственный за вагоны назначается уже при оформлении акта; при приёме его можно сменить, отказ в приёме
+ * снимает назначение.
  */
 @Service
 public class TransferService {
@@ -59,10 +60,11 @@ public class TransferService {
      * @param transferredByUsr кто сдал вагоны: для акта, проведённого сразу; null - сам составитель
      * @param transferredDt    время акта, ISO с часовым поясом; null - сейчас
      * @param wagons           вагоны
+     * @param responsibleUsr   ответственный за вагоны акта; null - ответственный не назначен
      */
     public record TransferBody(Long fromStation, Long fromDepot, Long fromYard, Long toStation, Long toDepot,
                                Long toYard, long workType, Long transferredByUsr, OffsetDateTime transferredDt,
-                               List<WagonItem> wagons) {
+                               List<WagonItem> wagons, Long responsibleUsr) {
 
         TransferPlace from() {
             return new TransferPlace(fromStation, fromDepot, fromYard);
@@ -71,6 +73,14 @@ public class TransferService {
         TransferPlace to() {
             return new TransferPlace(toStation, toDepot, toYard);
         }
+    }
+
+    /**
+     * Приём.
+     *
+     * @param responsibleUsr ответственный за вагоны акта; null - ответственный не назначен
+     */
+    public record AcceptBody(Long responsibleUsr) {
     }
 
     /**
@@ -85,14 +95,17 @@ public class TransferService {
     private final CurrentUserService currentUserService;
     private final Visibility visibility;
     private final WagonJournal wagonJournal;
+    private final ResponsibleService responsibleService;
     private final RefResolver refResolver;
 
     public TransferService(Db db, CurrentUserService currentUserService, Visibility visibility,
-                           WagonJournal wagonJournal, RefResolver refResolver) {
+                           WagonJournal wagonJournal, ResponsibleService responsibleService,
+                           RefResolver refResolver) {
         this.db = db;
         this.currentUserService = currentUserService;
         this.visibility = visibility;
         this.wagonJournal = wagonJournal;
+        this.responsibleService = responsibleService;
         this.refResolver = refResolver;
     }
 
@@ -174,6 +187,7 @@ public class TransferService {
 
     /**
      * Оформить акт: принимающая сторона и администратор проводят его сразу, передающая - оставляет ждать приёма.
+     * Ответственный за вагоны назначается сразу, временем акта.
      */
     @Transactional
     public TransferRow create(TransferBody body) throws Exception {
@@ -208,6 +222,8 @@ public class TransferService {
         if (immediate && giver != me.id() && db.loadRec("usr", giver) == null) {
             throw ApiException.badRequest("Сотрудник не найден");
         }
+        responsibleService.check(body.responsibleUsr(), station, null,
+                items.stream().map(WagonItem::number).toList());
 
         Map<String, Object> act = new HashMap<>();
         act.put("number", String.format("P-%05d", db.loadSqlRec(TransferSql.nextActId(), Map.of()).getLong("next_id")));
@@ -231,8 +247,9 @@ public class TransferService {
             int seq = 1;
             for (WagonItem item : items) {
                 long wagon = db.loadRec("wagon", Map.of("number", item.number())).getLong("id");
+                long responsible = wagonJournal.assign(wagon, time, body.responsibleUsr());
                 db.insertRec("transfer_act_wagon", Map.of("transfer_act", id, "wagon", wagon, "seq", seq++,
-                        "with_property", item.withProperty()));
+                        "with_property", item.withProperty(), "wagon_responsible", responsible));
             }
             if (immediate) {
                 moveWagons(id, time);
@@ -246,13 +263,27 @@ public class TransferService {
     }
 
     /**
-     * Принять все вагоны акта: вагоны переходят в новое расположение.
+     * Принять все вагоны акта: вагоны переходят в новое расположение. Ответственный, назначенный актом, меняется на
+     * выбранного при приёме; без тела запроса - остаётся.
      */
     @Transactional
-    public TransferRow accept(long id) throws Exception {
+    public TransferRow accept(long id, AcceptBody body) throws Exception {
         CurrentUser me = currentUserService.get();
-        requirePendingForMe(id, me);
+        DbRec act = requirePendingForMe(id, me);
         OffsetDateTime now = OffsetDateTime.now();
+        if (body != null) {
+            List<DbRec> actWagons = db.loadList("transfer_act_wagon", Map.of("transfer_act", id));
+            List<String> numbers = db.loadList("wagon", Map.of("id",
+                    actWagons.stream().map(r -> r.getLong("wagon")).toList())).stream()
+                    .map(r -> r.getString("number")).toList();
+            responsibleService.check(body.responsibleUsr(), stationOf(from(act)), null, numbers);
+            for (DbRec row : actWagons) {
+                Long opened = row.getLong("wagon_responsible", null);
+                if (opened != null) {
+                    wagonJournal.reassign(opened, body.responsibleUsr());
+                }
+            }
+        }
         db.updateRec("transfer_act", Map.of("id", id, "act_status_type", ActStatus.DONE, "received_by_usr", me.id(),
                 "received_dt", now));
         moveWagons(id, now);
@@ -271,6 +302,17 @@ public class TransferService {
         }
         db.updateRec("transfer_act", Map.of("id", id, "act_status_type", ActStatus.REJECTED, "received_by_usr", me.id(),
                 "received_dt", OffsetDateTime.now(), "reject_reason", body.reason().trim()));
+        // назначение ответственного, сделанное актом, снимается: сначала ссылка, на запись стоит внешний ключ
+        for (DbRec row : db.loadList("transfer_act_wagon", Map.of("transfer_act", id))) {
+            Long opened = row.getLong("wagon_responsible", null);
+            if (opened != null) {
+                Map<String, Object> values = new HashMap<>();
+                values.put("id", row.getLong("id"));
+                values.put("wagon_responsible", null);
+                db.updateRec("transfer_act_wagon", values);
+                wagonJournal.unassign(opened);
+            }
+        }
         return row(id, me);
     }
 
@@ -407,6 +449,8 @@ public class TransferService {
             a.setCanReceive(a.getActStatusType() == ActStatus.PENDING
                     && canTake(me, new TransferPlace(a.getToStation(), a.getToDepot(), a.getToYard()),
                     a.getStation()));
+            a.setCanCancel(ActCancelService.canCancelTransfer(me, a.getActStatusType(), a.getTransferredByUsr().getId(),
+                    a.getReceivedByUsr() == null ? null : a.getReceivedByUsr().getId()));
         }
         refResolver.resolve(acts);
         return acts;

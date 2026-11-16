@@ -1,15 +1,23 @@
 /**
  * Иконки приложения: имя файла без .svg — имя иконки.
  *
+ * Логотип — два эталона: logo.svg (светлая тема) и logo-dark.svg (тёмная тема), знак без фона; всё остальное с
+ * логотипом — производные (public/favicon.svg, public/icons/*.png).
+ *
  * Чтобы добавить иконку, положите svg в эту папку и допишите имя в IconName. У svg задаётся только viewBox (без width
  * и height), а цвет линий — currentColor: размер и цвет задаёт SvgIcon.
  */
 export type IconName =
   | 'logo'
+  // логотипы: цвета свои, не currentColor
+  | 'logo-dark'
   | 'wagons'
   | 'trips'
   | 'requests'
   | 'acts'
+  // не из макета: чек-листы и экипировка, нарисованы в том же стиле
+  | 'checks'
+  | 'equip'
   | 'warranty'
   | 'analytics'
   | 'settings'

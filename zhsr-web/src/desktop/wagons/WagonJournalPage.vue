@@ -24,11 +24,12 @@
       :retry="load"
       row-key="key"
       :loading="busy.active.value"
+      :row-menu="rowMenu"
       empty="Записей нет"
     />
 
     <template #right>
-      <WagonPanel :wagon="wagon" journal />
+      <WagonPanel :wagon="wagon" journal @changed="load" />
     </template>
   </DesktopFrame>
 </template>
@@ -37,8 +38,10 @@
 import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { Notify } from 'quasar'
+
 import type { WagonRow } from '@/api/wagons'
-import { fetchWagonJournal, fetchWagons } from '@/api/wagons'
+import { fetchWagonByNumber, fetchWagonJournal, JournalBasis } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
 import CbButton from '@/shared/components/choice/CbButton.vue'
@@ -46,12 +49,16 @@ import FilterBar from '@/shared/components/FilterBar.vue'
 import type { PeriodPreset } from '@/shared/components/period/period'
 import { presetDates } from '@/shared/components/period/period'
 import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
+import { openDialog } from '@/shared/components/dialog/openDialog'
 import DataTable from '@/shared/components/table/DataTable.vue'
+import type { RowMenuItem } from '@/shared/components/table/types'
 import { dictChoices } from '@/shared/dict/dictChoices'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { dayStart } from '@/shared/format'
+import ActCancelDialog from '../acts/ActCancelDialog.vue'
+import ChangeUndoDialog from '../trains/ChangeUndoDialog.vue'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import type { JournalRow } from './journalColumns'
 import { journalColumns } from './journalColumns'
@@ -103,15 +110,48 @@ const stateChoices = computed(() =>
 
 const back = () => void router.push({ name: 'wagons' })
 
-/** Вагон по номеру: поиск по номеру ищет среди всех вагонов, нужен точный. */
+// меню строки: отмена основания — акта приёма-передачи (Ф-АКТ-06), прицепки или отцепки в рейсе (Ф-АКТ-01)
+const rowMenu: RowMenuItem<JournalRow>[] = [
+  {
+    label: 'Отменить акт',
+    visible: (row) => row.act !== null && row.basisType === JournalBasis.TRANSFER,
+    disabled: (row) => (row.canCancel ? '' : t('Акт отменяет сдавший или принявший вагоны или администратор')),
+    run: (row) => void cancelAct(row),
+  },
+  {
+    label: 'Отменить прицепку',
+    visible: (row) => row.act !== null && row.basisType === JournalBasis.ATTACH,
+    disabled: (row) => (row.canCancel ? '' : t('Прицепку в рейсе отменяет ЛНП рейса или администратор')),
+    run: (row) => void undo(row),
+  },
+  {
+    label: 'Отменить отцепку',
+    visible: (row) => row.act !== null && row.basisType === JournalBasis.DETACH,
+    disabled: (row) => (row.canCancel ? '' : t('Отцепку в рейсе отменяет ЛНП рейса или администратор')),
+    run: (row) => void undo(row),
+  },
+]
+
+async function cancelAct(row: JournalRow) {
+  if (row.act === null) return
+  const done = await openDialog<true>(ActCancelDialog, { actId: row.act, number: row.actNumber ?? '' })
+  if (!done) return
+  Notify.create({ message: t('Акт отменён'), position: 'bottom' })
+  await Promise.all([load(), loadWagon()])
+}
+
+async function undo(row: JournalRow) {
+  if (row.act === null) return
+  const attach = row.basisType === JournalBasis.ATTACH
+  const done = await openDialog<true>(ChangeUndoDialog, { changeId: row.act, attach, number: props.number })
+  if (!done) return
+  Notify.create({ message: t(attach ? 'Прицепка отменена' : 'Отцепка отменена'), position: 'bottom' })
+  await Promise.all([load(), loadWagon()])
+}
+
+/** Вагон по номеру: нет вагона или нет доступа к его данным — ошибка сервера с причиной. */
 async function loadWagon() {
-  const list = await fetchWagons(
-    { number: props.number, station: null, trip: null, locationKinds: [], states: [] },
-    null,
-  )
-  const found = list.find((w) => w.number === props.number)
-  if (!found) throw new Error(t('Вагон № {number} не найден', { number: props.number }))
-  wagon.value = found
+  wagon.value = await fetchWagonByNumber(props.number)
 }
 
 async function load() {

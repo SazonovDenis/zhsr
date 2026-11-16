@@ -30,3 +30,8 @@ export function dayStart(day: string, addDays = 0): string {
   const [y, m, d] = day.split('-').map(Number)
   return isoDateTime(new Date(y!, m! - 1, d! + addDays))
 }
+
+/** Целое число с разбивкой на тысячи пробелом: 1234567 → «1 234 567». */
+export function formatThousands(value: number): string {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}

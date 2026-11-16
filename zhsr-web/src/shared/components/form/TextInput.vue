@@ -1,9 +1,14 @@
 <template>
   <span class="text-input" :style="{ width }">
     <input
+      ref="field"
       v-model="model"
-      class="text-input__field zs-focusable q-py-none q-pr-lg q-pl-sm"
-      :class="{ 'text-input__field--mono': mono, 'text-input__field--password': password }"
+      class="text-input__field zs-focusable q-py-none q-pl-sm"
+      :class="{
+        'text-input__field--mono': mono,
+        'text-input__field--password': password,
+        'text-input__field--password-empty': password && !model,
+      }"
       :type="password && !revealed ? 'password' : 'text'"
       :inputmode="inputmode"
       :placeholder="placeholder && t(placeholder)"
@@ -18,23 +23,25 @@
     >
       ✕
     </button>
-    <!-- пароль: «глаз» показывает и снова скрывает введённые символы -->
+    <!-- пароль: «глаз» показывает и снова скрывает введённые символы; стоит перед крестиком, а пока крестика нет — на
+         его месте у правого края -->
     <button
       v-if="password"
       type="button"
       tabindex="-1"
       class="text-input__reveal q-pa-none"
+      :class="{ 'text-input__reveal--alone': !model }"
       :title="t(revealed ? 'Скрыть пароль' : 'Показать пароль')"
       @mousedown.prevent
       @click="revealed = !revealed"
     >
-      <q-icon :name="revealed ? 'visibility_off' : 'visibility'" size="1.1rem" />
+      <q-icon :name="revealed ? 'visibility_off' : 'visibility'" class="text-input__reveal-icon" />
     </button>
   </span>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, useTemplateRef } from 'vue'
 
 import { t } from '@/boot/i18n'
 
@@ -60,6 +67,14 @@ withDefaults(
 const model = defineModel<string>({ default: '' })
 // пароль показан открытым текстом
 const revealed = ref(false)
+const field = useTemplateRef<HTMLInputElement>('field')
+
+/** Поставить фокус в поле. */
+function focus() {
+  field.value?.focus()
+}
+
+defineExpose({ focus })
 </script>
 
 <style scoped lang="scss">
@@ -71,13 +86,15 @@ const revealed = ref(false)
 
 .text-input__field {
   width: 100%;
+  // справа — место под крестик
+  padding-right: calc(var(--zs-clear-size) + 0.4rem);
   height: var(--zs-control-height);
   border: 0.0625rem solid $zs-border-input;
   border-radius: 0.3rem;
   background: #fff;
   color: $zs-text;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--zs-control-font-size);
 
   &::placeholder {
     color: $zs-text-faint;
@@ -93,20 +110,26 @@ const revealed = ref(false)
     font-family: $zs-font-mono;
   }
 
-  // справа — и крестик, и «глаз»
+  // справа — и «глаз», и крестик
   &--password {
-    padding-right: 3.1rem;
+    padding-right: calc(var(--zs-clear-size) + var(--zs-reveal-size) + 1rem);
+  }
+
+  // пароль не введён: крестика нет — справа только «глаз»
+  &--password-empty {
+    padding-right: calc(var(--zs-reveal-size) + 0.8rem);
   }
 }
 
-.text-input__field--password ~ .text-input__clear {
-  right: 1.9rem;
-}
-
+// пароль: «глаз» — перед крестиком, крестик — у правого края, как у всех полей
 .text-input__reveal {
   position: absolute;
   top: 50%;
-  right: 0.4rem;
+  right: calc(var(--zs-clear-size) + 0.6rem);
+
+  &--alone {
+    right: 0.4rem;
+  }
   display: flex;
   align-items: center;
   justify-content: center;
@@ -121,6 +144,11 @@ const revealed = ref(false)
   }
 }
 
+// «глаз» — размером с крестик: на телефоне крупнее
+.text-input__reveal-icon {
+  font-size: var(--zs-reveal-size);
+}
+
 .text-input__clear {
   position: absolute;
   top: 50%;
@@ -128,13 +156,13 @@ const revealed = ref(false)
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.1rem;
-  height: 1.1rem;
+  width: var(--zs-clear-size);
+  height: var(--zs-clear-size);
   border: 0;
   border-radius: 50%;
   background: $zs-bg-button-soft;
   color: $zs-text-faint;
-  font-size: 0.6rem;
+  font-size: var(--zs-clear-font-size);
   font-weight: 700;
   line-height: 1;
   transform: translateY(-50%);

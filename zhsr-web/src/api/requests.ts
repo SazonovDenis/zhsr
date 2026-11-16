@@ -1,4 +1,6 @@
 import type { TableSort } from '@/shared/components/table/types'
+import type { CheckTemplateRef } from './checks'
+import type { EquipTemplateRef } from './equip'
 import { http } from './http'
 import type { TripRef } from './wagons'
 
@@ -104,6 +106,7 @@ export interface RequestExecutorRecord {
 
 /** Примечание к заявке. */
 export interface RequestNote {
+  id: number
   /** когда написано, ISO */
   createdDt: string
   /** когда поступило на сервер, ISO */
@@ -118,6 +121,12 @@ export interface RequestDetail extends RepairRequest {
   executors: RequestExecutorRecord[]
   notes: RequestNote[]
   photos: StoredPhoto[]
+  /** чек-лист, по нарушению в котором создана заявка; null — заявка не из чек-листа */
+  checkList: number | null
+  checkListTemplate: CheckTemplateRef | null
+  /** опись, по недостаче в которой создана заявка; null — заявка не из описи */
+  equipList: number | null
+  equipListTemplate: EquipTemplateRef | null
 }
 
 /**
@@ -286,6 +295,16 @@ export async function addRequestNote(
   return detailOf((await http.post<ServerDetail>(`/requests/${id}/notes`, form)).data)
 }
 
+/** Исправить текст примечания (Ф-ЗАЯ-05): автор — в течение 10 минут после создания. */
+export async function updateRequestNote(noteId: number, text: string): Promise<RequestDetail> {
+  return detailOf((await http.put<ServerDetail>(`/requests/notes/${noteId}`, { text })).data)
+}
+
+/** Удалить фото заявки или примечания: автор — в течение 10 минут после создания. id — id фото на сервере. */
+export async function deleteRequestPhoto(photoId: string): Promise<RequestDetail> {
+  return detailOf((await http.delete<ServerDetail>(`/requests/photos/${photoId}`)).data)
+}
+
 /** Одно фото к заявке с телефона: каждое фото — своя отправка. clientDt — время заявки или примечания, ISO. */
 export async function addRequestPhoto(id: number, photo: Blob, clientDt: string, clientGuid: string): Promise<void> {
   const form = new FormData()
@@ -295,7 +314,24 @@ export async function addRequestPhoto(id: number, photo: Blob, clientDt: string,
   await http.post(`/requests/${id}/photos`, form)
 }
 
-/** Сотрудники службы — кому можно назначить заявку. */
-export async function fetchServiceStaff(service: number): Promise<UserRef[]> {
-  return (await http.get<UserRef[]>(`/services/${service}/staff`)).data
+/**
+ * Кому можно назначить заявку: сотрудник службы заявки или, когда назначает ЛНП, сотрудник из бригады рейса.
+ */
+export interface StaffCandidate {
+  usr: UserRef
+  /** должность в бригаде рейса — id справочника CrewDuty; null — выбор не из бригады */
+  crewDutyType: number | null
+  /** вагоны в бригаде рейса; null — нет */
+  wagon: WagonRef | null
+  wagon2: WagonRef | null
+  /** сотрудник службы заявки */
+  inService: boolean
+}
+
+/**
+ * Кому можно назначить заявку. trip — вся бригада этого рейса с должностью и вагонами, предпочтительно сотрудники
+ * службы заявки (так назначает ЛНП); null — все сотрудники службы.
+ */
+export async function fetchServiceStaff(service: number, trip: number | null = null): Promise<StaffCandidate[]> {
+  return (await http.get<StaffCandidate[]>(`/services/${service}/staff`, { params: { trip } })).data
 }

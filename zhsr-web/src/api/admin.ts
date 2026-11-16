@@ -131,3 +131,11 @@ export async function createAdminUser(draft: AdminUserDraft): Promise<AdminUser>
 export async function updateAdminUser(id: number, draft: AdminUserDraft): Promise<AdminUser> {
   return (await http.put<AdminUser>(`/admin/users/${id}`, draft)).data
 }
+
+/**
+ * Переставить строку таблицы с порядком показа на одну позицию вверх или вниз среди строк своей группы (например,
+ * пункт — среди пунктов своего раздела). table — имя таблицы БД.
+ */
+export async function moveSortOrder(table: string, id: number, up: boolean): Promise<void> {
+  await http.post(`/admin/order/${table}/${id}/${up ? 'up' : 'down'}`)
+}

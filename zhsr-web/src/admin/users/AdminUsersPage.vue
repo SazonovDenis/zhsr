@@ -3,7 +3,7 @@
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Пользователи') }}</h1>
       <div class="desktop-frame__actions">
-        <button type="button" class="zs-btn-primary" @click="edit(null)">{{ t('Новый пользователь') }}</button>
+        <q-btn unelevated no-caps color="primary" @click="edit(null)">{{ t('Новый пользователь') }}</q-btn>
       </div>
     </template>
 

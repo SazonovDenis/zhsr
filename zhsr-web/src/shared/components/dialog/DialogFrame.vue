@@ -1,5 +1,13 @@
 <template>
-  <q-dialog :model-value="show" :maximized="isMaximized" @update:model-value="onUpdateShow" @show="focusFirst">
+  <!-- Esc закрывает диалог только через onKeydown: открытый выпадающий список останавливает Esc у себя и закрывается
+       сам, не закрывая диалог (штатное закрытие Quasar по Esc это не учитывает — оно отключено) -->
+  <q-dialog
+    :model-value="show"
+    :maximized="isMaximized"
+    no-esc-dismiss
+    @update:model-value="onUpdateShow"
+    @show="focusFirst"
+  >
     <div
       ref="cardEl"
       class="dialog-frame"

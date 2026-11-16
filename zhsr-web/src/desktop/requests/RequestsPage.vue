@@ -3,7 +3,7 @@
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Заявки') }}</h1>
       <div class="desktop-frame__actions">
-        <button type="button" class="zs-btn-primary" @click="addRequest">{{ t('Новая заявка') }}</button>
+        <q-btn unelevated no-caps color="primary" @click="addRequest">{{ t('Новая заявка') }}</q-btn>
       </div>
     </template>
 
@@ -138,6 +138,16 @@ watch(
  * и выбор списка сброшены, период можно менять.
  */
 function applyRouteQuery() {
+  // переход к заявке из проверки или описи (?request=id&number=номер): поиск по номеру, заявка выбрана
+  const request = Number(route.query.request)
+  if (request && typeof route.query.number === 'string') {
+    Object.assign(filter, requestFilter('all', { query: route.query.number }))
+    list.value = null
+    wagonFilter.value = null
+    selectedId.value = request
+    void router.replace({ name: 'requests' })
+    return
+  }
   const id = Number(route.query.wagon)
   const number = route.query.number
   if (!id || typeof number !== 'string') return
@@ -200,7 +210,7 @@ async function loadCounts() {
 }
 
 applyRouteQuery()
-watch(() => route.query.wagon, applyRouteQuery)
+watch(() => [route.query.wagon, route.query.request], applyRouteQuery)
 
 // фильтр или сортировка изменились — данные загружаются заново
 watch([filter, sort], load, { deep: true })
@@ -275,7 +285,7 @@ async function init() {
 
 async function loadDicts() {
   try {
-    await busy.run(dictManager.prepareDict('FaultType'))
+    await busy.run(dictManager.prepareDicts('FaultType', 'WagonType'))
   } catch (e) {
     loadError.value = shownError(e)
   }

@@ -1,6 +1,7 @@
 import type { WagonJournalRow, WagonPlace } from '@/api/wagons'
 import { JournalBasis } from '@/api/wagons'
 import { t } from '@/boot/i18n'
+import { textOf } from '@/shared/checks/texts'
 import { LocationType } from '@/shared/constants/systemDicts'
 import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import { placeText } from '@/shared/wagonPlace'
@@ -12,7 +13,7 @@ export function journalPlace(p: WagonPlace): string {
   return placeText(p.locationType, p.place)
 }
 
-/** Основание записи журнала словами: «Акт отцепки 5», «Отправление рейса …», «Ввод вагона». */
+/** Основание записи журнала словами: «Отцепка в рейсе …», «Отправление рейса …», «Ввод вагона». */
 export function basisText(row: WagonJournalRow): string {
   const trip = row.basisTrip ? tripRefDatedText(row.basisTrip) : ''
   switch (row.basisType) {
@@ -23,13 +24,23 @@ export function basisText(row: WagonJournalRow): string {
     case JournalBasis.TRANSFER:
       return t('Акт приёма-передачи {n}', { n: row.actNumber ?? '' })
     case JournalBasis.DETACH:
-      return t('Акт отцепки {n}', { n: row.actNumber ?? '' })
+      return t('Отцепка в рейсе {trip}', { trip })
     case JournalBasis.ATTACH:
-      return t('Акт прицепки {n}', { n: row.actNumber ?? '' })
+      return t('Прицепка в рейсе {trip}', { trip })
     case JournalBasis.DEPARTURE:
       return t('Отправление рейса {trip}', { trip })
     case JournalBasis.ARRIVAL:
       return t('Прибытие рейса {trip}', { trip })
+    case JournalBasis.CHECK:
+      return t('Проверка «{name}», нарушений: {n}', {
+        name: textOf(row.checkListTemplate),
+        n: row.violationCount ?? 0,
+      })
+    case JournalBasis.EQUIP:
+      return t('Опись «{name}», нарушений: {n}', {
+        name: textOf(row.equipListTemplate),
+        n: row.violationCount ?? 0,
+      })
     default:
       return ''
   }

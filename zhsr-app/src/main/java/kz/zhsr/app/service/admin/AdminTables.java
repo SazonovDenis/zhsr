@@ -32,6 +32,17 @@ public final class AdminTables {
      */
     public static final String DISABLED = "disabled";
 
+    /**
+     * Порядок показа: таблица с этим полем по умолчанию сортируется по нему, строки переставляются кнопками
+     * ({@link SortOrderService}).
+     */
+    public static final String SORT_ORDER = "sort_order";
+
+    /**
+     * «В избранном» у неисправности: поле формы, а не колонка fault_type, - запись в fault_type_favorite.
+     */
+    public static final String FAVORITE = "favorite";
+
     private static final Map<String, AdminTable> TABLES = new LinkedHashMap<>();
 
     /**
@@ -43,6 +54,7 @@ public final class AdminTables {
             "station", "name",
             "depot", "name_ru",
             "fault_group_type", "name",
+            "fault_type", "name",
             "wagon_type", "text",
             "model_type", "text",
             Severity.TABLE, "text",
@@ -59,7 +71,9 @@ public final class AdminTables {
             "wagon_type", "WagonType",
             "model_type", "WagonModel",
             "fault_group_type", "FaultGroup",
-            "fault_type", "FaultType"
+            "fault_type", "FaultType",
+            // избранное - часть справочника неисправностей фронта (FaultType.favoriteOrder)
+            "fault_type_favorite", "FaultType"
     );
 
     static {
@@ -83,7 +97,8 @@ public final class AdminTables {
                 col("km", "Расстояние, км", INT, true))));
         add(new AdminTable("wagon_type", "Типы вагонов", List.of(
                 text("code", "Код", true, 20),
-                text("text", "Название", true, 255))));
+                text("text", "Название", true, 255),
+                text("short_text", "Кратко", true, 20))));
         add(new AdminTable("model_type", "Модели вагонов", List.of(
                 text("code", "Код", true, 20),
                 text("text", "Название", true, 255),
@@ -101,8 +116,13 @@ public final class AdminTables {
                 ref("fault_group_type", "Группа", false, "fault_group_type"),
                 ref("severity_type", "Критичность по умолчанию", true, Severity.TABLE),
                 ref("service", "Служба-исполнитель", true, ServiceType.TABLE),
+                // в избранном - запись в fault_type_favorite (порядок - в таблице «Избранные неисправности»)
+                formOnly(FAVORITE, "В избранном", BOOL, true),
                 // отключённая запись в таблице показывается зачёркнутой: своей колонки нет, поле - только в форме
                 formOnly(DISABLED, "Отключена", BOOL, true))));
+        add(new AdminTable("fault_type_favorite", "Избранные неисправности", List.of(
+                ref("fault_type", "Неисправность", true, "fault_type"),
+                col(SORT_ORDER, "Порядок показа", INT, true))));
     }
 
     private AdminTables() {
@@ -134,6 +154,13 @@ public final class AdminTables {
      */
     public static String dictName(String table) {
         return DICT_NAME.get(table);
+    }
+
+    /**
+     * Поле формы, которого нет в таблице: его пишет и читает AdminService отдельно.
+     */
+    public static boolean isVirtual(String table, String column) {
+        return table.equals("fault_type") && column.equals(FAVORITE);
     }
 
     private static void add(AdminTable table) {

@@ -1,5 +1,9 @@
 <template>
-  <div class="cb-button">
+  <div
+    class="cb-button"
+    :class="{ 'cb-button--wrap': wrap, 'cb-button--touch': isMobile }"
+    :style="wrap && columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined"
+  >
     <span v-if="label" class="cb-button__label q-mr-xs">{{ t(label) }}</span>
 
     <!-- варианты грузятся или не загрузились — на месте кнопок -->
@@ -41,6 +45,7 @@
 
 <script setup lang="ts">
 import { t } from '@/boot/i18n'
+import { isMobile } from '@/shared/device'
 import type { ChoiceItem } from './choice'
 import { displayOf, isDisabled } from './choice'
 import CbMoreMenu from './CbMoreMenu.vue'
@@ -57,8 +62,11 @@ import { useButtonChoice } from './useButtonChoice'
  * Правила values, v-model и change — см. choice.ts. У значения можно задать count: число показывается рядом с
  * подписью, например сколько вагонов в этом состоянии. Клавиатура: ряд — одна остановка Tab, по кнопкам ходят
  * стрелками (см. onItemKeydown в useButtonChoice).
+ *
+ * На телефоне кнопки крупные — под палец. wrap — все значения кнопками без «...», кнопки и текст в них переносятся;
+ * columns (при wrap) — кнопки сеткой в столько колонок.
  */
-const props = withDefaults(defineProps<ButtonChoiceProps & { label?: string }>(), {
+const props = withDefaults(defineProps<ButtonChoiceProps & { label?: string; columns?: number }>(), {
   single: false,
   required: false,
   values: () => [] as ChoiceItem[],
@@ -67,6 +75,8 @@ const props = withDefaults(defineProps<ButtonChoiceProps & { label?: string }>()
   modelValue: null,
   source: null,
   label: '',
+  wrap: false,
+  columns: 0,
 })
 
 const emit = defineEmits<ButtonChoiceEmit>()
@@ -103,8 +113,11 @@ const { visibleValues, hiddenValues, isSelected, onButtonClick, onMenuPick, tabS
   white-space: nowrap;
   cursor: pointer;
 
-  &:hover:not(:disabled):not(.cb-button__btn--selected) {
-    background: $zs-bg-hover;
+  // подсветка наведения — только с мышью: на телефоне после касания кнопка оставалась бы серой
+  @media (hover: hover) {
+    &:hover:not(:disabled):not(.cb-button__btn--selected) {
+      background: $zs-bg-hover;
+    }
   }
 
   // цвета выбранного — общие классы bg-selected и text-selected (app.scss)
@@ -132,5 +145,43 @@ const { visibleValues, hiddenValues, isSelected, onButtonClick, onMenuPick, tabS
   width: 1.9rem;
   height: 1.9rem;
   border-radius: 0.9rem;
+}
+
+// все значения кнопками: ряд переносится, текст кнопки — по словам; columns — сеткой
+.cb-button--wrap {
+  display: flex;
+  flex-wrap: wrap;
+
+  &[style*='grid-template-columns'] {
+    display: grid;
+  }
+
+  .cb-button__btn {
+    height: auto;
+    min-height: 1.9rem;
+    white-space: normal;
+    text-align: left;
+  }
+
+  .cb-button__text {
+    overflow: visible;
+    overflow-wrap: anywhere;
+  }
+}
+
+// телефон: кнопки под палец, стандартный шрифт
+.cb-button--touch {
+  gap: 0.4rem;
+
+  .cb-button__btn {
+    min-height: 2.8rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 1.4rem;
+    font-size: inherit;
+  }
+
+  &.cb-button--wrap .cb-button__btn {
+    border-radius: 0.5rem;
+  }
 }
 </style>

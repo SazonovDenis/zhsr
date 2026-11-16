@@ -1,5 +1,6 @@
 package kz.zhsr.app.dto.trip;
 
+import kz.zhsr.app.dto.ref.TrainRef;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -18,11 +19,13 @@ public class TripOption {
     private String trainNumber;
     /** маршрут рейса (route) */
     private long route;
+    /** поезд рейса; null - поезд не назначен */
+    private TrainRef train;
     /** название маршрута */
     private String name;
     /** вид маршрута (константы RouteKind) */
     private int routeKind;
-    /** время в пути, мин (route.duration) */
+    /** время в пути, мин: по станциям маршрута */
     private int duration;
     /** состояние рейса (trip_status_type) */
     private long tripStatusType;

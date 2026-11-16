@@ -5,15 +5,17 @@
       <!-- действия рейса в пути и после прибытия: видны все; нет прав или не тот статус — неактивна, причина рядом -->
       <div v-if="crew && !planned && headerButtons.length > 0" class="desktop-frame__actions">
         <template v-for="b in headerButtons" :key="b.label">
-          <button
-            type="button"
-            :class="b.primary ? 'zs-btn-primary' : 'trip-form__btn q-py-none q-px-md'"
-            :disabled="!!b.reason || running"
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            :outline="!b.primary"
+            :class="{ 'zs-soft-border': !b.primary }"
+            :disable="!!b.reason || running"
             :title="b.reason || undefined"
+            :label="t(b.label)"
             @click="b.run"
-          >
-            {{ t(b.label) }}
-          </button>
+          />
         </template>
       </div>
     </template>
@@ -23,7 +25,34 @@
 
     <div v-if="crew && norm" class="trip-form q-pt-none q-px-none q-pb-md">
       <div class="trip-form__caption">
-        {{ t('Состав и бригада') }}
+        {{ t('Поезд и бригада') }}
+      </div>
+      <div class="trip-form__train">
+        <span>{{ t('Поезд') }}</span>
+        <span class="trip-form__staff-name" :class="{ 'trip-form__bad': !crew.trip.train }">
+          {{ crew.trip.train ? crew.trip.train.name : t('не назначен') }}
+        </span>
+        <button
+          v-if="crew.trip.train"
+          type="button"
+          class="trip-form__link q-pa-none"
+          @click="openTrain(crew.trip.train.id)"
+        >
+          {{ t('Состав поезда') }} →
+        </button>
+        <q-btn
+          v-else
+          unelevated
+          outline
+          no-caps
+          color="primary"
+          class="zs-soft-border"
+          :disable="!!editReason"
+          :title="editReason || undefined"
+          @click="chooseTrain"
+        >
+          {{ t('Выбрать поезд') }}
+        </q-btn>
       </div>
 
       <div class="trip-form__staff">
@@ -71,15 +100,18 @@
           </span>
           <span v-if="norm.pool.length === 0" class="trip-form__muted">{{ t('Все проводники распределены') }}</span>
         </div>
-        <button
-          type="button"
-          class="trip-form__btn q-py-none q-px-md"
-          :disabled="!!crewReason"
+        <q-btn
+          unelevated
+          outline
+          no-caps
+          color="primary"
+          class="zs-soft-border"
+          :disable="!!crewReason"
           :title="crewReason || undefined"
           @click="pickConductors"
         >
           {{ t('Проводники…') }}
-        </button>
+        </q-btn>
       </div>
 
       <div class="trip-form__table">
@@ -90,29 +122,52 @@
           <span>{{ t('Проводник') }}</span>
           <span />
         </div>
-        <div v-for="(w, i) in norm.wagons" :key="w.number" class="trip-form__row q-py-sm q-px-md">
-          <span>{{ w.pos }}</span>
+        <div
+          v-for="({ cw, w }, i) in wagonRows"
+          :key="cw.id"
+          class="trip-form__row q-py-sm q-px-md"
+          :class="{ 'trip-form__row--off': !cw.riding }"
+        >
+          <span>{{ i + 1 }}</span>
           <span>
-            <span class="zs-mono trip-form__number">{{ w.number }}</span>
-            <span class="trip-form__muted trip-form__block">{{ dictManager.getValue('WagonType', w.type) }}</span>
+            <span class="zs-mono trip-form__number">{{ cw.number }}</span>
+            <span class="trip-form__muted trip-form__block">{{ dictManager.getValue('WagonType', cw.wagonType) }}</span>
           </span>
-          <span :class="{ 'trip-form__warn': isAway(i) }">
-            {{ where(i) }}
-            <span v-if="isAway(i)" class="trip-form__block">{{ t('не на станции отправления') }}</span>
-            <template v-if="isAway(i)">
+          <span :class="{ 'trip-form__warn': isAway(cw) }">
+            {{ where(cw) }}
+            <span v-if="isAway(cw)" class="trip-form__block">{{ t('не на станции отправления') }}</span>
+            <template v-if="isAway(cw)">
               <button
                 type="button"
                 class="trip-form__link q-pa-none"
-                :disabled="!!returnReason(i)"
-                :title="returnReason(i) || undefined"
-                @click="returnWagon(i)"
+                :disabled="!!returnReason(cw)"
+                :title="returnReason(cw) || undefined"
+                @click="returnWagon(cw)"
               >
                 {{ t('Оформить передачу') }} →
               </button>
             </template>
+            <span class="trip-form__changes">
+              <ChangeNote v-if="cw.attachPlan" :change="cw.attachPlan" @mark="markPlan" @cancel="cancelPlan" />
+              <ChangeNote
+                v-else-if="cw.attached && cw.attached.trip?.id === tripId"
+                :change="cw.attached"
+                undoable
+                @undo="undo"
+              />
+              <ChangeNote v-if="cw.detachPlan" :change="cw.detachPlan" @mark="markPlan" @cancel="cancelPlan" />
+              <ChangeNote
+                v-else-if="cw.detached && cw.detached.trip?.id === tripId"
+                :change="cw.detached"
+                undoable
+                @undo="undo"
+              />
+            </span>
           </span>
           <span>
-            <template v-if="canAssign && w.passenger">
+            <!-- проводники — у вагонов, которые едут в поезде -->
+            <template v-if="!w" />
+            <template v-else-if="canAssign && w.passenger">
               <span class="trip-form__slots">
                 <CbList
                   v-for="slot in [0, 1]"
@@ -137,7 +192,7 @@
             <button
               type="button"
               class="trip-form__move q-pa-none"
-              :disabled="!canEdit || i === 0"
+              :disabled="!!editReason || i === 0"
               :title="editReason || t('Выше')"
               @click="moveWagon(i, -1)"
             >
@@ -146,64 +201,62 @@
             <button
               type="button"
               class="trip-form__move q-pa-none"
-              :disabled="!canEdit || i === norm.wagons.length - 1"
+              :disabled="!!editReason || i === crew.wagons.length - 1"
               :title="editReason || t('Ниже')"
               @click="moveWagon(i, 1)"
             >
               ↓
             </button>
-            <button
-              type="button"
-              class="trip-form__move q-pa-none"
-              :disabled="!canEdit"
-              :title="editReason || t('Убрать из состава')"
-              @click="removeWagon(i)"
+            <q-btn
+              unelevated
+              outline
+              no-caps
+              color="primary"
+              class="zs-soft-border"
+              :disable="!!detachReason(cw)"
+              :title="detachReason(cw) || undefined"
+              @click="detachWagon(cw)"
             >
-              ✕
-            </button>
-            <button
-              type="button"
-              class="trip-form__btn q-py-none q-px-md"
-              :disabled="!canEdit"
-              :title="editReason || t('Добавить вагоны после этого')"
-              @click="addWagons(i + 1)"
-            >
-              {{ t('+ Вагон') }}
-            </button>
+              {{ t('Отцепить') }}
+            </q-btn>
           </span>
         </div>
-        <div v-if="norm.wagons.length === 0" class="trip-form__empty q-pa-md">
-          {{ t('Состав не сформирован') }}
-          <button
-            type="button"
-            class="trip-form__btn q-py-none q-px-md"
-            :disabled="!canEdit"
-            :title="editReason"
-            @click="addWagons(0)"
-          >
-            {{ t('+ Вагон') }}
-          </button>
+        <div v-if="crew.wagons.length === 0" class="trip-form__empty q-pa-md">
+          {{ crew.trip.train ? t('В поезде нет вагонов') : t('Поезд не назначен') }}
         </div>
+      </div>
+      <div class="trip-form__add">
+        <q-btn
+          unelevated
+          outline
+          no-caps
+          color="primary"
+          class="zs-soft-border"
+          :disable="!!attachReason"
+          :title="attachReason || undefined"
+          @click="addWagons"
+        >
+          {{ t('Добавить вагоны') }}
+        </q-btn>
       </div>
       <div class="trip-form__muted">
         {{
           planned
             ? t(
-                'Состав и бригада меняются, пока рейс в статусе «План». Формирование состава не меняет расположение вагонов.',
+                'Вагоны прицепляются к поезду фактом или планом; на остановках рейса — только планом. Формирование поезда не меняет расположение вагонов.',
               )
-            : t('После отправления состав меняется только актами отцепки и прицепки.')
+            : t('После отправления поезд меняется прицепкой и отцепкой в рейсе.')
         }}
       </div>
     </div>
 
-    <div v-if="crew && crew.acts.length > 0" class="trip-form">
-      <div class="trip-form__caption">{{ t('Акты по рейсу') }}</div>
+    <div v-if="crew && crew.changes.length > 0" class="trip-form">
+      <div class="trip-form__caption">{{ t('Прицепки и отцепки рейса') }}</div>
       <div class="trip-form__table">
-        <div v-for="a in crew.acts" :key="a.number" class="trip-form__act q-py-sm q-px-md">
-          <span class="zs-mono">{{ a.number }}</span>
-          <span>{{ actTitle(a) }}</span>
-          <span class="zs-mono">{{ a.wagons.join(', ') }}</span>
-          <span class="trip-form__muted">{{ formatDateTime(a.actDt) }}</span>
+        <div v-for="c in crew.changes" :key="c.id" class="trip-form__act q-py-sm q-px-md">
+          <span class="zs-mono">{{ c.number }}</span>
+          <ChangeNote :change="c" undoable @mark="markPlan" @cancel="cancelPlan" @undo="undo" />
+          <span class="trip-form__muted">{{ c.comment }}</span>
         </div>
       </div>
     </div>
@@ -217,6 +270,8 @@
       >
         <template v-if="crew && norm">
           <SidePanelFields>
+            <span>{{ t('Поезд') }}</span>
+            <span>{{ crew.trip.train?.name ?? t('не назначен') }}</span>
             <span>{{ t('Вид маршрута') }}</span>
             <span>{{ dictManager.getValue('TransportType', crew.trip.transportType) }}</span>
             <span>{{ t('Время в пути') }}</span>
@@ -229,6 +284,22 @@
             />
             <span>{{ t('Состояние') }}</span>
             <span><DictBadge :id="crew.trip.tripStatusType" dict="TripState" /></span>
+            <!-- после прибытия ЛНП назначает ответственного за вагоны поезда — как исполнителя заявки; до назначения
+                 отвечают проводники -->
+            <template v-if="crew.trip.tripStatusType === TripStatus.DONE">
+              <span>{{ t('Ответственный за вагоны') }}</span>
+              <span>
+                {{ responsibleText(crew.trip) }}
+                <SoftLink
+                  v-if="canMark"
+                  :text="crew.trip.responsibleAssigned ? 'Переназначить' : 'Назначить'"
+                  :disabled="running"
+                  class="q-ml-sm"
+                  @click="assignResponsible"
+                />
+                <span v-else class="trip-form__muted trip-form__block">{{ t(MARK_REASON) }}</span>
+              </span>
+            </template>
           </SidePanelFields>
 
           <template v-if="planned">
@@ -243,15 +314,15 @@
               </span>
             </div>
             <div v-if="ready" class="trip-form__verdict">{{ t('Поезд готов к отправлению') }}</div>
-            <button
-              type="button"
-              class="zs-btn-primary"
-              :disabled="!canMark || !ready || running"
+            <q-btn
+              unelevated
+              no-caps
+              color="primary"
+              :disable="!canMark || !ready || running"
               :title="canMark ? undefined : t(MARK_REASON)"
+              :label="t('Отметить отправление')"
               @click="mark(true)"
-            >
-              {{ t('Отметить отправление') }}
-            </button>
+            />
           </template>
         </template>
       </SidePanel>
@@ -264,24 +335,31 @@ import { Notify } from 'quasar'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import type { CouplingAct, CrewMember, StaffCandidate, TripCrew } from '@/api/trips'
+import type { TrainCard, TrainChange } from '@/api/trains'
+import { attachWagons, cancelChangePlan, detachWagons, orderTrain } from '@/api/trains'
+import type { CrewMember, CrewWagon, StaffCandidate, TripCrew, TripRow } from '@/api/trips'
 import {
+  assignTripResponsible,
+  cancelArrival,
+  cancelDeparture,
   fetchStaffCandidates,
   fetchTripCrew,
   setConductorWagons,
   setTripConductors,
   setTripDuty,
-  setTripWagons,
 } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import { formatHm } from '@/desktop/routes/duration'
 import { provideBusy } from '@/shared/busy'
 import CbList from '@/shared/components/choice/CbList.vue'
 import { openDialog } from '@/shared/components/dialog/openDialog'
+import SoftLink from '@/shared/components/form/SoftLink.vue'
+import ResponsibleAssignDialog from '../wagons/ResponsibleAssignDialog.vue'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
-import { CouplingType, CrewDuty, LocationType, RoleType, TripStatus } from '@/shared/constants/systemDicts'
+import { CrewDuty, LocationType, RoleType, TripStatus } from '@/shared/constants/systemDicts'
+import { TrainWagonChangeType } from '@/shared/constants/TrainWagonChange'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -295,18 +373,27 @@ import DesktopFrame from '../frame/DesktopFrame.vue'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import CrewPickDialog from './CrewPickDialog.vue'
+import type { AttachChoice, ChangeChoice } from '../trains/attach'
+import { changeBody, tripStops } from '../trains/attach'
+import AttachWagonsDialog from '../trains/AttachWagonsDialog.vue'
+import ChangeNote from '../trains/ChangeNote.vue'
+import ChangeUndoDialog from '../trains/ChangeUndoDialog.vue'
+import DetachDialog from '../trains/DetachDialog.vue'
+import MarkChangeDialog from '../trains/MarkChangeDialog.vue'
 import TripMarkDialog from './TripMarkDialog.vue'
-import TripWagonsDialog from './TripWagonsDialog.vue'
+import TripNewDialog from './TripNewDialog.vue'
 import { tripRefText } from '@/shared/trips/tripRefText'
 import TripTimes from './TripTimes.vue'
 import { markEditable, useNow } from '@/shared/trips/tripTimes'
 
 /**
- * Формирование рейса (Ф-РЕЙ-02, Ф-РЕЙ-06): слева состав и бригада, справа закреплённая панель рейса с готовностью и
- * отметкой отправления. В рейсе в статусе «План» состав, начальника поезда и ПЭМ меняют планировщик вагонов и
- * администратор, список проводников — планировщик проводников и администратор; проводников по вагонам распределяют
- * планировщик проводников и начальник поезда этого рейса. Начальник поезда и администратор отмечают отправление и
- * прибытие. Остальные видят экран без правки. Проверки — на сервере; здесь только доступность кнопок.
+ * Формирование рейса (Ф-РЕЙ-02, Ф-РЕЙ-06): слева поезд рейса и бригада, справа закреплённая панель рейса с готовностью
+ * и отметкой отправления. Вагоны поезда на время рейса — по факту и по плану: прицепленные и отцепляемые на остановках
+ * рейса показаны с пометкой, в норму проводников идут вагоны, которые едут на отправлении. В рейсе в статусе «План»
+ * вагоны поезда, начальника поезда и ПЭМ меняют планировщик вагонов и администратор, список проводников — планировщик
+ * проводников и администратор; проводников по вагонам распределяют планировщик проводников и начальник поезда этого
+ * рейса. Начальник поезда отмечает плановые прицепки и отцепки, отправление и прибытие. Остальные видят экран без
+ * правки. Проверки — на сервере; здесь только доступность кнопок.
  */
 const props = defineProps<{ id: string }>()
 
@@ -331,12 +418,21 @@ const canEdit = computed(() => planned.value && (isAdmin.value || hasRole(curren
 const canEditCrew = computed(
   () => planned.value && (isAdmin.value || hasRole(currentUser.value, RoleType.CREW_PLANNER)),
 )
-/** Почему состав, ЛНП и ПЭМ не поменять: нет прав или рейс не в статусе «План»; пусто — можно. */
+/** Почему вагоны поезда, ЛНП и ПЭМ не поменять: нет прав, рейс не в статусе «План» или поезд не назначен. */
 const editReason = computed(() =>
   why(
     isAdmin.value || hasRole(currentUser.value, RoleType.WAGON_PLANNER),
     PLANNER_REASON,
-    statusReason(TripStatus.PLANNED),
+    statusReason(TripStatus.PLANNED) || (crew.value?.trip.train ? '' : t('Поезд рейса не назначен')),
+  ),
+)
+/** Почему вагоны не добавить: до отправления — как editReason; в пути — только план планировщика. */
+const attachReason = computed(() =>
+  why(
+    isAdmin.value || hasRole(currentUser.value, RoleType.WAGON_PLANNER),
+    PLANNER_REASON,
+    statusReason(TripStatus.PLANNED, TripStatus.IN_PROGRESS) ||
+      (crew.value?.trip.train ? '' : t('Поезд рейса не назначен')),
   ),
 )
 /** Почему список проводников рейса не поменять: нет прав или рейс не в статусе «План»; пусто — можно. */
@@ -372,10 +468,11 @@ function statusReason(...allowed: number[]): string {
   return t('Недоступно в статусе «{status}»', { status: dictManager.getValue('TripState', s) })
 }
 const FIX_REASON = 'Исправить можно в течение 10 минут после отметки'
+const CANCEL_REASON = 'Отменить можно в течение 10 минут после отметки'
 const MARK_REASON = 'Отмечает ЛНП этого рейса'
-const PLANNER_REASON = 'Состав, ЛНП и ПЭМ меняет планировщик вагонов'
+const PLANNER_REASON = 'Вагоны поезда, ЛНП и ПЭМ меняет планировщик вагонов'
 const CREW_PLANNER_REASON = 'Проводников рейса назначает планировщик проводников'
-const COUPLE_REASON = 'Акт составляет ЛНП этого рейса или мастер депо'
+const COUPLE_REASON = 'Прицепку и отцепку в рейсе оформляет ЛНП этого рейса или мастер депо'
 const TRANSFER_REASON = 'Передачу оформляет мастер депо или приёмщик'
 
 /** Почему кнопка недоступна: сначала нет прав (rights — права есть, reason — текст), затем status; пусто — доступна. */
@@ -396,6 +493,16 @@ const headerButtons = computed(() => [
     run: () => couple('attach'),
   },
   {
+    label: 'Отметить прицепку',
+    primary: false,
+    reason: why(
+      canMark.value,
+      MARK_REASON,
+      statusReason(TripStatus.IN_PROGRESS) || (plannedChanges.value.length ? '' : t('Плановых прицепок и отцепок нет')),
+    ),
+    run: () => void markNext(),
+  },
+  {
     label: 'Отметить прибытие',
     primary: true,
     reason: why(canMark.value, MARK_REASON, statusReason(TripStatus.IN_PROGRESS)),
@@ -412,10 +519,30 @@ const headerButtons = computed(() => [
     run: () => mark(true, true),
   },
   {
+    label: 'Отменить отправление',
+    primary: false,
+    reason: why(
+      canMark.value,
+      MARK_REASON,
+      statusReason(TripStatus.IN_PROGRESS) || (fixDeparture.value ? '' : t(CANCEL_REASON)),
+    ),
+    run: () => void cancelMark(true),
+  },
+  {
     label: 'Исправить прибытие',
     primary: true,
     reason: why(canMark.value, MARK_REASON, statusReason(TripStatus.DONE) || (fixArrival.value ? '' : t(FIX_REASON))),
     run: () => mark(false, true),
+  },
+  {
+    label: 'Отменить прибытие',
+    primary: false,
+    reason: why(
+      canMark.value,
+      MARK_REASON,
+      statusReason(TripStatus.DONE) || (fixArrival.value ? '' : t(CANCEL_REASON)),
+    ),
+    run: () => void cancelMark(false),
   },
 ])
 const canAssign = computed(
@@ -503,6 +630,24 @@ async function apply(work: () => Promise<TripCrew>) {
 
 const setDuty = (duty: number, user: number | null) => apply(() => setTripDuty(tripId.value, duty, user))
 
+/** Ответственный за вагоны прибывшего рейса словами: сотрудник, «не назначен» или «проводники вагонов». */
+function responsibleText(trip: TripCrew['trip']): string {
+  if (!trip.responsibleAssigned) return t('проводники вагонов')
+  return trip.responsibleUsr ? userName(trip.responsibleUsr) : t('не назначен')
+}
+
+// ответственный за вагоны прибывшего рейса — во всплывающем окне, как исполнитель заявки
+async function assignResponsible() {
+  const trip = crew.value!.trip
+  const result = await openDialog<{ usr: number | null }>(ResponsibleAssignDialog, {
+    station: null,
+    trip: trip.id,
+    current: trip.responsibleUsr,
+    reassign: trip.responsibleAssigned,
+  })
+  if (result) await apply(() => assignTripResponsible(tripId.value, result.usr))
+}
+
 const conductors = () => crew.value!.crew.filter((m) => m.crewDutyType === CrewDuty.CONDUCTOR).map((m) => m.usr.id)
 
 function removeConductor(m: CrewMember) {
@@ -547,51 +692,115 @@ function onSlot(w: WagonNorm, slot: number, user: number | null) {
   })
 }
 
-const numbers = () => crew.value!.wagons.map((w) => w.number)
+// --- поезд рейса: операции с поездом возвращают поезд, рейс перечитывается ---
+
+async function trainApply(work: () => Promise<TrainCard>) {
+  error.value = null
+  running.value = true
+  try {
+    await work()
+    crew.value = await fetchTripCrew(tripId.value)
+  } catch (e) {
+    error.value = shownError(e)
+  } finally {
+    running.value = false
+  }
+}
+
+const trainId = () => crew.value!.trip.train!.id
 
 function moveWagon(i: number, step: number) {
-  const list = numbers()
+  const list = crew.value!.wagons.map((w) => w.number)
   const [wagon] = list.splice(i, 1)
   list.splice(i + step, 0, wagon!)
-  void apply(() => setTripWagons(tripId.value, list))
+  void trainApply(() => orderTrain(trainId(), list))
 }
 
-function removeWagon(i: number) {
-  const list = numbers()
-  list.splice(i, 1)
-  void apply(() => setTripWagons(tripId.value, list))
+/** Почему вагон не отцепить: нет прав, рейс закончен, вагон уже отцеплен или отцепка запланирована. */
+function detachReason(w: CrewWagon): string {
+  return attachReason.value || (w.dend ? t('Вагон отцеплен') : w.detachPlan ? t('Отцепка уже запланирована') : '')
 }
 
-async function addWagons(pos: number) {
+async function detachWagon(w: CrewWagon) {
   const trip = crew.value!.trip
-  const added = await openDialog<string[]>(TripWagonsDialog, {
-    tripId: tripId.value,
-    departureStation: trip.departureStation,
-    plannedDt: trip.plannedDt,
+  // до отправления вагон отцепляется фактом на своей станции; в пути — только планом на остановке
+  const choice = await openDialog<ChangeChoice>(DetachDialog, {
+    number: w.number,
+    stops: planned.value ? tripStops(trip) : tripStops(trip).slice(1),
+    factAllowed: planned.value && !!w.dbeg,
   })
-  if (!added) return
-  const list = numbers()
-  list.splice(pos, 0, ...added)
-  void apply(() => setTripWagons(tripId.value, list))
+  if (!choice) return
+  await trainApply(() => detachWagons(trainId(), changeBody([w.number], choice, trip.id)))
+}
+
+async function addWagons() {
+  const trip = crew.value!.trip
+  const stops = tripStops(trip)
+  const choice = await openDialog<AttachChoice>(AttachWagonsDialog, {
+    trainId: trainId(),
+    station: trip.departureStation,
+    at: trip.plannedDt,
+    stops: planned.value ? stops : stops.slice(1),
+    factStop: planned.value ? (stops[0] ?? null) : null,
+    factAllowed: planned.value,
+  })
+  if (!choice) return
+  await trainApply(() => attachWagons(trainId(), changeBody(choice.numbers, choice, trip.id)))
+}
+
+async function chooseTrain() {
+  const trip = crew.value!.trip
+  const saved = await openDialog<TripRow>(TripNewDialog, {
+    trip: { id: trip.id, route: trip.route, plannedDt: trip.plannedDt, train: null },
+  })
+  if (saved) await load()
+}
+
+const openTrain = (id: number) => void router.push({ name: 'train-form', params: { id } })
+
+// --- плановые прицепки и отцепки рейса ---
+
+const plannedChanges = computed(() => (crew.value?.changes ?? []).filter((c) => c.factDt === null))
+
+async function markPlan(change: TrainChange) {
+  const done = await openDialog<TrainCard>(MarkChangeDialog, { change, inProgress: inProgress.value })
+  if (done) await load()
+}
+
+/** «Отметить прицепку» в шапке: ближайшая по времени плановая прицепка или отцепка рейса. */
+async function markNext() {
+  const next = plannedChanges.value[0]
+  if (next) await markPlan(next)
+}
+
+function cancelPlan(change: TrainChange) {
+  void trainApply(() => cancelChangePlan(change.id))
+}
+
+async function undo(change: TrainChange) {
+  const done = await openDialog<true>(ChangeUndoDialog, {
+    changeId: change.id,
+    attach: change.changeType === TrainWagonChangeType.ATTACH,
+    number: change.number,
+  })
+  if (done) await load()
 }
 
 // --- показ ---
 
 const couple = (kind: string) => void router.push({ name: 'trip-coupling', params: { id: props.id, kind } })
 
-const actTitle = (a: CouplingAct) =>
-  t(a.couplingType === CouplingType.DETACH ? 'Отцепка на {station}' : 'Прицепка на {station}', {
-    station: dictManager.getValue('Station', a.station),
-  })
+/** Строки таблицы: вагон поезда и его норма проводников — норма есть только у вагонов, которые едут в поезде. */
+const wagonRows = computed(() =>
+  (crew.value?.wagons ?? []).map((cw) => ({
+    cw,
+    w: norm.value?.wagons.find((n) => n.number === cw.number) ?? null,
+  })),
+)
 
-// строки таблицы — вагоны, которые едут в составе
-const liveWagon = (i: number) => crew.value!.wagons.filter((w) => !w.detached)[i]!
-
-const atStation = (i: number) => {
-  const w = liveWagon(i)
-  return w.locationType === LocationType.STATION && w.place === crew.value!.trip.departureStation
-}
-const isAway = (i: number) => planned.value && !atStation(i)
+const atStation = (w: CrewWagon) =>
+  w.locationType === LocationType.STATION && w.place === crew.value!.trip.departureStation
+const isAway = (w: CrewWagon) => planned.value && w.riding && !atStation(w)
 
 // передачу на станцию оформляют мастер депо, приёмщик и администратор
 const canTransfer = computed(() =>
@@ -602,15 +811,13 @@ const canTransfer = computed(() =>
  * Почему передачу вагона не оформить: нет прав; передать на станцию можно только из депо или парка отстоя; пусто —
  * можно.
  */
-function returnReason(i: number): string {
+function returnReason(w: CrewWagon): string {
   if (!canTransfer.value) return t(TRANSFER_REASON)
-  const w = liveWagon(i)
   if (w.locationType === LocationType.DEPOT || w.locationType === LocationType.YARD) return ''
   return t('Передать на станцию можно только из депо или парка отстоя')
 }
 
-function returnWagon(i: number) {
-  const w = liveWagon(i)
+function returnWagon(w: CrewWagon) {
   void router.push({
     name: 'transfer',
     query: {
@@ -621,9 +828,8 @@ function returnWagon(i: number) {
   })
 }
 
-function where(i: number): string {
-  const w = liveWagon(i)
-  if (w.locationType === LocationType.TRIP && w.place === crew.value!.trip.id) return t('В составе')
+function where(w: CrewWagon): string {
+  if (w.locationType === LocationType.TRIP && w.place === crew.value!.trip.id) return t('В поезде рейса')
   return placeText(w.locationType, w.place, w.trip ? tripRefText(w.trip) : null)
 }
 
@@ -633,24 +839,32 @@ function conductorsText(w: WagonNorm): string {
   return w.conductors.map(label).join(', ')
 }
 
-const wagonsReady = computed(() => {
-  const all = crew.value?.wagons ?? []
-  return all.length > 0 && all.every((_, i) => atStation(i))
-})
+const riding = computed(() => (crew.value?.wagons ?? []).filter((w) => w.riding))
+const wagonsReady = computed(() => riding.value.length > 0 && riding.value.every(atStation))
 
 const readiness = computed(() => {
   const n = norm.value!
-  const all = crew.value!.wagons
+  const all = riding.value
+  const pending = crew.value!.pending
   const station = dictManager.getValue('Station', crew.value!.trip.departureStation)
   const chief = crew.value!.crew.find((m) => m.crewDutyType === CrewDuty.LNP)
   const pem = crew.value!.crew.find((m) => m.crewDutyType === CrewDuty.PEM)
   return [
     {
+      ok: !!crew.value!.trip.train && pending.length === 0,
+      title: t('Поезд назначен, планы до отправления отмечены'),
+      detail: !crew.value!.trip.train
+        ? t('поезд не назначен')
+        : pending.length
+          ? t('не отмечены: {list}', { list: pending.map((c) => c.number).join(', ') })
+          : crew.value!.trip.train.name,
+    },
+    {
       ok: wagonsReady.value,
       title: t('Вагоны на станции отправления'),
       detail: all.length
-        ? t('{a} из {b} на {station}', { a: all.filter((_, i) => atStation(i)).length, b: all.length, station })
-        : t('состав не сформирован'),
+        ? t('{a} из {b} на {station}', { a: all.filter(atStation).length, b: all.length, station })
+        : t('в поезде нет вагонов'),
     },
     {
       ok: n.chiefAndPem,
@@ -667,6 +881,18 @@ const readiness = computed(() => {
   ]
 })
 const ready = computed(() => readiness.value.every((c) => c.ok))
+
+// отменить отметку — кнопкой в шапке, без окна, как на телефоне: 10 минут после отметки; ошибка — над таблицей
+async function cancelMark(depart: boolean) {
+  await apply(() => (depart ? cancelDeparture : cancelArrival)(tripId.value))
+  if (error.value) return
+  Notify.create({
+    message: depart ? t('Отправление отменено') : t('Прибытие отменено'),
+    type: 'positive',
+    position: 'bottom',
+  })
+  void loadCurrentUser(true)
+}
 
 // отметить; fix — исправить время уже сделанной отметки или отменить её
 async function mark(depart: boolean, fix = false) {
@@ -693,10 +919,8 @@ async function mark(depart: boolean, fix = false) {
 
 .trip-form__caption {
   color: $zs-text-muted;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .trip-form__staff {
@@ -757,24 +981,6 @@ async function mark(depart: boolean, fix = false) {
   cursor: pointer;
 }
 
-.trip-form__btn {
-  flex: none;
-  height: var(--zs-control-height);
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.3rem;
-  background: #fff;
-  color: $primary;
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-
-  &:hover {
-    background: $zs-bg-hover;
-  }
-}
-
 .trip-form__table {
   border: 0.0625rem solid $zs-border;
   border-radius: 0.3rem;
@@ -796,6 +1002,30 @@ async function mark(depart: boolean, fix = false) {
     font-size: 0.8rem;
     font-weight: 600;
   }
+
+  // вагон не едет в поезде: отцеплен или прицепляется в пути
+  &--off {
+    color: $zs-text-muted;
+  }
+}
+
+.trip-form__train {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: $zs-text-muted;
+  font-size: 0.8rem;
+}
+
+.trip-form__changes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.trip-form__add {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .trip-form__number {
@@ -882,7 +1112,7 @@ async function mark(depart: boolean, fix = false) {
 
 .trip-form__act {
   display: grid;
-  grid-template-columns: 6rem minmax(10rem, 1fr) minmax(10rem, 1fr) 8rem;
+  grid-template-columns: 6rem minmax(16rem, 2fr) minmax(10rem, 1fr);
   gap: 0.8rem;
   border-top: 0.0625rem solid $zs-border-row;
   font-size: 0.8rem;

@@ -198,6 +198,8 @@ import { isLandscape, SCALE0_MAX_PX, screenScale, screenScaleMin } from '@/share
  *   кнопка, которой он отвечает. Если период не из коротких, третья кнопка короткого ряда показывает его подписью.
  * - Пустая дата — это пусто (null), а не сегодня.
  * - presets — свои готовые периоды вместо встроенных, в днях от сегодня (PeriodPreset).
+ * - periods — какие из встроенных периодов вынести кнопками в короткий ряд, по кодам и в заданном порядке; в «...» —
+ *   все встроенные периоды и календари. Не задано — в ряду первые три.
  * - Выбор в коротком ряду применяется сразу. В окне «...» период применяется кнопкой «Ок» (или сразу при
  *   applyImmediately).
  * - Раскладка окна зависит от экрана: обычная (готовые периоды и календари рядом), компактная (одна панель с
@@ -250,6 +252,11 @@ const props = withDefaults(
     label?: string
     /** свои готовые периоды вместо встроенных, от мелких к широким; могут меняться на ходу */
     presets?: PeriodPreset[] | null
+    /**
+     * какие из встроенных периодов вынести кнопками в короткий ряд и в каком порядке — коды d1, d3, d7, m1, mStart,
+     * m3, m6, y, yStart; в «...» — по-прежнему все встроенные; null — в ряду первые три
+     */
+    periods?: PeriodCode[] | null
   }>(),
   {
     periodCheck: null,
@@ -264,6 +271,7 @@ const props = withDefaults(
     clearable: false,
     label: '',
     presets: null,
+    periods: null,
   },
 )
 
@@ -406,11 +414,14 @@ const BUILT_IN_PERIODS = computed<{ label: string; value: PeriodCode }[]>(() => 
   { label: t('С начала года'), value: 'yStart' },
 ])
 
-// Короткий ряд — первые три периода; выбранный период не из них показывается подписью на месте третьей кнопки
+// Короткий ряд — переданные periods в их порядке, иначе первые три периода; выбранный период не из них показывается
+// подписью на месте последней кнопки
 const periodOptionsShort = computed(() => {
-  const options = periodOptions.value.slice(0, 3)
+  const options = props.periods
+    ? props.periods.flatMap((code) => periodOptions.value.filter((p) => p.value === code))
+    : periodOptions.value.slice(0, 3)
   if (periodShort.value && !options.some((p) => p.value === periodShort.value)) {
-    options[2] = { label: dateRangeStr.value ?? '', value: periodShort.value }
+    options[options.length - 1] = { label: dateRangeStr.value ?? '', value: periodShort.value }
   }
   return options
 })

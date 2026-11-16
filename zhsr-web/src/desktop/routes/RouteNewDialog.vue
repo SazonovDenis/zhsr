@@ -19,13 +19,7 @@
 
     <FormSection>
       <FormField label="Вид маршрута">
-        <CbSegment
-          v-model="draft.routeKind"
-          class="route-new__kind"
-          single
-          required
-          :values="dictChoices('RouteKind')"
-        />
+        <CbSegment v-model="draft.routeKind" single required :values="dictChoices('RouteKind')" />
       </FormField>
     </FormSection>
 
@@ -95,9 +89,3 @@ async function save() {
   }
 }
 </script>
-
-<style scoped lang="scss">
-.route-new__kind {
-  align-self: flex-start;
-}
-</style>

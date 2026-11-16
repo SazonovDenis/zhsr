@@ -1,35 +1,10 @@
 <template>
   <div class="pwa">
     <header class="pwa__header q-py-xs q-px-sm">
-      <button type="button" class="pwa__burger q-pa-none" :title="t('Меню')">
-        <q-icon name="menu" size="1.5rem" />
-        <q-menu anchor="bottom left" self="top left" :offset="[0, 6]">
-          <q-list class="pwa__menu">
-            <q-item
-              v-for="option in LOCALES"
-              :key="option.value"
-              v-close-popup
-              clickable
-              :active="option.value === locale"
-              active-class="pwa__menu-active"
-              @click="setLocale(option.value)"
-            >
-              <q-item-section side class="pwa__menu-side pwa__menu-code q-pr-none">{{ option.short }}</q-item-section>
-              <q-item-section>{{ option.label }}</q-item-section>
-            </q-item>
-            <q-separator />
-            <q-item v-close-popup clickable @click="openDialog(ChangePasswordDialog)">
-              <q-item-section side class="pwa__menu-side q-pr-none"><q-icon name="lock" /></q-item-section>
-              <q-item-section>{{ t('Сменить пароль') }}</q-item-section>
-            </q-item>
-            <q-separator />
-            <q-item v-close-popup clickable @click="onLogout">
-              <q-item-section side class="pwa__menu-side q-pr-none"><q-icon name="logout" /></q-item-section>
-              <q-item-section>{{ t('Выход') }}</q-item-section>
-            </q-item>
-          </q-list>
-        </q-menu>
-      </button>
+      <!-- логотип для тёмной темы (эталон shared/icons/logo-dark.svg); меню у него нет: язык, пароль и выход — в профиле -->
+      <span class="pwa__logo">
+        <SvgIcon name="logo-dark" size="1.6rem" />
+      </span>
       <span class="pwa__brand">{{ t(route.meta.title ?? 'Жолсерік') }}</span>
       <span class="pwa__net" :class="{ 'pwa__net--off': !isOnline }">
         <span class="pwa__net-dot" />
@@ -46,12 +21,23 @@
     <BottomSheet v-model:show="unsentOpen" :title="t('Есть неотправленные записи')">
       <div>{{ t('Выйти нельзя, пока на телефоне есть неотправленные записи.') }}</div>
       <template #buttons>
-        <button type="button" class="pwa__sheet-btn q-py-xs q-px-md" @click="unsentOpen = false">
-          {{ t('Закрыть') }}
-        </button>
-        <button type="button" class="pwa__sheet-btn pwa__sheet-btn--primary q-py-xs q-px-md" @click="viewUnsent">
-          {{ t('Просмотреть неотправленные') }}
-        </button>
+        <q-btn
+          unelevated
+          outline
+          no-caps
+          color="ink"
+          class="pwa__sheet-btn zs-pwa-btn zs-soft-border"
+          :label="t('Закрыть')"
+          @click="unsentOpen = false"
+        />
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          class="pwa__sheet-btn zs-pwa-btn"
+          :label="t('Просмотреть неотправленные')"
+          @click="viewUnsent"
+        />
       </template>
     </BottomSheet>
   </div>
@@ -61,13 +47,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import ChangePasswordDialog from '@/auth/ChangePasswordDialog.vue'
-import { i18n, t } from '@/boot/i18n'
+import { t } from '@/boot/i18n'
+import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { bus } from '@/shared/bus'
-import { openDialog } from '@/shared/components/dialog/openDialog'
 import { notifyError } from '@/shared/errors'
 import { dictManager } from '@/shared/dict/DictManager'
-import { LOCALES, setLocale } from '@/shared/locale'
 import { isOnline } from '@/shared/network'
 import { outbox, serverFailed, startOutbox } from '@/shared/offline/outbox'
 import { REQUEST_DICTS } from '@/shared/requests/requestView'
@@ -90,8 +74,6 @@ import PwaTabs from './components/PwaTabs.vue'
 const route = useRoute()
 const router = useRouter()
 
-const locale = computed(() => i18n.global.locale.value)
-
 // общий статус в шапке: связь и очередь; сбой связи или сервера показывается здесь, а не у записей
 const netText = computed(() => {
   const n = outbox.value.length
@@ -100,7 +82,7 @@ const netText = computed(() => {
   return serverFailed.value ? t('Сервер недоступен, не отправлено: {n}', { n }) : t('В сети, не отправлено: {n}', { n })
 })
 
-// пункт «Выход» доступен всегда: есть неотправленные записи — он покажет их; нет связи — logoutUser скажет об этом
+// «Выход» в профиле доступен всегда: есть неотправленные записи — он покажет их; нет связи — logoutUser скажет об этом
 const unsentOpen = ref(false)
 
 function viewUnsent() {
@@ -123,7 +105,15 @@ function saveWagons() {
 }
 watch(tripId, saveWagons)
 bus.on('connection-restored', saveWagons)
-onBeforeUnmount(() => bus.off('connection-restored', saveWagons))
+// «Выход» в профиле — тот же выход, что в меню шапки
+function logoutFromProfile() {
+  void onLogout()
+}
+bus.on('pwa-logout', logoutFromProfile)
+onBeforeUnmount(() => {
+  bus.off('connection-restored', saveWagons)
+  bus.off('pwa-logout', logoutFromProfile)
+})
 
 onMounted(async () => {
   saveWagons()
@@ -155,21 +145,14 @@ onMounted(async () => {
   color: #fff;
 }
 
-.pwa__burger {
+// логотип у левого края: отступ слева (0.5rem шапки + 0.2rem блока логотипа + 0.1rem — знак уже своего квадрата 1.6rem) равен
+// отступам сверху и снизу (0.25rem шапки + (2.7rem - 1.6rem) / 2)
+.pwa__logo {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 2.7rem;
   height: 2.7rem;
-  border: 0;
-  border-radius: 0.4rem;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-
-  &:active {
-    background: rgba(255, 255, 255, 0.12);
-  }
+  padding-right: 0.2rem;
+  padding-left: 0.2rem;
 }
 
 .pwa__brand {
@@ -204,41 +187,9 @@ onMounted(async () => {
   }
 }
 
-.pwa__menu {
-  min-width: 12rem;
-}
-
-// левая колонка меню одной ширины: текст всех пунктов начинается с одного места
-.pwa__menu-side {
-  width: 2.6rem;
-  min-width: 2.6rem;
-}
-
-.pwa__menu-code {
-  color: $zs-text-muted;
-  font-weight: 600;
-}
-
-.pwa__menu-active {
-  background: $zs-selected-bg;
-  color: $zs-selected-fg;
-}
-
+// кнопки — q-btn размера zs-pwa-btn; здесь только раскладка в ряду
 .pwa__sheet-btn {
   flex: 1;
-  min-height: 2.8rem;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.4rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  cursor: pointer;
-
-  &--primary {
-    border-color: $primary;
-    background: $primary;
-    color: #fff;
-  }
 }
 
 .pwa__main {

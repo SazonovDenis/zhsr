@@ -56,8 +56,9 @@ public class TransferController {
     }
 
     @PostMapping("/transfers/{id}/accept")
-    public TransferRow accept(@PathVariable long id) throws Exception {
-        return transferService.accept(id);
+    public TransferRow accept(@PathVariable long id,
+                              @RequestBody(required = false) TransferService.AcceptBody body) throws Exception {
+        return transferService.accept(id, body);
     }
 
     @PostMapping("/transfers/{id}/reject")

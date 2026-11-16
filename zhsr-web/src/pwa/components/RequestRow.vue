@@ -1,10 +1,12 @@
 <template>
-  <router-link :to="to" class="request-row q-pa-md" :class="{ 'request-row--queued': queued }">
+  <router-link :to="to" class="request-row q-px-md" :class="{ 'request-row--queued': queued }">
     <div class="request-row__main">
       <div class="request-row__title">{{ faultName(request.faultType) }}</div>
       <div class="request-row__meta">
-        {{ queued ? t('Новая') : request.number }} • {{ t('ваг. {n}', { n: request.wagon.number }) }} •
-        {{ formatDateTime(request.createdDt) }}
+        <!-- дата • вагон • номер -->
+        {{ formatDateTime(request.createdDt) }} •
+        <span class="request-row__wagon">{{ wagonShortText(request.wagon) }}</span> •
+        {{ queued ? t('Новая') : request.number }}
       </div>
       <div class="request-row__badges">
         <DictBadge v-if="!queued" :id="request.requestStatusType" dict="RequestStatus" />
@@ -34,7 +36,7 @@ import DictBadge from '@/shared/components/DictBadge.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { formatDateTime } from '@/shared/format'
 import { queuedFor } from '@/shared/offline/outbox'
-import { executorText, faultName, severityStyle } from '@/shared/requests/requestView'
+import { executorText, faultName, severityStyle, wagonShortText } from '@/shared/requests/requestView'
 
 /**
  * Строка заявки в списках мобильной части: неисправность, номер, вагон, время подачи, статус, критичность и кому
@@ -70,7 +72,14 @@ const to = computed(() => ({ name: 'pwa-request', params: { id: props.request.id
 </script>
 
 <style scoped lang="scss">
+.request-row__wagon {
+  font-weight: 700;
+}
+
 .request-row {
+  // по вертикали — чуть плотнее q-pa-md: строк в списке много
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
   display: flex;
   align-items: center;
   gap: 0.8rem;

@@ -89,7 +89,14 @@
     <template v-if="norm" #bar>
       <div class="crew__bar">
         <span class="crew__bar-text" :class="{ 'crew__bar-text--ok': normDone(norm) }">{{ normText }}</span>
-        <button type="button" class="crew__done q-py-none q-px-lg" @click="goBack">{{ t('Готово') }}</button>
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          class="zs-pwa-btn zs-pwa-btn--lg q-px-lg"
+          :label="t('Готово')"
+          @click="goBack"
+        />
       </div>
     </template>
   </PwaPage>
@@ -349,10 +356,8 @@ void loadCrew()
 
 .crew__caption {
   color: $zs-text-muted;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 
   // отступ под подписью группы — на треть меньше
   &--card {
@@ -556,17 +561,5 @@ void loadCrew()
   &--ok {
     color: #1d5e2c;
   }
-}
-
-.crew__done {
-  min-height: 3.3rem;
-  border: 0;
-  border-radius: 0.4rem;
-  background: $primary;
-  color: #fff;
-  font: inherit;
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
 }
 </style>

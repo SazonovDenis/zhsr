@@ -1,7 +1,7 @@
 <template>
   <RequestHistoryItem :title="title" :meta="meta" :text="text" :pending="pending" :line="line" inline>
     <div class="queued-item__marks q-mt-xs">
-      <span v-if="waiting" class="zs-badge queued-item__badge">{{ t('Ожидает отправки') }}</span>
+      <StatusBadge v-if="waiting" tone="wait">{{ t('Ожидает отправки') }}</StatusBadge>
       <template v-for="item in records" :key="item.id">
         <QueuedRefusal v-if="item.refused" :item="item" />
       </template>
@@ -17,6 +17,7 @@ import { computed } from 'vue'
 
 import type { RequestAction } from '@/api/requests'
 import { t } from '@/boot/i18n'
+import StatusBadge from '@/shared/components/StatusBadge.vue'
 import { formatDateTime } from '@/shared/format'
 import type { OutboxItem } from '@/shared/offline/outbox'
 import RequestHistoryItem from '@/shared/requests/RequestHistoryItem.vue'
@@ -59,10 +60,5 @@ const text = computed(() => records.value.find((x) => x.kind === 'note' || x.kin
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-}
-
-.queued-item__badge {
-  background: #fff1cc;
-  color: #6b4700;
 }
 </style>

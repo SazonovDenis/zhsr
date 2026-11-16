@@ -3,7 +3,9 @@ import { date } from 'quasar'
 import type { RepairRequest, RequestFilter } from '@/api/requests'
 import { requestFilter } from '@/api/requests'
 import { t } from '@/boot/i18n'
-import { RequestStatus } from '@/shared/constants/systemDicts'
+import type { CurrentUser } from '@/api/session'
+import type { RequestWagon } from '@/api/wagons'
+import { CrewDuty, RequestStatus } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { RequestEvent } from './historyTree'
 
@@ -25,6 +27,12 @@ export const REQUEST_DICTS = [
   'Yard',
 ] as const
 
+/** Вагон кратко, для строки списка: номер и краткий тип — «54956 куп.» (поле shortText справочника WagonType). */
+export function wagonShortText(w: { number: string; wagonType: number }): string {
+  const short = dictManager.getRec('WagonType', w.wagonType)?.shortText
+  return typeof short === 'string' && short ? `${w.number} ${short}` : w.number
+}
+
 /** Название неисправности заявки. */
 export function faultName(fault: number): string {
   return dictManager.getValue('FaultType', fault)
@@ -39,6 +47,17 @@ export function executorText(r: Omit<RepairRequest, 'id'>): string {
 export interface PhotoCaption {
   meta: string
   text: string
+}
+
+/**
+ * Плашка вагона в выборе вагона заявки: «Ваш вагон» — вагон, за которым проводник закреплён в текущем рейсе; иначе,
+ * если withTrip, «Ваш рейс» — вагон в составе текущего рейса пользователя; пусто — плашки нет. Текст переведён.
+ */
+export function wagonBadge(user: CurrentUser | null, w: RequestWagon, withTrip: boolean): string {
+  const trip = user?.trip
+  if (!trip) return ''
+  if (trip.crewDutyType === CrewDuty.CONDUCTOR && trip.wagons.includes(w.number)) return t('Ваш вагон')
+  return withTrip && w.trip?.id === trip.id ? t('Ваш рейс') : ''
 }
 
 /** Заявка, примечание или фото поступили на сервер более чем через минуту после создания: это показывается. */

@@ -1,5 +1,7 @@
 package kz.zhsr.app.dto.wagon;
 
+import kz.zhsr.app.dto.ref.TrainRef;
+import kz.zhsr.app.dto.ref.UserRef;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -24,6 +26,12 @@ public class WagonRow extends WagonOption {
     private long wagonStatusType;
     /** с какого времени вагон в этом состоянии */
     private OffsetDateTime dbegStatus;
+    /** текущий ответственный за вагон (wagon_info.responsible_usr); null - не назначен */
+    private UserRef responsibleUsr;
+    /** с какого времени ответственный назначен */
+    private OffsetDateTime dbegResponsible;
+    /** общий пробег, км (wagon_info.run_km) */
+    private int runKm;
     /** изготовитель; null - не указан */
     private String maker;
     /** год постройки; null - не указан */
@@ -32,7 +40,9 @@ public class WagonRow extends WagonOption {
     private LocalDate dbeg;
     /** вывод из эксплуатации; null - вагон в эксплуатации */
     private LocalDate dend;
-    /** рейсы в статусе «план» и «выполняется», в составе которых вагон, по плановому отправлению; второй проход */
+    /** поезд, в котором вагон сейчас; null - вагон не в поезде; второй проход */
+    private TrainRef train;
+    /** рейсы в статусе «план» и «выполняется» поезда вагона, по плановому отправлению; второй проход */
     private List<WagonTrip> trips = new ArrayList<>();
     /** акт, ожидающий приёма по вагону; null - нет; второй проход */
     private WagonPendingTransfer pendingTransfer;

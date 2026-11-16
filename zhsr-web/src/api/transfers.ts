@@ -41,9 +41,12 @@ export interface Transfer {
   receivedByUsr: UserRef | null
   receivedDt: string | null
   rejectReason: string | null
-  wagons: { number: string; withProperty: boolean }[]
+  /** вагоны; usr — ответственный, назначенный актом (wagon_responsible.usr), null — не назначен */
+  wagons: { number: string; withProperty: boolean; usr: UserRef | null }[]
   /** текущий сотрудник может принять вагоны или отказать */
   canReceive: boolean
+  /** текущий сотрудник может отменить акт (Ф-АКТ-06) */
+  canCancel: boolean
 }
 
 /** Вагон для акта: строка таблицы вагонов и акт, который ждёт приёма по этому вагону. */
@@ -67,6 +70,8 @@ export interface TransferDraft {
   /** время акта: значение DatePicker, время браузера без пояса */
   transferredDt: string
   wagons: { number: string; withProperty: boolean }[]
+  /** ответственный за вагоны акта; null — не назначен */
+  responsibleUsr: number | null
 }
 
 /** Акты, новые первыми. states — константы ActStatus; пусто — все. */
@@ -110,9 +115,9 @@ export async function createTransfer(draft: TransferDraft): Promise<Transfer> {
   return (await http.post<Transfer>('/transfers', { ...draft, transferredDt })).data
 }
 
-/** Принять все вагоны акта. */
-export async function acceptTransfer(id: number): Promise<Transfer> {
-  return (await http.post<Transfer>(`/transfers/${id}/accept`)).data
+/** Принять все вагоны акта; responsibleUsr — ответственный за вагоны акта, null — не назначен. */
+export async function acceptTransfer(id: number, responsibleUsr: number | null): Promise<Transfer> {
+  return (await http.post<Transfer>(`/transfers/${id}/accept`, { responsibleUsr })).data
 }
 
 /** Отказать в приёме с причиной. */

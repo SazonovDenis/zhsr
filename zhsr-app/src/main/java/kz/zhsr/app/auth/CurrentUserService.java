@@ -158,21 +158,21 @@ public class CurrentUserService {
     private CurrentUser.Trip[] loadTrips(long usrId) throws Exception {
         DbRec active = loadTripRec(usrId, TripStatus.IN_PROGRESS, "trip.planned_dt");
         if (active != null) {
-            return new CurrentUser.Trip[]{trip(active), null};
+            return new CurrentUser.Trip[]{trip(usrId, active), null};
         }
         DbRec next = loadTripRec(usrId, TripStatus.PLANNED, "trip.planned_dt");
         DbRec last = loadTripRec(usrId, TripStatus.DONE, "trip.arrived_dt desc nulls last");
         if (next == null || last == null) {
             DbRec only = next != null ? next : last;
-            return new CurrentUser.Trip[]{only == null ? null : trip(only), null};
+            return new CurrentUser.Trip[]{only == null ? null : trip(usrId, only), null};
         }
         OffsetDateTime now = OffsetDateTime.now();
         OffsetDateTime arrived = last.getDateTimeTZ("arrived_dt");
         long toNext = Math.max(0, Duration.between(now, next.getDateTimeTZ("planned_dt")).toMinutes());
         long fromLast = arrived == null ? Long.MAX_VALUE : Math.max(0, Duration.between(arrived, now).toMinutes());
         return fromLast < toNext
-                ? new CurrentUser.Trip[]{trip(last), trip(next)}
-                : new CurrentUser.Trip[]{trip(next), trip(last)};
+                ? new CurrentUser.Trip[]{trip(usrId, last), trip(usrId, next)}
+                : new CurrentUser.Trip[]{trip(usrId, next), trip(usrId, last)};
     }
 
     private DbRec loadTripRec(long usrId, long status, String order) throws Exception {
@@ -180,20 +180,16 @@ public class CurrentUserService {
     }
 
     /**
-     * Рейс из строки запроса. У сотрудника на рейсе одна строка бригады: вагоны проводника - из неё.
+     * Рейс из строки запроса. Вагоны проводника - из действующих строк бригады: строка - дежурство при вагоне.
      */
-    private static CurrentUser.Trip trip(DbRec trip) {
+    private CurrentUser.Trip trip(long usrId, DbRec trip) throws Exception {
         List<Long> wagons = new ArrayList<>();
         List<String> numbers = new ArrayList<>();
-        Long wagon = trip.getLong("wagon", null);
-        if (wagon != null) {
-            wagons.add(wagon);
-            numbers.add(trip.getString("number"));
-        }
-        Long wagon2 = trip.getLong("wagon2", null);
-        if (wagon2 != null) {
-            wagons.add(wagon2);
-            numbers.add(trip.getString("number2"));
+        for (DbRec r : db.loadSql(CurrentUserSql.tripWagons(), Map.of("usr", usrId, "trip", trip.getLong("id")))) {
+            if (!wagons.contains(r.getLong("wagon"))) {
+                wagons.add(r.getLong("wagon"));
+                numbers.add(r.getString("number"));
+            }
         }
         return new CurrentUser.Trip(trip.getLong("id"), trip.getString("train_number"), trip.getString("name"),
                 trip.getLong("trip_status_type"), trip.getDateTimeTZ("departure"), trip.getDateTimeTZ("arrival"),

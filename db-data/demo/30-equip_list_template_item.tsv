@@ -1,0 +1,103 @@
+id	equip_list_template	parent_item	text_ru	text_kk	text_en	unit	sort_order	disabled
+1	1		Мягкий съёмный инвентарь	Жұмсақ алынбалы мүкәммал	Soft removable inventory		1	false
+2	1	1	Матрац	Матрац	Mattress	шт	1	false
+3	1	1	Подушка	Жастық	Pillow	шт	2	false
+4	1	1	Одеяло	Көрпе	Blanket	шт	3	false
+5	1	1	Чехол матрасный	Матрац тысы	Mattress cover	шт	4	false
+6	1	1	Наперник	Жастық тысы	Pillow ticking	шт	5	false
+7	1	1	Шторы оконные	Терезе перделері	Window curtains	пар	6	false
+8	1	1	Занавески солнечные	Күннен қорғайтын перделер	Sun blinds	шт	7	false
+9	1	1	Простыня	Ақжайма	Bed sheet	шт	8	false
+10	1	1	Пододеяльник	Көрпе тысы	Duvet cover	шт	9	false
+11	1	1	Наволочка	Жастық қап	Pillowcase	шт	10	false
+12	1	1	Полотенце махровое	Түкті сүлгі	Terry towel	шт	11	false
+13	1	1	Ковровое покрытие	Кілем жабыны	Carpeting	шт	12	false
+14	1	1	Ковровая дорожка	Кілем жолақ	Carpet runner	шт	13	false
+15	1	1	Коврик купейный	Купе кілемшесі	Compartment mat	шт	14	false
+16	1		Съёмное оборудование	Алынбалы жабдық	Removable equipment		2	false
+17	1	16	Гардина на шторы оконные	Терезе перделеріне арналған карниз	Curtain rail	шт	1	false
+18	1	16	Прутики для занавесок	Перде шыбықтары	Curtain rods	шт	2	false
+19	1	16	Логотип на вагон	Вагон логотипі	Wagon logo	шт	3	false
+20	1	16	Маршрутная доска	Маршрут тақтасы	Route board	шт	4	false
+21	1	16	Сейф	Сейф	Safe	шт	5	false
+22	1	16	Держатель для туалетной бумаги	Дәретхана қағазын ұстағыш	Toilet paper holder	шт	6	false
+23	1	16	Диспенсер для жидкого мыла	Сұйық сабын диспенсері	Liquid soap dispenser	шт	7	false
+24	1	16	Огнетушитель	Өрт сөндіргіш	Fire extinguisher	шт	8	false
+25	1	16	Пепельница	Күлсауыт	Ashtray	шт	9	false
+26	1	16	Мусорный ящик	Қоқыс жәшігі	Waste bin	шт	10	false
+27	1		Съёмный инвентарь	Алынбалы мүкәммал	Removable inventory		3	false
+28	1	27	Вешалка - плечики	Киім ілгіш	Coat hanger	шт	1	false
+29	1	27	Ершик с бочком	Ыдысы бар щетка	Toilet brush with holder	шт	2	false
+30	1	27	Мешок для белья	Ақжайма қабы	Laundry bag	шт	3	false
+31	1		Посуда	Ыдыс-аяқ	Tableware		4	false
+32	1	31	Чайник для кипятка	Қайнаған су шәйнегі	Hot water kettle	шт	1	false
+33	1	31	Чайник для заварки	Шай демдейтін шәйнек	Teapot	шт	2	false
+34	1	31	Стакан с подстаканником	Стақан ұстағышы бар стақан	Glass with holder	шт	3	false
+35	1	31	Ложка чайная	Шай қасық	Teaspoon	шт	4	false
+36	1		Сигнальное оборудование	Сигналдық жабдық	Signalling equipment		5	false
+37	1	36	Фонарь ручной сигнальный двухцветный	Қос түсті қол сигнал шамы	Two-colour hand signal lamp	шт	1	false
+38	1	36	Флажки	Жалаушалар	Signal flags	комп	2	false
+39	1	36	Петарда	Петарда	Detonator	шт	3	false
+40	1		Медицинские принадлежности	Медициналық керек-жарақтар	Medical supplies		6	false
+41	1	40	Аптечка аварийная	Апаттық дәрі қобдишасы	Emergency first-aid kit	шт	1	false
+42	1	40	Аптечка текущая	Ағымдағы дәрі қобдишасы	Everyday first-aid kit	шт	2	false
+43	1	40	Противопедикулезная укладка	Педикулезге қарсы жиынтық	Anti-lice kit	шт	3	false
+44	1	40	Укладка Ф-30	Ф-30 жиынтығы	F-30 kit	шт	4	false
+45	1	40	Термометр комнатный	Бөлме термометрі	Room thermometer	шт	5	false
+46	1	40	Устройство для проведения искусственного дыхания	Жасанды тыныс алдыру құрылғысы	Artificial respiration device	шт	6	false
+47	1	40	Носилки медицинские	Медициналық зембіл	Medical stretcher	шт	7	false
+48	1		Средства санитарной гигиены (в сутки)	Санитариялық гигиена құралдары (тәулігіне)	Sanitary hygiene supplies (per day)		7	false
+49	1	48	Бумага туалетная	Дәретхана қағазы	Toilet paper	рул	1	false
+50	1	48	Мыло туалетное (жидкое)	Сұйық сабын	Liquid toilet soap	литр	2	false
+51	1	48	Пакет для сбора мусора	Қоқыс пакеті	Waste bag	шт	3	false
+52	1	48	Дезинфицирующие средства	Залалсыздандыру құралдары	Disinfectants	литр	4	false
+53	1	48	Освежитель воздуха	Ауа тазартқыш	Air freshener	шт	5	false
+54	1	48	Пробки для отверстия пола	Еден тесігінің тығындары	Floor drain plugs	шт	6	false
+55	2		Валики-подушки диванные	Диван білікше-жастықтары	Sofa bolster cushions	шт	1	false
+56	2		Клинки поролоновые	Поролон сыналар	Foam wedges	шт	2	false
+57	2		Зеркала с фацетом	Фацетті айналар	Bevelled mirrors	шт	3	false
+58	2		Зеркала круглые	Дөңгелек айналар	Round mirrors	шт	4	false
+59	2		Автошторы	Автоперделер	Automatic blinds	шт	5	false
+60	2		Поручни оконные	Терезе тұтқалары	Window handrails	шт	6	false
+61	2		Прутки никелированные для о/з	Никельденген шыбықтар	Nickel-plated rods	шт	7	false
+62	2		Стул поворотный со спинкой	Арқалығы бар айналмалы орындық	Swivel chair with back	шт	8	false
+63	2		Лестницы металлические раздвижные	Металл жылжымалы баспалдақтар	Extendable metal ladders	шт	9	false
+64	2		Лестницы-стремянки деревянные	Ағаш баспалдақтар	Wooden stepladders	шт	10	false
+65	2		Сетки багажные	Жүк торлары	Luggage nets	шт	11	false
+66	2		Сетки газетные	Газет торлары	Newspaper nets	шт	12	false
+67	2		Сетки душевые со шлангом	Шлангісі бар душ торлары	Shower heads with hose	шт	13	false
+68	2		Краны-смесители	Араластырғыш крандар	Mixer taps	шт	14	false
+69	2		Брюкодержатели	Шалбар ұстағыштар	Trouser holders	шт	15	false
+70	2		Скобы для брюк	Шалбар қапсырмалары	Trouser clips	шт	16	false
+71	2		Прокладки суконные полок вагонов РИЦ	РИЦ вагондары сөрелерінің мата төсемдері	Cloth shelf liners (RIC cars)	шт	17	false
+72	2		Рамки с оргстеклом для объявлений	Хабарландыруларға арналған оргшыны жақтаулар	Notice frames with acrylic glass	шт	18	false
+73	2		Карманы для рекламы	Жарнама қалталары	Advertising pockets	шт	19	false
+74	2		Шкафчик для литературы	Әдебиет шкафы	Literature cabinet	шт	20	false
+75	2		Шкафы-сейфы	Сейф шкафтар	Safe cabinets	шт	21	false
+76	2		Термометр титана	Титан термометрі	Water heater thermometer	шт	22	false
+77	2		Термометр котла	Қазандық термометрі	Boiler thermometer	шт	23	false
+78	2		Термометр дистанционный калорифера	Калорифердің қашықтықтан термометрі	Remote heater thermometer	шт	24	false
+79	2		Крючки вешалочные	Ілгіш ілмектер	Coat hooks	шт	25	false
+80	2		Ящики металлические для мусора	Металл қоқыс жәшіктері	Metal waste bins	шт	26	false
+81	2		Ящики для угля	Көмір жәшіктері	Coal boxes	шт	27	false
+82	2		Ковродержатели	Кілем ұстағыштар	Carpet holders	шт	28	false
+83	2		Мыльницы автоматические	Автоматты сабынсауыттар	Automatic soap dishes	шт	29	false
+84	2		Пламяотражатель титана	Титан жалын шағылдырғышы	Water heater flame deflector	шт	30	false
+85	2		Подвески подъёмных полок	Көтерме сөрелердің аспалары	Folding berth hangers	шт	31	false
+86	2		Съёмные диафрагмы и козырьки хвостового фонаря	Құйрық шамының алынбалы диафрагмалары мен күнқағарлары	Tail lamp diaphragms and visors	шт	32	false
+87	2		Посадочные номера (комплект)	Орын нөмірлері (жиынтық)	Seat numbers (set)	шт	33	false
+88	2		Фильтры вентиляционные запасные	Қосалқы желдету сүзгілері	Spare ventilation filters	шт	34	false
+89	2		Приводной ремень	Жетек белдігі	Drive belt	шт	35	false
+90	2		Гекстропные ремни привода ТРКП	ТРКП жетегінің сына белдіктері	V-belts of gearbox drive	шт	36	false
+91	2		Кронштейны для огнетушителей	Өрт сөндіргіш кронштейндері	Fire extinguisher brackets	шт	37	false
+92	2		Паропроводные рукава	Бу өткізгіш жеңдер	Steam hoses	шт	38	false
+93	2		Межвагонные высоковольтные соединения	Вагонаралық жоғары вольтты қосылыстар	Inter-car high-voltage connectors	шт	39	false
+94	2		Межвагонные соединения 54 В	Вагонаралық 54 В қосылыстар	Inter-car 54 V connectors	шт	40	false
+95	2		Радиоприёмники	Радиоқабылдағыштар	Radio receivers	шт	41	false
+96	2		Межвагонные соединения радио	Вагонаралық радио қосылыстары	Inter-car radio connectors	шт	42	false
+97	2		Эл. щит комплектный с аппаратурой	Аппаратурасы бар электр қалқаны	Electrical panel with equipment	шт	43	false
+98	2		Блок акустический	Акустикалық блок	Speaker unit	шт	44	false
+99	2		Плафоны круглые	Дөңгелек плафондар	Round light covers	шт	45	false
+100	2		Плафоны люминесцентного освещения	Люминесцентті жарық плафондары	Fluorescent light covers	шт	46	false
+101	2		Холодильник с оборудованием	Жабдығы бар тоңазытқыш	Refrigerator with equipment	шт	47	false
+102	2		Предохранительные ремни верхних полок	Жоғарғы сөрелердің сақтандыру белдіктері	Upper berth safety straps	шт	48	false

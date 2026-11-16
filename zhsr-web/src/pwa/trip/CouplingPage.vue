@@ -9,17 +9,16 @@
 
     <template v-if="card.crew.value">
       <div v-if="!isOnline" class="coupling__muted">{{ t('Для действия нужна связь') }}</div>
-      <label class="coupling__field">
-        <span class="coupling__label">{{ attach ? t('Станция прицепки') : t('Станция отцепки') }}</span>
-        <select
-          class="coupling__input q-py-none q-px-md"
-          :value="card.station.value ?? ''"
-          @change="card.setStation(Number(($event.target as HTMLSelectElement).value) || null)"
-        >
-          <option value="" disabled>{{ t('Выберите…') }}</option>
-          <option v-for="s in card.stops.value" :key="s.id" :value="s.id">{{ s.text }}</option>
-        </select>
-      </label>
+      <div class="coupling__field">
+        <span class="coupling__label">{{ attach ? t('Остановка прицепки') : t('Остановка отцепки') }}</span>
+        <CbList
+          :model-value="card.stop.value"
+          single
+          placeholder="Выберите…"
+          :values="card.stops.value"
+          @update:model-value="card.setStop(typeof $event === 'number' ? $event : null)"
+        />
+      </div>
 
       <div class="coupling__list">
         <label
@@ -42,23 +41,35 @@
       </div>
 
       <label class="coupling__field">
-        <span class="coupling__label">{{ t('Время акта') }}</span>
-        <DatePicker v-model="card.time.value" with-time date-text="Время акта" />
+        <span class="coupling__label">{{ attach ? t('Время прицепки') : t('Время отцепки') }}</span>
+        <DatePicker v-model="card.time.value" with-time :date-text="attach ? 'Время прицепки' : 'Время отцепки'" />
       </label>
       <label class="coupling__field">
-        <span class="coupling__label">{{ t('Приказ') }}</span>
-        <input v-model="card.order.value" class="coupling__input q-py-none q-px-md" maxlength="100" />
+        <span class="coupling__label">{{ t('Основания, примечания') }}</span>
+        <NoteInput v-model="card.comment.value" placeholder="Приказ, причина" />
       </label>
-      <label class="coupling__field">
-        <span class="coupling__label">{{ t('Причина') }}</span>
-        <textarea v-model="card.reason.value" class="coupling__textarea q-pa-md" rows="3" />
-      </label>
+      <!-- ответственный за вагоны: бригада рейса и сотрудники депо станции остановки -->
+      <div class="coupling__field">
+        <span class="coupling__label">{{ t('Ответственный за вагоны') }}</span>
+        <ResponsiblePicker
+          v-model="card.responsible.value"
+          :station="card.station.value"
+          :trip="Number(id)"
+          :disabled="!card.station.value"
+        />
+      </div>
     </template>
 
     <template #bar>
-      <button type="button" class="coupling__btn" :disabled="!card.canSubmit.value || !isOnline" @click="submit">
-        {{ attach ? t('Прицепить') : t('Отцепить') }}
-      </button>
+      <q-btn
+        unelevated
+        no-caps
+        color="primary"
+        class="zs-pwa-btn zs-pwa-btn--lg full-width"
+        :disable="!card.canSubmit.value || !isOnline"
+        :label="attach ? t('Прицепить') : t('Отцепить')"
+        @click="submit"
+      />
     </template>
   </PwaPage>
 </template>
@@ -69,6 +80,8 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { t } from '@/boot/i18n'
+import NoteInput from '@/shared/components/form/NoteInput.vue'
+import CbList from '@/shared/components/choice/CbList.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
 import { provideBusy } from '@/shared/busy'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
@@ -76,10 +89,11 @@ import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { isOnline } from '@/shared/network'
 import { useCoupling } from '@/shared/trips/useCoupling'
+import ResponsiblePicker from '@/shared/wagons/ResponsiblePicker.vue'
 import PwaPage from '../components/PwaPage.vue'
 
 /**
- * Акт отцепки или прицепки на телефоне (Ф-АКТ-01): станция, вагоны, приказ и причина. Нужна связь.
+ * Прицепка или отцепка в рейсе на телефоне (Ф-АКТ-01): остановка, вагоны, основания и примечания. Нужна связь.
  */
 const props = defineProps<{ id: string; kind: string }>()
 
@@ -99,7 +113,7 @@ void card.load()
 async function submit() {
   if (!(await card.submit())) return
   Notify.create({
-    message: attach.value ? t('Акт прицепки проведён') : t('Акт отцепки проведён'),
+    message: attach.value ? t('Вагоны прицеплены') : t('Вагоны отцеплены'),
     position: 'bottom',
   })
   goBack()
@@ -116,25 +130,6 @@ async function submit() {
 .coupling__label {
   font-size: 0.9rem;
   font-weight: 600;
-}
-
-.coupling__input,
-.coupling__textarea {
-  width: 100%;
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.3rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  font-size: 1rem;
-}
-
-.coupling__input {
-  height: 3.3rem;
-}
-
-.coupling__textarea {
-  resize: none;
 }
 
 .coupling__list {
@@ -180,22 +175,5 @@ async function submit() {
 .coupling__empty {
   color: $zs-text-muted;
   font-size: 0.9rem;
-}
-
-.coupling__btn {
-  width: 100%;
-  min-height: 3.5rem;
-  border: 0;
-  border-radius: 0.4rem;
-  background: $primary;
-  color: #fff;
-  font: inherit;
-  font-size: 1.1rem;
-  font-weight: 700;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.4;
-  }
 }
 </style>

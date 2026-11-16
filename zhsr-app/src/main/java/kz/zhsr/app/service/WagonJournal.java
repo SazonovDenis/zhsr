@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Журналы вагона: перевод в новое расположение и состояние.
+ * Журналы вагона: перевод в новое расположение и состояние, назначение ответственного.
  */
 @Service
 public class WagonJournal {
@@ -18,10 +18,11 @@ public class WagonJournal {
     /**
      * Записи журналов, открытые переводом.
      *
-     * @param location wagon_location.id
-     * @param status   wagon_status.id
+     * @param location    wagon_location.id
+     * @param status      wagon_status.id
+     * @param responsible wagon_responsible.id; null - перевод ответственного не назначал
      */
-    public record Opened(long location, long status) {
+    public record Opened(long location, long status, Long responsible) {
     }
 
     private final Db db;
@@ -34,11 +35,23 @@ public class WagonJournal {
      * Перевести вагон: закрыть текущие записи журналов временем time, открыть новые, обновить кэш wagon_info.
      * Вызывается внутри транзакции.
      *
-     * @param station станция, если расположение - станция
-     * @param trip    рейс, если расположение - рейс
+     * @param station     станция, если расположение - станция
+     * @param trip        рейс, если расположение - рейс
+     * @param responsible новый ответственный (usr); null - ответственный не назначен
      */
-    public Opened move(long wagon, OffsetDateTime time, long locationType, Long station, Long trip, long status)
-            throws Exception {
+    public Opened move(long wagon, OffsetDateTime time, long locationType, Long station, Long trip, long status,
+                       Long responsible) throws Exception {
+        Opened opened = moveKeepResponsible(wagon, time, locationType, station, trip, status);
+        return new Opened(opened.location(), opened.status(), assign(wagon, time, responsible));
+    }
+
+    /**
+     * Перевести вагон, как {@link #move}, но ответственного не менять: прежний остаётся. Вызывается внутри транзакции.
+     *
+     * @return открытые записи; responsible - null
+     */
+    public Opened moveKeepResponsible(long wagon, OffsetDateTime time, long locationType, Long station, Long trip,
+                                      long status) throws Exception {
         DbRec wagonStatus = db.loadRec("wagon_status", current(wagon));
         if (wagonStatus == null) {
             throw ApiException.conflict("У вагона нет текущего состояния");
@@ -55,7 +68,83 @@ public class WagonJournal {
         info.put("dbeg_status", time);
         info.put("wagon_status_type", status);
         db.updateRec("wagon_info", info, Map.of("wagon", wagon));
-        return new Opened(locationId, statusId);
+        return new Opened(locationId, statusId, null);
+    }
+
+    /**
+     * Сменить состояние вагона; расположение не меняется. Вызывается внутри транзакции.
+     *
+     * @return wagon_status.id открытой записи
+     */
+    public long moveStatus(long wagon, OffsetDateTime time, long status) throws Exception {
+        DbRec wagonStatus = db.loadRec("wagon_status", current(wagon));
+        if (wagonStatus == null) {
+            throw ApiException.conflict("У вагона нет текущего состояния");
+        }
+        if (!time.isAfter(wagonStatus.getDateTimeTZ("dbeg"))) {
+            throw ApiException.badRequest("Время должно быть позже последнего изменения вагонов");
+        }
+        db.updateRec("wagon_status", Map.of("id", wagonStatus.getLong("id"), "dend", time));
+        long id = db.insertRec("wagon_status", Map.of("wagon", wagon, "dbeg", time, "wagon_status_type", status));
+        db.updateRec("wagon_info", Map.of("dbeg_status", time, "wagon_status_type", status), Map.of("wagon", wagon));
+        return id;
+    }
+
+    /**
+     * Назначить ответственного: закрыть текущую запись журнала ответственного временем time, открыть новую, обновить
+     * кэш wagon_info. Вызывается внутри транзакции.
+     *
+     * @param usr ответственный; null - ответственный явно не назначен
+     * @return wagon_responsible.id открытой записи
+     */
+    public long assign(long wagon, OffsetDateTime time, Long usr) throws Exception {
+        DbRec current = db.loadRec("wagon_responsible", current(wagon));
+        if (current != null) {
+            if (!time.isAfter(current.getDateTimeTZ("dbeg"))) {
+                throw ApiException.badRequest("Время должно быть позже последнего изменения вагонов");
+            }
+            db.updateRec("wagon_responsible", Map.of("id", current.getLong("id"), "dend", time));
+        }
+        Map<String, Object> values = new HashMap<>();
+        values.put("wagon", wagon);
+        values.put("dbeg", time);
+        values.put("usr", usr);
+        long id = db.insertRec("wagon_responsible", values);
+        updateResponsibleInfo(wagon, time, usr);
+        return id;
+    }
+
+    /**
+     * Сменить ответственного в записи журнала, открытой документом (opened); если запись текущая - и в кэше
+     * wagon_info. Вызывается внутри транзакции.
+     *
+     * @param usr ответственный; null - ответственный явно не назначен
+     */
+    public void reassign(long opened, Long usr) throws Exception {
+        DbRec rec = db.loadRec("wagon_responsible", opened);
+        Map<String, Object> values = new HashMap<>();
+        values.put("id", opened);
+        values.put("usr", usr);
+        db.updateRec("wagon_responsible", values);
+        if (rec.getDateTimeTZ("dend") == null) {
+            updateResponsibleInfo(rec.getLong("wagon"), rec.getDateTimeTZ("dbeg"), usr);
+        }
+    }
+
+    /**
+     * Отменить назначение ответственного: запись журнала opened удаляется, прежняя снова текущая, кэш wagon_info - по
+     * ней. После назначения у вагона не должно быть других записей. Вызывается внутри транзакции.
+     */
+    public void unassign(long opened) throws Exception {
+        DbRec prev = undoRec("wagon_responsible", opened);
+        updateResponsibleInfo(prev.getLong("wagon"), prev.getDateTimeTZ("dbeg"), prev.getLong("usr", null));
+    }
+
+    private void updateResponsibleInfo(long wagon, OffsetDateTime dbeg, Long usr) throws Exception {
+        Map<String, Object> info = new HashMap<>();
+        info.put("dbeg_responsible", dbeg);
+        info.put("responsible_usr", usr);
+        db.updateRec("wagon_info", info, Map.of("wagon", wagon));
     }
 
     /**
@@ -83,6 +172,9 @@ public class WagonJournal {
     public void retime(Opened opened, OffsetDateTime time) throws Exception {
         retimeRec("wagon_location", opened.location(), time, "dbeg_location");
         retimeRec("wagon_status", opened.status(), time, "dbeg_status");
+        if (opened.responsible() != null) {
+            retimeRec("wagon_responsible", opened.responsible(), time, "dbeg_responsible");
+        }
     }
 
     /**
@@ -98,6 +190,21 @@ public class WagonJournal {
         info.put("dbeg_status", status.getDateTimeTZ("dbeg"));
         info.put("wagon_status_type", status.getLong("wagon_status_type"));
         db.updateRec("wagon_info", info, Map.of("wagon", location.getLong("wagon")));
+        if (opened.responsible() != null) {
+            unassign(opened.responsible());
+        }
+    }
+
+    /**
+     * Отменить перевод в новое расположение (moveLocation): запись журнала opened удаляется, прежняя снова текущая,
+     * кэш wagon_info - по ней. После перевода у вагона не должно быть других записей расположения. Вызывается внутри
+     * транзакции.
+     */
+    public void undoLocation(long opened) throws Exception {
+        DbRec location = undoRec("wagon_location", opened);
+        db.updateRec("wagon_info", locationInfo(location.getDateTimeTZ("dbeg"), location.getLong("location_type"),
+                location.getLong("station", null), location.getLong("depot", null), location.getLong("yard", null),
+                location.getLong("trip", null)), Map.of("wagon", location.getLong("wagon")));
     }
 
     private void retimeRec(String table, long id, OffsetDateTime time, String infoField) throws Exception {
@@ -125,7 +232,7 @@ public class WagonJournal {
         DbRec rec = db.loadRec(table, id);
         DbRec prev = previous(table, rec);
         if (rec.getDateTimeTZ("dend") != null || prev == null) {
-            throw ApiException.conflict("У вагона после отметки есть другие изменения");
+            throw ApiException.conflict("После этого у вагона были другие изменения - сначала отмените их");
         }
         db.deleteRec(table, id);
         Map<String, Object> values = new HashMap<>();

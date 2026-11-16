@@ -9,44 +9,53 @@
 
     <div v-if="card.crew.value" class="trip-coupling">
       <div class="trip-coupling__act">
-        <div class="trip-coupling__caption">{{ t('Акт') }}</div>
-        <FormField :label="attach ? 'Станция прицепки' : 'Станция отцепки'">
+        <div class="trip-coupling__caption">{{ attach ? t('Прицепка') : t('Отцепка') }}</div>
+        <FormField :label="attach ? 'Остановка прицепки' : 'Остановка отцепки'">
           <CbList
             single
             no-search
             placeholder="Выберите…"
-            :model-value="card.station.value"
+            :model-value="card.stop.value"
             :values="card.stops.value"
-            @update:model-value="card.setStation($event as number | null)"
+            @update:model-value="card.setStop($event as number | null)"
           />
         </FormField>
-        <FormField label="Время акта">
-          <DatePicker v-model="card.time.value" with-time date-text="Время акта" />
+        <FormField :label="attach ? 'Время прицепки' : 'Время отцепки'">
+          <DatePicker v-model="card.time.value" with-time :date-text="attach ? 'Время прицепки' : 'Время отцепки'" />
         </FormField>
-        <FormField label="Приказ">
-          <input v-model="card.order.value" class="trip-coupling__input q-pa-sm" maxlength="100" />
+        <FormField label="Основания, примечания">
+          <NoteInput v-model="card.comment.value" :rows="4" placeholder="Приказ, причина" />
         </FormField>
-        <FormField label="Причина">
-          <textarea v-model="card.reason.value" class="trip-coupling__input q-pa-sm" rows="4" />
+        <!-- ответственный за вагоны: бригада рейса и сотрудники депо станции остановки -->
+        <FormField label="Ответственный за вагоны">
+          <ResponsiblePicker
+            v-model="card.responsible.value"
+            :station="card.station.value"
+            :trip="Number(id)"
+            :disabled="!card.station.value"
+          />
         </FormField>
-        <button type="button" class="zs-btn-primary" :disabled="!card.canSubmit.value" @click="submit">
+        <q-btn unelevated no-caps color="primary" :disable="!card.canSubmit.value" @click="submit">
           {{ attach ? t('Прицепить') : t('Отцепить') }}
-        </button>
-        <button
+        </q-btn>
+        <q-btn
           v-if="attach"
-          type="button"
-          class="trip-coupling__btn q-py-none q-px-md"
-          :disabled="!card.returnFrom.value"
+          unelevated
+          outline
+          no-caps
+          color="primary"
+          class="zs-soft-border"
+          :disable="!card.returnFrom.value"
           :title="card.returnFrom.value ? '' : t('Все отмеченные вагоны должны быть в одном депо или парке отстоя')"
           @click="returnToStation"
         >
           {{ t('Вернуть на станцию') }}
-        </button>
+        </q-btn>
       </div>
 
       <div class="trip-coupling__list">
         <div class="trip-coupling__caption">
-          {{ attach ? t('Вагоны на станции, в депо и парке отстоя') : t('Вагоны в составе') }}
+          {{ attach ? t('Вагоны на станции, в депо и парке отстоя') : t('Вагоны в поезде') }}
         </div>
         <div class="trip-coupling__table">
           <label v-for="w in card.wagons.value" :key="w.number" class="trip-coupling__row q-py-sm q-px-md">
@@ -100,19 +109,22 @@ import { provideBusy } from '@/shared/busy'
 import CbList from '@/shared/components/choice/CbList.vue'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
+import NoteInput from '@/shared/components/form/NoteInput.vue'
 import FormField from '@/shared/components/form/FormField.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
 import { placeCode } from '@/shared/transferPlace'
 import { dictManager } from '@/shared/dict/DictManager'
 import { useCoupling } from '@/shared/trips/useCoupling'
+import ResponsiblePicker from '@/shared/wagons/ResponsiblePicker.vue'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import TripTimes from './TripTimes.vue'
 
 /**
- * Экран акта отцепки или прицепки (Ф-АКТ-01): слева станция, приказ и причина, рядом вагоны с галочками, справа рейс.
+ * Экран прицепки или отцепки в рейсе (Ф-АКТ-01): слева остановка, основания и примечания, рядом вагоны с галочками,
+ * справа рейс.
  * Вагон в депо или парке отстоя прицепить нельзя: «Вернуть на станцию» открывает акт приёма-передачи (Ф-АКТ-02).
  */
 const props = defineProps<{ id: string; kind: string }>()
@@ -142,7 +154,7 @@ function returnToStation() {
 async function submit() {
   if (!(await card.submit())) return
   Notify.create({
-    message: attach.value ? t('Акт прицепки проведён') : t('Акт отцепки проведён'),
+    message: attach.value ? t('Вагоны прицеплены') : t('Вагоны отцеплены'),
     type: 'positive',
     position: 'bottom',
   })
@@ -166,38 +178,8 @@ async function submit() {
 
 .trip-coupling__caption {
   color: $zs-text-muted;
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.trip-coupling__input {
-  width: 100%;
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.3rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
   font-size: 0.9rem;
-  resize: none;
-}
-
-.trip-coupling__btn {
-  height: var(--zs-control-height);
-  border: 0.0625rem solid $zs-border-input;
-  border-radius: 0.3rem;
-  background: #fff;
-  color: $primary;
-  font: inherit;
-  font-size: 0.8rem;
   font-weight: 600;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: default;
-  }
 }
 
 .trip-coupling__list {

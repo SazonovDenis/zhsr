@@ -8,13 +8,18 @@ import { effectiveOf, isDisabled, modelIds, modelOf } from './choice'
 export interface ButtonChoiceProps {
   /** одиночный выбор, иначе множественный */
   single?: boolean
-  /** хотя бы одно значение должно быть выбрано */
+  /** хотя бы одно значение должно быть выбрано; при single нажатая кнопка не отжимается */
   required?: boolean
   values?: ChoiceItem[]
   /** id значений, которые не показываются кнопками, пока не выбраны (доступны через «...») */
   hidden?: ChoiceId[]
   /** сколько значений показывать кнопками до появления «...» */
   maxButtonCount?: number
+  /**
+   * все значения — кнопками, без «...»: кнопки переносятся на новые строки, текст кнопки — по словам. Для телефона,
+   * где варианты должны быть видны сразу (частые неисправности, варианты ответа)
+   */
+  wrap?: boolean
   modelValue?: ChoiceModel
   /** источник вариантов: загрузка и ошибка показываются на месте кнопок; null — варианты уже есть */
   source?: Loadable | null
@@ -38,7 +43,7 @@ export function useButtonChoice(props: ButtonChoiceProps, emit: ButtonChoiceEmit
   )
 
   const values = computed(() => props.values ?? [])
-  const maxCount = computed(() => props.maxButtonCount ?? 3)
+  const maxCount = computed(() => (props.wrap ? Number.POSITIVE_INFINITY : (props.maxButtonCount ?? 3)))
 
   // объекты выбранных значений — единственный источник правды
   const selected = ref<ChoiceItem[]>([])
@@ -112,6 +117,8 @@ export function useButtonChoice(props: ButtonChoiceProps, emit: ButtonChoiceEmit
     if (isDisabled(item)) return
 
     const wasSelected = isSelected(item)
+    // одиночный обязательный выбор: нажатая кнопка не отжимается, повторное нажатие ничего не меняет
+    if (props.single && props.required && wasSelected) return
     if (props.single) {
       selected.value = wasSelected ? [] : [item]
     } else {

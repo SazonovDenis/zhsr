@@ -7,7 +7,7 @@ import java.util.List;
  *
  * @param stops   остановки по порядку
  * @param changed номера остановок (с 0), у которых сменилась станция или предыдущая остановка: им время в пути
- *                ставится по умолчанию
+ *                от предыдущей остановки ставится по умолчанию
  */
 public record RecalcStops(List<RouteStop> stops, List<Integer> changed) {
     public RecalcStops {

@@ -44,11 +44,21 @@ final class AdminSql {
                 + searchWhere(table, search, params), params);
     }
 
+    /**
+     * Сортировка по полю-ссылке: текст записи, на которую ссылается поле.
+     */
+    static String refSort(AdminTable table, AdminColumn column) {
+        return "(select " + column.ref() + "." + AdminTables.textColumn(column.ref()) + " from " + column.ref()
+               + " where " + column.ref() + ".id = " + table.name() + "." + column.name() + ")";
+    }
+
     private static String select(AdminTable table) {
         List<String> cols = new ArrayList<>();
         cols.add("id");
         for (AdminColumn c : table.columns()) {
-            cols.add(c.name());
+            if (!AdminTables.isVirtual(table.name(), c.name())) {
+                cols.add(c.name());
+            }
         }
         return "select " + String.join(", ", cols) + "\nfrom " + table.name() + "\n";
     }

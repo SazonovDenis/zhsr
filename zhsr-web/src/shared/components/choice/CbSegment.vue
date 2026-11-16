@@ -1,5 +1,5 @@
 <template>
-  <div class="cb-segment">
+  <div class="cb-segment" :class="{ 'cb-segment--touch': isMobile }">
     <span v-if="label" class="cb-segment__label q-my-none q-mr-sm q-ml-md">{{ t(label) }}</span>
 
     <!-- варианты грузятся или не загрузились — на месте кнопок -->
@@ -12,7 +12,7 @@
         type="button"
         :data-index="index"
         :tabindex="item.id === tabStopId ? 0 : -1"
-        class="cb-segment__item zs-focusable q-py-none q-px-md"
+        class="cb-segment__item zs-focusable q-py-none"
         :class="{ 'cb-segment__item--active bg-selected text-selected': isSelected(item) }"
         :disabled="isDisabled(item)"
         :title="displayOf(item)"
@@ -40,6 +40,7 @@
 
 <script setup lang="ts">
 import { t } from '@/boot/i18n'
+import { isMobile } from '@/shared/device'
 import type { ChoiceItem } from './choice'
 import { displayOf, isDisabled } from './choice'
 import CbMoreMenu from './CbMoreMenu.vue'
@@ -54,7 +55,7 @@ import { useButtonChoice } from './useButtonChoice'
  *   <CbSegment v-model="period" label="Период:" :values="items" single required />
  *
  * Правила values, v-model и change — см. choice.ts. Клавиатура: ряд — одна остановка Tab, по кнопкам ходят стрелками
- * (см. onItemKeydown в useButtonChoice).
+ * (см. onItemKeydown в useButtonChoice). На телефоне рамка и сегменты крупные — под палец.
  */
 const props = withDefaults(defineProps<ButtonChoiceProps & { label?: string }>(), {
   single: false,
@@ -82,6 +83,8 @@ const { visibleValues, hiddenValues, isSelected, onButtonClick, onMenuPick, tabS
 
   display: inline-flex;
   flex-wrap: nowrap;
+  // ширина — по сегментам: в колонке (мобильная страница, форма) рамка не растягивается на всю ширину
+  align-self: flex-start;
   align-items: stretch;
   gap: 0.1rem;
   height: var(--zs-control-height);
@@ -100,6 +103,8 @@ const { visibleValues, hiddenValues, isSelected, onButtonClick, onMenuPick, tabS
 
 .cb-segment__item {
   flex: none;
+  // боковой отступ одинаков у всех сегментов: выбор не сдвигает подписи; выбранный сегмент прилегает к рамке
+  padding: 0 0.9rem;
   border: 0;
   border-radius: calc(var(--cb-segment-radius) - var(--cb-segment-border));
   background: transparent;
@@ -109,8 +114,11 @@ const { visibleValues, hiddenValues, isSelected, onButtonClick, onMenuPick, tabS
   white-space: nowrap;
   cursor: pointer;
 
-  &:hover:not(:disabled):not(.cb-segment__item--active) {
-    background: $zs-bg-button-soft;
+  // подсветка наведения — только с мышью: на телефоне после касания сегмент оставался бы серым
+  @media (hover: hover) {
+    &:hover:not(:disabled):not(.cb-segment__item--active) {
+      background: $zs-bg-button-soft;
+    }
   }
 
   &:disabled {
@@ -122,5 +130,14 @@ const { visibleValues, hiddenValues, isSelected, onButtonClick, onMenuPick, tabS
 .cb-segment__more {
   padding: 0 0.5rem;
   border-radius: calc(var(--cb-segment-radius) - var(--cb-segment-border));
+}
+
+// телефон: рамка и сегменты под палец, стандартный шрифт
+.cb-segment--touch {
+  --zs-control-height: 2.8rem;
+
+  .cb-segment__item {
+    font-size: inherit;
+  }
 }
 </style>

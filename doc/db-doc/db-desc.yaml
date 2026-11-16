@@ -5,37 +5,33 @@ diagrams:
 
   trip:
     title: "Поездки и рейсы"
-    tables: [ trip, trip_wagon, route, trip_status_type, usr, wagon_location: { hide_references: [ "trip" ] }, wagon_status ]
-    hide_fields: [ "trip_status_type", "usr", "wagon_location", "wagon_status" ]
+    tables: [ trip, train, train_wagon, wagon_run, route, route_station, station, trip_status_type, usr ]
+    hide_fields: [ "trip_status_type", "usr", "station" ]
 
-  usr:
-    title: "Сотрудники: роли, депо, службы и категории"
-    tables: [ usr, usr_role, role_type, usr_depot, usr_category, depot: { hide_references: [ "station" ] }, service, category_type ]
-    hide_fields: [ role_type, depot, service, category_type ]
-    top: [ role_type, depot, service, category_type ]
+  train:
+    title: "Поезд и вагоны в нём"
+    description: "Вагоны, которые ходят вместе из рейса в рейс. Прицепка и отцепка меняют поезд."
+    tables: [ train, train_wagon, train_wagon_change, trip, wagon: { hide_references: [ "depot" ] }, wagon_run, station, route_station, wagon_location: { hide_references: [ "trip", "wagon", "station" ] }, wagon_status: { hide_references: [ "wagon" ] }, wagon_responsible: { hide_references: [ "usr", "wagon" ] } ]
+    hide_fields: [ "station", "route_station", "wagon", "wagon_location", "wagon_status", "wagon_responsible" ]
+    top: [ wagon_status, wagon_responsible, wagon_location ]
 
   trip_crew:
     title: "Бригада рейса"
-    tables: [ trip, trip_crew, usr, crew_duty_type, wagon, route ]
-    hide_fields: [ "crew_duty_type", "wagon", "usr" ]
+    tables: [ trip, trip_crew, usr, crew_duty_type, wagon, route, train ]
+    hide_fields: [ "crew_duty_type", "wagon", "usr", route, train ]
     top: [ usr ]
 
   wagon_location_status:
     title: "Вагоны: перемещение и смена состояния"
     description: "Главные журналы для любых изменений вагона. Другие таблицы могут хранить дополнительную информацию, но ссылаются сюда."
-    tables: [ wagon_location, wagon_status, wagon: { hide_references: [ "depot" ] }, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, station, trip, location_type ]
-    hide_fields: [ "depot", "yard", "station" , "wagon", "trip", "location_type" ]
-
-  coupling_act:
-    title: "Отцепка и прицепка"
-    tables: [ wagon, coupling_act, coupling_act_wagon, wagon_location, wagon_status, coupling_type, act_status_type, act_cancellation ]
-    hide_fields: [ "wagon", "wagon_location", "wagon_status", "coupling_type", "act_status_type" ]
+    tables: [ wagon_location, wagon_status, wagon_responsible, wagon_edit: { hide_references: [ "wagon", "created_by_usr" ] }, wagon: { hide_references: [ "depot" ] }, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, station, trip, location_type, usr ]
+    hide_fields: [ "depot", "yard", "station" , "wagon", "trip", "location_type", "usr" ]
 
   transfer_act:
     title: "Передача вагонов между депо, станцией и парком отстоя"
     description: "Акт приёма-передачи вагонов между станцией, её депо и парками отстоя"
-    tables: [ wagon: { hide_references: [ "depot" ] }, transfer_act, transfer_act_wagon, act_status_type, act_cancellation, station, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, wagon_location: { hide_references: [ "station", "depot", "wagon", "yard" ] } ]
-    hide_fields: [ "wagon", "act_status_type", "station", "depot", "yard", "wagon_location" ]
+    tables: [ wagon: { hide_references: [ "depot" ] }, transfer_act, transfer_act_wagon, act_status_type, act_cancellation, station, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, wagon_location: { hide_references: [ "station", "depot", "wagon", "yard" ] }, wagon_responsible: { hide_references: [ "wagon", "usr" ] } ]
+    hide_fields: [ "wagon", "act_status_type", "station", "depot", "yard", "wagon_location", "wagon_responsible" ]
     top: [ transfer_act_wagon, act_cancellation, act_status_type ]
 
   repair_request_data:
@@ -54,22 +50,23 @@ diagrams:
     description: |
       Для каждого объекта (вагон, заявка на ремонт) в таблицах ***_info хранится одна запись, в которую копируются последние данные со всех версионных таблиц объекта. 
       Предназначены для быстрого построения списков.
-    tables: [ wagon_info, wagon, wagon_location, wagon_status, repair_request_info, repair_request: { hide_references: [ "wagon" ] }, repair_request_status, repair_request_executor ]
-    hide_fields: [ "wagon", "wagon_location", "wagon_status", "repair_request", "repair_request_status", "repair_request_executor" ]
+    tables: [ wagon_info: { hide_references: [ "responsible_usr" ] }, wagon, wagon_location, wagon_status, wagon_responsible: { hide_references: [ "usr" ] }, repair_request_info, repair_request: { hide_references: [ "wagon" ] }, repair_request_status, repair_request_executor ]
+    hide_fields: [ "wagon", "wagon_location", "wagon_status", "wagon_responsible", "repair_request", "repair_request_status", "repair_request_executor" ]
 
   system_dict:
     title: "Справочники: системные константы"
     description: "Значения отражены в константах кода (kz.zhsr.app.constants) и меняются только вместе с кодом. Данные - zhsr-database/src/main/resources/db/dict/*.tsv, загружаются при создании БД. В администрировании не редактируются."
-    tables: [ role_type, service, category_type, transport_type, location_type, trip_status_type, crew_duty_type, coupling_type, act_status_type, work_type, wagon_status_type, request_status_type, severity_type ]
+    tables: [ role_type, service, category_type, transport_type, location_type, trip_status_type, crew_duty_type, act_status_type, work_type, wagon_status_type, request_status_type, severity_type ]
 
   fault_type:
     title: "Справочник: типы неисправностей"
-    tables: [ fault_type, fault_group_type, severity_type, service, role_type ]
+    tables: [ fault_type, fault_type_favorite, fault_group_type, severity_type, service, role_type ]
     hide_fields: [ "role_type" ]
 
   wagon:
     title: "Справочник: вагоны"
-    tables: [ wagon, wagon_type, model_type, depot, station ]
+    tables: [ wagon, wagon_type, model_type, depot, station, wagon_info: { hide_references: [ station, depot ] } ]
+    hide_fields: [ station ]
 
   route:
     title: "Справочник: маршруты"
@@ -81,6 +78,12 @@ diagrams:
     description: "Граф: станции - вершины, перегоны - рёбра."
     tables: [ station, stage, stage_point, route_station, route ]
     hide_fields: [ "route" ]
+
+  usr:
+    title: "Сотрудники: роли, депо, службы и категории"
+    tables: [ usr, usr_role, role_type, usr_depot, usr_category, depot: { hide_references: [ "station" ] }, service, category_type ]
+    hide_fields: [ role_type, depot, service, category_type ]
+    top: [ role_type, depot, service, category_type ]
 
   check_list_struct:
     title: "Чек-листы: структура"
@@ -96,7 +99,7 @@ diagrams:
     description: |
       Заполненные чек-листы: проверка вагона, рейса или сотрудника (медосмотр, инструктаж). У значения пункта
       сохраняются норматив, признак нарушения и созданная заявка.
-    tables: [ check_list, check_list_value, check_list_template, check_list_template_item: { hide_references: [ parent_item ] }, check_dict_value, check_list_item_norm, wagon, trip: { hide_references: [ departed_by_usr, arrived_by_usr ] }, usr, repair_request: { hide_references: [ created_by_usr ] } ]
+    tables: [ check_list, check_list_value, check_list_value_photo, check_list_template, check_list_template_item: { hide_references: [ parent_item ] }, check_dict_value, check_list_item_norm, wagon, trip: { hide_references: [ departed_by_usr, arrived_by_usr ] }, usr, repair_request: { hide_references: [ created_by_usr ] } ]
     hide_fields: [ check_list_template, check_list_template_item, check_dict_value, check_list_item_norm, wagon, trip, usr, repair_request ]
     top: [ check_list_template, check_list_template_item ]
 
@@ -114,7 +117,7 @@ diagrams:
     description: |
       Заполненные описи вагона: текущий факт - что лежит в вагоне. У значения пункта сохраняются требуемое количество,
       норматив и признак нарушения; недостача по всей описи - одна заявка.
-    tables: [ equip_list, equip_list_value, equip_list_template, equip_list_template_item: { hide_references: [ parent_item ] }, equip_list_item_norm, wagon, trip: { hide_references: [ departed_by_usr, arrived_by_usr ] }, usr, repair_request: { hide_references: [ created_by_usr ] } ]
+    tables: [ equip_list, equip_list_value, equip_list_value_photo, equip_list_template, equip_list_template_item: { hide_references: [ parent_item ] }, equip_list_item_norm, wagon, trip: { hide_references: [ departed_by_usr, arrived_by_usr ] }, usr, repair_request: { hide_references: [ created_by_usr ] } ]
     hide_fields: [ equip_list_template, equip_list_template_item, equip_list_item_norm, wagon, trip, usr, repair_request ]
     top: [ equip_list_template, equip_list_template_item ]
 
@@ -272,6 +275,9 @@ tables:
         description: "Пусто - вагон в эксплуатации"
       depot:
         title: "Депо приписки"
+      initial_run_km:
+        title: "Пробег на момент ввода, км"
+        description: "Задаётся при вводе вагона; общий пробег - wagon_info.run_km"
       data:
         title: "Прочие паспортные данные"
         description: "JSON без схемы (например, seats, manufacturer)"
@@ -317,18 +323,6 @@ tables:
     description: |
       Системный справочник.
     constants_from: zhsr-database/src/main/resources/db/dict/crew_duty_type.tsv
-    columns:
-      text:
-        title: "Значение"
-      code:
-        title: "Код"
-        description: "Уникален"
-
-  coupling_type:
-    title: "Отцепка или прицепка"
-    description: |
-      Системный справочник.
-    constants_from: zhsr-database/src/main/resources/db/dict/coupling_type.tsv
     columns:
       text:
         title: "Значение"
@@ -383,6 +377,9 @@ tables:
     columns:
       text:
         title: "Значение"
+      short_text:
+        title: "Кратко"
+        description: "Рядом с номером вагона в строке списка: «54956 куп.»"
       code:
         title: "Код типа"
         description: "Уникален"
@@ -482,6 +479,18 @@ tables:
         title: "Отключён"
         description: "Не предлагается при подаче заявки. Тип неисправности с заявками не удаляется, а отключается"
 
+  fault_type_favorite:
+    title: "Избранная неисправность"
+    description: |
+      Неисправность, которая показывается первой при подаче заявки (частые неисправности). Неисправность в избранном -
+      один раз; запись удаляется вместе с неисправностью. В администрировании - галочка «В избранном» в форме
+      неисправности и таблица «Избранные неисправности» с порядком показа.
+    columns:
+      fault_type:
+        title: "Неисправность"
+      sort_order:
+        title: "Порядок показа"
+
   station:
     title: "Станция"
     description: |
@@ -525,18 +534,16 @@ tables:
         description: "Градусы, WGS 84"
 
   route:
-    title: "Маршрут (поезд)"
+    title: "Маршрут"
     description: |
-      Поезд компании, курсирующий по определённому маршруту, например: '655/656'
+      Маршрут по расписанию, например: '655/656'
     columns:
       train_number:
         title: "Номер поезда"
-        description: "Уникален в компании"
+        description: "Номер по расписанию, под которым ходит любой поезд маршрута. Уникален в компании"
       name:
         title: "Название (сообщение)"
         description: "Пример: 'Астана-Алматы'"
-      duration:
-        title: "Время в пути, мин"
       conductor_hours:
         title: "Норма часов за рейс для проводника"
       lnp_hours:
@@ -570,14 +577,19 @@ tables:
       km:
         title: "Километраж от начала маршрута"
       have_stop:
-        title: "Остановка"
+        title: "Делается ли остановка на станции"
         description: "Нет - станция следования, поезд проходит её без остановки"
-      run_duration:
-        title: "Время в пути от предыдущей станции маршрута, мин"
-        description: "У начальной станции 0"
-      stop_duration:
-        title: "Стоянка, мин"
-        description: "У станций следования, начальной и конечной станций 0"
+      arrival_min:
+        title: "Время прибытия, мин от полуночи"
+        description: |
+          Минуты от полуночи дня отправления с начальной станции; 1440 и больше - следующие сутки. У начальной станции
+          пусто
+      departure_min:
+        title: "Время отправления, мин от полуночи"
+        description: |
+          Минуты от полуночи дня отправления с начальной станции; 1440 и больше - следующие сутки. У конечной станции
+          пусто; у станции следования равно времени прибытия. Стоянка - отправление минус прибытие, время в пути
+          маршрута - прибытие на конечную станцию минус отправление с начальной
 
   db_info:
     title: "Идентификатор БД"
@@ -588,6 +600,9 @@ tables:
       db_guid:
         title: "Идентификатор БД"
         description: "zhsr-<имя tenant>-<8 случайных hex-символов>"
+      demo:
+        title: "Демо-БД"
+        description: "БД загружена с демо-данными: страница входа показывает быстрый вход демо-пользователями"
 
   dict_version:
     title: "Версия справочника"
@@ -606,12 +621,15 @@ tables:
   trip:
     title: "Рейс"
     description: |
-      Поездка поезда. Станция отправления - первая остановка маршрута, станция прибытия - последняя.
-      Начальник поезда и ПЭМ берутся из бригады рейса (trip_crew) - записи с должностями "начальник поезда" и
-      "поездной электромеханик".
+      Поездка поезда по маршруту. Станция отправления - первая остановка маршрута, станция прибытия - последняя.
+      Вагоны рейса - вагоны поезда на момент. Начальник поезда и ПЭМ берутся из бригады рейса (trip_crew) - записи
+      с должностями "начальник поезда" и "поездной электромеханик".
     columns:
       route:
         title: "Маршрут"
+      train:
+        title: "Поезд"
+        description: "Пусто - поезд ещё не назначен"
       planned_dt:
         title: "Плановое отправление"
       trip_status_type:
@@ -619,8 +637,14 @@ tables:
         constants_from: zhsr-database/src/main/resources/db/dict/trip_status_type.tsv
       departed_dt:
         title: "Дата отправления"
+        description: |
+          Записи журналов вагонов поезда, открытые отметкой отправления, - текущие записи с dbeg, равным этому времени.
+          Исправление и отмена отметки правят именно их
       arrived_dt:
         title: "Дата прибытия"
+        description: |
+          Записи журналов вагонов поезда, открытые отметкой прибытия, - текущие записи с dbeg, равным этому времени.
+          Исправление и отмена отметки правят именно их
       departed_by_usr:
         title: "Кто отметил отправление"
       arrived_by_usr:
@@ -632,57 +656,133 @@ tables:
         title: "Когда отмечено прибытие"
         description: "Время внесения отметки. 10 минут после него отметку можно исправить или отменить"
 
-  trip_wagon:
-    title: "Состав вагонов рейса"
+  train:
+    title: "Поезд"
+    description: |
+      Вагоны, которые ходят вместе из рейса в рейс. Вагоны поезда - train_wagon; рейс ссылается на поезд.
     columns:
-      trip:
-        title: "Рейс"
+      name:
+        title: "Обозначение"
+        description: "Уникально среди действующих поездов"
+      dbeg:
+        title: "Когда сформирован"
+      dend:
+        title: "Когда расформирован"
+        description: "Пусто - поезд действует"
+
+  train_wagon:
+    title: "Участие вагона в поезде"
+    description: |
+      Период нахождения вагона в поезде по факту. Прицепка и отцепка - изменения train_wagon_change. Вагон,
+      отцепленный и снова прицепленный к тому же поезду, - вторая строка. Вагон в каждый момент - не больше чем в
+      одном поезде. Отмена без истории: отмена прицепки удаляет строку, отмена отцепки удаляет изменение и очищает
+      dend.
+    columns:
+      train:
+        title: "Поезд"
       wagon:
         title: "Вагон"
-        description: "Уникален в рейсе"
       seq:
-        title: "Позиция"
-      depart_wagon_location:
-        title: "Запись расположения при отправлении"
-        description: "wagon_location: вагон в рейсе"
-      arrive_wagon_location:
-        title: "Запись расположения при прибытии"
-        description: "wagon_location: вагон на станции прибытия"
-      depart_wagon_status:
-        title: "Запись состояния при отправлении"
-        description: "wagon_status: в пути"
-      arrive_wagon_status:
-        title: "Запись состояния при прибытии"
-        description: "wagon_status: в простое"
-      data:
-        title: "Данные перевозки"
-        description: "JSON: гружёный, груз, накладная, станция назначения"
+        title: "Позиция в поезде"
+      dbeg:
+        title: "Дата прицепки к поезду"
+        description: "Совпадает с train_wagon_change.fact_dt выполненной прицепки. Пусто - прицепка только запланирована"
+      dend:
+        title: "Дата отцепки от поезда"
+        description: "Совпадает с train_wagon_change.fact_dt выполненной отцепки. Пусто - вагон в поезде"
+
+  train_wagon_change:
+    title: "Нахождение вагона в поезде"
+    description: |
+      Прицепка вагона к поезду или отцепка от него. Изменение бывает плановым, выполненным и отменённым.
+      Выполненные прицепки и отцепки идут по очереди. Любая прицепка и отцепка задаёт станцию. 
+      Выполненная прицепка или отцепка заполняет период участия (train_wagon.dbeg или train_wagon.dend).
+      Прицепка и отцепка в рейсе задают рейс и остановку маршрута и открывают записи журналов вагона, прицепка и отцепка вне рейса журналы вагона не меняют.
+    columns:
+      train_wagon:
+        title: "Участие в поезде"
+      change_type:
+        title: "Вид изменения"
+        constants_from: kz.zhsr.app.constants.TrainWagonChangeType
+      status:
+        title: "Статус"
+        constants_from: kz.zhsr.app.constants.TrainWagonChangeStatus
+      planned_dt:
+        title: "Плановое время"
+      fact_dt:
+        title: "Фактическое время"
+        description: "Заполнено у выполненного изменения"
+      station:
+        title: "Станция, на которой произошло изменение"
+      trip:
+        title: "Рейс, в котором произошло изменение"
+        description: "Пусто - изменение вне рейса"
+      route_station:
+        title: "Станция рейса, на которой произошло изменение"
+        description: "Не дублирует station, а даёт определенность в определении маршрута пробега между станциями - порядок станций есть только в станциях рейса."
+      usr:
+        title: "Кто внёс"
+        description: "Запланировал или отметил факт"
+      comment:
+        title: "Основания, примечания"
+        description: "Приказ, причина"
+      wagon_location:
+        title: "Запись расположения, открытая прицепкой или отцепкой"
+        description: "Пусто - изменение вне рейса или не выполнено"
+      wagon_status:
+        title: "Запись состояния, открытая прицепкой или отцепкой"
+        description: "Пусто - изменение вне рейса или не выполнено"
+      wagon_responsible:
+        title: "Запись ответственного, открытая прицепкой или отцепкой"
+        description: "Пусто - изменение вне рейса или не выполнено"
+
+  wagon_run:
+    title: "Пробег вагона за участок рейса"
+    description: |
+      Участок, который вагон проехал в поезде рейса: от начальной станции маршрута или остановки прицепки до конечной
+      станции или остановки отцепки. Строку вносит прибытие рейса или отцепка в пути; отмена прибытия или отцепки
+      удаляет строку. Общий пробег вагона (wagon_info.run_km) - пробег на момент ввода плюс сумма km.
+    columns:
+      wagon:
+        title: "Вагон"
+      trip:
+        title: "Рейс"
+      train_wagon:
+        title: "Участие в поезде"
+        description: "Участие, на котором пройден участок; вагон, отцепленный и снова прицепленный в рейсе, - два участка"
+      km:
+        title: "Пробег, км"
+        description: "Разность километража route_station конца и начала участка"
 
   trip_crew:
     title: "Бригада рейса"
     description: |
-      Член бригады с должностью на рейсе: проводник, начальник поезда, поездной электромеханик (ПЭМ). Начальник
-      поезда и ПЭМ - не больше одного на рейс.
+      Сотрудник на дежурстве в рейсе с должностью: проводник, начальник поезда, поездной электромеханик (ПЭМ).
+      Строка - дежурство при вагоне: проводник двух вагонов - две строки. Начальник поезда и ПЭМ - не больше одного
+      на дежурстве. До отправления строки правятся и удаляются, с отправления - не удаляются.
     columns:
       trip:
         title: "Рейс"
       usr:
         title: "Сотрудник"
-        description: "Один раз на рейс"
       crew_duty_type:
         title: "Должность на рейсе"
         constants_from: zhsr-database/src/main/resources/db/dict/crew_duty_type.tsv
       wagon:
         title: "Вагон, если должность на рейсе - проводник"
         description: "Пусто - проводник назначен на рейс без привязки к вагону"
-      wagon2:
-        title: "Второй вагон проводника"
-        description: "Соседний с первым; пусто - проводник обслуживает один вагон"
+      dbeg:
+        title: "Заступление на дежурство"
+        description: "Отправление рейса или назначение в пути; пусто - рейс ещё не отправлен"
+      dend:
+        title: "Окончание дежурства"
+        description: |
+          Прибытие рейса или перевод проводника на другой вагон в рейсе. Пусто - на дежурстве
 
   act_cancellation:
     title: "Акт отмены"
     description: |
-      На акт отмены ссылается отменённый акт отцепки, прицепки или приёма-передачи. Отменённый акт не удаляется,
+      На акт отмены ссылается отменённый акт приёма-передачи. Отменённый акт не удаляется,
       но больше не действует.
     columns:
       created_by_usr:
@@ -691,57 +791,6 @@ tables:
         title: "Когда отменён"
       reason:
         title: "Причина отмены"
-
-  coupling_act:
-    title: "Акт отцепки, прицепки"
-    description: |
-      Отцепка или прицепка вагонов на остановке рейса.
-    columns:
-      number:
-        title: "Номер"
-        description: "Уникален"
-      coupling_type:
-        title: "Отцепка или прицепка"
-        constants_from: zhsr-database/src/main/resources/db/dict/coupling_type.tsv
-      trip:
-        title: "Рейс"
-      route_station:
-        title: "На какой остановке произошла операция"
-      order_info:
-        title: "Приказ-основание"
-      reason:
-        title: "Причина"
-      created_by_usr:
-        title: "Кто составил"
-      created_dt:
-        title: "Когда"
-      act_dt:
-        title: "Время акта"
-        description: "Время, которое указал пользователь: с него действуют записи журналов вагонов"
-      act_status_type:
-        title: "Статус"
-        description: "Проведён или отменён"
-        constants_from: zhsr-database/src/main/resources/db/dict/act_status_type.tsv
-      act_cancellation:
-        title: "Акт отмены"
-        description: "Заполнен только при статусе \"отменён\""
-
-  coupling_act_wagon:
-    title: "Вагон в акте отцепки, прицепки"
-    columns:
-      coupling_act:
-        title: "Акт"
-      wagon:
-        title: "Вагон"
-        description: "Уникален в акте"
-      seq:
-        title: "Порядок"
-      wagon_location:
-        title: "Запись расположения"
-        description: "wagon_location, открытая актом: прицепка - рейс, отцепка - станция"
-      wagon_status:
-        title: "Запись состояния"
-        description: "wagon_status, открытая актом: прицепка - в пути, отцепка - в простое"
 
   transfer_act:
     title: "Приём-передача вагонов между депо, станцией и парком отстоя"
@@ -810,6 +859,9 @@ tables:
       wagon_location:
         title: "Запись расположения"
         description: "wagon_location, открытая приёмом: депо или парк отстоя акта либо их станция; пусто, пока акт не принят"
+      wagon_responsible:
+        title: "Запись ответственного"
+        description: "wagon_responsible, открытая актом при передаче; при приёме ответственного можно сменить в этой записи; пусто у отменённого акта и при отказе"
 
   repair_request:
     title: "Заявка на ремонт"
@@ -821,9 +873,10 @@ tables:
         title: "Номер"
         description: "Уникален. Код компании, год (две цифры), порядковый номер в году"
       wagon:
-        title: "Вагон"
+        title: "В каком вагоне"
       trip:
-        title: "Рейс"
+        title: "На каком рейсе зафиксирована"
+        description: "Пусто - неисправность зафиксирована вне рейса, в депо, на станции и т.п."
       fault_type:
         title: "Неисправность"
       severity_type:
@@ -866,7 +919,7 @@ tables:
       repair_request:
         title: "Заявка"
       note:
-        title: "Примечание"
+        title: "Примечание или описание от автора"
       created_by_usr:
         title: "Автор примечания"
       created_dt:
@@ -1002,11 +1055,55 @@ tables:
         title: "Состояние"
         constants_from: zhsr-database/src/main/resources/db/dict/wagon_status_type.tsv
 
+  wagon_edit:
+    title: "Ручная правка вагона"
+    description: |
+      Смена состояния (Ф-ВАГ-02) или расположения (Ф-ВАГ-03) администратором с комментарием, смена ответственного
+      (Ф-ВАГ-07) - без акта. Ссылается на записи журналов, которые открыла: при смене состояния - wagon_status, при
+      смене расположения - wagon_location и запись ответственного, при смене ответственного - только запись
+      ответственного.
+    columns:
+      wagon:
+        title: "Вагон"
+      created_by_usr:
+        title: "Кто правил"
+      created_dt:
+        title: "Когда"
+      comment:
+        title: "Комментарий"
+        description: "Обязателен при смене состояния и расположения; при смене ответственного - пусто"
+      wagon_location:
+        title: "Запись расположения"
+        description: "wagon_location, открытая сменой расположения"
+      wagon_status:
+        title: "Запись состояния"
+        description: "wagon_status, открытая сменой состояния"
+      wagon_responsible:
+        title: "Запись ответственного"
+        description: "wagon_responsible, открытая сменой расположения или ответственного"
+
+  wagon_responsible:
+    title: "Журнал ответственного за вагон"
+    description: |
+      Запись действует с dbeg по dend (не включая); dend пуст - текущий ответственный. Периоды вагона не пересекаются.
+      Документы и другие таблицы ссылаются на записи, которые они открыли.
+    columns:
+      wagon:
+        title: "Вагон"
+      dbeg:
+        title: "Начало ответственности"
+      dend:
+        title: "Конец ответственности"
+        description: "Пусто - текущая запись"
+      usr:
+        title: "Ответственный"
+        description: "Пусто - ответственный явно не назначен"
+
   wagon_info:
     title: "Текущие данные вагона"
     description: |
-      Кэш состояния вагона для быстрого доступа. Все поля вычисляемые: копия текущих записей журналов wagon_location и
-      wagon_status, обновляется в одной транзакции с журналами. Одна запись на вагон. Расположение ровно одно из:
+      Кэш состояния вагона для быстрого доступа. Все поля вычисляемые: копия текущих записей журналов wagon_location,
+      wagon_status и wagon_responsible, обновляется в одной транзакции с журналами. Одна запись на вагон. Расположение ровно одно из:
       станция, депо, парк отстоя, рейс.
     columns:
       wagon:
@@ -1037,6 +1134,15 @@ tables:
         title: "Состояние"
         description: "Вычисляемое: из текущей записи wagon_status"
         constants_from: zhsr-database/src/main/resources/db/dict/wagon_status_type.tsv
+      dbeg_responsible:
+        title: "Начало текущей ответственности"
+        description: "Вычисляемое: dbeg текущей записи wagon_responsible"
+      responsible_usr:
+        title: "Ответственный"
+        description: "Вычисляемое: usr текущей записи wagon_responsible; пусто - не назначен"
+      run_km:
+        title: "Общий пробег, км"
+        description: "Вычисляемое: wagon.initial_run_km плюс сумма wagon_run.km"
 
   check_dict:
     title: "Справочник вариантов ответов"
@@ -1085,6 +1191,10 @@ tables:
         title: "Название на казахском"
       text_en:
         title: "Название на английском"
+      check_object:
+        title: "Объект проверки"
+        description: "Что проверяют по чек-листу"
+        constants_from: kz.zhsr.app.constants.CheckObject
       sort_order:
         title: "Порядок в списке"
       disabled:
@@ -1123,9 +1233,11 @@ tables:
   check_list_item_norm:
     title: "Норматив пункта чек-листа"
     description: |
-      Какое значение пункта - нарушение. Пункт без норматива нарушения не даёт. Для вагона берётся действующий
-      норматив его типа вагона, если его нет - общий (тип вагона пуст); нет ни того ни другого - пункт к типу вагона
-      не относится и не показывается. Нормативы пункта для одного типа вагона по периодам не пересекаются.
+      Какое значение пункта - нарушение. Пункт без норматива нарушения не даёт. Для вагона берётся текущий (незакрытый)
+      норматив его типа вагона, если его нет - общий (тип вагона пуст); для сотрудника и рейса - общий. Пункт
+      показывается, если у пункта нет нормативов или для объекта проверки нашёлся норматив. Норматив, по которому
+      проверены значения, при правке закрывается (dend) и заменяется новым. Нормативы пункта для одного типа вагона по
+      периодам не пересекаются.
     columns:
       check_list_template_item:
         title: "Пункт шаблона"
@@ -1145,8 +1257,8 @@ tables:
         title: "Критичный"
         description: "Нарушение блокирует отправку вагона в рейс"
       fault_type:
-        title: "Неисправность заявки"
-        description: "Неисправность заявки, которая создаётся по нарушению. Пусто - нарушение без заявки"
+        title: "Вид неисправности, которая будет указана в заявке, автоматически создаваемой при нарушении"
+        description: "Пусто - нарушение не требует автоматического создания заявки"
       dbeg:
         title: "Начало действия"
       dend:
@@ -1185,8 +1297,8 @@ tables:
       created_dt:
         title: "Когда начата"
       completed_dt:
-        title: "Когда завершена"
-        description: "Пусто - черновик"
+        title: "Когда последний раз сохранена"
+        description: "Проверяющий нажал «Проверка окончена»: чек-лист приходит на сервер только завершённым. Автор исправляет чек-лист в течение 10 минут после сохранения"
 
   check_list_value:
     title: "Значение пункта чек-листа"
@@ -1215,6 +1327,25 @@ tables:
         title: "Заявка"
         description: "Заявка, созданная по нарушению"
 
+  check_list_value_photo:
+    title: "Фото к значению пункта чек-листа"
+    description: |
+      Файл - в хранилище файлов (S3). Заявка по нарушению получает ссылку на тот же файл (repair_request_photo с тем же
+      storage_key): файл не копируется. Удаляется вместе со значением.
+    columns:
+      check_list_value:
+        title: "Значение пункта"
+      storage_key:
+        title: "Ключ файла в бакете"
+      size_bytes:
+        title: "Размер, байт"
+      created_by_usr:
+        title: "Кто приложил"
+      created_dt:
+        title: "Когда приложено"
+      received_dt:
+        title: "Когда поступило на сервер"
+
   equip_list_template:
     title: "Шаблон описи экипировки"
     description: |
@@ -1227,8 +1358,8 @@ tables:
       text_en:
         title: "Название на английском"
       fault_type:
-        title: "Неисправность заявки по недостаче"
-        description: "Одна заявка на всю опись. Пусто - опись без заявки"
+        title: "Вид неисправности, которая будет указана в заявке, автоматически создаваемой при недостаче"
+        description: "Одна заявка на всю опись. Пусто - при недостаче не нужно автоматически создавать заявку"
       sort_order:
         title: "Порядок в списке"
       disabled:
@@ -1264,8 +1395,9 @@ tables:
     title: "Норматив пункта описи экипировки"
     description: |
       Требуется = количество на единицу базы × база + добавка для головного и хвостового вагона. Число мест, купе и
-      окон - у модели вагона. Подбор норматива для вагона - как у норматива чек-листа: сначала по типу вагона, потом
-      общий. Пункт без норматива (опись имущества) сравнивается с прошлой описью вагона.
+      окон - у модели вагона. Подбор, показ и правка норматива - как у норматива чек-листа. Пункт без норматива (опись
+      имущества) сравнивается с прошлой описью вагона. Добавка для головного и хвостового вагона в требуемое
+      количество пока не входит (техдолг).
     columns:
       equip_list_template_item:
         title: "Пункт шаблона"
@@ -1311,8 +1443,8 @@ tables:
       created_dt:
         title: "Когда начата"
       completed_dt:
-        title: "Когда завершена"
-        description: "Пусто - черновик"
+        title: "Когда последний раз сохранена"
+        description: "Опись приходит на сервер только завершённой. Автор исправляет опись в течение 10 минут после сохранения"
       repair_request:
         title: "Заявка по недостаче. Пусто - заявка не создавалась"
 
@@ -1336,3 +1468,25 @@ tables:
       violation:
         title: "Было ли нарушение"
         description: "Нарушает ли фактическое количество норматив на момент описи. Сохраняется, чтобы уже проведенные описи не менялась при смене норматива."
+      comment:
+        title: "Примечание"
+        description: "Примечание проводящего опись к пункту"
+
+  equip_list_value_photo:
+    title: "Фото к значению пункта описи"
+    description: |
+      Файл - в хранилище файлов (S3). Заявка по недостаче получает ссылку на тот же файл (repair_request_photo с тем же
+      storage_key): файл не копируется. Удаляется вместе со значением.
+    columns:
+      equip_list_value:
+        title: "Значение пункта"
+      storage_key:
+        title: "Ключ файла в бакете"
+      size_bytes:
+        title: "Размер, байт"
+      created_by_usr:
+        title: "Кто приложил"
+      created_dt:
+        title: "Когда приложено"
+      received_dt:
+        title: "Когда поступило на сервер"

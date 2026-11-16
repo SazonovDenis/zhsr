@@ -29,7 +29,7 @@ import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { loadCached } from '@/shared/offline/cache'
 
 /**
- * Нижняя панель вкладок мобильной части: «Рейс», «Заявки» (число — заявки, ожидающие обработки), «Профиль».
+ * Нижняя панель вкладок мобильной части: «Профиль», «Рейс», «Заявки» (число — заявки, ожидающие обработки), «Проверки».
  */
 const route = useRoute()
 
@@ -44,9 +44,11 @@ async function loadState() {
 }
 
 const tabs = computed<{ name: string; label: string; icon?: string; svg?: IconName; badge?: number }[]>(() => [
+  // профиль — первым
+  { name: 'pwa-profile', label: 'Профиль', svg: 'user' },
   { name: 'pwa-home', label: 'Рейс', icon: 'today' },
   { name: 'pwa-requests', label: 'Заявки', svg: 'requests', badge: requests.value },
-  { name: 'pwa-profile', label: 'Профиль', svg: 'user' },
+  { name: 'pwa-checks', label: 'Проверки', svg: 'checks' },
 ])
 
 const onRefresh = () => void loadState()
@@ -64,7 +66,9 @@ onMounted(loadState)
 .pwa-tabs {
   display: grid;
   flex: none;
-  grid-template-columns: repeat(3, 1fr);
+  // все вкладки в одну строку, поровну
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
   border-top: 0.0625rem solid $zs-border;
   background: #fff;
 }

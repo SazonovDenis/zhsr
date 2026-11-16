@@ -1,6 +1,7 @@
-id	text_ru	text_kk	text_en	sort_order	disabled
-1	Приёмка вагона	Вагонды қабылдау	Wagon acceptance	1	false
-2	Медосмотр	Медициналық тексеру	Medical check	2	false
-3	Инструктаж	Нұсқаулық	Briefing	3	false
-4	Проверка: топ нарушений	Тексеру: негізгі бұзушылықтар	Inspection: top violations	4	false
-5	Проверка качества уборки	Жинау сапасын тексеру	Cleaning quality check	5	false
+id	text_ru	text_kk	text_en	check_object	sort_order	disabled
+1	Приёмка вагона	Вагонды қабылдау	Wagon acceptance	1	1	false
+2	Медосмотр	Медициналық тексеру	Medical check	2	2	false
+3	Инструктаж	Нұсқаулық	Briefing	2	3	false
+4	Топ нарушений	Негізгі бұзушылықтар	Top violations	1	4	false
+5	Проверка качества уборки	Жинау сапасын тексеру	Cleaning quality check	1	5	false
+6	Подготовка рейса	Рейсті дайындау	Trip preparation	3	6	false

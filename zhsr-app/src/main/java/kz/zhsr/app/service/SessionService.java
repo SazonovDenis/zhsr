@@ -156,12 +156,21 @@ public class SessionService {
     }
 
     /**
-     * Идентификатор серверной БД. Его пишет install/db-reset; без него фронт не может сверить локальную БД.
+     * БД загружена с демо-данными (db_info.demo, пишет prepare/db-reset --demo): страница входа показывает быстрый вход
+     * демо-пользователями. Доступно без входа.
+     */
+    public boolean demo() throws Exception {
+        List<DbRec> rows = db.loadList("db_info", null);
+        return rows.size() == 1 && rows.get(0).getBoolean("demo");
+    }
+
+    /**
+     * Идентификатор серверной БД. Его пишет prepare/db-reset; без него фронт не может сверить локальную БД.
      */
     private String dbGuid() throws Exception {
         List<DbRec> rows = db.loadList("db_info", null);
         if (rows.size() != 1) {
-            throw new IllegalStateException("В db_info должна быть одна строка: БД создаётся через install/db-reset");
+            throw new IllegalStateException("В db_info должна быть одна строка: БД создаётся через prepare/db-reset");
         }
         return rows.get(0).getString("db_guid");
     }

@@ -9,7 +9,8 @@
     @action="onAction"
   >
     <template #actions-left><slot name="actions-left" /></template>
-    <slot />
+    <!-- двойной клик по варианту с data-dialog-pick — выбор и основное действие -->
+    <div class="form-dialog__fields" @dblclick="onDblclick"><slot /></div>
     <ErrorBox v-if="shown" :error="shown" class="form-dialog__error" />
     <div v-if="hint" class="form-dialog__hint">{{ t(hint) }}</div>
   </DialogFrame>
@@ -34,6 +35,9 @@ import DialogFrame from './DialogFrame.vue'
  * Основное действие отправляет событие ok; что проверить и какой запрос отправить, решает конкретный диалог. Пока
  * running = true, кнопка основного действия крутит спиннер, а повторно действие не запускается.
  *
+ * Двойной клик по элементу с атрибутом data-dialog-pick — то же, что нажать кнопку основного действия: первый клик
+ * уже выбрал вариант. Атрибут ставится у вариантов списка, если список — единственное поле формы (выбор исполнителя).
+ *
  * Диалог-наследник открывается через openDialog: у него v-model:show, а результат он отдаёт событием done.
  *
  *   <FormDialog v-model:show="show" title="Ввод вагона" ok-text="Ввести вагон" :running="running"
@@ -45,6 +49,8 @@ const props = withDefaults(
     title: string
     /** текст кнопки основного действия на русском */
     okText?: string
+    /** текст кнопки «Отмена» на русском, например «Не отменять» у отмены заявки */
+    cancelText?: string
     width?: string
     running?: boolean
     /** ошибка над кнопками: проверки формы (formError) или запроса (shownError, запрос второй строкой); null — нет */
@@ -54,7 +60,15 @@ const props = withDefaults(
     /** дополнительные кнопки справа — перед кнопкой основного действия, например «Назначить себя» */
     extraActions?: DialogAction[]
   }>(),
-  { okText: 'Сохранить', width: '35rem', running: false, error: null, hint: '', extraActions: () => [] },
+  {
+    okText: 'Сохранить',
+    cancelText: 'Отмена',
+    width: '35rem',
+    running: false,
+    error: null,
+    hint: '',
+    extraActions: () => [],
+  },
 )
 
 const emit = defineEmits<{ ok: [] }>()
@@ -67,7 +81,7 @@ const shown = computed(() => props.error)
 const busy = useBusy()
 
 const actions = computed<DialogAction[]>(() => [
-  { title: 'Отмена', left: true },
+  { title: props.cancelText, left: true },
   ...props.extraActions,
   { name: 'ok', title: props.okText, default: true },
 ])
@@ -75,9 +89,19 @@ const actions = computed<DialogAction[]>(() => [
 function onAction(name: string) {
   if (name === 'ok') emit('ok')
 }
+
+function onDblclick(e: MouseEvent) {
+  if (props.running || !(e.target as HTMLElement).closest('[data-dialog-pick]')) return
+  emit('ok')
+}
 </script>
 
 <style scoped lang="scss">
+.form-dialog__fields {
+  // обёртка только ловит двойной клик: поля раскладываются, как будто её нет
+  display: contents;
+}
+
 .form-dialog__error {
   font-size: 0.8rem;
 }

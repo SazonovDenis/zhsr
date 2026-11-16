@@ -26,19 +26,20 @@
 
       <ErrorBox v-if="error" :error="error" class="login-page__error q-py-sm q-px-md" />
 
+      <!-- синяя стандартная: на телефоне — как кнопки страниц телефона (zs-pwa-btn--lg) -->
       <q-btn
         type="submit"
         unelevated
         no-caps
         color="primary"
-        class="login-page__submit"
+        :class="{ 'zs-pwa-btn zs-pwa-btn--lg': isMobile }"
         :label="t('Войти')"
         :loading="running"
       />
     </form>
 
-    <!-- быстрый вход фиктивными пользователями — только при dev-запуске: клик заполняет логин и пароль -->
-    <div v-if="isDev" class="login-page__dev q-py-sm q-px-md">
+    <!-- быстрый вход демо-пользователями — только если БД сервера с демо-данными: клик заполняет логин и пароль -->
+    <div v-if="demo" class="login-page__dev q-py-sm q-px-md">
       <span class="login-page__dev-title">{{ t('Демо вход') }}:</span>
       <button
         v-for="u in DEMO_LOGINS"
@@ -58,7 +59,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { isPasswordChangeRequired } from '@/api/http'
-import { DEMO_LOGINS, login } from '@/api/session'
+import { DEMO_LOGINS, fetchDemo, login } from '@/api/session'
 import { t } from '@/boot/i18n'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import { openDialog } from '@/shared/components/dialog/openDialog'
@@ -84,7 +85,8 @@ import ForeignQueueDialog from './ForeignQueueDialog.vue'
  * её нет.
  */
 
-const isDev = import.meta.env.DEV
+// БД сервера с демо-данными (db_info.demo) — показывается быстрый вход
+const demo = ref(false)
 
 const router = useRouter()
 
@@ -103,6 +105,11 @@ const formEl = ref<HTMLFormElement | null>(null)
 onMounted(async () => {
   const inputs = formEl.value?.querySelectorAll('input')
   inputs?.[0]?.focus()
+  // признак демо-БД — подсказка, а не данные формы: сервер недоступен — быстрого входа просто нет, ошибку входа
+  // покажет сама форма (осознанно не показываем)
+  fetchDemo()
+    .then((v) => (demo.value = v))
+    .catch(() => (demo.value = false))
   queued.value = await db.outbox.count()
   owner.value = await lastLogin()
   if (owner.value && !username.value) {
@@ -259,10 +266,6 @@ async function submit() {
   }
 }
 
-.login-page__submit {
-  min-height: var(--zs-control-height);
-  font-weight: 600;
-}
 .login-page__warning {
   padding: 0.6rem 0.9rem;
   border-radius: 0.3rem;

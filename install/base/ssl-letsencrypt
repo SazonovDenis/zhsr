@@ -1,0 +1,41 @@
+#!/bin/sh
+set -e
+
+# Сертификат Let's Encrypt для домена (домен уже указывает на этот сервер, порт 80 открыт) и автопродление.
+#   ./ssl-letsencrypt <домен> <почта>
+# Сертификат кладётся в ssl/ (server.crt, server.key), nginx перезапускается. Продление - раз в сутки по cron.
+
+cd "$(dirname "$0")"
+
+if [ $# -lt 2 ]; then
+    echo "Использование: $0 <домен> <почта>" >&2
+    exit 1
+fi
+DOMAIN=$1
+EMAIL=$2
+DIR=$(pwd)
+
+mkdir -p ssl acme letsencrypt
+
+# выпуск: проверка через файл в acme/, его отдаёт nginx по http
+docker run --rm -v "$DIR/acme:/var/www/acme" -v "$DIR/letsencrypt:/etc/letsencrypt" certbot/certbot \
+    certonly --webroot -w /var/www/acme -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive
+
+# сертификат -> ssl/ и перезапуск nginx; этим же скриптом продлевает cron
+cat > ssl-renew <<RENEW
+#!/bin/sh
+set -e
+cd "$DIR"
+docker run --rm -v "$DIR/acme:/var/www/acme" -v "$DIR/letsencrypt:/etc/letsencrypt" certbot/certbot renew --quiet
+# файлы certbot принадлежат root - копирует сам контейнер
+docker run --rm -v "$DIR/letsencrypt:/etc/letsencrypt:ro" -v "$DIR/ssl:/out" --entrypoint sh certbot/certbot -c \
+    "cp -L /etc/letsencrypt/live/$DOMAIN/fullchain.pem /out/server.crt && cp -L /etc/letsencrypt/live/$DOMAIN/privkey.pem /out/server.key"
+docker compose restart zhsr-nginx
+RENEW
+chmod +x ssl-renew
+./ssl-renew
+
+# продление раз в сутки
+( crontab -l 2>/dev/null | grep -v "$DIR/ssl-renew"; echo "17 3 * * * $DIR/ssl-renew > /dev/null 2>&1" ) | crontab -
+
+echo "Готово: сертификат для $DOMAIN, продление - по cron"

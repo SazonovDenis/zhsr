@@ -13,9 +13,8 @@ export const requestsColumns = defineColumns<RepairRequest>([
   {
     field: 'wagon',
     title: 'Вагон',
-    width: '6rem',
+    width: '8rem',
     cell: CellRequestWagon,
-    cellClass: 'zs-mono',
     sortable: true,
     sortField: 'wagonNumber',
   },

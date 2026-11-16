@@ -1,6 +1,6 @@
 <template>
   <!-- клики здесь не сворачивают левое меню: до aside они не доходят -->
-  <div class="user-block q-pa-sm" :class="{ 'user-block--collapsed': collapsed }" @click.stop>
+  <div class="user-block q-py-xs" :class="{ 'user-block--collapsed': collapsed }" @click.stop>
     <!-- блок внизу панели: подменю раскрывается вверх, над пользователем -->
     <div v-if="open" class="user-block__submenu">
       <button
@@ -34,7 +34,7 @@
         <q-icon name="logout" size="1.1rem" />
         <span v-if="!collapsed">{{ t('Выход') }}</span>
       </button>
-      <div class="user-block__separator user-block__separator--wide q-my-xs q-mr-md q-ml-lg" />
+      <div class="user-block__separator user-block__separator--wide" />
     </div>
 
     <!-- клик по пользователю разворачивает подменю прямо в панели: язык, смена пароля и выход -->
@@ -42,7 +42,7 @@
       type="button"
       class="user-block__user q-py-xs q-px-sm"
       :class="{ 'user-block__user--open': open }"
-      :title="collapsed ? `${user.name}, ${roles}` : undefined"
+      :title="`${user.name}, ${roles}`"
       @click="toggle"
     >
       <SvgIcon name="user" class="user-block__icon" />
@@ -113,13 +113,14 @@ function onChangePassword() {
 .user-block {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  // промежуток между подменю и пользователем — как отступ блока сверху (q-py-xs): строка пользователя стоит от черты
+  // над ней одинаково, раскрыто подменю или нет
+  gap: 0.25rem;
   color: $zs-menu-fg;
   cursor: default;
 
   &--collapsed {
     align-items: center;
-    padding: 0.4rem 0;
   }
 }
 
@@ -213,14 +214,14 @@ function onChangePassword() {
     margin: 0.3rem 0;
   }
 
-  // во всю ширину меню: за отступы блока пользователя
+  // во всю ширину меню: за боковой отступ обёртки блока пользователя (DesktopMenu, 0.5rem)
   &--wide {
-    margin: 0.3rem -0.6rem;
+    margin: 0.3rem -0.5rem 0;
 
     .user-block--collapsed & {
       align-self: stretch;
       width: auto;
-      margin: 0.3rem 0;
+      margin: 0.3rem 0 0;
     }
   }
 }
@@ -233,16 +234,22 @@ function onChangePassword() {
 }
 
 .user-block__name {
+  overflow: hidden;
   color: #fff;
   font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 // роли не обрезаются: не помещаются в строку — переносятся
 .user-block__role {
+  overflow: hidden;
   color: $zs-menu-fg-muted;
   font-size: 0.8rem;
-  overflow-wrap: anywhere;
+  // одной строкой, лишнее — многоточием (полностью — в подсказке): при разворачивании меню ширина растёт плавно, и
+  // переносимый текст на это время вытягивал блок в несколько строк — высота прыгала
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 </style>
