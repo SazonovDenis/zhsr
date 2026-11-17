@@ -1,5 +1,5 @@
 <template>
-  <DesktopFrame v-model:floating="panel.floating.value" :right-open="panel.open.value" right-width="28rem">
+  <DesktopFrame v-model:floating="panel.floating.value" :right-open="panel.open.value">
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Описи') }}</h1>
       <div class="desktop-frame__actions">
@@ -49,7 +49,9 @@
       :loading="busy.active.value"
       :error="loadError"
       :retry="load"
+      :sort="sort"
       empty="Описей по выбранному фильтру нет"
+      @sort="sort = $event"
     />
 
     <template #right>
@@ -74,7 +76,7 @@ import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { RowKey } from '@/shared/components/table/types'
+import type { RowKey, TableSort } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -98,31 +100,61 @@ const filter = reactive<EquipListFilter>({ template: null, wagon: null, query: '
 const rows = shallowRef<EquipListRow[]>([])
 const selectedId = ref<RowKey | null>(route.query.id ? Number(route.query.id) : null)
 const panel = useSidePanel(selectedId)
+// сортировка по колонке; null — сначала новые
+const sort = ref<TableSort | null>(null)
 const loadError = ref<ShownError | null>(null)
 const newReason = computed(() => equipReason())
 
 const columns = defineColumns<EquipListRow>([
-  { field: 'createdDt', title: 'Начата', width: '9rem', format: (v) => formatDateTime(v as string) },
+  {
+    field: 'createdDt',
+    title: 'Начата',
+    // по ширине даты «17.11 17:32» (цифры по 1ch, точка, двоеточие и пробел уже) и отступов слева 1rem и справа (dense);
+    // дата не переносится
+    width: 'calc(9.5ch + 1.3rem)',
+    dense: true,
+    cellClass: 'text-no-wrap',
+    sortable: true,
+    format: (v) => formatDateTime(v as string),
+  },
+  // вид описи — без сортировки
   {
     field: 'equipListTemplate',
     title: 'Шаблон описи',
     width: 'minmax(14rem, 2fr)',
     format: (_, row) => textOf(row.equipListTemplate),
   },
-  { field: 'wagon', title: 'Вагон', width: '8rem', cellClass: 'zs-mono', format: (_, row) => row.wagon.number },
+  {
+    field: 'wagon',
+    title: 'Вагон',
+    width: '8rem',
+    cellClass: 'zs-mono',
+    sortable: true,
+    format: (_, row) => row.wagon.number,
+  },
   {
     field: 'createdByUsr',
     title: 'Составил',
     width: 'minmax(10rem, 1fr)',
+    sortable: true,
     format: (_, row) => userName(row.createdByUsr),
   },
-  { field: 'violationCount', title: 'Нарушений', width: '8rem', align: 'right' },
+  // числа — по ширине заголовка; ширина постоянная: у каждой строки таблицы своя сетка, ширина по содержимому
+  // разъехалась бы по строкам. Заявка по недостаче у описи одна: 1 или 0
+  // нарушений нет — «нет»; заявки нет — пусто
+  {
+    field: 'violationCount',
+    title: 'Нарушений',
+    width: '6.5rem',
+    align: 'right',
+    format: (_, row) => (row.violationCount ? String(row.violationCount) : t('нет')),
+  },
   {
     field: 'repairRequest',
-    title: 'Заявка',
-    width: '10rem',
-    cellClass: 'zs-mono',
-    format: (_, row) => row.repairRequest?.number ?? '',
+    title: 'Заявок',
+    width: '5rem',
+    align: 'right',
+    format: (_, row) => (row.repairRequest ? '1' : ''),
   },
 ])
 
@@ -140,7 +172,7 @@ const templateChoice = computed({
 async function load() {
   loadError.value = null
   try {
-    const [list] = await busy.run(Promise.all([fetchEquipLists(filter), loadCurrentUser()]))
+    const [list] = await busy.run(Promise.all([fetchEquipLists(filter, sort.value), loadCurrentUser()]))
     rows.value = list
   } catch (e) {
     rows.value = []
@@ -160,7 +192,8 @@ applyRouteQuery()
 watch(() => route.query.wagon, applyRouteQuery)
 watch(wagonFilter, (w) => (filter.wagon = w?.id ?? null), { immediate: true })
 
-watch(filter, load, { deep: true })
+// фильтр или сортировка изменились — данные загружаются заново
+watch([filter, sort], load, { deep: true })
 void load()
 </script>
 

@@ -33,17 +33,18 @@
           :title="canChooseExecutor ? undefined : t('Назначить можно, если выбран вагон вашего рейса')"
         >
           <template #option="{ item }">
-            <StaffOption
-              :name="item.text ?? ''"
-              :candidate="(item.data?.candidate as StaffCandidate) ?? null"
-              :wagon-number="wagonNumber || null"
+            <UserOption
+              :name="(item.data?.candidate as StaffCandidate | undefined)?.usr.name ?? item.text ?? ''"
+              :me="isMe({ id: Number(item.id) })"
+              v-bind="staffRow((item.data?.candidate as StaffCandidate | undefined) ?? null, wagonNumber || null)"
             />
           </template>
         </CbList>
       </FormField>
     </FormSection>
 
-    <FormSection divided>
+    <!-- описание и фото — в одну строку: фото справа от описания, в ряд -->
+    <FormSection divided columns="minmax(0, 1fr) max-content" class="request-dialog__note">
       <FormField label="Описание">
         <NoteInput v-model="draft.description" placeholder="Например: в 3-м купе не закрывается окно" />
       </FormField>
@@ -78,8 +79,9 @@ import { faultDefaults } from '@/shared/requests/faults'
 import FaultPicker from '@/shared/requests/FaultPicker.vue'
 import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
 import { canAssignOnCreate, staffTrip } from '@/shared/requests/rights'
-import { currentUser, hasRole, loadCurrentUser, userName } from '@/shared/user'
-import StaffOption from '@/shared/requests/StaffOption.vue'
+import { currentUser, isMe, hasRole, loadCurrentUser, userName } from '@/shared/user'
+import { staffRow } from '@/shared/requests/staffRow'
+import UserOption from '@/shared/components/UserOption.vue'
 import { sortStaff } from '@/shared/requests/staff'
 import RequestWagonField from './RequestWagonField.vue'
 
@@ -135,7 +137,7 @@ const executorShown = computed(() => {
 const staff = shallowRef<StaffCandidate[]>([])
 // номер выбранного вагона: у кого из бригады этот вагон — жирным и выше в списке
 const wagonNumber = ref(r?.wagon.number ?? '')
-// у сотрудника бригады рейса справа — должность и вагоны (StaffOption); предпочтительные — первыми
+// у сотрудника бригады рейса справа — должность и вагоны (UserOption); предпочтительные — первыми
 const staffChoices = computed(() =>
   sortStaff(staff.value, wagonNumber.value || null).map((c) => ({
     id: c.usr.id,
@@ -209,5 +211,15 @@ async function save() {
 <style scoped lang="scss">
 .request-dialog__wide {
   grid-column: 1 / -1;
+}
+
+// фото — в ряд, без переноса
+.request-dialog__note :deep(.photo-picker) {
+  flex-wrap: nowrap;
+}
+
+// описание — начальной высотой с плитку фото (PhotoPicker, 4.5rem); растягивается вниз
+.request-dialog__note :deep(.note-input__field) {
+  height: 4.5rem;
 }
 </style>

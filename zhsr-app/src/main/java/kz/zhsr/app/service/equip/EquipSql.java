@@ -1,5 +1,6 @@
 package kz.zhsr.app.service.equip;
 
+import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.dto.equip.EquipListFilter;
 import kz.zhsr.app.service.SqlQuery;
 import kz.zhsr.app.service.SqlWhere;
@@ -7,6 +8,7 @@ import kz.zhsr.app.service.check.CheckRights;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * SQL описей экипировки ({@link EquipService}): запросы с соединениями, подсчётом и порядком, которые не покрываются
@@ -30,12 +32,21 @@ final class EquipSql {
             """;
 
     /**
-     * Описи по фильтру (Ф-ЭКП-03), сначала новые.
+     * Поле строки -> выражение сортировки.
+     */
+    private static final Map<String, String> SORT = Map.of(
+            "createdDt", "equip_list.created_dt",
+            "wagon", "wagon.number",
+            "createdByUsr", "(select usr.full_name from usr where usr.id = equip_list.created_by_usr)"
+    );
+
+    /**
+     * Описи по фильтру (Ф-ЭКП-03); по умолчанию сначала новые.
      *
      * @param me      сотрудник
      * @param seesAll сотрудник видит все описи; false - только составленные им
      */
-    static SqlQuery list(EquipListFilter filter, long me, boolean seesAll, CheckRights.ListScope scope) {
+    static SqlQuery list(EquipListFilter filter, long me, boolean seesAll, CheckRights.ListScope scope, ListSort sort) {
         SqlWhere where = new SqlWhere();
         if (!seesAll) {
             visible(where, me, scope);
@@ -55,7 +66,7 @@ final class EquipSql {
         if (filter.to() != null) {
             where.add("equip_list.created_dt < :toNext", "toNext", filter.to().plusDays(1));
         }
-        return where.query(SELECT, "order by equip_list.created_dt desc, equip_list.id desc");
+        return where.query(SELECT, sort.orderBy(SORT, "equip_list.created_dt desc, equip_list.id desc"));
     }
 
     /**

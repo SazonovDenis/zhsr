@@ -1,5 +1,12 @@
 <template>
-  <div class="error-box q-pa-md" role="alert">
+  <!-- closable: крестик в правом верхнем углу; на телефоне нажатие на ошибку — тоже закрыть, на десктопе — только
+       крестик -->
+  <div
+    class="error-box q-pa-md"
+    :class="{ 'error-box--closable': closable, 'error-box--tap': closable && isMobile }"
+    role="alert"
+    @click="closable && isMobile && emit('close')"
+  >
     <div class="error-box__body">
       <div>{{ error.text }}</div>
       <div v-if="error.request" class="error-box__request q-mt-xs">{{ error.request }}</div>
@@ -16,18 +23,35 @@
     >
       <q-icon name="refresh" size="1.3rem" />
     </button>
+    <button
+      v-if="closable"
+      type="button"
+      tabindex="-1"
+      class="error-box__close q-pa-none"
+      :title="t('Закрыть')"
+      @click.stop="emit('close')"
+    >
+      ✕
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { t } from '@/boot/i18n'
+import { isMobile } from '@/shared/device'
 import type { ShownError } from '@/shared/errors'
 
 /**
  * Ошибка загрузки на месте списка или карточки: текст и бледной второй строкой — запрос, который упал. retry — повтор
- * загрузки: его запускает кнопка справа.
+ * загрузки: его запускает кнопка справа. closable — ошибку можно закрыть: крестик в правом верхнем углу посылает
+ * close, на телефоне — и нажатие на саму ошибку; убирает ошибку вызывающий.
  */
-withDefaults(defineProps<{ error: ShownError; retry?: (() => void) | null }>(), { retry: null })
+withDefaults(defineProps<{ error: ShownError; retry?: (() => void) | null; closable?: boolean }>(), {
+  retry: null,
+  closable: false,
+})
+
+const emit = defineEmits<{ close: [] }>()
 </script>
 
 <style scoped lang="scss">
@@ -39,6 +63,28 @@ withDefaults(defineProps<{ error: ShownError; retry?: (() => void) | null }>(), 
   background: $zs-error-bg;
   color: $zs-error-fg;
   font-size: 0.9rem;
+}
+
+.error-box--closable {
+  position: relative;
+  // справа сверху — место под крестик
+  padding-right: 2rem;
+}
+
+.error-box--tap {
+  cursor: pointer;
+}
+
+.error-box__close {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  border: 0;
+  background: none;
+  color: $zs-error-fg;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .error-box__body {

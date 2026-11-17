@@ -11,17 +11,23 @@
     <div class="history-item__body q-pb-md" :class="{ 'history-item__body--future': future }">
       <div class="history-item__head" :class="{ 'history-item__head--inline': inline }">
         <span class="history-item__title">{{ title }}</span>
-        <span class="history-item__meta">{{ meta }}</span>
+        <!-- дата • кто (ФИО разметкой: плашка «вы») и хвост, например «поступило: …» -->
+        <span class="history-item__meta">
+          {{ meta }}<template v-if="by"> • <UserName :user="by" /></template>{{ metaTail }}
+        </span>
       </div>
       <TextPhotos
-        v-if="text || photos.length > 0 || pending.length > 0"
+        v-if="text || textUser || photos.length > 0 || pending.length > 0"
         class="history-item__content"
         :photos="photos"
         :pending="pending"
-        :caption="{ meta, text }"
-        :has-text="!!text?.trim()"
+        :caption="{ meta: captionMeta, text: captionText }"
+        :has-text="!!text?.trim() || !!textUser"
       >
-        <span v-if="text" class="history-item__text">{{ text }}</span>
+        <span v-if="text || textUser" class="history-item__text">
+          <!-- пробел — выражением: пробел-разделитель между тегами шаблон при сборке убирает -->
+          {{ text }}<template v-if="textUser">{{ ' ' }}<UserName :user="textUser" /></template>
+        </span>
         <template v-if="$slots.photos" #photos="scope"><slot name="photos" v-bind="scope" /></template>
       </TextPhotos>
       <slot />
@@ -30,28 +36,51 @@
 </template>
 
 <script setup lang="ts">
-import type { RequestPhoto } from '@/api/requests'
+import { computed } from 'vue'
+
+import type { RequestPhoto, UserRef } from '@/api/requests'
+import UserName from '@/shared/components/UserName.vue'
+import { userName } from '@/shared/user'
 import TextPhotos from './TextPhotos.vue'
 
 /**
  * Запись ленты истории заявки: точка с линией к следующей записи, заголовок и под ним текст и фото (TextPhotos): фото
  * не заходят на заголовок. Слот default — дополнение под текстом, например пометка «Ожидает отправки»; слот photos —
  * фото, ожидающие отправки (pending). line — линия к следующей записи: обычная, серая или её нет. inline — meta в одной
- * строке с заголовком, сразу после него.
+ * строке с заголовком, сразу после него. meta — дата; by — кто (после даты через «•»); metaTail — хвост после него.
+ * textUser — сотрудник после текста (например, «Исполнитель:» и ФИО). ФИО — разметкой (UserName); в подписи к фото —
+ * текстом.
  */
-withDefaults(
+const props = withDefaults(
   defineProps<{
     title: string
     meta: string
+    by?: UserRef | null
+    metaTail?: string
     text?: string
+    textUser?: UserRef | null
     photos?: RequestPhoto[]
     pending?: RequestPhoto[]
     inline?: boolean
     future?: boolean
     line?: 'none' | 'solid' | 'future'
   }>(),
-  { text: '', photos: () => [], pending: () => [], inline: false, future: false, line: 'none' },
+  {
+    by: null,
+    metaTail: '',
+    text: '',
+    textUser: null,
+    photos: () => [],
+    pending: () => [],
+    inline: false,
+    future: false,
+    line: 'none',
+  },
 )
+
+// подпись к фото в просмотре — обычным текстом
+const captionMeta = computed(() => `${props.meta}${props.by ? ` • ${userName(props.by)}` : ''}${props.metaTail}`)
+const captionText = computed(() => (props.textUser ? `${props.text} ${userName(props.textUser)}` : props.text))
 </script>
 
 <style scoped lang="scss">

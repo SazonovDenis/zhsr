@@ -1,3 +1,4 @@
+import type { TableSort } from '@/shared/components/table/types'
 import type { RequestRef, Texts } from './checks'
 import { http } from './http'
 import type { UserRef, WagonRef } from './requests'
@@ -161,8 +162,10 @@ export async function fetchEquipForm(
   return (await http.get<EquipForm>('/equip-lists/form', { params })).data
 }
 
-export async function fetchEquipLists(filter: EquipListFilter): Promise<EquipListRow[]> {
-  return (await http.get<EquipListRow[]>('/equip-lists', { params: filter })).data
+/** Описи по фильтру. sort — поле и направление сортировки; null — сначала новые. */
+export async function fetchEquipLists(filter: EquipListFilter, sort: TableSort | null = null): Promise<EquipListRow[]> {
+  const params = { ...filter, sort: sort?.field, desc: sort?.desc }
+  return (await http.get<EquipListRow[]>('/equip-lists', { params })).data
 }
 
 /** Последняя опись вагона — список имущества вагона, без ограничения видимости описей; описей нет — null. */

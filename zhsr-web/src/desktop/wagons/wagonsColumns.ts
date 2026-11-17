@@ -12,7 +12,7 @@ export const wagonsColumns = defineColumns<WagonRow>([
   {
     field: 'depot',
     title: 'Депо приписки',
-    width: 'minmax(min-content, 0.8fr)',
+    width: 'minmax(min-content, 0.6fr)',
     format: (depot) => dictManager.getValue('Depot', depot as number | null),
   },
   { field: 'locationType', title: 'Расположение', cell: CellWagonLocation, sortable: true, sortField: 'dbegLocation' },

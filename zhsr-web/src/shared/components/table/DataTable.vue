@@ -6,8 +6,12 @@
         <div
           v-for="col in columns"
           :key="col.field"
-          class="data-table__head-cell q-py-sm q-px-md"
-          :class="[alignClass(col), { 'data-table__head-cell--sortable': col.sortable }]"
+          class="data-table__head-cell q-py-sm"
+          :class="[
+            alignClass(col),
+            col.dense ? 'q-pl-md q-pr-xs' : 'q-px-md',
+            { 'data-table__head-cell--sortable': col.sortable },
+          ]"
           role="columnheader"
           :aria-sort="ariaSort(col)"
           :tabindex="col.sortable ? 0 : undefined"
@@ -51,8 +55,8 @@
                 <div
                   v-for="col in columns"
                   :key="col.field"
-                  class="data-table__cell q-py-sm q-px-md"
-                  :class="[alignClass(col), col.cellClass]"
+                  class="data-table__cell q-py-sm"
+                  :class="[alignClass(col), col.dense ? 'q-pl-md q-pr-xs' : 'q-px-md', col.cellClass]"
                   role="cell"
                 >
                   <component :is="col.cell ?? CellText" :row="item" :value="item[col.field]" :column="col" />
@@ -86,8 +90,8 @@
         <div
           v-for="col in columns"
           :key="col.field"
-          class="data-table__foot-cell q-py-sm q-px-md"
-          :class="alignClass(col)"
+          class="data-table__foot-cell q-py-sm"
+          :class="[alignClass(col), col.dense ? 'q-pl-md q-pr-xs' : 'q-px-md']"
         >
           <template v-if="typeof col.footer === 'string'">{{ col.footer }}</template>
           <component :is="col.footer" v-else-if="col.footer" :rows="rows" :column="col" />

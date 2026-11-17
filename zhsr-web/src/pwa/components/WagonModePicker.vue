@@ -28,7 +28,7 @@
       <ErrorBox v-else-if="pick.error.value" :error="pick.error.value" :retry="pick.load" />
     </template>
 
-    <!-- мой рейс: состав открытым списком; другой вагон: поиск по цифрам среди всех, у вагона — расположение -->
+    <!-- мой рейс: состав открытым списком; другой вагон: поиск по цифрам среди всех; у вагона — расположение -->
     <template v-else>
       <TextInput
         v-if="pick.mode.value === 'other'"
@@ -47,10 +47,7 @@
           type="button"
           class="wagon-modes__wagon wagon-modes__wagon--on q-py-sm q-px-md"
         >
-          <span class="wagon-modes__grow">
-            <span class="wagon-modes__wagon-number zs-mono">{{ selected.number }}</span>
-            <span class="wagon-modes__muted q-ml-sm">{{ dictManager.getValue('WagonType', selected.wagonType) }}</span>
-          </span>
+          <WagonOption :number="selected.number" :type="dictManager.getValue('WagonType', selected.wagonType)" />
         </button>
         <button
           v-for="w in pick.wagons.value"
@@ -60,12 +57,13 @@
           :class="{ 'wagon-modes__wagon--on': selected?.id === w.id }"
           @click="emit('pick', w)"
         >
-          <span class="wagon-modes__grow">
-            <span class="wagon-modes__wagon-number zs-mono">{{ w.number }}</span>
-            <span class="wagon-modes__muted q-ml-sm">{{ dictManager.getValue('WagonType', w.wagonType) }}</span>
-            <span v-if="pick.mode.value === 'other'" class="wagon-modes__place">{{ placeOf(w) }}</span>
-          </span>
-          <StatusBadge v-if="badgeOf(w)" tone="selected" class="wagon-modes__badge">{{ badgeOf(w) }}</StatusBadge>
+          <!-- строка вагона: слева номер и под ним тип, справа расположение и под ним плашка -->
+          <WagonOption
+            :number="w.number"
+            :type="dictManager.getValue('WagonType', w.wagonType)"
+            :place="placeOf(w)"
+            :badge="badgeOf(w)"
+          />
         </button>
         <div v-if="pick.limited.value" class="wagon-modes__empty q-py-md q-px-md">
           {{ t('Показаны первые {n} — уточните номер', { n: WAGON_SEARCH_LIMIT }) }}
@@ -92,7 +90,7 @@ import type { CurrentUser } from '@/api/session'
 import type { RequestWagon } from '@/api/wagons'
 import { WAGON_SEARCH_LIMIT } from '@/api/wagons'
 import { t } from '@/boot/i18n'
-import StatusBadge from '@/shared/components/StatusBadge.vue'
+import WagonOption from '@/shared/components/WagonOption.vue'
 import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
@@ -109,7 +107,7 @@ import { useWizardWagon } from '../requests/useWizardWagon'
  *
  * - «Мой вагон» — карточки вагонов проводника; вагон один — выбирается сам.
  * - «Мой рейс» — состав текущего рейса открытым списком.
- * - «Другой вагон» — поиск по цифрам номера среди всех вагонов; у вагона — расположение; новый поиск снимает выбор.
+ * - «Другой вагон» — поиск по цифрам номера среди всех вагонов; новый поиск снимает выбор.
  *
  * На входе — данные пользователя (user: рейс, его вагоны, должность в бригаде) и выбранный вагон (selected); выбор
  * отдаётся событием pick: вагон или null — выбор снят. Смена режима снимает выбор. Режим по умолчанию — первый
@@ -134,7 +132,7 @@ function badgeOf(w: RequestWagon): string {
   return wagonBadge(props.user, w, pick.mode.value === 'other')
 }
 
-/** Где вагон сейчас — в «Другом вагоне». */
+/** Где вагон сейчас. */
 function placeOf(w: RequestWagon): string {
   return placeText(w.locationType, w.place, w.trip ? tripRefText(w.trip) : null)
 }
@@ -238,26 +236,6 @@ onMounted(async () => {
   &--on {
     background: $zs-selected-bg;
   }
-}
-
-.wagon-modes__grow {
-  flex: 1;
-  min-width: 0;
-}
-
-.wagon-modes__wagon-number {
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.wagon-modes__place {
-  display: block;
-  color: $zs-text-muted;
-  font-size: 0.8rem;
-}
-
-.wagon-modes__badge {
-  flex: none;
 }
 
 .wagon-modes__mine {

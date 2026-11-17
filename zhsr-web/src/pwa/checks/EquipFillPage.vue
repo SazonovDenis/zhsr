@@ -1,5 +1,5 @@
 <template>
-  <!-- «назад» в шапке — выход из описи без сохранения; по шагам назад — кнопка «Назад» внизу -->
+  <!-- «назад» в шапке — выход из описи без сохранения; «Назад» внизу — в запуск -->
   <!-- позиции: серый фон под карточками, прокручивается блок позиций (fill) — заголовки разделов липнут к его верху -->
   <PwaPage
     :title="fill.editing.value ? t('Изменение описи') : t('Опись экипировки')"
@@ -11,28 +11,9 @@
     <LoadSpinner v-if="busy.active.value" />
     <ErrorBox v-if="fill.loadError.value" :error="fill.loadError.value" :retry="retry" />
 
-    <!-- шаг 1: шаблон описи -->
-    <template v-if="fill.templateId.value === null">
-      <div class="pwa-equip__label">{{ t('Шаблон описи') }}</div>
-      <button
-        v-for="tpl in fill.templates.value"
-        :key="tpl.id"
-        type="button"
-        class="pwa-equip__choice q-px-md"
-        @click="fill.templateId.value = tpl.id"
-      >
-        {{ textOf(tpl) }}
-      </button>
-    </template>
-
-    <!-- шаг 2: вагон -->
-    <template v-else-if="!fill.form.value">
-      <div class="pwa-equip__label">{{ t('Вагон') }}</div>
-      <WagonPickList @pick="onWagon" />
-    </template>
-
-    <!-- шаг 3: позиции — карточками по разделам верхнего уровня, как в чек-листе; прокручивается свой блок -->
-    <div v-else class="pwa-equip__items">
+    <!-- позиции (шаблон и вагон выбраны при запуске, CheckStartPage) — карточками по разделам верхнего уровня, как в
+         чек-листе; прокручивается свой блок -->
+    <div v-if="fill.form.value" class="pwa-equip__items">
       <div v-for="card in cards" :key="card.key" class="pwa-equip__card q-mb-sm">
         <!-- заголовок раздела липнет к верху в пределах всех позиций, кроме последней (см. treeCards) -->
         <div v-for="(part, pi) in card.parts" :key="pi" class="pwa-equip__part">
@@ -106,7 +87,6 @@ import { useRoute, useRouter } from 'vue-router'
 import type { EquipFormItem } from '@/api/equip'
 import { equipPhotoUrl, fetchEquipList } from '@/api/equip'
 import type { RequestPhoto } from '@/api/requests'
-import type { RequestWagon } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
 import { numText, textOf } from '@/shared/checks/texts'
@@ -123,11 +103,12 @@ import BottomBar from '../components/BottomBar.vue'
 import BottomSheet from '../components/BottomSheet.vue'
 import ItemNotePhotos from '../components/ItemNotePhotos.vue'
 import PwaPage from '../components/PwaPage.vue'
-import WagonPickList from '../components/WagonPickList.vue'
 import { closeSheet, exitFill, leaveFill } from './wizardHistory'
 
 /**
- * Составление описи экипировки на телефоне (Ф-ЭКП-02): шаблон описи, вагон, позиции карточками по разделам верхнего
+ * Составление описи экипировки на телефоне (Ф-ЭКП-02). Шаблон описи и вагон выбираются при запуске (CheckStartPage) и
+ * приходят в адресе; открыта без шаблона в адресе (не из запуска и не исправление) — переход в запуск. Позиции
+ * карточками по разделам верхнего
  * уровня — как в чек-листе; у позиции — требуемое количество, количество из прошлой описи и справа поле количества;
  * у позиции с нарушением — примечание и фото, как в чек-листе. Фактическое количество по умолчанию — из прошлой описи;
  * меньше прошлого — подсвечено. Только при связи; «Опись окончена» отправляет опись и открывает её просмотр.
@@ -183,10 +164,6 @@ function removeStored(item: EquipFormItem, id: string) {
   e.stored = e.stored.filter((x) => String(x) !== id)
 }
 
-function onWagon(w: RequestWagon) {
-  fill.wagon.value = { id: w.id, number: w.number, wagonType: w.wagonType }
-}
-
 const barActions = computed<BottomBarAction[]>(() => [
   { key: 'back', title: 'Назад', align: 'left' },
   { key: 'finish', title: 'Опись окончена', kind: 'primary', loading: fill.sending.value },
@@ -217,13 +194,10 @@ async function leave() {
   else await exitFill(router, { name: 'pwa-checks' })
 }
 
-/** «Назад» внизу: на шаг назад — к вагону, к шаблону (из мастера — в мастер), с первого шага — в список. */
+/** «Назад» внизу: исправление — выход в просмотр описи; новая — в запуск. */
 function back() {
   if (editId !== null) void leave()
-  else if (fill.templateId.value === null) void router.push({ name: 'pwa-checks' })
-  else if (preset && fill.form.value) router.back()
-  else if (fill.form.value) fill.wagon.value = null
-  else fill.templateId.value = null
+  else router.back()
 }
 
 // опись сохранена — её просмотр вместо заполнения и мастера: «назад» из просмотра не возвращает ни в заполнение, ни в мастер
@@ -238,6 +212,11 @@ function retry() {
 }
 
 async function init() {
+  // новая опись без шаблона в адресе — не из запуска: выбор шаблона и вагона — в запуске
+  if (editId === null && !preset) {
+    await router.replace({ name: 'pwa-check-start' })
+    return
+  }
   try {
     await busy.run(Promise.all([loadCurrentUser(), dictManager.prepareDict('WagonType')]))
   } catch (e) {
@@ -262,12 +241,6 @@ void init()
 // нарушение — тот же красный, что в чек-листе
 $zs-equip-bad: #e0001b;
 
-.pwa-equip__label {
-  margin-top: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
 .pwa-equip__muted {
   color: $zs-text-muted;
   font-size: 0.9rem;
@@ -279,18 +252,6 @@ $zs-equip-bad: #e0001b;
 
 .pwa-equip__bad {
   color: $zs-error-fg;
-}
-
-.pwa-equip__choice {
-  width: 100%;
-  min-height: 3.3rem;
-  margin-top: 0.5rem;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.5rem;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  text-align: left;
 }
 
 .pwa-equip__items {

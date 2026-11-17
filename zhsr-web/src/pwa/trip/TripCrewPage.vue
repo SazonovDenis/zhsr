@@ -19,7 +19,15 @@
           <span class="crew__ready-icon" :class="{ 'crew__ready-icon--ok': c.ok }">{{ c.ok ? '✓' : '!' }}</span>
           <span class="crew__ready-text">
             <span class="crew__ready-title">{{ c.title }}</span>
-            <span class="crew__muted">{{ c.detail }}</span>
+            <!-- ЛНП и ПЭМ — ФИО разметкой (плашка «вы»), остальное — текстом -->
+            <span v-if="c.people" class="crew__muted">
+              <template v-for="(p, i) in c.people" :key="p.label">
+                <template v-if="i > 0"> • </template>
+                {{ p.label }}
+                <UserName v-if="p.user" :user="p.user" /><template v-else>—</template>
+              </template>
+            </span>
+            <span v-else class="crew__muted">{{ c.detail }}</span>
           </span>
         </div>
       </div>
@@ -39,7 +47,9 @@
             :disabled="!editable || busy"
             @click="poolPick = m"
           >
-            <span>{{ label(m) }}</span>
+            <span
+              ><UserName :user="m.usr" /><template v-if="m.senior"> • {{ t('ст.') }}</template></span
+            >
             <span v-if="editable" class="crew__chip-arrow">→ {{ t('вагон') }}</span>
           </button>
         </div>
@@ -64,7 +74,12 @@
         <template v-if="w.passenger">
           <div v-for="slot in [0, 1]" :key="slot" class="crew__slot">
             <span class="crew__slot-text q-py-xs q-px-none" :class="{ 'crew__slot-text--bad': slotBad(w, slot) }">
-              {{ w.conductors[slot] ? label(w.conductors[slot]!) : t('не назначен') }}
+              <template v-if="w.conductors[slot]">
+                <UserName :user="w.conductors[slot]!.usr" /><template v-if="w.conductors[slot]!.senior">
+                  • {{ t('ст.') }}</template
+                >
+              </template>
+              <template v-else>{{ t('не назначен') }}</template>
             </span>
             <SoftLink
               v-if="editable"
@@ -111,7 +126,18 @@
     :disabled="busy"
     @update:show="(v) => !v && (slotPick = null)"
     @pick="onSlot"
-  />
+  >
+    <!-- «Список ФИО»: ФИО и под ним должность, справа — где проводник сейчас; «Не назначен» — только текст -->
+    <template #option="{ option }">
+      <UserOption
+        :name="option.name"
+        :me="option.id !== null && isMe({ id: option.id })"
+        :duty="slotRows.get(option.id)?.duty ?? ''"
+        :place="slotRows.get(option.id)?.place ?? ''"
+        :plain="option.id === null"
+      />
+    </template>
+  </PickSheet>
 
   <!-- проводник из нераспределённых — на вагон -->
   <PickSheet
@@ -130,6 +156,7 @@
 import { computed, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 
+import UserName from '@/shared/components/UserName.vue'
 import type { CrewMember, TripCrew } from '@/api/trips'
 import { fetchTripCrew, setConductorWagons } from '@/api/trips'
 import { t } from '@/boot/i18n'
@@ -139,6 +166,7 @@ import ErrorBox from '@/shared/components/ErrorBox.vue'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { CrewDuty, TripStatus } from '@/shared/constants/systemDicts'
+import UserOption from '@/shared/components/UserOption.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -146,8 +174,8 @@ import { formatDateTime } from '@/shared/format'
 import { isOnline } from '@/shared/network'
 import { loadCached } from '@/shared/offline/cache'
 import type { WagonNorm } from '@/shared/trips/crewNorm'
-import { crewNorm, normDone, slotOptions } from '@/shared/trips/crewNorm'
-import { currentUser, loadCurrentUser, userName } from '@/shared/user'
+import { conductorDuty, crewNorm, normDone, slotOptions } from '@/shared/trips/crewNorm'
+import { currentUser, isMe, loadCurrentUser, userName } from '@/shared/user'
 import type { PickOption } from '../components/PickSheet.vue'
 import PickSheet from '../components/PickSheet.vue'
 import PwaPage from '../components/PwaPage.vue'
@@ -200,7 +228,11 @@ const readiness = computed(() => {
     {
       ok: n.chiefAndPem,
       title: t('Начальник поезда и ПЭМ'),
-      detail: `${t('ЛНП')} ${chief ? userName(chief.usr) : '—'} • ${t('ПЭМ')} ${pem ? userName(pem.usr) : '—'}`,
+      detail: '',
+      people: [
+        { label: t('ЛНП'), user: chief?.usr ?? null },
+        { label: t('ПЭМ'), user: pem?.usr ?? null },
+      ],
     },
     {
       ok: n.full && n.notOk.length === 0,
@@ -262,9 +294,27 @@ const slotPick = shallowRef<{ wagon: WagonNorm; slot: number } | null>(null)
 const slotPickOptions = computed<PickOption<number | null>[]>(() => {
   const pick = slotPick.value
   if (!pick) return []
-  const choices = slotOptions(crew.value!, pick.wagon, pick.slot, label)
-  return [{ id: null, name: t('Не назначен') }, ...choices.map((o) => ({ id: o.user, name: o.label }))]
+  return [
+    { id: null, name: t('Не назначен') },
+    ...slotChoices.value.map((o) => ({ id: o.user, name: o.member.usr.name })),
+  ]
 })
+
+const slotChoices = computed(() => {
+  const pick = slotPick.value
+  return pick ? slotOptions(crew.value!, pick.wagon, pick.slot, label) : []
+})
+
+// должность и место проводника для строки «Списка ФИО» — по id сотрудника
+const slotRows = computed(
+  () =>
+    new Map<number | null, { duty: string; place: string }>(
+      slotChoices.value.map((o) => [
+        o.user,
+        { duty: conductorDuty(o.member, dictManager.getValue('CrewDuty', o.member.crewDutyType)), place: o.place },
+      ]),
+    ),
+)
 
 // null — снять проводника с места
 function onSlot(user: number | null) {

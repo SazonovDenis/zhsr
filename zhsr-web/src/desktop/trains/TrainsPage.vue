@@ -127,7 +127,9 @@ async function init() {
 
 async function loadDicts() {
   try {
-    await busy.run(dictManager.prepareDict('Station'))
+    await busy.run(
+      dictManager.prepareDicts('Station', 'Depot', 'Yard', 'LocationKind', 'WagonType', 'WagonModel', 'TripState'),
+    )
   } catch (e) {
     loadError.value = shownError(e)
   }

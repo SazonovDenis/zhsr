@@ -31,10 +31,11 @@
         <div class="checks__meta">
           <!-- дата • вагон (жирным, как в списке заявок) • ФИО -->
           {{ formatDateTime(r.at) }} •
-          <template v-if="r.subject">
+          <template v-if="r.checkedUsr"> <UserName :user="r.checkedUsr" /> • </template>
+          <template v-else-if="r.subject">
             <span :class="{ checks__wagon: r.isWagon }">{{ r.subject }}</span> •
           </template>
-          {{ r.author }}
+          <UserName :user="r.author" />
         </div>
         <div v-if="r.violations > 0" class="checks__violations">
           {{ t('Нарушений: {n}', { n: r.violations }) }}
@@ -55,9 +56,11 @@
 import { date } from 'quasar'
 import { computed, ref, shallowRef, watch } from 'vue'
 
+import UserName from '@/shared/components/UserName.vue'
 import type { CheckListRow } from '@/api/checks'
 import { fetchCheckLists } from '@/api/checks'
 import type { EquipListRow } from '@/api/equip'
+import type { UserRef } from '@/api/requests'
 import { fetchEquipLists } from '@/api/equip'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
@@ -132,7 +135,9 @@ interface Row {
   isWagon: boolean
   /** когда окончена, ISO */
   at: string
-  author: string
+  /** проверенный сотрудник — у чек-листа сотрудника; иначе null, объект — subject */
+  checkedUsr: UserRef | null
+  author: UserRef
   violations: number
 }
 
@@ -159,8 +164,9 @@ const rows = computed<Row[]>(() =>
       title: textOf(r.checkListTemplate),
       subject: checkSubject(r),
       isWagon: !!r.wagon,
+      checkedUsr: r.wagon ? null : r.checkedUsr,
       at: r.completedDt,
-      author: userName(r.createdByUsr),
+      author: r.createdByUsr,
       violations: r.violationCount,
     })),
     ...equips.value.map((r) => ({
@@ -170,8 +176,9 @@ const rows = computed<Row[]>(() =>
       title: textOf(r.equipListTemplate),
       subject: wagonShortText(r.wagon),
       isWagon: true,
+      checkedUsr: null,
       at: r.completedDt,
-      author: userName(r.createdByUsr),
+      author: r.createdByUsr,
       violations: r.violationCount,
     })),
   ].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)),

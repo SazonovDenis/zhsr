@@ -10,6 +10,7 @@ import kz.zhsr.app.constants.EquipBasis;
 import kz.zhsr.app.constants.EquipQuantityKind;
 import kz.zhsr.app.constants.LocationType;
 import kz.zhsr.app.constants.RoleType;
+import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.dto.equip.EquipForm;
 import kz.zhsr.app.dto.equip.EquipFormItem;
 import kz.zhsr.app.dto.equip.EquipItemRow;
@@ -107,9 +108,9 @@ public class EquipService {
     /**
      * Описи по фильтру (Ф-ЭКП-03): видимость - как у проверок ({@link CheckRights#seesAll}).
      */
-    public List<EquipListRow> list(EquipListFilter filter) throws Exception {
+    public List<EquipListRow> list(EquipListFilter filter, ListSort sort) throws Exception {
         CurrentUser user = currentUserService.get();
-        SqlQuery q = EquipSql.list(filter, user.id(), CheckRights.seesAll(user), CheckRights.scope(user));
+        SqlQuery q = EquipSql.list(filter, user.id(), CheckRights.seesAll(user), CheckRights.scope(user), sort);
         List<EquipListRow> res = db.loadSql(q.sql(), q.params(), EquipListRow.class);
         refResolver.resolve(res);
         return res;

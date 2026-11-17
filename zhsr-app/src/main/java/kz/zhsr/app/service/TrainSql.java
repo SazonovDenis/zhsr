@@ -55,7 +55,7 @@ final class TrainSql {
     static String trainWagons() {
         return """
                 select train_wagon.id, train_wagon.train, train_wagon.wagon, train_wagon.seq, train_wagon.dbeg,
-                       train_wagon.dend, wagon.number, wagon.wagon_type, wagon_type.code,
+                       train_wagon.dend, wagon.number, wagon.wagon_type, wagon.model_type, wagon_type.code,
                        wagon_info.location_type, wagon_info.trip, wagon_info.wagon_status_type,
                        coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard, wagon_info.trip) as place,
                        %1$s as station,

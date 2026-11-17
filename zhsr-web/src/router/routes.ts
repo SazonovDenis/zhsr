@@ -162,6 +162,14 @@ const routes: RouteRecordRaw[] = [
         props: true,
         component: () => desktop().then((m) => m.WagonJournalPage),
       },
+      // имущество вагона: последняя опись; номер вагона — для заголовка
+      {
+        path: 'wagons/:id/equip',
+        name: 'wagon-equip',
+        meta: { hideMenu: true },
+        props: (route) => ({ id: route.params.id, number: String(route.query.number ?? '') }),
+        component: () => desktop().then((m) => m.EquipLastPage),
+      },
       { path: 'trips', name: 'trips', component: () => desktop().then((m) => m.TripsPage) },
       {
         path: 'trips/:id',

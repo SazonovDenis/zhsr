@@ -66,6 +66,7 @@
                 />
               </span>
             </div>
+            <!-- примечание и фото — в одну строку: фото справа от примечания, в ряд -->
             <div v-if="detailsShown(item)" class="equip-fill__details q-mt-sm">
               <NoteInput v-model="extra(item).comment" :rows="2" placeholder="Примечание" />
               <PhotoPicker
@@ -253,9 +254,26 @@ void init()
 
 .equip-fill__details {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: 0.5rem;
-  max-width: 40rem;
+
+  // примечание — свободное место, не шире 40rem
+  > :first-child {
+    flex: 1;
+    min-width: 0;
+    max-width: 40rem;
+  }
+
+  // фото — в ряд, без переноса
+  :deep(.photo-picker) {
+    flex: none;
+    flex-wrap: nowrap;
+  }
+
+  // описание — начальной высотой с плитку фото (PhotoPicker, 4.5rem); растягивается вниз
+  :deep(.note-input__field) {
+    height: 4.5rem;
+  }
 }
 
 .equip-fill__line {

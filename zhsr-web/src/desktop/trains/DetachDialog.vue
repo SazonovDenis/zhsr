@@ -6,14 +6,24 @@
     :error="error"
     @ok="save"
   >
-    <FormSection columns="max-content max-content">
+    <FormSection columns="max-content max-content max-content">
+      <!-- состав поезда: план вне рейса или на остановке рейса поезда — первым -->
+      <FormField v-if="mode === 'plan' && stops.length === 0 && tripStops.length > 0" label="Где">
+        <CbList v-model="where" single no-search required :values="whereChoices" style="width: 24rem" />
+      </FormField>
       <FormField label="Отцепка">
         <CbSegment v-model="mode" single required :values="modes" />
+      </FormField>
+      <!-- вне рейса — где отцепка: станция, где сейчас вагон; только для чтения, первой после вида отцепки -->
+      <FormField v-if="(mode === 'fact' || (stops.length === 0 && where === OUT)) && station !== null" label="Станция">
+        <span class="detach__station">{{
+          t('{station} (где сейчас вагон)', { station: dictManager.getValue('Station', station) })
+        }}</span>
       </FormField>
       <FormField v-if="mode === 'plan' && stops.length > 0" label="Остановка">
         <CbList v-model="stopIndex" single no-search :values="stopChoices" style="width: 18rem" />
       </FormField>
-      <FormField v-else-if="mode === 'plan'" label="Плановое время">
+      <FormField v-if="mode === 'plan' && stops.length === 0 && where === OUT" label="Плановое время">
         <DatePicker v-model="planTime" with-time date-text="Плановое время" />
       </FormField>
       <FormField v-else label="Время отцепки">
@@ -42,6 +52,8 @@ import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { formError } from '@/shared/errors'
 import { formatDateTime, isoDateTime } from '@/shared/format'
+import type { TripRef } from '@/api/wagons'
+import { tripRefText } from '@/shared/trips/tripRefText'
 import type { AttachStop, ChangeChoice } from './attach'
 
 /**
@@ -52,11 +64,40 @@ import type { AttachStop, ChangeChoice } from './attach'
  * @prop number      номер вагона
  * @prop stops       остановки рейса для плана; пусто — отцепка вне рейса
  * @prop factAllowed отцепка фактом возможна
+ * @prop station     вне рейса — станция, где сейчас вагон (id справочника Station): показывается, где будет отцепка;
+ *                   null — не показывать
+ * @prop tripStops   состав поезда: рейсы поезда в плане с их остановками — план можно поставить и вне рейса, и на
+ *                   остановке рейса (выбор «Где»); пусто — только вне рейса
  */
-const props = withDefaults(defineProps<{ number: string; stops?: AttachStop[]; factAllowed?: boolean }>(), {
-  stops: () => [],
-  factAllowed: true,
-})
+const props = withDefaults(
+  defineProps<{
+    number: string
+    stops?: AttachStop[]
+    factAllowed?: boolean
+    station?: number | null
+    tripStops?: { trip: TripRef; stops: AttachStop[] }[]
+  }>(),
+  { stops: () => [], factAllowed: true, station: null, tripStops: () => [] },
+)
+
+// «Где» на составе поезда: OUT — вне рейса, иначе «рейс:номер остановки»
+const OUT = 'out'
+const where = ref<string>(OUT)
+const whereChoices = computed<ChoiceItem[]>(() => [
+  {
+    id: OUT,
+    text:
+      props.station !== null
+        ? t('Вне рейса — {station}', { station: dictManager.getValue('Station', props.station) })
+        : t('Вне рейса'),
+  },
+  ...props.tripStops.flatMap((g) =>
+    g.stops.map((s, i) => ({
+      id: `${g.trip.id}:${i}`,
+      text: `${tripRefText(g.trip)}: ${dictManager.getValue('Station', s.station)} • ${formatDateTime(s.time)}`,
+    })),
+  ),
+])
 
 const show = defineModel<boolean>('show', { default: false })
 const emit = defineEmits<{ done: [choice: ChangeChoice] }>()
@@ -88,6 +129,13 @@ function save() {
     emit('done', { fact: false, time: null, station: null, routeStation: stop.routeStation })
     return
   }
+  if (where.value !== OUT) {
+    const [tripId, i] = where.value.split(':').map(Number)
+    const group = props.tripStops.find((g) => g.trip.id === tripId)!
+    const stop = group.stops[i!]!
+    emit('done', { fact: false, time: null, station: null, routeStation: stop.routeStation, trip: group.trip.id })
+    return
+  }
   if (!planTime.value) {
     error.value = formError(t('Укажите плановое время'))
     return
@@ -95,3 +143,12 @@ function save() {
   emit('done', { fact: false, time: isoDateTime(new Date(planTime.value)), station: null, routeStation: null })
 }
 </script>
+
+<style scoped lang="scss">
+// станция — текстом на высоте полей рядом
+.detach__station {
+  display: flex;
+  align-items: center;
+  min-height: var(--zs-control-height);
+}
+</style>

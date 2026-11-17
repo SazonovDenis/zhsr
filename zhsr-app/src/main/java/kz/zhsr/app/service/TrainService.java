@@ -22,6 +22,7 @@ import kz.zhsr.app.dto.train.TrainChange;
 import kz.zhsr.app.dto.train.TrainFilter;
 import kz.zhsr.app.dto.train.TrainOption;
 import kz.zhsr.app.dto.train.TrainRow;
+import kz.zhsr.app.dto.train.TrainRowWagon;
 import kz.zhsr.app.dto.train.TrainWagon;
 import kz.zhsr.app.dto.train.WagonBusy;
 import org.springframework.stereotype.Service;
@@ -575,7 +576,7 @@ public class TrainService {
         long train = row.getLong("train");
         Place place = place(train, change.getLong("trip", null), change.getLong("route_station", null),
                 change.getLong("station"));
-        if (!canMark(me, change, place) && !isPlanner(me)) {
+        if (!canCancelPlan(me, change, place)) {
             throw ApiException.forbidden("План отменяет планировщик вагонов или начальник поезда рейса");
         }
         db.updateRec("train_wagon_change", Map.of("id", changeId, "status", TrainWagonChangeStatus.CANCELLED));
@@ -1012,6 +1013,11 @@ public class TrainService {
         return isChief(place.trip().getLong("id"), me) || (place.inProgress() && isMaster(place.trip(), me));
     }
 
+    /** Может ли сотрудник отменить план: кто может отметить его выполненным, и планировщик вагонов - и в рейсе. */
+    private boolean canCancelPlan(CurrentUser me, DbRec change, Place place) throws Exception {
+        return canMark(me, change, place) || isPlanner(me);
+    }
+
     /**
      * Может ли сотрудник отменить выполненную прицепку или отцепку (train_wagon_change.id): журнал вагона.
      */
@@ -1048,6 +1054,7 @@ public class TrainService {
         boolean planned = c.getInt("status") == TrainWagonChangeStatus.PLANNED;
         boolean done = c.getInt("status") == TrainWagonChangeStatus.DONE;
         res.setCanMark(planned && row != null && canMark(me, c, place));
+        res.setCanCancel(planned && row != null && canCancelPlan(me, c, place));
         res.setCanUndo(done && row != null && canUndo(me, c, place));
         return res;
     }
@@ -1093,14 +1100,26 @@ public class TrainService {
         Map<Long, List<DbRec>> trips = trips(ids, ACTIVE);
         for (TrainRow row : rows) {
             List<DbRec> list = wagons.getOrDefault(row.getId(), List.of());
-            List<String> numbers = new ArrayList<>();
+            List<TrainRowWagon> refs = new ArrayList<>();
             Set<Long> stations = new HashSet<>();
+            // вид и место расположения вагонов: «вид:место»; одно на всех - вагоны в одном месте
+            Set<String> places = new HashSet<>();
+            Long locationType = null;
+            Long place = null;
             boolean away = false;
             int planned = 0;
             for (DbRec w : list) {
                 boolean in = w.get("dbeg") != null && w.get("dend") == null;
                 if (in) {
-                    numbers.add(w.getString("number"));
+                    TrainRowWagon ref = new TrainRowWagon();
+                    ref.setId(w.getLong("wagon"));
+                    ref.setNumber(w.getString("number"));
+                    ref.setWagonType(w.getLong("wagon_type"));
+                    ref.setModelType(w.getLong("model_type", null));
+                    refs.add(ref);
+                    locationType = w.getLong("location_type", null);
+                    place = w.getLong("place", null);
+                    places.add(locationType + ":" + place);
                     Long station = w.getLong("station", null);
                     if (station == null) {
                         away = true;
@@ -1112,7 +1131,11 @@ public class TrainService {
                     planned++;
                 }
             }
-            row.setWagons(numbers);
+            row.setWagons(refs);
+            if (places.size() == 1) {
+                row.setLocationType(locationType);
+                row.setPlace(place);
+            }
             row.setStation(!away && stations.size() == 1 ? stations.iterator().next() : null);
             row.setPlannedCount(planned);
             for (DbRec trip : trips.getOrDefault(row.getId(), List.of())) {

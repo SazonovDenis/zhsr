@@ -32,7 +32,7 @@
         <span>{{ t('Служба') }}</span>
         <span>{{ dictManager.getValue('Service', r.service) }}</span>
         <span>{{ t('Автор') }}</span>
-        <span>{{ userName(r.createdByUsr) }}</span>
+        <span><UserName :user="r.createdByUsr" /></span>
         <!-- заявку создала Система по нарушению в чек-листе или по недостаче в описи — переход к ним -->
         <template v-if="source">
           <span>{{ t('Источник') }}</span>
@@ -44,14 +44,17 @@
         </template>
         <span>{{ t('Исполнитель') }}</span>
         <span>
-          {{ r.executorUsr ? userName(r.executorUsr) : t('не назначен') }}
+          <UserName v-if="r.executorUsr" :user="r.executorUsr" /><template v-else>{{ t('не назначен') }}</template>
+          <!-- статус не подходит (выполнена, закрыта…) — ссылки нет; нет прав — неактивна, причина во всплывающей
+               подсказке -->
           <SoftLink
-            v-if="card.assignable.value"
+            v-if="card.assignStatusOk.value"
             :text="card.reassign.value ? 'Переназначить' : 'Назначить'"
+            :disabled="!card.assignable.value"
+            :title="card.assignable.value ? undefined : card.assignHint.value || undefined"
             class="q-ml-sm"
             @click="assign"
           />
-          <span v-else class="request-panel__reason request-panel__block">{{ card.assignHint.value }}</span>
         </span>
       </SidePanelFields>
 
@@ -111,6 +114,7 @@
 import { computed, toRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import UserName from '@/shared/components/UserName.vue'
 import type { RepairRequest, RequestAction } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import { openDialog } from '@/shared/components/dialog/openDialog'
@@ -133,8 +137,8 @@ import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import RequestDialog from './RequestDialog.vue'
 import { tripRefDatedText, tripRefText } from '@/shared/trips/tripRefText'
-import { userName } from '@/shared/user'
-import RequestAssignDialog from './RequestAssignDialog.vue'
+import UserPickDialog from '@/shared/components/dialog/UserPickDialog.vue'
+import { executorRows } from '@/shared/requests/staffRow'
 import RequestTextDialog from './RequestTextDialog.vue'
 import TakeForeignDialog from './TakeForeignDialog.vue'
 
@@ -196,15 +200,18 @@ function openSource() {
 
 // исполнитель — во всплывающем окне, из сотрудников службы заявки
 async function assign() {
-  const result = await openDialog<{ executor: number | null }>(RequestAssignDialog, {
+  const reassign = !!r.value?.executorUsr
+  await openDialog<{ usr: number | null }>(UserPickDialog, {
+    title: reassign ? 'Переназначить исполнителя' : 'Назначить исполнителя',
+    okText: reassign ? 'Переназначить' : 'Назначить',
     current: r.value?.executorUsr ?? null,
-    wagonNumber: r.value?.wagon.number ?? null,
     load: async () => {
       await card.loadStaff()
-      return card.staff.value
+      return executorRows(card.staff.value, r.value?.wagon.number ?? null)
     },
+    // сохраняет окно: ошибка — в окне, а не в панели
+    save: (usr: number | null) => card.assign(usr),
   })
-  if (result) await card.assign(result.executor)
 }
 
 // примечание к заявке: текст и фото — во всплывающем окне
@@ -277,15 +284,6 @@ defineExpose({ ready, onAction, edit, assign, addNote })
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-}
-
-.request-panel__block {
-  display: block;
-}
-
-.request-panel__reason {
-  color: $zs-text-muted;
-  font-size: 0.8rem;
 }
 
 .request-panel__error {

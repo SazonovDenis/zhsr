@@ -34,8 +34,11 @@ export function useSidePanel(selectedId: Ref<RowKey | null>) {
   }
 
   function onKeydown(e: KeyboardEvent) {
-    // Escape внутри диалога до сюда не доходит: диалог его останавливает (DialogFrame)
-    if (e.key === 'Escape' && open.value) close()
+    // Escape внутри диалога до сюда не доходит: диалог его останавливает (DialogFrame). Страховка: пока открыт диалог
+    // или выпадающее меню, Escape — их, а не панели, даже если фокус из них ушёл
+    if (e.key !== 'Escape' || !open.value || e.defaultPrevented) return
+    if (document.querySelector('.q-dialog, .q-menu')) return
+    close()
   }
 
   window.addEventListener('keydown', onKeydown)

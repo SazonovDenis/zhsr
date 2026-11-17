@@ -1,5 +1,13 @@
 <template>
-  <RequestHistoryItem :title="title" :meta="meta" :text="text" :pending="pending" :line="line" inline>
+  <RequestHistoryItem
+    :title="title"
+    :meta="formatDateTime(props.items[0]!.created)"
+    :by="currentUser"
+    :text="text"
+    :pending="pending"
+    :line="line"
+    inline
+  >
     <div class="queued-item__marks q-mt-xs">
       <StatusBadge v-if="waiting" tone="wait">{{ t('Ожидает отправки') }}</StatusBadge>
       <template v-for="item in records" :key="item.id">
@@ -22,7 +30,7 @@ import { formatDateTime } from '@/shared/format'
 import type { OutboxItem } from '@/shared/offline/outbox'
 import RequestHistoryItem from '@/shared/requests/RequestHistoryItem.vue'
 import { ACTIONS } from '@/shared/requests/rights'
-import { currentUser, userName } from '@/shared/user'
+import { currentUser } from '@/shared/user'
 import QueuedPhoto from './QueuedPhoto.vue'
 import QueuedRefusal from './QueuedRefusal.vue'
 import { useQueuedPhotos } from './useQueuedPhotos'
@@ -48,9 +56,6 @@ const title = computed(() => {
   if (records.value.some((x) => x.kind === 'edit')) return t('Исправление заявки')
   return t(records.value.length > 0 ? 'Примечание' : 'Приложено фото')
 })
-const meta = computed(
-  () => `${formatDateTime(props.items[0]!.created)} • ${currentUser.value ? userName(currentUser.value) : ''}`,
-)
 const text = computed(() => records.value.find((x) => x.kind === 'note' || x.kind === 'action')?.text ?? '')
 </script>
 

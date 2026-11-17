@@ -109,6 +109,11 @@ export function crewNorm(crew: TripCrew): CrewNorm {
   }
 }
 
+/** Должность проводника для строки «Списка ФИО»: «Проводник», у старшего — «Проводник • ст.». */
+export function conductorDuty(m: CrewMember, duty: string): string {
+  return m.senior ? `${duty} • ${t('ст.')}` : duty
+}
+
 /** Норма выполнена полностью: все вагоны по норме, в хвостовых — старшие проводники. */
 export function normDone(norm: CrewNorm): boolean {
   return norm.full && norm.tailBad.length === 0 && norm.notOk.length === 0
@@ -116,26 +121,31 @@ export function normDone(norm: CrewNorm): boolean {
 
 /**
  * Кого можно поставить в место вагона: текущего, нераспределённых и проводников соседнего вагона с одним вагоном.
- * label — подпись проводника.
+ * label — подпись проводника. У варианта: label — подпись строкой («ФИО • с вагона 12»), member — проводник, place —
+ * где он сейчас («2 вагона», «с вагона 12»; пусто — нераспределён) для строки «Списка ФИО».
  */
 export function slotOptions(
   crew: TripCrew,
   w: WagonNorm,
   slot: number,
   label: (m: CrewMember) => string,
-): { user: number; label: string }[] {
+): { user: number; label: string; member: CrewMember; place: string }[] {
   const order = crew.wagons.filter((x) => x.riding).map((x) => x.number)
   const i = order.indexOf(w.number)
   const neighbours = [order[i - 1], order[i + 1]].filter((x): x is string => !!x)
   const current = w.conductors[slot]
   const all = crew.crew.filter((m) => m.crewDutyType === CrewDuty.CONDUCTOR)
+  const option = (m: CrewMember, place: string) => ({
+    user: m.usr.id,
+    label: place ? `${label(m)} • ${place}` : label(m),
+    member: m,
+    place,
+  })
   return [
-    ...(current
-      ? [{ user: current.usr.id, label: label(current) + (current.wagons.length === 2 ? ` • ${t('2 вагона')}` : '') }]
-      : []),
-    ...all.filter((m) => m.wagons.length === 0).map((m) => ({ user: m.usr.id, label: label(m) })),
+    ...(current ? [option(current, current.wagons.length === 2 ? t('2 вагона') : '')] : []),
+    ...all.filter((m) => m.wagons.length === 0).map((m) => option(m, '')),
     ...all
       .filter((m) => m.wagons.length === 1 && neighbours.includes(m.wagons[0]!) && !m.wagons.includes(w.number))
-      .map((m) => ({ user: m.usr.id, label: `${label(m)} • ${t('с вагона {n}', { n: m.wagons[0]! })}` })),
+      .map((m) => option(m, t('с вагона {n}', { n: m.wagons[0]! }))),
   ]
 }

@@ -11,7 +11,7 @@ import { dictManager } from '@/shared/dict/DictManager'
 import { notifyError } from '@/shared/errors'
 import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
 import { markEditable, useNow } from '@/shared/trips/tripTimes'
-import ResponsibleAssignDialog from '../wagons/ResponsibleAssignDialog.vue'
+import { pickResponsible } from '../wagons/responsibleAssign'
 import TripCancelDialog from './TripCancelDialog.vue'
 import TripMarkDialog from './TripMarkDialog.vue'
 import TripNewDialog from './TripNewDialog.vue'
@@ -206,14 +206,17 @@ export function useTripActions(changed: () => void) {
   async function assignResponsible(trip: TripRow) {
     try {
       const crew = await fetchTripCrew(trip.id)
-      const result = await openDialog<{ usr: number | null }>(ResponsibleAssignDialog, {
+      // окно и сохраняет: ошибка назначения — в окне
+      const result = await pickResponsible({
         station: null,
         trip: trip.id,
         current: crew.trip.responsibleUsr,
         reassign: crew.trip.responsibleAssigned,
+        save: async (usr) => {
+          await assignTripResponsible(trip.id, usr)
+        },
       })
       if (!result) return
-      await assignTripResponsible(trip.id, result.usr)
     } catch (e) {
       notifyError(e)
       return

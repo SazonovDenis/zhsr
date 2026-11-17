@@ -1,11 +1,13 @@
 package kz.zhsr.app.service.check;
 
 import kz.zhsr.app.dto.check.CheckListFilter;
+import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.service.SqlQuery;
 import kz.zhsr.app.service.SqlWhere;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * SQL проверок по чек-листу ({@link CheckService}): запросы с соединениями и подсчётом, которые не покрываются методами
@@ -32,13 +34,22 @@ final class CheckSql {
             """;
 
     /**
-     * Проверки по фильтру (Ф-ЧЕК-04), сначала новые.
+     * Поле строки -> выражение сортировки.
+     */
+    private static final Map<String, String> SORT = Map.of(
+            "createdDt", "check_list.created_dt",
+            "wagon", "wagon.number",
+            "createdByUsr", "(select usr.full_name from usr where usr.id = check_list.created_by_usr)"
+    );
+
+    /**
+     * Проверки по фильтру (Ф-ЧЕК-04); по умолчанию сначала новые.
      *
      * @param me      сотрудник
      * @param seesAll сотрудник видит все проверки; false - по scope
      * @param scope   что видно, кроме своих (CheckRights.scope)
      */
-    static SqlQuery list(CheckListFilter filter, long me, boolean seesAll, CheckRights.ListScope scope) {
+    static SqlQuery list(CheckListFilter filter, long me, boolean seesAll, CheckRights.ListScope scope, ListSort sort) {
         SqlWhere where = new SqlWhere();
         if (!seesAll) {
             visible(where, me, scope);
@@ -58,7 +69,7 @@ final class CheckSql {
         if (filter.to() != null) {
             where.add("check_list.created_dt < :toNext", "toNext", filter.to().plusDays(1));
         }
-        return where.query(SELECT, "order by check_list.created_dt desc, check_list.id desc");
+        return where.query(SELECT, sort.orderBy(SORT, "check_list.created_dt desc, check_list.id desc"));
     }
 
     /**

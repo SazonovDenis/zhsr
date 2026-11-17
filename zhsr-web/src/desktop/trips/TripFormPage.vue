@@ -78,7 +78,7 @@
             </template>
           </CbList>
           <span v-else class="trip-form__staff-name" :class="{ 'trip-form__bad': !d.member }">
-            {{ d.member ? userName(d.member.usr) : t('не назначен') }}
+            <UserName v-if="d.member" :user="d.member.usr" /><template v-else>{{ t('не назначен') }}</template>
           </span>
         </label>
       </div>
@@ -87,7 +87,7 @@
         <span class="trip-form__pool-title">{{ t('Нераспределённые проводники') }}</span>
         <div class="trip-form__chips">
           <span v-for="m in norm.pool" :key="m.usr.id" class="trip-form__chip q-py-none q-px-sm">
-            {{ label(m) }}
+            <UserName :user="m.usr" /><template v-if="m.senior"> • {{ t('ст.') }}</template>
             <button
               type="button"
               class="trip-form__chip-del q-pa-none"
@@ -180,13 +180,32 @@
                   :model-value="w.conductors[slot]?.usr.id ?? null"
                   :values="slotChoices(w, slot)"
                   @update:model-value="onSlot(w, slot, $event as number | null)"
-                />
+                >
+                  <!-- «Список ФИО»: ФИО слева, справа должность, под ней — где проводник сейчас -->
+                  <template #option="{ item }">
+                    <UserOption
+                      :name="(item.data?.name as string | undefined) ?? ''"
+                      :me="(item.data?.me as boolean | undefined) ?? false"
+                      :duty="(item.data?.duty as string | undefined) ?? ''"
+                      :place="(item.data?.place as string | undefined) ?? ''"
+                    />
+                  </template>
+                </CbList>
               </span>
               <span v-if="w.notAdjacent" class="trip-form__bad trip-form__block">
                 {{ t('назначен на несоседние вагоны') }}
               </span>
             </template>
-            <span v-else :class="{ 'trip-form__muted': !w.passenger }">{{ conductorsText(w) }}</span>
+            <!-- проводники вагона через запятую; нет — «не назначены», вагону не нужны — «не требуется» -->
+            <span v-else :class="{ 'trip-form__muted': !w.passenger }">
+              <template v-if="w.passenger && w.conductors.length > 0">
+                <template v-for="(m, ci) in w.conductors" :key="m.usr.id">
+                  <template v-if="ci > 0">, </template>
+                  <UserName :user="m.usr" /><template v-if="m.senior"> • {{ t('ст.') }}</template>
+                </template>
+              </template>
+              <template v-else>{{ conductorsText(w) }}</template>
+            </span>
           </span>
           <span class="trip-form__moves">
             <button
@@ -289,15 +308,19 @@
             <template v-if="crew.trip.tripStatusType === TripStatus.DONE">
               <span>{{ t('Ответственный за вагоны') }}</span>
               <span>
-                {{ responsibleText(crew.trip) }}
+                <UserName
+                  v-if="crew.trip.responsibleAssigned && crew.trip.responsibleUsr"
+                  :user="crew.trip.responsibleUsr"
+                />
+                <template v-else>{{ responsibleText(crew.trip) }}</template>
+                <!-- ссылка видна всегда; нельзя — неактивна, причина во всплывающей подсказке -->
                 <SoftLink
-                  v-if="canMark"
                   :text="crew.trip.responsibleAssigned ? 'Переназначить' : 'Назначить'"
-                  :disabled="running"
+                  :disabled="running || !canMark"
+                  :title="canMark ? undefined : t(MARK_REASON)"
                   class="q-ml-sm"
                   @click="assignResponsible"
                 />
-                <span v-else class="trip-form__muted trip-form__block">{{ t(MARK_REASON) }}</span>
               </span>
             </template>
           </SidePanelFields>
@@ -310,7 +333,15 @@
               </span>
               <span>
                 <span class="trip-form__ready-title">{{ c.title }}</span>
-                <span class="trip-form__muted trip-form__block">{{ c.detail }}</span>
+                <!-- ЛНП и ПЭМ — ФИО разметкой (плашка «вы»), остальное — текстом -->
+                <span v-if="c.people" class="trip-form__muted trip-form__block">
+                  <template v-for="(p, i) in c.people" :key="p.label">
+                    <template v-if="i > 0"> • </template>
+                    {{ p.label }}
+                    <UserName v-if="p.user" :user="p.user" /><template v-else>—</template>
+                  </template>
+                </span>
+                <span v-else class="trip-form__muted trip-form__block">{{ c.detail }}</span>
               </span>
             </div>
             <div v-if="ready" class="trip-form__verdict">{{ t('Поезд готов к отправлению') }}</div>
@@ -335,6 +366,7 @@ import { Notify } from 'quasar'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import UserName from '@/shared/components/UserName.vue'
 import type { TrainCard, TrainChange } from '@/api/trains'
 import { attachWagons, cancelChangePlan, detachWagons, orderTrain } from '@/api/trains'
 import type { CrewMember, CrewWagon, StaffCandidate, TripCrew, TripRow } from '@/api/trips'
@@ -352,9 +384,10 @@ import { t } from '@/boot/i18n'
 import { formatHm } from '@/desktop/routes/duration'
 import { provideBusy } from '@/shared/busy'
 import CbList from '@/shared/components/choice/CbList.vue'
+import UserOption from '@/shared/components/UserOption.vue'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
-import ResponsibleAssignDialog from '../wagons/ResponsibleAssignDialog.vue'
+import { pickResponsible } from '../wagons/responsibleAssign'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
@@ -366,8 +399,8 @@ import { shownError } from '@/shared/errors'
 import { formatDateTime } from '@/shared/format'
 import { useLoad } from '@/shared/loadable'
 import type { WagonNorm } from '@/shared/trips/crewNorm'
-import { crewNorm, normDone, slotOptions } from '@/shared/trips/crewNorm'
-import { currentUser, hasRole, loadCurrentUser, userName } from '@/shared/user'
+import { conductorDuty, crewNorm, normDone, slotOptions } from '@/shared/trips/crewNorm'
+import { currentUser, isMe, hasRole, loadCurrentUser, userName } from '@/shared/user'
 import { placeText } from '@/shared/wagonPlace'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import SidePanel from '../frame/SidePanel.vue'
@@ -630,22 +663,24 @@ async function apply(work: () => Promise<TripCrew>) {
 
 const setDuty = (duty: number, user: number | null) => apply(() => setTripDuty(tripId.value, duty, user))
 
-/** Ответственный за вагоны прибывшего рейса словами: сотрудник, «не назначен» или «проводники вагонов». */
+/** Ответственный за вагоны прибывшего рейса словами, когда сотрудника нет: «не назначен» или «проводники вагонов». */
 function responsibleText(trip: TripCrew['trip']): string {
-  if (!trip.responsibleAssigned) return t('проводники вагонов')
-  return trip.responsibleUsr ? userName(trip.responsibleUsr) : t('не назначен')
+  return trip.responsibleAssigned ? t('не назначен') : t('проводники вагонов')
 }
 
-// ответственный за вагоны прибывшего рейса — во всплывающем окне, как исполнитель заявки
+// ответственный за вагоны прибывшего рейса — во всплывающем окне, как исполнитель заявки: окно и сохраняет, ошибка —
+// в окне
 async function assignResponsible() {
   const trip = crew.value!.trip
-  const result = await openDialog<{ usr: number | null }>(ResponsibleAssignDialog, {
+  await pickResponsible({
     station: null,
     trip: trip.id,
     current: trip.responsibleUsr,
     reassign: trip.responsibleAssigned,
+    save: async (usr) => {
+      crew.value = await assignTripResponsible(tripId.value, usr)
+    },
   })
-  if (result) await apply(() => assignTripResponsible(tripId.value, result.usr))
 }
 
 const conductors = () => crew.value!.crew.filter((m) => m.crewDutyType === CrewDuty.CONDUCTOR).map((m) => m.usr.id)
@@ -670,7 +705,16 @@ async function pickConductors() {
 }
 
 const slotChoices = (w: WagonNorm, slot: number) =>
-  slotOptions(crew.value!, w, slot, label).map((o) => ({ id: o.user, text: o.label }))
+  slotOptions(crew.value!, w, slot, label).map((o) => ({
+    id: o.user,
+    text: o.label,
+    data: {
+      name: o.member.usr.name,
+      me: isMe(o.member.usr),
+      duty: conductorDuty(o.member, dictManager.getValue('CrewDuty', o.member.crewDutyType)),
+      place: o.place,
+    },
+  }))
 
 function onSlot(w: WagonNorm, slot: number, user: number | null) {
   const prev = w.conductors[slot]
@@ -833,10 +877,9 @@ function where(w: CrewWagon): string {
   return placeText(w.locationType, w.place, w.trip ? tripRefText(w.trip) : null)
 }
 
+/** Проводники вагона словами, когда их не показать списком: вагону не нужны или не назначены. */
 function conductorsText(w: WagonNorm): string {
-  if (!w.passenger) return t('не требуется')
-  if (w.conductors.length === 0) return t('не назначены')
-  return w.conductors.map(label).join(', ')
+  return w.passenger ? t('не назначены') : t('не требуется')
 }
 
 const riding = computed(() => (crew.value?.wagons ?? []).filter((w) => w.riding))
@@ -869,7 +912,11 @@ const readiness = computed(() => {
     {
       ok: n.chiefAndPem,
       title: t('Начальник поезда и ПЭМ'),
-      detail: `${t('ЛНП')} ${chief ? userName(chief.usr) : '—'} • ${t('ПЭМ')} ${pem ? userName(pem.usr) : '—'}`,
+      detail: '',
+      people: [
+        { label: t('ЛНП'), user: chief?.usr ?? null },
+        { label: t('ПЭМ'), user: pem?.usr ?? null },
+      ],
     },
     {
       ok: normDone(n),

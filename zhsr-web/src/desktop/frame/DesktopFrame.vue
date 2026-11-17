@@ -19,7 +19,7 @@
       v-if="$slots.right && rightOpen"
       class="desktop-frame__right"
       :class="{ 'desktop-frame__right--floating': floating }"
-      :style="{ width: rightWidth }"
+      :style="{ width: RIGHT_WIDTH }"
     >
       <slot name="right" />
     </aside>
@@ -48,7 +48,8 @@ import { MENU_WIDTH, menuState } from '../menu/menuState'
  * заголовком, и Escape делает то же самое. Escape не возвращает, пока открыто выпадающее окно или диалог: тогда он
  * закрывает их (они сами останавливают Escape или ещё видны в DOM в момент нажатия).
  *
- * Правая панель показывается, пока rightOpen (когда — решает useSidePanel). Стоит ли она рядом со списком или
+ * Правая панель — одной ширины на всех страницах (RIGHT_WIDTH); показывается, пока rightOpen (когда — решает
+ * useSidePanel). Стоит ли она рядом со списком или
  * плавает поверх него (с тенью, как в макете), фрейм решает по свободному месту: панель стоит рядом, если после неё
  * списку остаётся не меньше minContentWidth. Ширина фрейма отслеживается, поэтому решение пересматривается при
  * любой перестройке: изменили окно, развернули или свернули левое меню. Решение уходит владельцу через
@@ -60,10 +61,12 @@ import { MENU_WIDTH, menuState } from '../menu/menuState'
  * фрейма: иначе свернувшееся меню освобождало бы место, фрейм просил бы развернуть его обратно, и меню раскачивалось
  * бы. Если пользователь сам развернул меню, его выбор сильнее: панель плавает.
  */
+/** Ширина правой панели — одна на всех страницах, чтобы панель не прыгала при переходе между списками. */
+const RIGHT_WIDTH = '25rem'
+
 const props = withDefaults(
   defineProps<{
     title?: string
-    rightWidth?: string
     rightOpen?: boolean
     minContentWidth?: string
     back?: (() => void) | null
@@ -71,7 +74,6 @@ const props = withDefaults(
   {
     title: '',
     back: null,
-    rightWidth: '22.4rem',
     rightOpen: true,
     minContentWidth: '40rem',
   },
@@ -91,7 +93,7 @@ function toPx(length: string): number {
 }
 
 function decide() {
-  const next = frameWidth.value < toPx(props.rightWidth) + toPx(props.minContentWidth)
+  const next = frameWidth.value < toPx(RIGHT_WIDTH) + toPx(props.minContentWidth)
   if (next !== floating.value) floating.value = next
 }
 
@@ -106,12 +108,12 @@ onMounted(() => {
 
 onBeforeUnmount(() => observer?.disconnect())
 
-watch([frameWidth, () => props.rightWidth, () => props.minContentWidth], decide)
+watch([frameWidth, () => props.minContentWidth], decide)
 
 // просьба свернуть меню: при развёрнутом меню панели рядом со списком не хватило бы места
 const slots = useSlots()
 watchEffect(() => {
-  const need = toPx(props.rightWidth) + toPx(props.minContentWidth)
+  const need = toPx(RIGHT_WIDTH) + toPx(props.minContentWidth)
   menuState.panelNeedsSpace = !!slots.right && Screen.width - toPx(MENU_WIDTH) < need
 })
 

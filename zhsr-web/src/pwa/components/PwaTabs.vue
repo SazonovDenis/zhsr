@@ -69,8 +69,8 @@ onMounted(loadState)
   // все вкладки в одну строку, поровну
   grid-auto-columns: 1fr;
   grid-auto-flow: column;
-  border-top: 0.0625rem solid $zs-border;
-  background: #fff;
+  // цвет верхней строки
+  background: var(--zs-header-bg);
 }
 
 .pwa-tabs__tab {
@@ -81,14 +81,14 @@ onMounted(loadState)
   gap: 0.1rem;
   min-height: 3.1rem;
   padding: 0.3rem 0 calc(0.3rem + env(safe-area-inset-bottom));
-  color: $zs-text-muted;
+  color: $zs-menu-fg-muted;
   font-size: 0.7rem;
   font-weight: 500;
   text-decoration: none;
 
-  // выделенный пункт — прямоугольник цвета верхней строки на всю ячейку, без зазоров
+  // выделенный пункт — прямоугольник цвета выделенного пункта меню десктопа на всю ячейку, без зазоров
   &--active {
-    background: var(--zs-header-bg);
+    background: $zs-menu-active-bg;
     color: #fff;
     font-weight: 700;
   }

@@ -62,7 +62,7 @@
           <span>{{ t('Служба') }}</span>
           <span>{{ dictManager.getValue('Service', r.service) }}</span>
           <span>{{ t('Автор') }}</span>
-          <span>{{ userName(r.createdByUsr) }}</span>
+          <span><UserName :user="r.createdByUsr" /></span>
           <!-- заявку создала Система по нарушению в чек-листе или по недостаче в описи — переход к ним -->
           <template v-if="source">
             <span>{{ t('Источник') }}</span>
@@ -74,9 +74,10 @@
           </template>
           <span>{{ t('Исполнитель') }}</span>
           <span>
-            {{ r.executorUsr ? userName(r.executorUsr) : t('не назначен') }}
+            <UserName v-if="r.executorUsr" :user="r.executorUsr" /><template v-else>{{ t('не назначен') }}</template>
+            <!-- видна тем, кто назначает по роли, если статус подходит (не выполнена, не закрыта…) -->
             <SoftLink
-              v-if="card.assignable.value"
+              v-if="card.assignShown.value"
               :text="card.reassign.value ? 'Переназначить' : 'Назначить'"
               class="card__assign q-ml-sm"
               @click="openAssign"
@@ -194,11 +195,16 @@
     :error="assignError"
     :retry="loadAssign"
     :disabled="card.blocked.value"
-    @pick="card.assign($event)"
+    :save="(id: number | null) => card.assign(id)"
   >
     <!-- у сотрудника бригады рейса справа — должность и вагоны, совпадения с заявкой жирным -->
     <template #option="{ option }">
-      <StaffOption :name="option.name" :candidate="candidateOf(option.id)" :wagon-number="r?.wagon.number ?? null" />
+      <UserOption
+        :name="option.name"
+        :me="option.id !== null && isMe({ id: option.id })"
+        v-bind="staffRow(candidateOf(option.id), r?.wagon.number ?? null)"
+        :plain="option.id === null"
+      />
     </template>
   </PickSheet>
 
@@ -262,6 +268,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import UserName from '@/shared/components/UserName.vue'
 import type { RepairRequest, RequestAction } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
@@ -279,7 +286,8 @@ import { formatDateTime } from '@/shared/format'
 import type { QueuedRequest } from '@/shared/offline/outbox'
 import PickSheet from '../components/PickSheet.vue'
 import { requestSource } from '@/shared/requests/requestSource'
-import StaffOption from '@/shared/requests/StaffOption.vue'
+import { staffRow } from '@/shared/requests/staffRow'
+import UserOption from '@/shared/components/UserOption.vue'
 import { sortStaff } from '@/shared/requests/staff'
 import QueuedItem from '../components/QueuedItem.vue'
 import QueuedPhoto from '../components/QueuedPhoto.vue'
@@ -292,7 +300,7 @@ import { historyTree } from '@/shared/requests/historyTree'
 import RequestHistory from '@/shared/requests/RequestHistory.vue'
 import { faultName, receivedLate, severityStyle } from '@/shared/requests/requestView'
 import { useRequestCard } from '@/shared/requests/useRequestCard'
-import { currentUser, userName } from '@/shared/user'
+import { currentUser, isMe } from '@/shared/user'
 import BottomSheet from '../components/BottomSheet.vue'
 import PwaPage from '../components/PwaPage.vue'
 import { tripRefDatedText } from '@/shared/trips/tripRefText'
@@ -403,7 +411,7 @@ function candidateOf(id: number | null) {
 const assignOpen = ref(false)
 const assignOptions = computed(() => [
   { id: null, name: t('Не назначен') },
-  ...staffOptions.value.map((u) => ({ id: u.id, name: userName(u) })),
+  ...staffOptions.value.map((u) => ({ id: u.id, name: u.name })),
 ])
 
 const assignError = ref<ShownError | null>(null)

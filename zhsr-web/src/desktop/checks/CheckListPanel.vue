@@ -11,19 +11,29 @@
     <template v-if="detail">
       <SidePanelFields>
         <span>{{ t('Объект проверки') }}</span>
-        <span>{{ checkSubjectText(detail) || '—' }}</span>
+        <!-- вагон — номер ссылкой: список вагонов с поиском по этому номеру -->
+        <span v-if="detail.wagon">
+          {{ t('вагон') }}
+          <SoftRouteLink
+            text="{number}"
+            :params="{ number: detail.wagon.number }"
+            :to="{ name: 'wagons', query: { number: detail.wagon.number } }"
+          />
+        </span>
+        <span v-else>{{ checkSubjectText(detail) || '—' }}</span>
         <span>{{ t('Рейс') }}</span>
         <span>{{ detail.trip ? tripRefDatedText(detail.trip) : '—' }}</span>
         <span>{{ t('Проверяющий') }}</span>
-        <span>{{ userName(detail.createdByUsr) }}</span>
+        <span><UserName :user="detail.createdByUsr" /></span>
         <span>{{ t('Окончена') }}</span>
         <span>{{ formatDateTime(detail.completedDt) }}</span>
         <!-- подпись — по центру строки с кнопкой фильтра -->
         <span class="self-center">{{ t('Нарушений') }}</span>
-        <!-- «Показать только нарушения» — в списке только нарушенные пункты -->
+        <!-- «Показать только нарушения» — в списке только нарушенные пункты; нарушений нет — «нет» и без кнопки -->
         <span class="check-panel__violations">
-          <span :class="{ 'check-panel__bad-text': detail.violationCount > 0 }">{{ detail.violationCount }}</span>
-          <CbButton v-model="filter" :values="filterChoices" />
+          <span v-if="detail.violationCount > 0" class="check-panel__bad-text">{{ detail.violationCount }}</span>
+          <template v-else>{{ t('нет') }}</template>
+          <CbButton v-if="detail.violationCount > 0" v-model="filter" :values="filterChoices" />
         </span>
       </SidePanelFields>
 
@@ -84,6 +94,7 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import UserName from '@/shared/components/UserName.vue'
 import type { CheckListDetail, CheckListValue, RequestRef } from '@/api/checks'
 import { checkPhotoUrl, fetchCheckList } from '@/api/checks'
 import { t } from '@/boot/i18n'
@@ -103,7 +114,7 @@ import { shownError } from '@/shared/errors'
 import { formatDateTime } from '@/shared/format'
 import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import { useNow } from '@/shared/trips/tripTimes'
-import { loadCurrentUser, userName } from '@/shared/user'
+import { loadCurrentUser } from '@/shared/user'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import { checkSubjectText } from './checksColumns'

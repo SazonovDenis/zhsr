@@ -120,16 +120,18 @@ import { provideBusy } from '@/shared/busy'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
-import { LocationType } from '@/shared/constants/systemDicts'
+import { LocationType, TripStatus } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
+import { fetchTripCrew } from '@/api/trips'
+import type { TripRef } from '@/api/wagons'
 import type { ShownError } from '@/shared/errors'
-import { shownError } from '@/shared/errors'
+import { notifyError, shownError } from '@/shared/errors'
 import { isoDateTime } from '@/shared/format'
 import { tripRefText } from '@/shared/trips/tripRefText'
 import { placeText } from '@/shared/wagonPlace'
 import DesktopFrame from '../frame/DesktopFrame.vue'
-import type { AttachChoice, ChangeChoice } from './attach'
-import { changeBody } from './attach'
+import type { AttachChoice, AttachStop, ChangeChoice } from './attach'
+import { changeBody, tripStops } from './attach'
 import AttachWagonsDialog from './AttachWagonsDialog.vue'
 import ChangeNote from './ChangeNote.vue'
 import ChangeUndoDialog from './ChangeUndoDialog.vue'
@@ -177,7 +179,7 @@ async function load() {
     await busy.run(async () => {
       const [data] = await Promise.all([
         fetchTrain(trainId.value),
-        dictManager.prepareDicts('Station', 'Depot', 'Yard', 'WagonType'),
+        dictManager.prepareDicts('Station', 'Depot', 'Yard', 'WagonType', 'WagonModel', 'LocationKind', 'TripState'),
       ])
       train.value = data
     })
@@ -222,7 +224,23 @@ async function attach() {
 }
 
 async function detach(w: TrainWagon) {
-  const choice = await openDialog<ChangeChoice>(DetachDialog, { number: w.number, factAllowed: !!w.dbeg })
+  // остановки рейсов поезда в плане: план отцепки можно поставить и на остановке рейса
+  let tripStopGroups: { trip: TripRef; stops: AttachStop[] }[]
+  try {
+    const crews = await busy.run(Promise.all(train.value!.trips.map((tr) => fetchTripCrew(tr.id))))
+    tripStopGroups = crews
+      .filter((c) => c.trip.tripStatusType === TripStatus.PLANNED)
+      .map((c) => ({ trip: train.value!.trips.find((tr) => tr.id === c.trip.id)!, stops: tripStops(c.trip) }))
+  } catch (e) {
+    notifyError(e)
+    return
+  }
+  const choice = await openDialog<ChangeChoice>(DetachDialog, {
+    number: w.number,
+    factAllowed: !!w.dbeg,
+    station: w.station,
+    tripStops: tripStopGroups,
+  })
   if (!choice) return
   await apply(() => detachWagons(train.value!.id, changeBody([w.number], choice, null)))
 }

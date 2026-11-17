@@ -413,8 +413,9 @@ public class RequestService {
 
     /**
      * Назначить исполнителя, сменить его или снять назначение (executor = null) - Ф-ЗАЯ-02. Новая заявка с
-     * исполнителем становится «назначенной», назначенная без исполнителя - «новой»; в остальных статусах статус не
-     * меняется.
+     * исполнителем становится «назначенной». Назначать, сменять и снимать исполнителя можно только у невыполненной
+     * заявки ({@link RequestRights#checkAssign}). Без исполнителя назначенная и взятая в работу становятся «новыми»,
+     * отложенная до ТО остаётся отложенной. В остальных случаях статус не меняется.
      */
     @Transactional
     public RequestDetail assign(long id, RequestExecutorBody body) throws Exception {
@@ -437,10 +438,10 @@ public class RequestService {
             if (status == RequestStatus.NEW) {
                 status = RequestStatus.ASSIGNED;
             }
-        } else if (status == RequestStatus.ASSIGNED) {
+        } else if (status == RequestStatus.ASSIGNED || status == RequestStatus.IN_PROGRESS) {
             status = RequestStatus.NEW;
-        } else {
-            throw ApiException.badRequest("Снять исполнителя можно только с назначенной заявки");
+        } else if (status != RequestStatus.DEFERRED) {
+            throw ApiException.badRequest("Снять исполнителя можно только с невыполненной заявки");
         }
         move(row, status, executor, user.id(), clientTime(body.clientDt(), OffsetDateTime.now()));
         return detail(id);

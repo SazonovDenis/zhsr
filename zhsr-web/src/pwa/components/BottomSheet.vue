@@ -64,12 +64,20 @@ onBeforeUnmount(() => dialogHistory.forget(historyEntry))
   // браузер без dvh пропустил бы ограничение, и высокий лист ушёл бы верхом за экран вместе с заголовком
   max-height: 85vh;
   max-height: 85dvh;
-  // снизу под кнопками — как по бокам; плюс вырез экрана (safe-area)
-  padding: 1.3rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  // снизу под кнопками — как по бокам; плюс вырез экрана (safe-area). Поля по бокам — у заголовка, тела и кнопок, а
+  // не у панели: тело прокручивается и обрезает всё за своими краями, а так содержимое может выйти в его поля
+  padding: 1.3rem 0 calc(1rem + env(safe-area-inset-bottom));
   border-radius: 1.3rem 1.3rem 0 0;
   background: #fff;
   color: $zs-text;
   font-size: 0.9rem;
+}
+
+.bottom-sheet__titles,
+.bottom-sheet__body,
+.bottom-sheet__buttons {
+  padding-right: 1rem;
+  padding-left: 1rem;
 }
 
 .bottom-sheet__titles {

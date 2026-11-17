@@ -22,6 +22,7 @@ import kz.zhsr.app.dto.check.CheckListValueRow;
 import kz.zhsr.app.dto.check.CheckNormRow;
 import kz.zhsr.app.dto.check.CheckTemplateRow;
 import kz.zhsr.app.dto.check.CheckValueDraft;
+import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.service.ApiException;
 import kz.zhsr.app.service.SqlQuery;
 import kz.zhsr.app.service.request.RequestService;
@@ -116,9 +117,9 @@ public class CheckService {
      * Проверки по фильтру (Ф-ЧЕК-04): сотрудник видит проверки, которые провёл сам, и по своим вагонам и рейсу
      * ({@link CheckRights#scope}); роли из {@link CheckRights#SEE_ALL} и администратор - все.
      */
-    public List<CheckListRow> list(CheckListFilter filter) throws Exception {
+    public List<CheckListRow> list(CheckListFilter filter, ListSort sort) throws Exception {
         CurrentUser user = currentUserService.get();
-        SqlQuery q = CheckSql.list(filter, user.id(), CheckRights.seesAll(user), CheckRights.scope(user));
+        SqlQuery q = CheckSql.list(filter, user.id(), CheckRights.seesAll(user), CheckRights.scope(user), sort);
         List<CheckListRow> res = db.loadSql(q.sql(), q.params(), CheckListRow.class);
         refResolver.resolve(res);
         return res;

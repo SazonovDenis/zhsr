@@ -1,5 +1,5 @@
 <template>
-  <!-- «назад» в шапке — выход из чек-листа без сохранения; по шагам назад — кнопка «Назад» внизу -->
+  <!-- «назад» в шапке — выход из чек-листа без сохранения; «Назад» внизу — в запуск -->
   <!-- пункты: серый фон под карточками, прокручивается блок пунктов (fill) — заголовки разделов липнут к его верху -->
   <PwaPage
     :title="editId !== null ? t('Изменение чек-листа') : t('Чек-лист')"
@@ -11,34 +11,9 @@
     <LoadSpinner v-if="busy.active.value" />
     <ErrorBox v-if="fill.loadError.value" :error="fill.loadError.value" :retry="retry" />
 
-    <!-- шаг 1: чек-лист -->
-    <template v-if="fill.templateId.value === null">
-      <div class="pwa-check__label">{{ t('Чек-лист') }}</div>
-      <button
-        v-for="tpl in fill.templates.value"
-        :key="tpl.id"
-        type="button"
-        class="pwa-check__choice q-px-md"
-        @click="fill.templateId.value = tpl.id"
-      >
-        <span>{{ textOf(tpl) }}</span>
-        <span class="pwa-check__muted">{{ checkObjectText(tpl.checkObject) }}</span>
-      </button>
-      <div
-        v-if="!busy.active.value && fill.templates.value.length === 0 && !fill.loadError.value"
-        class="pwa-check__muted"
-      >
-        {{ t('Нет чек-листов, которые вы проводите') }}
-      </div>
-    </template>
-
-    <!-- шаг 2: объект проверки -->
-    <template v-else-if="!fill.form.value">
-      <template v-if="fill.checkObject.value === CheckObject.WAGON">
-        <div class="pwa-check__label">{{ t('Вагон') }}</div>
-        <WagonPickList @pick="onWagon" />
-      </template>
-      <template v-else>
+    <!-- рейс и сотрудник: чек-лист и вагон выбраны при запуске (CheckStartPage), рейс и сотрудника — здесь -->
+    <template v-if="!fill.form.value">
+      <template v-if="fill.templateId.value !== null && fill.checkObject.value !== CheckObject.WAGON">
         <div class="pwa-check__label">{{ t('Рейс') }}</div>
         <CbList
           :model-value="fill.trip.value"
@@ -58,8 +33,8 @@
             class="pwa-check__choice q-px-md"
             @click="fill.checkedUsr.value = m.usr.id"
           >
-            <span>{{ userName(m.usr) }}</span>
-            <span class="pwa-check__muted">{{ dictManager.getValue('CrewDuty', m.crewDutyType) }}</span>
+            <!-- «Список ФИО»: ФИО и под ним должность -->
+            <UserOption :name="m.usr.name" :me="isMe(m.usr)" :duty="dictManager.getValue('CrewDuty', m.crewDutyType)" />
           </button>
           <ErrorBox v-if="fill.crewLoad.error" :error="fill.crewLoad.error" :retry="fill.crewLoad.retry" />
         </template>
@@ -168,13 +143,12 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import UserOption from '@/shared/components/UserOption.vue'
 import type { CheckFormItem } from '@/api/checks'
 import { checkPhotoUrl, CheckObject, CheckValueKind, fetchCheckList } from '@/api/checks'
 import type { RequestPhoto } from '@/api/requests'
-import type { RequestWagon } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
-import { checkObjectText } from '@/shared/checks/labels'
 import { numText, textOf } from '@/shared/checks/texts'
 import type { CheckFillValue } from '@/shared/checks/useCheckFill'
 import { useCheckFill } from '@/shared/checks/useCheckFill'
@@ -187,23 +161,23 @@ import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { shownError } from '@/shared/errors'
-import { loadCurrentUser, userName } from '@/shared/user'
+import { isMe, loadCurrentUser } from '@/shared/user'
 import type { BottomBarAction } from '../components/BottomBar.vue'
 import BottomBar from '../components/BottomBar.vue'
 import BottomSheet from '../components/BottomSheet.vue'
 import ItemNotePhotos from '../components/ItemNotePhotos.vue'
 import PwaPage from '../components/PwaPage.vue'
-import WagonPickList from '../components/WagonPickList.vue'
 import { closeSheet, exitFill, leaveFill } from './wizardHistory'
 
 /**
- * Проведение проверки по чек-листу на телефоне (Ф-ЧЕК-03): чек-лист, объект проверки, пункты карточками по разделам
+ * Проведение проверки по чек-листу на телефоне (Ф-ЧЕК-03). Чек-лист и вагон выбираются при запуске (CheckStartPage) и
+ * приходят в адресе; здесь — рейс и сотрудник у чек-листа рейса и сотрудника, затем пункты карточками по разделам
  * верхнего уровня; ответ из двух вариантов — циклической кнопкой справа от текста, из большего числа — кнопками под
  * текстом. У нарушенного пункта подряд — ссылки «Добавить примечание» (поле
  * открывается по нажатию, вне поля примечание — текстом с крестиком удаления) и «Добавить фото» (сразу камера; снятое
  * фото — миниатюры с просмотром). Только при связи: значения живут в памяти страницы и уходят на сервер один раз по
- * «Проверка окончена», после чего открывается просмотр сохранённого чек-листа. «Назад» возвращает на шаг назад, с
- * первого шага — на главную.
+ * «Проверка окончена», после чего открывается просмотр сохранённого чек-листа. «Назад» возвращает в запуск. Открыта
+ * без чек-листа в адресе (не из запуска и не исправление) — переход в запуск.
  */
 
 const router = useRouter()
@@ -272,10 +246,6 @@ function removeStored(item: CheckFormItem, id: string) {
   v.stored = v.stored.filter((x) => String(x) !== id)
 }
 
-function onWagon(w: RequestWagon) {
-  fill.wagon.value = { id: w.id, number: w.number, wagonType: w.wagonType }
-}
-
 const barActions = computed<BottomBarAction[]>(() => [
   { key: 'back', title: 'Назад', align: 'left' },
   { key: 'finish', title: 'Проверка окончена', kind: 'primary', loading: fill.sending.value },
@@ -306,22 +276,10 @@ async function leave() {
   else await exitFill(router, { name: 'pwa-checks' })
 }
 
-/** «Назад» внизу: с пунктов — к объекту проверки (из мастера — в мастер), с объекта — к выбору чек-листа, с первого
- * шага — в список. */
+/** «Назад» внизу: исправление — выход в просмотр чек-листа; новый — в запуск. */
 function back() {
-  if (editId !== null) {
-    void leave()
-  } else if (fill.templateId.value === null) {
-    void router.push({ name: 'pwa-checks' })
-  } else if (preset && fill.form.value) {
-    router.back()
-  } else if (fill.form.value) {
-    fill.wagon.value = null
-    fill.checkedUsr.value = null
-    if (fill.checkObject.value === CheckObject.TRIP) fill.trip.value = null
-  } else {
-    fill.templateId.value = null
-  }
+  if (editId !== null) void leave()
+  else router.back()
 }
 
 // чек-лист сохранён — его просмотр вместо заполнения и мастера: «назад» из просмотра не возвращает ни в заполнение, ни в мастер
@@ -335,8 +293,13 @@ function retry() {
   else void fill.loadForm()
 }
 
-// цепочка загрузок — сразу в setup: пользователь (права на шаблоны), справочники, шаблоны
+// цепочка загрузок — сразу в setup: пользователь (права на шаблоны), справочники, шаблоны. Новый чек-лист без
+// чек-листа в адресе — не из запуска: выбор чек-листа и вагона — в запуске
 async function init() {
+  if (editId === null && !preset) {
+    await router.replace({ name: 'pwa-check-start' })
+    return
+  }
   try {
     await busy.run(Promise.all([loadCurrentUser(), dictManager.prepareDicts('WagonType', 'CrewDuty')]))
   } catch (e) {

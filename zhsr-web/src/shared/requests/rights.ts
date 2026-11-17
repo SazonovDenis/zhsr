@@ -233,11 +233,22 @@ export function canAssign(user: CurrentUser, r: RepairRequest): boolean {
  * Почему пользователь не может назначить исполнителя — коротко, на русском (в тексте статуса {status}); пусто — может.
  */
 export function assignBlockReason(user: CurrentUser, r: RepairRequest): string {
-  if (!isMyMaster(user, r) && !isMyLnp(user, r) && !isAdmin(user)) {
-    return 'назначают мастер депо станции вагона и ЛНП рейса вагона'
-  }
-  if (FINAL_STATUSES.includes(r.requestStatusType)) return 'заявка в статусе «{status}»'
-  return ''
+  if (!assignRoleOk(user, r)) return 'назначают мастер депо станции вагона и ЛНП рейса вагона'
+  return assignStatusReason(r)
+}
+
+/** Назначает ли пользователь исполнителя по своей роли: мастер депо станции вагона, ЛНП рейса вагона, администратор. */
+export function assignRoleOk(user: CurrentUser, r: RepairRequest): boolean {
+  return isMyMaster(user, r) || isMyLnp(user, r) || isAdmin(user)
+}
+
+/**
+ * Почему по статусу заявки исполнителя не назначить, не сменить и не снять (в тексте статуса {status}): заявка выполнена
+ * или в конечном статусе; пусто — статус подходит.
+ */
+export function assignStatusReason(r: RepairRequest): string {
+  const done = r.requestStatusType === RequestStatus.DONE || FINAL_STATUSES.includes(r.requestStatusType)
+  return done ? 'заявка в статусе «{status}»' : ''
 }
 
 /**

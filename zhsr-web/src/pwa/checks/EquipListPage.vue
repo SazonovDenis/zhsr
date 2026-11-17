@@ -15,12 +15,13 @@
         <span>{{ t('Рейс') }}</span>
         <span>{{ detail.trip ? tripRefDatedText(detail.trip) : '—' }}</span>
         <span>{{ t('Составил') }}</span>
-        <span>{{ userName(detail.createdByUsr) }}</span>
+        <span><UserName :user="detail.createdByUsr" /></span>
         <!-- подпись — по центру строки с кнопкой фильтра -->
         <span class="self-center">{{ t('Нарушений') }}</span>
         <!-- «Показать только нарушения» — сразу за числом: в списке только позиции с нарушением; нарушений нет — кнопки нет -->
         <span class="view__violations">
-          <span :class="{ 'view__bad-text': detail.violationCount > 0 }">{{ detail.violationCount }}</span>
+          <span v-if="detail.violationCount > 0" class="view__bad-text">{{ detail.violationCount }}</span>
+          <template v-else>{{ t('нет') }}</template>
           <CbButton v-if="detail.violationCount > 0" v-model="filter" :values="filterChoices" />
         </span>
         <span>{{ t('Заявка по недостаче') }}</span>
@@ -77,6 +78,7 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import UserName from '@/shared/components/UserName.vue'
 import type { EquipListDetail, EquipListValue } from '@/api/equip'
 import { equipPhotoUrl, fetchEquipList } from '@/api/equip'
 import type { RequestPhoto } from '@/api/requests'
@@ -98,7 +100,7 @@ import { wagonShortText } from '@/shared/requests/requestView'
 import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import PhotoStrip from '@/shared/requests/PhotoStrip.vue'
 import { useNow } from '@/shared/trips/tripTimes'
-import { loadCurrentUser, userName } from '@/shared/user'
+import { loadCurrentUser } from '@/shared/user'
 import type { BottomBarAction } from '../components/BottomBar.vue'
 import BottomBar from '../components/BottomBar.vue'
 import PwaPage from '../components/PwaPage.vue'

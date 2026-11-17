@@ -84,15 +84,18 @@ public class RequestRights {
     }
 
     /**
-     * Назначить или сменить исполнителя может мастер депо станции вагона, пока заявка не в конечном статусе
-     * (Ф-ЗАЯ-02).
+     * Назначить, сменить или снять исполнителя может мастер депо станции вагона, ЛНП рейса вагона и администратор, пока
+     * заявка не выполнена: не в статусе «Выполнена» и не в конечном статусе (Ф-ЗАЯ-02).
      *
      * @throws ApiException 403 - не может
      */
     public void checkAssign(CurrentUser user, RequestRow r) {
-        if (FINAL_STATUSES.contains(r.getRequestStatusType())
-            || !(isMyMaster(user, r) || isMyLnp(user, r) || isAdmin(user))) {
+        if (!(isMyMaster(user, r) || isMyLnp(user, r) || isAdmin(user))) {
             throw ApiException.forbidden("Назначить исполнителя может мастер депо станции вагона и ЛНП рейса вагона");
+        }
+        long status = r.getRequestStatusType();
+        if (status == RequestStatus.DONE || FINAL_STATUSES.contains(status)) {
+            throw ApiException.forbidden("Исполнителя можно назначить только у невыполненной заявки");
         }
     }
 

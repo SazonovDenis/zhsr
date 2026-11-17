@@ -11,16 +11,20 @@
     <template v-if="detail">
       <div class="view__attrs">
         <span>{{ t('Объект проверки') }}</span>
-        <span>{{ subject || '—' }}</span>
+        <span>
+          <UserName v-if="detail.checkedUsr && !detail.wagon" :user="detail.checkedUsr" />
+          <template v-else>{{ subject || '—' }}</template>
+        </span>
         <span>{{ t('Рейс') }}</span>
         <span>{{ detail.trip ? tripRefDatedText(detail.trip) : '—' }}</span>
         <span>{{ t('Проверяющий') }}</span>
-        <span>{{ userName(detail.createdByUsr) }}</span>
+        <span><UserName :user="detail.createdByUsr" /></span>
         <!-- подпись — по центру строки с кнопкой фильтра -->
         <span class="self-center">{{ t('Нарушений') }}</span>
         <!-- «Показать только нарушения» — сразу за числом: в списке только нарушенные пункты; нарушений нет — кнопки нет -->
         <span class="view__violations">
-          <span :class="{ 'view__bad-text': detail.violationCount > 0 }">{{ detail.violationCount }}</span>
+          <span v-if="detail.violationCount > 0" class="view__bad-text">{{ detail.violationCount }}</span>
+          <template v-else>{{ t('нет') }}</template>
           <CbButton v-if="detail.violationCount > 0" v-model="filter" :values="filterChoices" />
         </span>
       </div>
@@ -74,6 +78,7 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import UserName from '@/shared/components/UserName.vue'
 import type { CheckListDetail, CheckListValue } from '@/api/checks'
 import { checkPhotoUrl, fetchCheckList } from '@/api/checks'
 import type { RequestPhoto } from '@/api/requests'

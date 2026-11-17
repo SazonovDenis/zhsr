@@ -51,10 +51,10 @@
             <span>{{ t('Состояние') }}</span>
             <span>{{ statusText(selected.actStatusType) }}</span>
             <span>{{ t('Сдал') }}</span>
-            <span>{{ userName(selected.transferredByUsr) }} • {{ formatDateTime(selected.transferredDt) }}</span>
+            <span><UserName :user="selected.transferredByUsr" /> • {{ formatDateTime(selected.transferredDt) }}</span>
             <template v-if="selected.receivedByUsr">
               <span>{{ t('Принял') }}</span>
-              <span>{{ userName(selected.receivedByUsr) }} • {{ formatDateTime(selected.receivedDt) }}</span>
+              <span><UserName :user="selected.receivedByUsr" /> • {{ formatDateTime(selected.receivedDt) }}</span>
             </template>
             <template v-if="selected.rejectReason">
               <span>{{ t('Причина отказа') }}</span>
@@ -116,6 +116,7 @@ import { Notify } from 'quasar'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import UserName from '@/shared/components/UserName.vue'
 import type { Transfer } from '@/api/transfers'
 import { fetchTransfers, transferFrom, transferTo } from '@/api/transfers'
 import { t } from '@/boot/i18n'
@@ -135,7 +136,7 @@ import { shownError } from '@/shared/errors'
 import { transferPlaceText } from '@/shared/transferPlace'
 import { formatDateTime } from '@/shared/format'
 import { roleReason } from '@/shared/roleReason'
-import { loadCurrentUser, userName } from '@/shared/user'
+import { loadCurrentUser } from '@/shared/user'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'

@@ -16,6 +16,8 @@ export interface ChangeChoice {
   time: string | null
   station: number | null
   routeStation: number | null
+  /** рейс остановки routeStation, если его выбрали в окне (состав поезда); нет — рейс задаёт вызывающий */
+  trip?: number
 }
 
 /** Выбор диалога «Прицепить вагоны»: номера вагонов и как прицепить. */
@@ -30,7 +32,7 @@ export function changeBody(numbers: string[], choice: ChangeChoice, trip: number
     fact: choice.fact,
     time: choice.time,
     station: choice.station,
-    trip: choice.routeStation === null ? null : trip,
+    trip: choice.routeStation === null ? null : (choice.trip ?? trip),
     routeStation: choice.routeStation,
     comment: '',
     responsibleUsr: null,

@@ -20,43 +20,43 @@
         <span>{{ t('Нормы часов') }}</span>
         <!-- нормы — друг под другом: проводник, ЛНП, ПЭМ -->
         <span class="route-panel__norms">
-          <span>{{ t('проводник {n}', { n: route.conductorHours }) }}</span>
-          <span>{{ t('ЛНП {n}', { n: route.lnpHours }) }}</span>
-          <span>{{ t('ПЭМ {n}', { n: route.pemHours }) }}</span>
+          <span>{{ t('проводник: {n} час', { n: route.conductorHours }) }}</span>
+          <span>{{ t('ЛНП: {n} час', { n: route.lnpHours }) }}</span>
+          <span>{{ t('ПЭМ: {n} час', { n: route.pemHours }) }}</span>
         </span>
       </SidePanelFields>
 
-      <!-- без прав кнопка видна, но неактивна, причина во всплывающей подсказке -->
-      <div class="route-panel__actions">
-        <q-btn
-          unelevated
-          outline
-          no-caps
-          color="ink"
-          class="zs-soft-border"
-          :disable="!!editReason"
-          :title="editReason || undefined"
-          @click="emit('edit')"
-        >
-          {{ t('Редактировать') }}
-        </q-btn>
-      </div>
-
       <!-- остановки — списком или на карте (переключатель); прокручиваются только они, атрибуты над ними на месте -->
       <section class="route-panel__stops q-pt-md q-px-lg q-pb-none">
-        <div class="route-panel__tabs" role="tablist">
-          <button
-            v-for="tab in TABS"
-            :key="tab.id"
-            type="button"
-            role="tab"
-            class="route-panel__tab q-pt-none q-px-none q-pb-xs"
-            :class="{ 'route-panel__tab--active': view === tab.id }"
-            :aria-selected="view === tab.id"
-            @click="view = tab.id"
+        <!-- под чертой: переключатель слева, «Редактировать» справа; без прав кнопка видна, но неактивна, причина во
+             всплывающей подсказке -->
+        <div class="route-panel__head">
+          <div class="route-panel__tabs" role="tablist">
+            <button
+              v-for="tab in TABS"
+              :key="tab.id"
+              type="button"
+              role="tab"
+              class="route-panel__tab q-pt-none q-px-none q-pb-xs"
+              :class="{ 'route-panel__tab--active': view === tab.id }"
+              :aria-selected="view === tab.id"
+              @click="view = tab.id"
+            >
+              {{ t(tab.label) }}
+            </button>
+          </div>
+          <q-btn
+            unelevated
+            outline
+            no-caps
+            color="ink"
+            class="zs-soft-border"
+            :disable="!!editReason"
+            :title="editReason || undefined"
+            @click="emit('edit')"
           >
-            {{ t(tab.label) }}
-          </button>
+            {{ t('Редактировать') }}
+          </q-btn>
         </div>
         <!-- станции маршрута — из карточки маршрута: грузятся при выборе строки -->
         <LoadSpinner v-if="loading" />
@@ -158,12 +158,14 @@ const period = computed(() => {
   flex-direction: column;
 }
 
-.route-panel__actions {
+.route-panel__head {
   display: flex;
+  flex: none;
   align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin: -0.3rem 0 -0.9rem;
+  justify-content: space-between;
+  gap: 1rem;
+  // отступ под подписью группы — на треть меньше промежутка между блоками (0.6rem)
+  margin-bottom: calc(-0.6rem / 3);
 }
 
 // остановки занимают всё место панели под атрибутами
@@ -182,8 +184,6 @@ const period = computed(() => {
   display: flex;
   flex: none;
   gap: 1.3rem;
-  // отступ под подписью группы — на треть меньше промежутка между блоками (0.6rem)
-  margin-bottom: calc(-0.6rem / 3);
 }
 
 .route-panel__tab {

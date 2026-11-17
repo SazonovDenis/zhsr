@@ -11,7 +11,10 @@
     <template v-for="(item, index) in items" :key="index">
       <!-- стрелка перед станцией; после свёрнутых станций следования стрелка у самого свёрнутого блока -->
       <div v-if="index > 0 && items[index - 1]?.kind !== 'gap'" class="route-stops__link">
-        <span class="route-stops__run">{{ formatDuration(item.runDuration) }}</span>
+        <!-- над свёрнутыми станциями следования — словами: «2 ч 23 м» -->
+        <span class="route-stops__run">
+          {{ item.kind === 'gap' ? formatWords(item.runDuration) : formatDuration(item.runDuration) }}
+        </span>
         <span class="route-stops__arrow">
           <SvgIcon name="arrow-route" size="0.8rem" />
           <template v-if="item.kind === 'gap'">
@@ -45,7 +48,7 @@
     <!-- заголовки колонок справа -->
     <div v-if="items.length > 0" class="route-stops__columns">
       <span class="route-stops__columns-space" />
-      <span class="route-stops__time">{{ t('в пути, мин') }}</span>
+      <span class="route-stops__time">{{ t('В пути') }}</span>
       <span class="route-stops__stop q-pa-none">{{ t('стоянка') }}</span>
     </div>
 
@@ -57,17 +60,16 @@
       </span>
 
       <template v-if="item.kind === 'gap'">
-        <span class="route-stops__gap-text">{{ t('{n} станций следования', item.count) }}</span>
-        <!-- время свёрнутых перегонов складывается -->
-        <span class="route-stops__time">{{ formatDuration(item.passDuration) }}</span>
-        <span class="route-stops__stop q-pa-none" />
+        <!-- на всю строку, по бокам многоточия; своего времени у свёрнутых станций нет: время от предыдущей
+             остановки — у следующей остановки -->
+        <span class="route-stops__gap-text q-py-xs">…&nbsp;{{ t('{n} станций следования', item.count) }}&nbsp;…</span>
       </template>
       <template v-else>
         <span class="route-stops__title q-pa-none">
           <span class="route-stops__name">{{ stationName(item.point) }}</span>
           <span class="route-stops__sub route-stops__km">{{ kmText(item.point, index) }}</span>
         </span>
-        <span class="route-stops__time">{{ formatDuration(item.runDuration) }}</span>
+        <span class="route-stops__time">{{ formatHourMin(item.runDuration) }}</span>
         <span class="route-stops__stop q-pa-none">
           {{ stopOf(item.point) > 0 ? t('{m} мин', { m: stopOf(item.point) }) : '' }}
         </span>
@@ -85,17 +87,18 @@ import type { RoutePoint } from '@/api/routes'
 import { t } from '@/boot/i18n'
 import { dictManager } from '@/shared/dict/DictManager'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
-import { formatHm, runOf, stopOf } from './duration'
+import { formatDuration as formatWords, formatHm, runOf, stopOf } from './duration'
 
 /**
  * Отображение станций маршрута по макету: станции по порядку с расстоянием от начала маршрута, временем в пути и
  * стоянками.
  *
  * - layout = 'horizontal' — в строку (шапка редактора маршрута): точка и название станции, под названием стоянка и
- *   расстояние («отправление» у начальной); над стрелкой между станциями — время в пути по перегону.
+ *   расстояние («отправление» у начальной); над стрелкой между станциями — время в пути по перегону («2:32»), над
+ *   свёрнутыми станциями следования — словами («2 ч 23 м»).
  * - layout = 'vertical' — столбиком (правая панель списка маршрутов): линия пути с точками, название, под ним
- *   расстояние; справа, под заголовками «в пути, мин» и «стоянка», — время в пути от предыдущей станции
- *   («2:32»), как над стрелками в строку, и стоянка («20 мин»).
+ *   расстояние; справа, под заголовками «В пути» и «стоянка», — время в пути от предыдущей станции
+ *   («3 ч 34 мин»; после свёрнутых станций следования — от предыдущей остановки) и стоянка («20 мин»).
  * - Остановки — заполненная точка и название жирным, станции следования (поезд проходит их без остановки) — пустое
  *   кольцо и серое название. Клик по компоненту сворачивает станции следования в их число между остановками и
  *   разворачивает обратно.
@@ -115,40 +118,40 @@ const props = withDefaults(
 const collapsed = defineModel<boolean>('collapsed', { default: false })
 
 /**
- * Элемент показа. runDuration — время в пути до элемента от предыдущего показанного, мин.
+ * Элемент показа. runDuration — время в пути до элемента от предыдущего показанного, мин; у остановки после
+ * свёрнутых станций следования — от предыдущей остановки.
  */
 type Item =
   | { kind: 'stop' | 'pass'; point: RoutePoint; runDuration: number }
-  /**
-   * свёрнутые станции следования. runDuration — время над свёрнутым блоком в строку: от предыдущей остановки до
-   * следующей; passDuration — время столбиком: сумма свёрнутых перегонов, без перегона до следующей остановки
-   */
-  | { kind: 'gap'; count: number; runDuration: number; passDuration: number }
+  /** свёрнутые станции следования. runDuration — время от предыдущей остановки до следующей */
+  | { kind: 'gap'; count: number; runDuration: number }
 
 const hasPassing = computed(() => props.points.some((p) => !p.haveStop))
 
 const items = computed<Item[]>(() => {
   const result: Item[] = []
-  let gap: { kind: 'gap'; count: number; runDuration: number; passDuration: number } | null = null
+  let gap: { kind: 'gap'; count: number; runDuration: number } | null = null
 
   props.points.forEach((point, index) => {
     const run = runOf(props.points, index)
     if (!point.haveStop && collapsed.value) {
       if (!gap) {
-        gap = { kind: 'gap', count: 0, runDuration: 0, passDuration: 0 }
+        gap = { kind: 'gap', count: 0, runDuration: 0 }
         result.push(gap)
       }
       gap.count++
       gap.runDuration += run
-      gap.passDuration += run
       return
     }
+    let runDuration = run
     if (gap) {
-      // путь от последней свёрнутой станции до этой остановки — тоже часть времени над свёрнутым блоком
+      // путь от последней свёрнутой станции до этой остановки — тоже часть времени над свёрнутым блоком; у остановки
+      // время от предыдущей остановки
       gap.runDuration += run
+      runDuration = gap.runDuration
       gap = null
     }
-    result.push({ kind: point.haveStop ? 'stop' : 'pass', point, runDuration: run })
+    result.push({ kind: point.haveStop ? 'stop' : 'pass', point, runDuration })
   })
   return result
 })
@@ -164,6 +167,15 @@ function kmText(point: RoutePoint, index: number): string {
 /** Время в пути — часы и минуты: «0:34», «2:32», «19:05»; ноль — пусто (у начальной станции). */
 function formatDuration(min: number): string {
   return min ? formatHm(min) : ''
+}
+
+/** Время в пути столбиком: «3 ч 34 мин», «34 мин», «3 ч»; ноль — пусто (у начальной станции). */
+function formatHourMin(min: number): string {
+  if (!min) return ''
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  if (h === 0) return t('{m} мин', { m })
+  return m === 0 ? t('{h} ч', { h }) : t('{h} ч {m} мин', { h, m })
 }
 </script>
 
@@ -318,6 +330,20 @@ function formatDuration(min: number): string {
   margin: 0.1rem 0;
 }
 
+// перед станцией следования — мелкий отступ: строка начинается ниже, верхний отрезок линии длиннее на столько же,
+// чтобы линия пути не прерывалась
+.route-stops__row--pass {
+  > .route-stops__title,
+  > .route-stops__time,
+  > .route-stops__stop {
+    padding-top: 0.3rem;
+  }
+
+  .route-stops__line:first-child {
+    height: 0.5rem;
+  }
+}
+
 .route-stops__title {
   display: flex;
   flex: 1;
@@ -381,6 +407,8 @@ function formatDuration(min: number): string {
   align-items: center;
   color: $zs-text-muted;
   font-size: 0.8rem;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .route-stops__empty {

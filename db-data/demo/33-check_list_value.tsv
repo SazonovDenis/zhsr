@@ -99,19 +99,19 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 98	6	118			4		97	true	
 99	6	120			3	Проверено, замечаний нет	98	false	
 100	6	121			3		99	false	
-101	6	122			3	Клининг в Караганде не подтвердил выход	100	false	
+101	6	122			3	Без замечаний	100	false	
 102	6	123			4		101	true	
 103	6	124	Без замечаний			Состояние удовлетворительное		false	
 104	7	2					1	false	
-105	7	3			1	Не загорается индикатор при проверке	2	false	
+105	7	3			1	Без замечаний	2	false	
 106	7	4			2		3	true	
 107	7	5			1	Проверено визуально	4	false	
-108	7	7		22		Кондиционер не включается	5	false	
+108	7	7		22		Без замечаний	5	false	
 109	7	8			3	Проверено в 3-м и 5-м купе.\nЗамечаний нет.	6	false	
 110	7	9			4		7	true	
 111	7	10			1	Без замечаний	8	false	
 112	8	26					19	false	
-113	8	27			1	Титан не греет	20	false	
+113	8	27			1	Без замечаний	20	false	
 114	8	28			2		21	true	
 115	8	29			1	Проверено вместе с проводником	22	false	
 116	8	30					23	false	
@@ -167,7 +167,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 166	9	89			2		73	true	
 167	9	90			1	Проверено при приёмке.\nПовторная проверка не требуется.	74	false	
 168	9	91					75	false	
-169	9	92			1	Нет запаса в санузле	76	false	
+169	9	92			1	Без замечаний	76	false	
 170	9	93			2		77	true	
 171	9	94			1	Проверено, замечаний нет	78	false	
 172	9	95					79	false	
@@ -187,7 +187,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 186	10	2			1	Проверено, замечаний нет	1	false	
 187	10	3			1		2	false	
 188	10	4			1	Проверено визуально	3	false	
-189	10	5			2	Сообщено проводнику, ждём мастера	4	true	24
+189	10	5			1	Без замечаний	4	false	
 190	10	7		22		Без замечаний	5	false	
 191	10	8			3		6	false	
 192	10	9			3	Проверено, замечаний нет	7	false	
@@ -227,7 +227,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 226	15	2			1	Без замечаний	1	false	
 227	15	3			1		2	false	
 228	15	4			1	Проверено, замечаний нет	3	false	
-229	15	5			2	Сообщено проводнику, ждём мастера	4	true	1004
+229	15	5			1	Без замечаний	4	false	
 230	15	7		22		Проверено визуально	5	false	
 231	15	8			3		6	false	
 232	15	9			3	Без замечаний	7	false	
@@ -265,7 +265,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 264	19	9			3	Проверено, замечаний нет	7	false	
 265	19	10			2	Сообщено проводнику, ждём мастера	8	true	1014
 266	20	2			1	Проверено визуально	1	false	
-267	20	3			2	Обнаружено при обходе.\nПроводник предупреждён.	2	true	1016
+267	20	3			1	Без замечаний	2	false	
 268	20	4			1	Без замечаний	3	false	
 269	20	5			1		4	false	
 270	20	7		22		Проверено, замечаний нет	5	false	
@@ -311,7 +311,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 310	25	7		22		Без замечаний	5	false	
 311	25	8			3		6	false	
 312	25	9			3	Проверено, замечаний нет	7	false	
-313	25	10			2	Сообщено проводнику, ждём мастера	8	true	1028
+313	25	10			1	Без замечаний	8	false	
 314	26	2			1	Проверено визуально	1	false	
 315	26	3			2	Обнаружено при обходе.\nПроводник предупреждён.	2	true	1030
 316	26	4			1	Без замечаний	3	false	
@@ -349,7 +349,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 348	30	4			1	Проверено, замечаний нет	3	false	
 349	30	5			1		4	false	
 350	30	7		22		Проверено визуально	5	false	
-351	30	8			4	Обнаружено при обходе.\nПроводник предупреждён.	6	true	1040
+351	30	8			3	Без замечаний	6	false	
 352	30	9			3	Без замечаний	7	false	
 353	30	10			1		8	false	
 354	31	2			1	Проверено, замечаний нет	1	false	
@@ -389,7 +389,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 388	35	4			1	Без замечаний	3	false	
 389	35	5			1		4	false	
 390	35	7		22		Проверено, замечаний нет	5	false	
-391	35	8			4	Обнаружено при обходе.\nПроводник предупреждён.	6	true	1054
+391	35	8			3	Без замечаний	6	false	
 392	35	9			3	Проверено визуально	7	false	
 393	35	10			1		8	false	
 394	36	2			1	Без замечаний	1	false	
@@ -426,7 +426,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 425	39	10			1		8	false	
 426	40	2			1	Проверено, замечаний нет	1	false	
 427	40	3			1		2	false	
-428	40	4			2	Требуется замена	3	true	1066
+428	40	4			1	Без замечаний	3	false	
 429	40	5			1		4	false	
 430	40	7		22		Без замечаний	5	false	
 431	40	8			3		6	false	
@@ -464,7 +464,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 463	44	8			3		6	false	
 464	44	9			4	Требуется замена	7	true	1076
 465	44	10			1		8	false	
-466	45	2			2	Устранить до отправления	1	true	1078
+466	45	2			1	Без замечаний	1	false	
 467	45	3			1		2	false	
 468	45	4			1	Проверено, замечаний нет	3	false	
 469	45	5			1		4	false	
@@ -510,7 +510,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 509	50	5			1		4	false	
 510	50	7		22		Проверено, замечаний нет	5	false	
 511	50	8			3		6	false	
-512	50	9			4	Требуется замена	7	true	1090
+512	50	9			3	Без замечаний	7	false	
 513	50	10			1		8	false	
 514	51	2			1	Без замечаний	1	false	
 515	51	3			1		2	false	
@@ -550,7 +550,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 549	55	5			1		4	false	
 550	55	7		22		Без замечаний	5	false	
 551	55	8			3		6	false	
-552	55	9			4	Требуется замена	7	true	1104
+552	55	9			3	Без замечаний	7	false	
 553	55	10			1		8	false	
 554	56	2			2	Устранить до отправления	1	true	1106
 555	56	3			1		2	false	
@@ -587,7 +587,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 586	60	2			1	Без замечаний	1	false	
 587	60	3			1		2	false	
 588	60	4			1	Проверено, замечаний нет	3	false	
-589	60	5			2	Сообщено проводнику, ждём мастера	4	true	1116
+589	60	5			1	Без замечаний	4	false	
 590	60	7		22		Проверено визуально	5	false	
 591	60	8			3		6	false	
 592	60	9			3	Без замечаний	7	false	
@@ -625,7 +625,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 624	64	9			3	Проверено, замечаний нет	7	false	
 625	64	10			2	Сообщено проводнику, ждём мастера	8	true	1126
 626	65	2			1	Проверено визуально	1	false	
-627	65	3			2	Обнаружено при обходе.\nПроводник предупреждён.	2	true	1128
+627	65	3			1	Без замечаний	2	false	
 628	65	4			1	Без замечаний	3	false	
 629	65	5			1		4	false	
 630	65	7		22		Проверено, замечаний нет	5	false	
@@ -671,7 +671,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 670	70	7		22		Без замечаний	5	false	
 671	70	8			3		6	false	
 672	70	9			3	Проверено, замечаний нет	7	false	
-673	70	10			2	Сообщено проводнику, ждём мастера	8	true	1140
+673	70	10			1	Без замечаний	8	false	
 674	71	2			1	Проверено визуально	1	false	
 675	71	3			1		2	false	
 676	71	4			1	Без замечаний	3	false	
@@ -711,7 +711,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 710	75	7		22		Проверено визуально	5	false	
 711	75	8			3		6	false	
 712	75	9			3	Без замечаний	7	false	
-713	75	10			2	Сообщено проводнику, ждём мастера	8	true	1154
+713	75	10			1	Без замечаний	8	false	
 714	76	2			1	Проверено, замечаний нет	1	false	
 715	76	3			2	Обнаружено при обходе.\nПроводник предупреждён.	2	true	1156
 716	76	4			1	Проверено визуально	3	false	
@@ -749,7 +749,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 748	80	4			1	Без замечаний	3	false	
 749	80	5			1		4	false	
 750	80	7		22		Проверено, замечаний нет	5	false	
-751	80	8			4	Обнаружено при обходе.\nПроводник предупреждён.	6	true	1166
+751	80	8			3	Без замечаний	6	false	
 752	80	9			3	Проверено визуально	7	false	
 753	80	10			1		8	false	
 754	81	2			1	Без замечаний	1	false	
@@ -786,7 +786,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 785	84	10			1		8	false	
 786	85	2			1	Проверено, замечаний нет	1	false	
 787	85	3			1		2	false	
-788	85	4			2	Требуется замена	3	true	1178
+788	85	4			1	Без замечаний	3	false	
 789	85	5			1		4	false	
 790	85	7		22		Без замечаний	5	false	
 791	85	8			3		6	false	
@@ -824,7 +824,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 823	89	8			3		6	false	
 824	89	9			4	Требуется замена	7	true	1188
 825	89	10			1		8	false	
-826	90	2			2	Устранить до отправления	1	true	1190
+826	90	2			1	Без замечаний	1	false	
 827	90	3			1		2	false	
 828	90	4			1	Проверено, замечаний нет	3	false	
 829	90	5			1		4	false	
@@ -864,7 +864,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 863	94	8			3		6	false	
 864	94	9			3	Проверено, замечаний нет	7	false	
 865	94	10			1		8	false	
-866	95	2			2	Устранить до отправления	1	true	1204
+866	95	2			1	Без замечаний	1	false	
 867	95	3			1		2	false	
 868	95	4			1	Без замечаний	3	false	
 869	95	5			1		4	false	
@@ -910,7 +910,7 @@ id	check_list	check_list_template_item	value_string	value_number	check_dict_valu
 909	100	5			1		4	false	
 910	100	7		22		Без замечаний	5	false	
 911	100	8			3		6	false	
-912	100	9			4	Требуется замена	7	true	1216
+912	100	9			3	Без замечаний	7	false	
 913	100	10			1		8	false	
 914	101	2			2	Устранить до отправления	1	true	1218
 915	101	3			1		2	false	

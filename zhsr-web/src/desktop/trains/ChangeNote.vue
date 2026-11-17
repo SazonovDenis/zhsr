@@ -20,8 +20,8 @@
         no-caps
         color="primary"
         padding="0"
-        :disable="!change.canMark"
-        :title="change.canMark ? undefined : t(MARK_REASON)"
+        :disable="!change.canCancel"
+        :title="change.canCancel ? undefined : t(CANCEL_REASON)"
         @click="emit('cancel', change)"
       >
         {{ t('Отменить план') }}
@@ -60,7 +60,8 @@ import { formatDateTime } from '@/shared/format'
 const props = withDefaults(defineProps<{ change: TrainChange; undoable?: boolean }>(), { undoable: false })
 const emit = defineEmits<{ mark: [change: TrainChange]; cancel: [change: TrainChange]; undo: [change: TrainChange] }>()
 
-const MARK_REASON = 'Отмечает и отменяет план планировщик вагонов, в рейсе — ЛНП рейса'
+const MARK_REASON = 'Отмечает план планировщик вагонов, в рейсе — ЛНП рейса'
+const CANCEL_REASON = 'Отменяет план планировщик вагонов или ЛНП рейса'
 const UNDO_REASON = 'Отменяет планировщик вагонов, в рейсе — ЛНП рейса'
 
 const planned = computed(() => props.change.status === TrainWagonChangeStatus.PLANNED)

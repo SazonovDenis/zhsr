@@ -15,13 +15,14 @@
     >
       <template #option="{ item }">
         <div v-if="item.data?.hint" class="zs-sub">{{ item.text }}</div>
-        <div v-else class="wagon-pick__row">
-          <span class="zs-mono wagon-pick__number">{{ item.data?.number }}</span>
-          <span>{{ item.data?.type }}</span>
-          <!-- расположение — только при поиске «Другой вагон» -->
-          <span class="zs-sub wagon-pick__place">{{ mode === 'other' ? item.data?.place : '' }}</span>
-          <StatusBadge v-if="item.data?.badge" tone="selected">{{ item.data?.badge }}</StatusBadge>
-        </div>
+        <!-- строка вагона: слева номер и под ним тип, справа расположение и под ним плашка -->
+        <WagonOption
+          v-else
+          :number="(item.data?.number as string | undefined) ?? ''"
+          :type="(item.data?.type as string | undefined) ?? ''"
+          :place="(item.data?.place as string | undefined) ?? ''"
+          :badge="(item.data?.badge as string | undefined) ?? ''"
+        />
       </template>
     </CbList>
   </div>
@@ -33,7 +34,7 @@ import { computed, nextTick, reactive, ref, shallowRef, watch } from 'vue'
 import type { WagonRef } from '@/api/requests'
 import type { RequestWagon } from '@/api/wagons'
 import { fetchTripWagons, findWagons, WAGON_SEARCH_LIMIT } from '@/api/wagons'
-import StatusBadge from '@/shared/components/StatusBadge.vue'
+import WagonOption from '@/shared/components/WagonOption.vue'
 import CbList from '@/shared/components/choice/CbList.vue'
 import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import type { ChoiceItem, ChoiceModel } from '@/shared/components/choice/choice'
@@ -255,23 +256,5 @@ void load()
 // режимы — с узкими боковыми отступами: комбо вагона в той же строке
 .wagon-pick :deep(.cb-segment__item) {
   padding: 0 0.6rem;
-}
-
-.wagon-pick__row {
-  display: grid;
-  grid-template-columns: 5rem 8rem minmax(0, 1fr) auto;
-  gap: 0.8rem;
-  align-items: center;
-  width: 100%;
-}
-
-.wagon-pick__number {
-  font-weight: 600;
-}
-
-.wagon-pick__place {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 </style>

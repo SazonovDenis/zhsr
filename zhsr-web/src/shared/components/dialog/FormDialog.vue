@@ -9,15 +9,19 @@
     @action="onAction"
   >
     <template #actions-left><slot name="actions-left" /></template>
-    <!-- двойной клик по варианту с data-dialog-pick — выбор и основное действие -->
-    <div class="form-dialog__fields" @dblclick="onDblclick"><slot /></div>
-    <ErrorBox v-if="shown" :error="shown" class="form-dialog__error" />
+    <!-- двойной клик по варианту с data-dialog-pick — выбор и основное действие; любое действие в полях (нажатие,
+         ввод) убирает ошибку -->
+    <div class="form-dialog__fields" @dblclick="onDblclick" @pointerdown="dismiss" @keydown="dismiss" @input="dismiss">
+      <slot />
+    </div>
+    <!-- ошибка с крестиком: крестик (на телефоне и нажатие на неё) — убрать -->
+    <ErrorBox v-if="shown" :error="shown" closable class="form-dialog__error" @close="dismiss" />
     <div v-if="hint" class="form-dialog__hint">{{ t(hint) }}</div>
   </DialogFrame>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { t } from '@/boot/i18n'
 import { useBusy } from '@/shared/busy'
@@ -31,6 +35,9 @@ import DialogFrame from './DialogFrame.vue'
  * ошибки, подсказка и кнопки: «Отмена» слева, справа — дополнительные (extraActions) и основного действия.
  *
  * Слот actions-left — кнопки слева на панели диалога, например «Удалить запись».
+ *
+ * Ошибка (error) — с крестиком в правом верхнем углу; крестик (на телефоне и нажатие на неё) или любое действие в
+ * полях формы её убирают, новая ошибка показывается снова.
  *
  * Основное действие отправляет событие ok; что проверить и какой запрос отправить, решает конкретный диалог. Пока
  * running = true, кнопка основного действия крутит спиннер, а повторно действие не запускается.
@@ -75,7 +82,17 @@ const emit = defineEmits<{ ok: [] }>()
 
 const show = defineModel<boolean>('show', { default: false })
 
-const shown = computed(() => props.error)
+// ошибку убрал пользователь (крестик, нажатие на неё, действие в полях); новая ошибка показывается снова
+const dismissed = ref(false)
+watch(
+  () => props.error,
+  () => (dismissed.value = false),
+)
+const shown = computed(() => (dismissed.value ? null : props.error))
+
+function dismiss() {
+  if (props.error) dismissed.value = true
+}
 
 // ожидание диалога (provideBusy в диалоге-наследнике): спиннер в подвале — на всю цепочку загрузок формы
 const busy = useBusy()

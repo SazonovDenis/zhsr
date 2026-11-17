@@ -25,8 +25,9 @@ withDefaults(
 <style scoped lang="scss">
 .badge {
   display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border-radius: 0.3rem;
+  padding: 0.1rem 0.6rem;
+  // скруглённые бока: радиус не меньше половины высоты плашки
+  border-radius: 1rem;
   font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;

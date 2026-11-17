@@ -1,5 +1,6 @@
 package kz.zhsr.app.controller;
 
+import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.dto.equip.EquipForm;
 import kz.zhsr.app.dto.equip.EquipItemBody;
 import kz.zhsr.app.dto.equip.EquipItemRow;
@@ -63,8 +64,8 @@ public class EquipController {
     }
 
     @GetMapping("/equip-lists")
-    public List<EquipListRow> list(EquipListFilter filter) throws Exception {
-        return equipService.list(filter);
+    public List<EquipListRow> list(EquipListFilter filter, ListSort sort) throws Exception {
+        return equipService.list(filter, sort);
     }
 
     /** Последняя опись вагона без ограничения видимости; описей нет - пустой ответ. */

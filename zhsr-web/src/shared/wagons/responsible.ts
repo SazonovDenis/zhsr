@@ -34,6 +34,18 @@ export interface ResponsibleCandidate extends UserRef {
   depotStaff: boolean
 }
 
+/** Должность кандидата в бригаде рейса; не в бригаде — пусто. */
+export function responsibleDuty(c: ResponsibleCandidate | null): string {
+  return c && c.crewDutyType !== null ? dictManager.getValue('CrewDuty', c.crewDutyType) : ''
+}
+
+/** Где кандидат: «рейс 002 • Алматы — Астана» или «депо станции»; не известно — пусто. */
+export function responsiblePlace(c: ResponsibleCandidate | null): string {
+  if (!c) return ''
+  if (c.trip) return t('рейс {trip}', { trip: tripRefText(c.trip) })
+  return c.depotStaff ? t('депо станции') : ''
+}
+
 /** Кто кандидат: «ПЭМ • рейс 002 • Алматы — Астана» или «депо станции»; не известно — пусто. */
 export function responsibleWho(c: ResponsibleCandidate): string {
   if (c.trip && c.crewDutyType !== null) {

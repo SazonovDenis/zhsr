@@ -81,7 +81,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, shallowRef, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import type { TripOption } from '@/api/trips'
 import { fetchTripOptions } from '@/api/trips'
@@ -145,7 +145,18 @@ const rowMenu: RowMenuItem<WagonRow>[] = [
   { label: 'Ввести вагон', separator: true, disabled: () => addReason.value, run: () => void addWagon() },
 ]
 
-const filter = reactive<WagonFilter>({ number: '', station: null, trip: null, locationKinds: [], states: [] })
+const route = useRoute()
+// ?number= — поиск по номеру (переход из чек-листа или описи); из адреса параметр убирается
+const filter = reactive<WagonFilter>({
+  number: typeof route.query.number === 'string' ? route.query.number : '',
+  station: null,
+  trip: null,
+  locationKinds: [],
+  states: [],
+})
+if (route.query.number !== undefined) void router.replace({ name: 'wagons' })
+// вагон, который выбрать после первой загрузки: переход по номеру — строка с этим номером выделяется
+let pickNumber = filter.number.trim()
 // поиск по номеру: фильтры скрыты, сервер их не применяет (Ф-ВАГ-04)
 const searching = computed(() => filter.number.trim() !== '')
 
@@ -173,6 +184,11 @@ async function load() {
   loadError.value = null
   try {
     rows.value = await busy.run(fetchWagons(wagonQuery(filter), sort.value))
+    if (pickNumber) {
+      const row = rows.value.find((r) => r.number === pickNumber)
+      if (row) selectedId.value = row.id
+      pickNumber = ''
+    }
   } catch (e) {
     rows.value = []
     loadError.value = shownError(e)

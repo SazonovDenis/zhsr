@@ -13,7 +13,7 @@
       <div v-if="editId !== null" class="check-fill__fixed">
         <span>{{ fill.template.value ? textOf(fill.template.value) : '' }}</span>
         <span v-if="fill.wagon.value" class="zs-mono">{{ fill.wagon.value.number }}</span>
-        <span v-else-if="fill.editing.value?.checkedUsr">{{ userName(fill.editing.value.checkedUsr) }}</span>
+        <span v-else-if="fill.editing.value?.checkedUsr"><UserName :user="fill.editing.value.checkedUsr" /></span>
       </div>
       <div v-else class="check-fill__subject">
         <FormField label="Чек-лист" class="check-fill__field">
@@ -43,7 +43,16 @@
               :placeholder="fill.trip.value === null ? 'Сначала выберите рейс' : 'Выберите члена бригады'"
               :values="crewChoices"
               :source="fill.crewLoad"
-            />
+            >
+              <!-- «Список ФИО»: ФИО и под ним должность -->
+              <template #option="{ item }">
+                <UserOption
+                  :name="(item.data?.name as string | undefined) ?? ''"
+                  :me="(item.data?.me as boolean | undefined) ?? false"
+                  :duty="(item.data?.duty as string | undefined) ?? ''"
+                />
+              </template>
+            </CbList>
           </FormField>
         </template>
       </div>
@@ -90,6 +99,7 @@
               </div>
               <SoftLink v-if="!detailsShown(item)" text="Описание и фото" @click="opened.add(item.id)" />
             </div>
+            <!-- описание и фото — в одну строку: фото справа от описания, в ряд -->
             <div v-if="detailsShown(item)" class="check-fill__details q-mt-sm">
               <NoteInput v-model="value(item).comment" :rows="2" placeholder="Описание нарушения" />
               <PhotoPicker
@@ -124,6 +134,8 @@
 import { computed, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import UserOption from '@/shared/components/UserOption.vue'
+import UserName from '@/shared/components/UserName.vue'
 import type { CheckFormItem } from '@/api/checks'
 import { checkPhotoUrl, CheckObject, CheckValueKind, fetchCheckList } from '@/api/checks'
 import type { RequestPhoto } from '@/api/requests'
@@ -145,7 +157,7 @@ import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { shownError } from '@/shared/errors'
 import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
-import { loadCurrentUser, userName } from '@/shared/user'
+import { isMe, loadCurrentUser, userName } from '@/shared/user'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import RequestWagonField from '../requests/RequestWagonField.vue'
 
@@ -191,6 +203,7 @@ const crewChoices = computed<ChoiceItem[]>(() =>
   fill.crew.value.map((m) => ({
     id: m.usr.id,
     text: `${userName(m.usr)} • ${dictManager.getValue('CrewDuty', m.crewDutyType)}`,
+    data: { name: m.usr.name, me: isMe(m.usr), duty: dictManager.getValue('CrewDuty', m.crewDutyType) },
   })),
 )
 const usrChoice = computed({
@@ -335,8 +348,25 @@ void init()
 
 .check-fill__details {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: 0.5rem;
+
+  // описание — всё свободное место
+  > :first-child {
+    flex: 1;
+    min-width: 0;
+  }
+
+  // фото — в ряд, без переноса
+  :deep(.photo-picker) {
+    flex: none;
+    flex-wrap: nowrap;
+  }
+
+  // описание — начальной высотой с плитку фото (PhotoPicker, 4.5rem); растягивается вниз
+  :deep(.note-input__field) {
+    height: 4.5rem;
+  }
 }
 
 .check-fill__footer {

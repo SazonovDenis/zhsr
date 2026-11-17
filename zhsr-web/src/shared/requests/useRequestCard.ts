@@ -29,7 +29,17 @@ import { queueAction, queueAssign, queuedDecision, queueNote, queuePhotos } from
 import { useNow } from '@/shared/trips/tripTimes'
 import { currentUser } from '@/shared/user'
 import { provideRequestChanges } from './requestChanges'
-import { ACTIONS, assignBlockReason, canAssign, canChangeOwn, canEdit, requestActions, staffTrip } from './rights'
+import {
+  ACTIONS,
+  assignBlockReason,
+  assignRoleOk,
+  assignStatusReason,
+  canAssign,
+  canChangeOwn,
+  canEdit,
+  requestActions,
+  staffTrip,
+} from './rights'
 
 /**
  * Карточка заявки — общее для правой панели десктопа и экрана заявки на телефоне: загрузка заявки, кнопки действий
@@ -130,16 +140,22 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     }))
   })
   const assignable = computed(() => !!request.value && !!user.value && canAssign(user.value, request.value))
+  /** статус заявки позволяет назначать исполнителя: не выполнена и не в конечном статусе; иначе ссылки назначения нет */
+  const assignStatusOk = computed(() => !!request.value && !assignStatusReason(request.value))
+  /** ссылка назначения на телефоне: пользователь назначает по роли и статус подходит */
+  const assignShown = computed(
+    () => assignStatusOk.value && !!user.value && !!request.value && assignRoleOk(user.value, request.value),
+  )
   /** назначение или переназначение: у заявки уже есть исполнитель */
   const reassign = computed(() => !!request.value?.executorUsr)
-  /** почему исполнителя не назначить — «Вы не можете назначить (переназначить): …» (переведено); пусто — можно */
+  /** почему исполнителя не назначить — «Нельзя назначить (переназначить): …» (переведено); пусто — можно */
   const assignHint = computed(() => {
     const r = request.value
     if (!r || !user.value) return ''
     const reason = assignBlockReason(user.value, r)
     if (!reason) return ''
     const status = dictManager.getValue('RequestStatus', r.requestStatusType)
-    const text = reassign.value ? 'Вы не можете переназначить: {reason}' : 'Вы не можете назначить: {reason}'
+    const text = reassign.value ? 'Нельзя переназначить: {reason}' : 'Нельзя назначить: {reason}'
     return t(text, { reason: t(reason, { status }) })
   })
   const editable = computed(() => !!request.value && !!user.value && canEdit(user.value, request.value, now.value))
@@ -262,7 +278,11 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     pending.value = null
   }
 
-  async function assign(executor: number | null) {
+  /**
+   * Назначить исполнителя или снять назначение (null). Ошибку не показывает в карточке, а бросает: её показывает окно
+   * выбора, которое и сохраняет (UserPickDialog, PickSheet). Без связи на телефоне — в очередь.
+   */
+  async function assign(executor: number | null): Promise<void> {
     if (!request.value) return
     if (queueing()) {
       const id = request.value.id
@@ -270,7 +290,7 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
       await queueDecided(() => queueAssign(id, executor, name, user.value?.id ?? 0))
       return
     }
-    await run(() => assignRequest(request.value!.id, executor))
+    changed(await assignRequest(request.value.id, executor))
   }
 
   async function addNote(text: string, photos: Blob[]): Promise<boolean> {
@@ -369,6 +389,8 @@ export function useRequestCard(id: Ref<number | null>, offline = false, busy: Bu
     comment,
     actionPhotos,
     assignable,
+    assignStatusOk,
+    assignShown,
     assignHint,
     reassign,
     staff,

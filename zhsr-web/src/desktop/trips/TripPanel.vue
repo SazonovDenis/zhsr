@@ -20,18 +20,20 @@
       <span><DictBadge :id="trip.tripStatusType" dict="TripState" /></span>
       <span>{{ t('Поезд') }}</span>
       <span>{{ trip.train?.name ?? t('не назначен') }}</span>
-      <!-- после прибытия: ответственный за вагоны поезда — как исполнитель заявки: строка и ссылка; нельзя — пояснение -->
+      <!-- после прибытия: ответственный за вагоны поезда — как исполнитель заявки: строка и ссылка; ссылка видна всегда,
+           нельзя — неактивна, причина во всплывающей подсказке -->
       <template v-if="trip.tripStatusType === TripStatus.DONE">
         <span>{{ t('Ответственный за вагоны') }}</span>
         <span>
-          {{ responsibleText }}
+          <UserName v-if="responsibleUser" :user="responsibleUser" />
+          <template v-else>{{ responsibleText }}</template>
           <SoftLink
-            v-if="!assign?.reason"
             :text="crewTrip?.responsibleAssigned ? 'Переназначить' : 'Назначить'"
+            :disabled="!assign || !!assign.reason"
+            :title="assign?.reason || undefined"
             class="q-ml-sm"
             @click="assign?.run()"
           />
-          <span v-else class="zs-sub trip-panel__block">{{ assign.reason }}</span>
         </span>
       </template>
     </SidePanelFields>
@@ -58,6 +60,7 @@
 <script setup lang="ts">
 import { computed, onMounted, shallowRef, watch } from 'vue'
 
+import UserName from '@/shared/components/UserName.vue'
 import type { TripCrew, TripRow } from '@/api/trips'
 import { fetchTripCrew } from '@/api/trips'
 import { t } from '@/boot/i18n'
@@ -67,7 +70,7 @@ import { dictManager } from '@/shared/dict/DictManager'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
 import { TripStatus } from '@/shared/constants/systemDicts'
 import { notifyError } from '@/shared/errors'
-import { loadCurrentUser, userName } from '@/shared/user'
+import { loadCurrentUser } from '@/shared/user'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import { useTripActions } from './tripActions'
@@ -107,22 +110,20 @@ watch(
   { immediate: true },
 )
 
-/** Ответственный словами: сотрудник, «не назначен» или до назначения «проводники вагонов»; не загружен — многоточие. */
+/** Назначенный ответственный; null — не назначен или ещё не назначали (тогда — responsibleText). */
+const responsibleUser = computed(() => (crewTrip.value?.responsibleAssigned ? crewTrip.value.responsibleUsr : null))
+
+/** Ответственный словами, когда сотрудника нет: «не назначен» или до назначения «проводники вагонов»; не загружен — многоточие. */
 const responsibleText = computed(() => {
   const ct = crewTrip.value
   if (!ct) return '…'
-  if (!ct.responsibleAssigned) return t('проводники вагонов')
-  return ct.responsibleUsr ? userName(ct.responsibleUsr) : t('не назначен')
+  return ct.responsibleAssigned ? t('не назначен') : t('проводники вагонов')
 })
 
 onMounted(() => void loadCurrentUser())
 </script>
 
 <style scoped lang="scss">
-.trip-panel__block {
-  display: block;
-}
-
 .trip-panel__actions {
   display: flex;
   flex-wrap: wrap;

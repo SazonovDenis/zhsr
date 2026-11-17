@@ -1,5 +1,5 @@
 <template>
-  <DesktopFrame v-model:floating="panel.floating.value" :right-open="panel.open.value" right-width="25rem">
+  <DesktopFrame v-model:floating="panel.floating.value" :right-open="panel.open.value">
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Заявки') }}</h1>
       <div class="desktop-frame__actions">
@@ -83,7 +83,13 @@ import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
-import { ACTIONS, assignBlockReason, editBlockReason, requestActions } from '@/shared/requests/rights'
+import {
+  ACTIONS,
+  assignBlockReason,
+  assignStatusReason,
+  editBlockReason,
+  requestActions,
+} from '@/shared/requests/rights'
 import { RequestStatus, ServiceType } from '@/shared/constants/systemDicts'
 import { dictChoices } from '@/shared/dict/dictChoices'
 import { provideBusy } from '@/shared/busy'
@@ -248,14 +254,15 @@ const rowMenu: RowMenuItem<RepairRequest>[] = [
     run: (row) => void withPanel(row, (p) => p.edit()),
   },
   // исполнитель уже есть — «Переназначить», иначе «Назначить»
-  // виден всегда один из двух пунктов, поэтому черта — над обоими
+  // виден один из двух пунктов (или ни одного), поэтому черта — над обоими
   ...[false, true].map((reassign) => ({
     label: reassign ? 'Переназначить исполнителя' : 'Назначить исполнителя',
     separator: true,
-    visible: (row: RepairRequest) => !!row.executorUsr === reassign,
+    // статус не подходит (выполнена, закрыта…) — пункта нет; нет прав — неактивен с причиной
+    visible: (row: RepairRequest) => !!row.executorUsr === reassign && !assignStatusReason(row),
     disabled: (row: RepairRequest) => {
       const reason = currentUser.value ? assignBlockReason(currentUser.value, row) : ''
-      const text = reassign ? 'Вы не можете переназначить: {reason}' : 'Вы не можете назначить: {reason}'
+      const text = reassign ? 'Нельзя переназначить: {reason}' : 'Нельзя назначить: {reason}'
       return reason ? t(text, { reason: reasonText(row, reason) }) : ''
     },
     run: (row: RepairRequest) => void withPanel(row, (p) => p.assign()),

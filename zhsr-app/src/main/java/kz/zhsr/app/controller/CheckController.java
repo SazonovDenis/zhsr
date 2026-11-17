@@ -15,6 +15,7 @@ import kz.zhsr.app.dto.check.CheckNormBody;
 import kz.zhsr.app.dto.check.CheckNormRow;
 import kz.zhsr.app.dto.check.CheckTemplateBody;
 import kz.zhsr.app.dto.check.CheckTemplateRow;
+import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.service.check.CheckAdminService;
 import kz.zhsr.app.service.check.CheckService;
 import kz.zhsr.app.service.storage.FileStorage;
@@ -65,8 +66,8 @@ public class CheckController {
     }
 
     @GetMapping("/check-lists")
-    public List<CheckListRow> list(CheckListFilter filter) throws Exception {
-        return checkService.list(filter);
+    public List<CheckListRow> list(CheckListFilter filter, ListSort sort) throws Exception {
+        return checkService.list(filter, sort);
     }
 
     @GetMapping("/check-lists/{id}")

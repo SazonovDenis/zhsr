@@ -23,17 +23,19 @@
       </span>
       <span>{{ t('Ответственный') }}</span>
       <span>
-        {{ wagon.responsibleUsr ? userName(wagon.responsibleUsr) : t('не назначен') }}
-        <!-- сменить или снять ответственного без акта — как исполнителя заявки; нельзя — пояснение под строкой -->
+        <UserName v-if="wagon.responsibleUsr" :user="wagon.responsibleUsr" /><template v-else>{{
+          t('не назначен')
+        }}</template>
+        <!-- сменить или снять ответственного без акта — как исполнителя заявки; ссылка видна всегда, нельзя —
+             неактивна, причина во всплывающей подсказке -->
         <SoftLink
-          v-if="!responsibleReason"
           :text="wagon.responsibleUsr ? 'Сменить' : 'Назначить'"
-          :disabled="changing"
+          :disabled="!!responsibleReason"
+          :title="responsibleReason || undefined"
           class="q-ml-sm"
           @click="changeResponsible"
         />
         <span class="zs-sub wagon-panel__since">{{ sinceText(wagon.dbegResponsible, nowMinute) }}</span>
-        <span v-if="responsibleReason" class="zs-sub wagon-panel__since">{{ responsibleReason }}</span>
       </span>
       <span>{{ t('Пробег') }}</span>
       <span>{{ t('{km} км', { km: formatThousands(wagon.runKm) }) }}</span>
@@ -66,15 +68,7 @@
       </template>
     </SidePanelFields>
     <!-- рейсы поезда вагона: выполняется и ближайший в плане — ссылкой на формирование рейса -->
-    <div v-if="wagon && shownTrips.length > 0" class="wagon-panel__section q-mt-md">
-      <div class="wagon-panel__section-title">{{ t('Рейсы') }}</div>
-      <div v-for="tr in shownTrips" :key="tr.trip.id" class="wagon-panel__trip">
-        <button type="button" class="wagon-panel__link q-pa-none" @click="openTrip(tr.trip.id)">
-          {{ tripRefDatedText(tr.trip) }}
-        </button>
-        <DictBadge :id="tr.tripStatusType" dict="TripState" />
-      </div>
-    </div>
+    <TripLinks v-if="wagon" :trips="shownTrips" class="q-mt-md" />
     <!-- переходы в списки с фильтром по этому вагону; число — сколько там будет строк -->
     <div v-if="wagon" class="wagon-panel__links q-mt-md">
       <SoftRouteLink
@@ -107,6 +101,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import UserName from '@/shared/components/UserName.vue'
 import { fetchCheckLists } from '@/api/checks'
 import { fetchEquipLists } from '@/api/equip'
 import { fetchRequestCounts } from '@/api/requests'
@@ -114,7 +109,6 @@ import type { WagonPendingTransfer, WagonRow } from '@/api/wagons'
 import { changeWagonResponsible } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import DictBadge from '@/shared/components/DictBadge.vue'
-import { openDialog } from '@/shared/components/dialog/openDialog'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
 import SoftRouteLink from '@/shared/components/form/SoftRouteLink.vue'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -122,16 +116,13 @@ import { wagonRequestsFilter, wagonRequestsPeriod } from '@/shared/requests/requ
 import { nowMinute, sinceText } from '@/shared/since'
 import { transferPlaceText } from '@/shared/transferPlace'
 import { TripStatus } from '@/shared/constants/systemDicts'
-import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import { formatThousands } from '@/shared/format'
-import { userName } from '@/shared/user'
 import { wagonPlace } from '@/shared/wagonPlace'
-import EquipLastDialog from '../equip/EquipLastDialog.vue'
-import { notifyError } from '@/shared/errors'
-import ResponsibleAssignDialog from './ResponsibleAssignDialog.vue'
+import { pickResponsible } from './responsibleAssign'
 import { changeResponsibleReason, wagonStation } from './wagonActions'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
+import TripLinks from '../trips/TripLinks.vue'
 
 /**
  * Правая панель списка вагонов и журнала вагона: карточка выбранного вагона — депо приписки, расположение, состояние и
@@ -152,27 +143,19 @@ const emit = defineEmits<{ close: []; changed: [wagon: WagonRow] }>()
 
 // ответственный без акта (Ф-ВАГ-07): почему нельзя; пусто — можно
 const responsibleReason = computed(() => (props.wagon ? changeResponsibleReason(props.wagon) : ''))
-const changing = ref(false)
 
-// ответственный — во всплывающем окне, как исполнитель заявки; ответ сервера — вагон после смены (событие changed)
+// ответственный — во всплывающем окне, как исполнитель заявки: окно и сохраняет, ошибка — в окне; ответ сервера —
+// вагон после смены (событие changed)
 async function changeResponsible() {
   const w = props.wagon
   if (!w) return
-  const result = await openDialog<{ usr: number | null }>(ResponsibleAssignDialog, {
+  await pickResponsible({
     station: wagonStation(w),
     wagons: [w.number],
     current: w.responsibleUsr,
     reassign: w.responsibleUsr !== null,
+    save: async (usr) => emit('changed', await changeWagonResponsible(w.id, usr)),
   })
-  if (!result) return
-  changing.value = true
-  try {
-    emit('changed', await changeWagonResponsible(w.id, result.usr))
-  } catch (e) {
-    notifyError(e)
-  } finally {
-    changing.value = false
-  }
 }
 
 const router = useRouter()
@@ -231,13 +214,10 @@ watch(
   { immediate: true },
 )
 
-/** Список имущества: последняя опись вагона в окне. */
+/** Список имущества: последняя опись вагона на отдельной странице. */
 function openEquip() {
-  if (props.wagon) void openDialog(EquipLastDialog, { wagon: props.wagon.id, number: props.wagon.number })
-}
-
-function openTrip(id: number) {
-  void router.push({ name: 'trip-form', params: { id } })
+  if (props.wagon)
+    void router.push({ name: 'wagon-equip', params: { id: props.wagon.id }, query: { number: props.wagon.number } })
 }
 
 function openTrain(id: number) {
@@ -259,24 +239,7 @@ function openTrain(id: number) {
   cursor: pointer;
 }
 
-.wagon-panel__section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
 // подзаголовок блока — как «История» в панели заявки
-.wagon-panel__section-title {
-  color: $zs-text-muted;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.wagon-panel__trip {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
 
 .wagon-panel__links {
   display: flex;

@@ -1,3 +1,4 @@
+import type { TableSort } from '@/shared/components/table/types'
 import { http } from './http'
 import type { UserRef, WagonRef } from './requests'
 import type { TripRef } from './wagons'
@@ -205,8 +206,10 @@ export async function fetchCheckForm(template: number, wagon: number | null): Pr
   return (await http.get<CheckForm>('/check-lists/form', { params: { template, wagon } })).data
 }
 
-export async function fetchCheckLists(filter: CheckListFilter): Promise<CheckListRow[]> {
-  return (await http.get<CheckListRow[]>('/check-lists', { params: filter })).data
+/** Проверки по фильтру. sort — поле и направление сортировки; null — сначала новые. */
+export async function fetchCheckLists(filter: CheckListFilter, sort: TableSort | null = null): Promise<CheckListRow[]> {
+  const params = { ...filter, sort: sort?.field, desc: sort?.desc }
+  return (await http.get<CheckListRow[]>('/check-lists', { params })).data
 }
 
 export async function fetchCheckList(id: number): Promise<CheckListDetail> {

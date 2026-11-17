@@ -4,8 +4,11 @@
       <RequestHistoryItem
         v-if="node.event"
         :title="eventTitle(node.event)"
-        :meta="metaOf(node.event)"
+        :meta="formatDateTime(node.event.at)"
+        :by="node.event.by ?? null"
+        :meta-tail="metaTailOf(node.event)"
         :text="textOf(node.event)"
+        :text-user="node.event.executor ?? null"
         :photos="node.event.photos ?? []"
         :pending="pendingOf(node)"
         inline
@@ -41,7 +44,6 @@ import type { RequestPhoto } from '@/api/requests'
 import { t } from '@/boot/i18n'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
 import { formatDateTime } from '@/shared/format'
-import { userName } from '@/shared/user'
 import type { HistoryNode, RequestEvent } from './historyTree'
 import RequestHistoryItem from './RequestHistoryItem.vue'
 import { useRequestChanges } from './requestChanges'
@@ -66,15 +68,16 @@ function noteEditable(e: RequestEvent): boolean {
 
 const future = computed(() => (props.status === null ? [] : futureSteps(props.status)))
 
-/** Дата и кем; поступило на сервер заметно позже — и когда поступило. */
-function metaOf(e: RequestEvent): string {
-  const meta = `${formatDateTime(e.at)} • ${e.by ? userName(e.by) : t('Система')}`
-  if (!receivedLate(e.at, e.receivedAt)) return meta
-  return `${meta}, ${t('поступило: {at}', { at: formatDateTime(e.receivedAt) })}`
+/** Хвост после даты и автора: без автора — «• Система»; поступило на сервер заметно позже — и когда поступило. */
+function metaTailOf(e: RequestEvent): string {
+  const who = e.by ? '' : ` • ${t('Система')}`
+  if (!receivedLate(e.at, e.receivedAt)) return who
+  return `${who}, ${t('поступило: {at}', { at: formatDateTime(e.receivedAt) })}`
 }
 
+/** Текст записи; назначение — «Исполнитель:», ФИО после него — разметкой (textUser). */
 function textOf(e: RequestEvent): string {
-  return e.executor ? t('Исполнитель: {name}', { name: userName(e.executor) }) : (e.text ?? '')
+  return e.executor ? t('Исполнитель:') : (e.text ?? '')
 }
 
 function pendingOf(node: HistoryNode): RequestPhoto[] {

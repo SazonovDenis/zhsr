@@ -39,8 +39,10 @@ export interface TrainChange {
   comment: string | null
   /** номер вагона */
   number: string
-  /** текущий сотрудник может отметить план выполненным или отменить план */
+  /** текущий сотрудник может отметить план выполненным */
   canMark: boolean
+  /** текущий сотрудник может отменить план: кто может отметить, и планировщик вагонов */
+  canCancel: boolean
   /** текущий сотрудник может отменить выполненное изменение без истории */
   canUndo: boolean
 }
@@ -78,6 +80,15 @@ export interface TrainWagon {
   detached: TrainChange | null
 }
 
+/** Вагон в строке поезда: поля для колонок «Номер» и «Тип» списка вагонов. */
+export interface TrainRowWagon {
+  id: number
+  number: string
+  wagonType: number
+  /** модель вагона — id справочника WagonModel; null — не задана */
+  modelType: number | null
+}
+
 /** Строка таблицы поездов. */
 export interface TrainRow {
   id: number
@@ -86,10 +97,14 @@ export interface TrainRow {
   dbeg: string
   /** когда расформирован, ISO; null — поезд действует */
   dend: string | null
-  /** номера вагонов поезда сейчас по порядку */
-  wagons: string[]
+  /** вагоны поезда сейчас по порядку: номер, тип и модель */
+  wagons: TrainRowWagon[]
   /** станция вагонов поезда — id справочника Station; null — на разных станциях, в рейсе или вагонов нет */
   station: number | null
+  /** вид расположения вагонов поезда (LocationKind): все в одном месте; null — в разных местах или вагонов нет */
+  locationType: number | null
+  /** место вагонов по виду расположения: станция, депо, парк отстоя или рейс; null — как у locationType */
+  place: number | null
   /** число плановых прицепок и отцепок */
   plannedCount: number
   /** рейс поезда в статусе «выполняется» */

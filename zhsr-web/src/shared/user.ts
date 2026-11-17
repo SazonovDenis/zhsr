@@ -105,10 +105,16 @@ export function hasRole(user: CurrentUser | null, role: number): boolean {
   return !!user?.roles.includes(role)
 }
 
+/** Сотрудник — текущий пользователь. Реактивно: зависит от currentUser. */
+export function isMe(u: { id: number }): boolean {
+  return u.id === currentUser.value?.id
+}
+
 /**
- * ФИО сотрудника для показа: текущий пользователь — с пометкой «(вы)», в том числе в списках выбора. Реактивно:
- * зависит от currentUser.
+ * ФИО сотрудника обычным текстом: текущий пользователь — с пометкой «(вы)». Только там, где плашку не нарисовать
+ * (подсказки, текст выбранного в поле, уведомления, ячейки-строки таблиц); в разметке — UserName, плашка «вы».
+ * Реактивно: зависит от currentUser.
  */
 export function userName(u: { id: number; name: string }): string {
-  return u.id === currentUser.value?.id ? t('{name} (вы)', { name: u.name }) : u.name
+  return isMe(u) ? t('{name} (вы)', { name: u.name }) : u.name
 }

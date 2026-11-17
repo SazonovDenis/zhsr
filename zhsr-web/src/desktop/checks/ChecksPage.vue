@@ -1,5 +1,5 @@
 <template>
-  <DesktopFrame v-model:floating="panel.floating.value" :right-open="panel.open.value" right-width="28rem">
+  <DesktopFrame v-model:floating="panel.floating.value" :right-open="panel.open.value">
     <template #header>
       <h1 class="desktop-frame__title">{{ t('Чек-листы') }}</h1>
       <div class="desktop-frame__actions">
@@ -49,7 +49,9 @@
       :loading="busy.active.value"
       :error="loadError"
       :retry="load"
+      :sort="sort"
       empty="Проверок по выбранному фильтру нет"
+      @sort="sort = $event"
     />
 
     <template #right>
@@ -74,7 +76,7 @@ import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { RowKey } from '@/shared/components/table/types'
+import type { RowKey, TableSort } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { useLoad } from '@/shared/loadable'
@@ -98,6 +100,8 @@ const filter = reactive<CheckListFilter>({ template: null, wagon: null, query: '
 const rows = shallowRef<CheckListRow[]>([])
 const selectedId = ref<RowKey | null>(route.query.id ? Number(route.query.id) : null)
 const panel = useSidePanel(selectedId)
+// сортировка по колонке; null — сначала новые
+const sort = ref<TableSort | null>(null)
 const loadError = ref<ShownError | null>(null)
 const newReason = computed(() => anyCheckReason())
 
@@ -116,7 +120,7 @@ const templateChoice = computed({
 async function load() {
   loadError.value = null
   try {
-    const [list] = await busy.run(Promise.all([fetchCheckLists(filter), loadCurrentUser()]))
+    const [list] = await busy.run(Promise.all([fetchCheckLists(filter, sort.value), loadCurrentUser()]))
     rows.value = list
   } catch (e) {
     rows.value = []
@@ -136,7 +140,8 @@ applyRouteQuery()
 watch(() => route.query.wagon, applyRouteQuery)
 watch(wagonFilter, (w) => (filter.wagon = w?.id ?? null), { immediate: true })
 
-watch(filter, load, { deep: true })
+// фильтр или сортировка изменились — данные загружаются заново
+watch([filter, sort], load, { deep: true })
 void load()
 </script>
 

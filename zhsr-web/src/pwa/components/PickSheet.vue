@@ -1,12 +1,12 @@
 <template>
   <BottomSheet v-model:show="show" :title="title" :subtitle="subtitle">
     <ErrorBox v-if="error" :error="error" :retry="retry" class="pick-sheet__error q-py-sm q-px-md" />
-    <div v-else class="pick-sheet">
+    <div v-else class="pick-sheet" @pointerdown="saveError = null">
       <button
         v-for="o in options"
         :key="String(o.id)"
         type="button"
-        class="pick-sheet__item q-py-xs q-px-md"
+        class="pick-sheet__item q-py-xs q-px-sm"
         :class="{ 'pick-sheet__item--on': picked === o.id }"
         :disabled="o.disabled"
         @click="picked = o.id"
@@ -19,6 +19,14 @@
         </slot>
       </button>
     </div>
+    <!-- ошибка сохранения (save) — под списком, с крестиком; лист остаётся открытым; любое касание списка её убирает -->
+    <ErrorBox
+      v-if="saveError"
+      :error="saveError"
+      closable
+      class="pick-sheet__error q-py-sm q-px-md"
+      @close="saveError = null"
+    />
     <template #buttons>
       <q-btn
         unelevated
@@ -27,6 +35,7 @@
         color="ink"
         class="pick-sheet__btn zs-pwa-btn zs-soft-border"
         :label="t('Отмена')"
+        :disable="saving"
         @click="show = false"
       />
       <q-btn
@@ -35,6 +44,7 @@
         color="primary"
         class="pick-sheet__btn pick-sheet__btn--primary zs-pwa-btn"
         :disable="!!error || disabled"
+        :loading="saving"
         :label="t(okText)"
         @click="confirm"
       />
@@ -43,11 +53,12 @@
 </template>
 
 <script setup lang="ts" generic="T extends string | number | null">
-import { shallowRef, watch } from 'vue'
+import { ref, shallowRef, watch } from 'vue'
 
 import { t } from '@/boot/i18n'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import type { ShownError } from '@/shared/errors'
+import { shownError } from '@/shared/errors'
 import BottomSheet from './BottomSheet.vue'
 
 /** Вариант выбора. */
@@ -64,7 +75,8 @@ export interface PickOption<T> {
 /**
  * Назначение: лист снизу со списком вариантов и кнопками «Отмена» и «Назначить». Выбор — нажатием на строку, применяется
  * кнопкой: событие pick(id). selected — что выбрано при открытии. Двойное касание варианта — выбор и применение сразу. Слот option — свой вид строки варианта. error — вместо списка, например нет связи; retry —
- * повторить загрузку.
+ * повторить загрузку. save — лист сохраняет выбор сам: спиннер на кнопке, ошибка — в листе, лист остаётся открытым;
+ * удалось — лист закрывается и посылает pick. Без save — лист закрывается и посылает pick сразу.
  */
 const props = withDefaults(
   defineProps<{
@@ -77,8 +89,10 @@ const props = withDefaults(
     disabled?: boolean
     /** текст кнопки применения на русском */
     okText?: string
+    /** сохранить выбор; ошибка — бросить, лист её покажет; null — сохраняет владелец по событию pick */
+    save?: ((id: T) => Promise<void>) | null
   }>(),
-  { subtitle: '', error: null, retry: null, disabled: false, okText: 'Назначить' },
+  { subtitle: '', error: null, retry: null, disabled: false, okText: 'Назначить', save: null },
 )
 
 const emit = defineEmits<{ pick: [id: T] }>()
@@ -86,21 +100,41 @@ const emit = defineEmits<{ pick: [id: T] }>()
 const show = defineModel<boolean>('show', { default: false })
 
 const picked = shallowRef<T>(props.selected)
+const saving = ref(false)
+const saveError = ref<ShownError | null>(null)
+// другой выбор — ошибка прошлого сохранения уже не о нём
+watch(picked, () => (saveError.value = null))
 
 watch(show, (open) => {
-  if (open) picked.value = props.selected
+  if (!open) return
+  picked.value = props.selected
+  saveError.value = null
 })
 
-function confirm() {
+async function confirm() {
+  if (saving.value) return
+  const id = picked.value
+  if (props.save) {
+    saving.value = true
+    saveError.value = null
+    try {
+      await props.save(id)
+    } catch (e) {
+      saveError.value = shownError(e)
+      return
+    } finally {
+      saving.value = false
+    }
+  }
   show.value = false
-  emit('pick', picked.value)
+  emit('pick', id)
 }
 
 // двойное касание варианта — выбор и применение сразу, как кнопкой
 function pickNow(o: PickOption<T>) {
-  if (o.disabled || props.disabled || props.error) return
+  if (o.disabled || props.disabled || props.error || saving.value) return
   picked.value = o.id
-  confirm()
+  void confirm()
 }
 </script>
 
@@ -109,6 +143,8 @@ function pickNow(o: PickOption<T>) {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  // список шире полей листа (1rem, поля тела листа): до края листа — 0.5rem
+  margin: 0 -0.5rem;
   overflow-y: auto;
 }
 

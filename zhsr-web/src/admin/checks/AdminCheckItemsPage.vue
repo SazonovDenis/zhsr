@@ -1,5 +1,5 @@
 <template>
-  <DesktopFrame v-model:floating="panel.floating.value" :back="back" :right-open="panel.open.value" right-width="28rem">
+  <DesktopFrame v-model:floating="panel.floating.value" :back="back" :right-open="panel.open.value">
     <template #header>
       <h1 class="desktop-frame__title">{{ title }}</h1>
       <div class="desktop-frame__actions">

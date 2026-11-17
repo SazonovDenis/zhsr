@@ -1,58 +1,64 @@
 <template>
-  <PwaPage>
+  <!-- fill: кнопки прижаты к низу экрана, прокручиваются только сведения над ними -->
+  <PwaPage fill>
     <template v-if="user">
-      <div class="profile__head">
-        <div class="profile__name">{{ user.name }}</div>
-        <div class="profile__roles">{{ roles }}</div>
-      </div>
+      <div class="profile__main">
+        <div class="profile__head">
+          <div class="profile__name">{{ user.name }}</div>
+          <div class="profile__roles">{{ roles }}</div>
+        </div>
 
-      <div class="profile__attrs">
-        <span>{{ t('Службы') }}</span>
-        <span>{{ services || '—' }}</span>
-        <span>{{ t('Депо') }}</span>
-        <span>{{ user.depot ? dictManager.getValue('Depot', user.depot) : '—' }}</span>
-        <span>{{ t('Станция депо') }}</span>
-        <span>{{ user.depotStation ? dictManager.getValue('Station', user.depotStation) : '—' }}</span>
-        <template v-if="user.trip">
-          <span>{{ t('Текущий рейс') }}</span>
-          <span>{{ tripText(user.trip) }}</span>
-          <span>{{ t('Должность в рейсе') }}</span>
-          <span>{{ dictManager.getValue('CrewDuty', user.trip.crewDutyType) }}</span>
-          <template v-if="user.trip.wagons.length > 0">
-            <span>{{ t('Вагоны') }}</span>
-            <span class="zs-mono">{{ user.trip.wagons.join(', ') }}</span>
+        <div class="profile__attrs">
+          <span>{{ t('Службы') }}</span>
+          <span>{{ services || '—' }}</span>
+          <span>{{ t('Депо') }}</span>
+          <span>{{ user.depot ? dictManager.getValue('Depot', user.depot) : '—' }}</span>
+          <span>{{ t('Станция депо') }}</span>
+          <span>{{ user.depotStation ? dictManager.getValue('Station', user.depotStation) : '—' }}</span>
+          <template v-if="user.trip">
+            <span>{{ t('Текущий рейс') }}</span>
+            <span>{{ tripText(user.trip) }}</span>
+            <span>{{ t('Должность в рейсе') }}</span>
+            <span>{{ dictManager.getValue('CrewDuty', user.trip.crewDutyType) }}</span>
+            <template v-if="user.trip.wagons.length > 0">
+              <span>{{ t('Вагоны') }}</span>
+              <span class="zs-mono">{{ user.trip.wagons.join(', ') }}</span>
+            </template>
           </template>
-        </template>
-        <template v-if="user.otherTrip">
-          <span>{{ t('Соседний рейс') }}</span>
-          <span>{{ tripText(user.otherTrip) }}</span>
-        </template>
+          <template v-if="user.otherTrip">
+            <span>{{ t('Соседний рейс') }}</span>
+            <span>{{ tripText(user.otherTrip) }}</span>
+          </template>
+        </div>
+
+        <!-- язык интерфейса: три кнопки, названия языков — на самих языках -->
+        <div class="profile__language">
+          <div class="zs-group-head">{{ t('Язык интерфейса') }}</div>
+          <CbSegment v-model="language" single required :values="languages" />
+        </div>
       </div>
 
-      <!-- кнопки страницы телефона — как везде на страницах (zs-pwa-btn--lg), во всю ширину: пароль — белая с рамкой, выход — синяя -->
-      <q-btn
-        unelevated
-        outline
-        no-caps
-        color="ink"
-        class="zs-pwa-btn zs-pwa-btn--lg zs-soft-border"
-        icon="lock"
-        :label="t('Сменить пароль')"
-        @click="openDialog(ChangePasswordDialog)"
-      />
-      <q-btn
-        unelevated
-        no-caps
-        color="primary"
-        class="zs-pwa-btn zs-pwa-btn--lg"
-        :label="t('Выход')"
-        @click="bus.emit('pwa-logout')"
-      />
-
-      <!-- язык интерфейса: три кнопки, названия языков — на самих языках -->
-      <div class="profile__language">
-        <div class="zs-group-head">{{ t('Язык интерфейса') }}</div>
-        <CbSegment v-model="language" single required :values="languages" />
+      <!-- кнопки страницы телефона — как везде на страницах (zs-pwa-btn--lg), друг под другом внизу: пароль — белая с
+           рамкой, выход — синяя -->
+      <div class="profile__actions">
+        <q-btn
+          unelevated
+          outline
+          no-caps
+          color="ink"
+          class="zs-pwa-btn zs-pwa-btn--lg zs-soft-border"
+          icon="lock"
+          :label="t('Сменить пароль')"
+          @click="openDialog(ChangePasswordDialog)"
+        />
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          class="zs-pwa-btn zs-pwa-btn--lg"
+          :label="t('Выход')"
+          @click="bus.emit('pwa-logout')"
+        />
       </div>
     </template>
     <LoadSpinner v-else-if="busy.active.value" />
@@ -119,6 +125,23 @@ void load()
 </script>
 
 <style scoped lang="scss">
+// сведения — на всю высоту над кнопками, прокручиваются сами
+.profile__main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.profile__actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .profile__head {
   display: flex;
   flex-direction: column;

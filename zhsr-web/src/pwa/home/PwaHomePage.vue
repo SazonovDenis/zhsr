@@ -61,7 +61,8 @@
       <div v-if="crew && crew.trip.tripStatusType === TripStatus.DONE" class="today__responsible">
         <span>{{ t('Ответственный за вагоны') }}</span>
         <span>
-          {{ responsibleText(crew.trip) }}
+          <UserName v-if="crew.trip.responsibleAssigned && crew.trip.responsibleUsr" :user="crew.trip.responsibleUsr" />
+          <template v-else>{{ responsibleText(crew.trip) }}</template>
           <SoftLink
             v-if="isChief"
             :text="crew.trip.responsibleAssigned ? 'Переназначить' : 'Назначить'"
@@ -86,9 +87,17 @@
           <span>{{ t('Вагоны') }}</span>
           <span>{{ norm.wagons.length }}</span>
           <span>{{ t('ЛНП') }}</span>
-          <span>{{ memberName(CrewDuty.LNP) }}</span>
+          <span
+            ><UserName v-if="member(CrewDuty.LNP)" :user="member(CrewDuty.LNP)!.usr" /><template v-else>{{
+              t('не назначен')
+            }}</template></span
+          >
           <span>{{ t('ПЭМ') }}</span>
-          <span>{{ memberName(CrewDuty.PEM) }}</span>
+          <span
+            ><UserName v-if="member(CrewDuty.PEM)" :user="member(CrewDuty.PEM)!.usr" /><template v-else>{{
+              t('не назначен')
+            }}</template></span
+          >
         </div>
         <SoftLink text="Формирование" class="today__crew-link" @click="router.push({ name: 'pwa-trip' })" />
         <!-- плановые прицепки и отцепки рейса: ЛНП отмечает факт или отменяет план; без прав и связи кнопок нет -->
@@ -144,8 +153,19 @@
       :selected="crew?.trip.responsibleUsr?.id ?? null"
       :error="assignError"
       :retry="loadAssign"
-      @pick="assignResponsible($event)"
-    />
+      :save="assignResponsible"
+    >
+      <!-- «Список ФИО»: ФИО слева, справа должность, под ней — где сотрудник; «Не назначен» — только текст -->
+      <template #option="{ option }">
+        <UserOption
+          :name="option.name"
+          :me="option.id !== null && isMe({ id: option.id })"
+          :duty="responsibleDuty(assignCandidateOf(option.id))"
+          :place="responsiblePlace(assignCandidateOf(option.id))"
+          :plain="option.id === null"
+        />
+      </template>
+    </PickSheet>
 
     <!-- отметка отправления или прибытия: календарь во весь экран, без заголовка -->
     <CalendarDialog
@@ -178,6 +198,7 @@ import { date, Notify } from 'quasar'
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import UserName from '@/shared/components/UserName.vue'
 import type { RepairRequest } from '@/api/requests'
 import { fetchRequests, requestFilter } from '@/api/requests'
 import type { TrainChange } from '@/api/trains'
@@ -211,9 +232,10 @@ import { outboxAsRequest, queuedRequests, withQueuedEdit } from '@/shared/offlin
 import { CrewDuty, RequestStatus, RoleType, ServiceType, TripStatus } from '@/shared/constants/systemDicts'
 import { TrainWagonChangeType } from '@/shared/constants/TrainWagonChange'
 import { canAccept, canWork } from '@/shared/requests/rights'
-import { currentUser, hasRole, loadCurrentUser, userName } from '@/shared/user'
+import { currentUser, isMe, hasRole, loadCurrentUser } from '@/shared/user'
 import type { ResponsibleCandidate, ResponsibleChoice } from '@/shared/wagons/responsible'
-import { fetchResponsibles, responsibleUsr, responsibleWho } from '@/shared/wagons/responsible'
+import UserOption from '@/shared/components/UserOption.vue'
+import { fetchResponsibles, responsibleDuty, responsiblePlace, responsibleUsr } from '@/shared/wagons/responsible'
 import ResponsiblePicker from '@/shared/wagons/ResponsiblePicker.vue'
 import { crewNorm, normDone } from '@/shared/trips/crewNorm'
 import { delayText, markEditable, useNow } from '@/shared/trips/tripTimes'
@@ -254,11 +276,8 @@ const error = ref<ShownError | null>(null)
 const crew = shallowRef<TripCrew | null>(null)
 const norm = computed(() => (crew.value ? crewNorm(crew.value) : null))
 
-// сотрудник бригады на должности; нет — «не назначен»
-const memberName = (duty: number) => {
-  const m = crew.value?.crew.find((x) => x.crewDutyType === duty)
-  return m ? userName(m.usr) : t('не назначен')
-}
+// сотрудник бригады на должности; нет — undefined («не назначен»)
+const member = (duty: number) => crew.value?.crew.find((x) => x.crewDutyType === duty)
 
 // отправление и прибытие отмечают начальник поезда и администратор; нужна связь
 const isChief = computed(
@@ -293,10 +312,9 @@ const fixing = ref(false)
 // ответственный за вагон при прицепке и отцепке в пути; null — ещё не выбран
 const markResponsible = ref<ResponsibleChoice>(null)
 
-/** Ответственный за вагоны прибывшего рейса словами: сотрудник, «не назначен» или «проводники вагонов». */
+/** Ответственный за вагоны прибывшего рейса словами, когда сотрудника нет: «не назначен» или «проводники вагонов». */
 function responsibleText(tr: TripCrew['trip']): string {
-  if (!tr.responsibleAssigned) return t('проводники вагонов')
-  return tr.responsibleUsr ? userName(tr.responsibleUsr) : t('не назначен')
+  return tr.responsibleAssigned ? t('не назначен') : t('проводники вагонов')
 }
 
 // после прибытия: выбор ответственного за вагоны в листе снизу — как исполнитель заявки; null — не назначен
@@ -305,8 +323,12 @@ const assignCandidates = shallowRef<ResponsibleCandidate[]>([])
 const assignError = ref<ShownError | null>(null)
 const assignOptions = computed<PickOption<number | null>[]>(() => [
   { id: null, name: t('Не назначен') },
-  ...assignCandidates.value.map((c) => ({ id: c.id, name: userName(c), hint: responsibleWho(c) })),
+  ...assignCandidates.value.map((c) => ({ id: c.id, name: c.name })),
 ])
+
+function assignCandidateOf(id: number | null): ResponsibleCandidate | null {
+  return assignCandidates.value.find((c) => c.id === id) ?? null
+}
 
 // кандидаты — с сервера: ошибка показывается прямо в листе
 async function loadAssign() {
@@ -325,14 +347,11 @@ function openAssign() {
   void loadAssign()
 }
 
+// сохраняет лист выбора: ошибка — в листе
 async function assignResponsible(usr: number | null) {
   const current = crew.value
   if (!current) return
-  try {
-    crew.value = await assignTripResponsible(current.trip.id, usr)
-  } catch (e) {
-    notifyError(e)
-  }
+  crew.value = await assignTripResponsible(current.trip.id, usr)
 }
 
 function openMark(depart: boolean) {

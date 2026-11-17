@@ -52,10 +52,10 @@
           @update:model-value="draft.executorUsr = typeof $event === 'number' ? $event : null"
         >
           <template #option="{ item }">
-            <StaffOption
-              :name="item.text ?? ''"
-              :candidate="(item.data?.candidate as StaffCandidate) ?? null"
-              :wagon-number="wagonNumber || null"
+            <UserOption
+              :name="(item.data?.candidate as StaffCandidate | undefined)?.usr.name ?? item.text ?? ''"
+              :me="isMe({ id: Number(item.id) })"
+              v-bind="staffRow((item.data?.candidate as StaffCandidate | undefined) ?? null, wagonNumber || null)"
             />
           </template>
         </CbList>
@@ -123,12 +123,13 @@ import PhotoPicker from '@/shared/requests/PhotoPicker.vue'
 import { faultName } from '@/shared/requests/requestView'
 import { canAssignOnCreate, staffTrip } from '@/shared/requests/rights'
 import { loadOffline } from '@/shared/requests/useRequestCard'
-import { currentUser, loadCurrentUser, userName } from '@/shared/user'
+import { currentUser, isMe, loadCurrentUser, userName } from '@/shared/user'
 import type { BottomBarAction } from '../components/BottomBar.vue'
 import BottomBar from '../components/BottomBar.vue'
 import PwaPage from '../components/PwaPage.vue'
 import WagonModePicker from '../components/WagonModePicker.vue'
-import StaffOption from '@/shared/requests/StaffOption.vue'
+import { staffRow } from '@/shared/requests/staffRow'
+import UserOption from '@/shared/components/UserOption.vue'
 import { sortStaff } from '@/shared/requests/staff'
 
 /**
@@ -223,7 +224,7 @@ const canChooseExecutor = computed(() => {
   return canAssignOnCreate(user, wagonTrip)
 })
 const staff = shallowRef<StaffCandidate[]>([])
-// у сотрудника бригады рейса справа — должность и вагоны (StaffOption); предпочтительные — первыми
+// у сотрудника бригады рейса справа — должность и вагоны (UserOption); предпочтительные — первыми
 const staffChoices = computed(() =>
   sortStaff(staff.value, wagonNumber.value || null).map((c) => ({
     id: c.usr.id,

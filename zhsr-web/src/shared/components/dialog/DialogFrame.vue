@@ -51,7 +51,8 @@ import DialogHeader from './DialogHeader.vue'
  *   <DialogFrame v-model:show="open" :title="t('Ввод вагона')" :actions="actions" @action="onAction">...</DialogFrame>
  *
  * - Показ управляется v-model:show: диалог сам себя не закрывает, а отправляет update:show — закрывает владелец.
- * - Escape закрывает, Enter выполняет основное действие (default), Tab ходит по кругу по элементам с классом
+ * - Escape закрывает, Enter выполняет основное действие (default) — и когда фокус потерян (ушёл на body): клавиши
+ *   тогда получает верхний открытый диалог (onWindowKeydown, isTopDialog). Tab ходит по кругу по элементам с классом
  *   zs-focusable внутри диалога. При открытии фокус встаёт на первый такой элемент — первый контрол формы. Класс
  *   zs-focusable ставят сами контролы: TextInput, DatePicker, CbList, CbSegment, CbButton, кнопки действий.
  * - На телефоне диалог развёрнут на весь экран, а кнопка «назад» закрывает его (см. dialogHistory).
@@ -111,6 +112,34 @@ watch(
 )
 
 /**
+ * Клавиши при потерянном фокусе. Элемент с фокусом исчез из страницы (например, закрытая нажатием ошибка) — фокус
+ * уходит на body, и клавиши диалога (keydown на его карточке) до него не доходят: Escape закрыл бы панель страницы, а не
+ * диалог. Поэтому верхний открытый диалог ловит клавиши на уровне окна, пока фокус на body: возвращает фокус в себя и
+ * обрабатывает клавишу как свою — Escape закрывает его, Enter выполняет основное действие, Tab ведёт по его элементам.
+ * Фокус в выпадающем меню или в другом месте страницы — не трогает.
+ */
+function onWindowKeydown(e: KeyboardEvent) {
+  if (!props.show || !isTopDialog()) return
+  if (e.target !== document.body && e.target !== document.documentElement) return
+  e.stopPropagation()
+  if (e.key !== 'Escape') focusFirst()
+  onKeydown(e)
+}
+
+/**
+ * Диалог — верхний: последний из открытых диалогов Quasar на странице (каждый открытый диалог — свой узел в конце body,
+ * по порядку открытия). Так поверх диалога может быть и не DialogFrame — например, просмотр фото: тогда клавиши его.
+ */
+function isTopDialog(): boolean {
+  const dialogs = document.querySelectorAll('.q-dialog')
+  const top = dialogs[dialogs.length - 1]
+  return !!top && !!cardEl.value && top.contains(cardEl.value)
+}
+
+// захват: раньше обработчиков страницы (панель, «назад» фрейма)
+window.addEventListener('keydown', onWindowKeydown, true)
+
+/**
  * Фокус на первый контрол — по событию show диалога: оно приходит и для диалога, созданного уже показанным
  * (openDialog), и после того, как Quasar поставил фокус по-своему.
  */
@@ -118,7 +147,10 @@ function focusFirst() {
   focusables()[0]?.focus()
 }
 
-onBeforeUnmount(() => dialogHistory.forget(historyEntry))
+onBeforeUnmount(() => {
+  dialogHistory.forget(historyEntry)
+  window.removeEventListener('keydown', onWindowKeydown, true)
+})
 
 /** Элементы, по которым ходит Tab: с классом zs-focusable, видимые, доступные и не исключённые из Tab (tabindex -1). */
 function focusables(): HTMLElement[] {
