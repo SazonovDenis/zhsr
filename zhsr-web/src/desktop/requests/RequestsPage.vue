@@ -82,7 +82,7 @@ import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
-import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
+import type { RowMenuItem, TableSort } from '@/shared/components/table/types'
 import {
   ACTIONS,
   assignBlockReason,
@@ -100,6 +100,7 @@ import { useSidePanel } from '../frame/useSidePanel'
 import RequestDialog from './RequestDialog.vue'
 import RequestPanel from './RequestPanel.vue'
 import { requestsColumns } from './requestsColumns'
+import { useKeptSelection } from '../frame/keptSelection'
 
 /**
  * Список заявок на ремонт (Ф-ЗАЯ-06): «созданные мной», «мне на исполнение», «все»; фильтры по периоду подачи, статусу, критичности,
@@ -173,7 +174,8 @@ const rows = shallowRef<RepairRequest[]>([])
 const counts = shallowRef<RequestCounts>({ requestStatusType: {}, severityType: {} })
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок (справочники, фильтры, список)
 const busy = provideBusy()
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 // правая панель: рядом со списком на широком окне, поверх него — на узком
 const panel = useSidePanel(selectedId)
 const sort = ref<TableSort | null>(null)

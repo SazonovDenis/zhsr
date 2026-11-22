@@ -127,7 +127,7 @@ import { openDialog } from '@/shared/components/dialog/openDialog'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { RowKey, RowMenuItem } from '@/shared/components/table/types'
+import type { RowMenuItem } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
 import { ActStatus, RoleType } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -144,6 +144,7 @@ import { useSidePanel } from '../frame/useSidePanel'
 import ActAcceptDialog from './ActAcceptDialog.vue'
 import ActCancelDialog from './ActCancelDialog.vue'
 import ActRejectDialog from './ActRejectDialog.vue'
+import { useKeptSelection } from '../frame/keptSelection'
 
 /** Акты приёма-передачи между депо, станцией и парком отстоя (Ф-АКТ-02): список, оформление новых, приём вагонов, отказ и отмена акта (Ф-АКТ-06). По умолчанию — ожидают приёма. */
 const router = useRouter()
@@ -171,7 +172,8 @@ const columns = defineColumns<Transfer>([
 
 const states = ref<number[]>([ActStatus.PENDING])
 const rows = shallowRef<Transfer[]>([])
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 const selected = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null)
 const panel = useSidePanel(selectedId)
 const loadError = ref<ShownError | null>(null)

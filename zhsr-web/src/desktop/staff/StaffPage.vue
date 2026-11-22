@@ -86,7 +86,7 @@ import { openDialog } from '@/shared/components/dialog/openDialog'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
+import type { RowMenuItem, TableSort } from '@/shared/components/table/types'
 import { RoleType, TripStatus } from '@/shared/constants/systemDicts'
 import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -100,6 +100,7 @@ import { tripOptionItem, tripOptionOf } from '../trips/tripOptionItem'
 import TripOptionView from '../trips/TripOptionView.vue'
 import { staffColumns } from './staffColumns'
 import StaffPeriodDialog from './StaffPeriodDialog.vue'
+import { useKeptSelection } from '../frame/keptSelection'
 
 /**
  * Сотрудники: фильтры (поиск по ФИО, логину и телефону, станция текущего депо, рейс, поезд) и таблица — ФИО, роли,
@@ -143,7 +144,8 @@ const filter = reactive<StaffFilter>({ search: '', station: null, trip: null, tr
 const rows = shallowRef<StaffRow[]>([])
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок (справочники, список)
 const busy = provideBusy()
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 const sort = ref<TableSort | null>(null)
 // ошибка загрузки показывается на месте строк таблицы
 const loadError = ref<ShownError | null>(null)

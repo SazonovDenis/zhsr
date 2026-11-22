@@ -40,7 +40,7 @@
           />
         </button>
         <template v-if="adminOpen && !collapsed">
-          <template v-for="item in menu.admin.items" :key="item.id">
+          <template v-for="item in visibleAdminItems" :key="item.id">
             <!-- подгруппа: раскрытие одной сворачивает другую -->
             <template v-if="isMenuGroup(item)">
               <button
@@ -128,9 +128,9 @@ const collapsed = computed(() => menuState.userCollapsed ?? (isMenuAutoCollapsed
 const adminOpen = computed(() => menuState.openGroup === menu.admin.id)
 const user = shallowRef<CurrentUser | null>(null)
 // пункты с ролями видны только этим ролям
-const visibleItems = computed(() =>
-  menu.items.filter((item) => !item.roles || item.roles.some((r) => hasRole(user.value, r))),
-)
+const roleVisible = (item: MenuItem) => !item.roles || item.roles.some((r) => hasRole(user.value, r))
+const visibleItems = computed(() => menu.items.filter(roleVisible))
+const visibleAdminItems = computed(() => menu.admin.items.filter(roleVisible))
 
 // счётчики пунктов меню из текущего состояния (fetchCurrentState); загружаются при показе меню, после
 // восстановления связи и по событию шины state-refresh — его отправляет тот, кто изменил данные, влияющие на счётчики

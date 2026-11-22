@@ -76,7 +76,7 @@ import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { RowKey, TableSort } from '@/shared/components/table/types'
+import type { TableSort } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -87,6 +87,7 @@ import { loadCurrentUser, userName } from '@/shared/user'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { useSidePanel } from '../frame/useSidePanel'
 import EquipListPanel from './EquipListPanel.vue'
+import { useKeptSelection } from '../frame/keptSelection'
 
 /**
  * Список описей экипировки (Ф-ЭКП-03): поиск по номеру вагона, шаблон, период (по умолчанию — месяц). Видимость — как у
@@ -98,7 +99,8 @@ const route = useRoute()
 const busy = provideBusy()
 const filter = reactive<EquipListFilter>({ template: null, wagon: null, query: '', ...wagonRequestsPeriod() })
 const rows = shallowRef<EquipListRow[]>([])
-const selectedId = ref<RowKey | null>(route.query.id ? Number(route.query.id) : null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection(route.query.id ? Number(route.query.id) : null)
 const panel = useSidePanel(selectedId)
 // сортировка по колонке; null — сначала новые
 const sort = ref<TableSort | null>(null)

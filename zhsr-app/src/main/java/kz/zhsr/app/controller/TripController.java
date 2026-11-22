@@ -83,18 +83,6 @@ public class TripController {
         return tripService.setCrew(id, body);
     }
 
-    @PutMapping("/trips/{id}/crew-wagons")
-    public TripCrew setCrewWagons(@PathVariable long id, @RequestBody TripService.CrewWagonsBody body)
-            throws Exception {
-        return tripService.setCrewWagons(id, body);
-    }
-
-    @PutMapping("/trips/{id}/duty/{duty}")
-    public TripCrew setDuty(@PathVariable long id, @PathVariable long duty,
-                            @RequestBody TripService.DutyBody body) throws Exception {
-        return tripService.setDuty(id, duty, body);
-    }
-
     @PostMapping("/trips/{id}/depart")
     public TripCrew depart(@PathVariable long id, @RequestBody TripService.MarkBody body) throws Exception {
         return tripService.depart(id, body);

@@ -55,4 +55,6 @@ public class TrainChange {
     private boolean canUndo;
     /** у отменённого плана: текущий сотрудник может вернуть план - вычисляемое */
     private boolean canRestore;
+    /** текущий сотрудник может исправить запись: ожидающий план - целиком, факт - основания - вычисляемое */
+    private boolean canEdit;
 }

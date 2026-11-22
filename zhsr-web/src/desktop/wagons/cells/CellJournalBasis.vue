@@ -21,11 +21,12 @@ import { useRouter } from 'vue-router'
 
 import type { CellProps } from '@/shared/components/table/types'
 import type { JournalRow } from '../journalColumns'
+import { openTripTrain } from '../../trips/openTripTrain'
 import { basisText } from '../journalText'
 
 /**
  * Основание записи журнала: документ и причина из него. Отправление, прибытие, отцепка и прицепка — ссылка на
- * формирование рейса, где видны и акты рейса; проверка и опись — ссылка на карточку в своём списке.
+ * экран поезда с этим рейсом (журнал рейса); проверка и опись — ссылка на карточку в своём списке.
  */
 const props = defineProps<CellProps<JournalRow>>()
 
@@ -39,7 +40,7 @@ function openDocument() {
 }
 
 function openTrip() {
-  if (props.row.basisTrip) void router.push({ name: 'trip-form', params: { id: props.row.basisTrip.id } })
+  if (props.row.basisTrip) void openTripTrain(router, props.row.basisTrip.id)
 }
 </script>
 

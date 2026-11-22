@@ -1,6 +1,5 @@
 package kz.zhsr.app.dto.train;
 
-import kz.zhsr.app.dto.ref.TripRef;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -22,8 +21,9 @@ public class TrainCard extends TrainRow {
     /** время последнего Факта поезда: раньше него Факт не вносится, удалить можно только Факт этого времени; null -
      * фактов нет */
     private OffsetDateTime lastFactDt;
-    /** рейсы поезда в статусе «план» и «выполняется», по плановому отправлению */
-    private List<TripRef> trips = List.of();
+    /** рейсы поезда в статусе «план», «выполняется» и «выполнен» - отметки отправления и прибытия в журнале, по
+     * плановому отправлению */
+    private List<TrainTripMark> tripMarks = List.of();
     /** текущий сотрудник может менять поезд: планировщик вагонов или администратор */
     private boolean canEdit;
     /** текущий сотрудник может прицеплять и отцеплять вагоны: кто меняет поезд, а у поезда в рейсе - ещё начальник

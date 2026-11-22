@@ -34,3 +34,4 @@ id	route	train	planned_dt	trip_status_type	departed_dt	departed_by_usr	arrived_d
 129	3		2026-11-03 20:00:00+05:00	1				
 130	5		2026-11-05 08:00:00+05:00	1				
 131	2		2026-11-07 21:00:00+05:00	1				
+132	102	3	2026-10-31 09:30:00+05:00	1				

@@ -62,13 +62,14 @@ import { provideBusy } from '@/shared/busy'
 import { valueKindText, VALUE_KINDS } from '@/shared/checks/labels'
 import { treeRows } from '@/shared/checks/tree'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { Column, RowKey, RowMenuItem } from '@/shared/components/table/types'
+import type { Column, RowMenuItem } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import CellTreeText from '../shared/CellTreeText.vue'
 import { canMoveIn, orderSort, provideSortOrder, sortOrderColumn } from '../shared/sortOrder'
 import { nextOrder, openSpecDialog, ORDER_FIELDS, TEXT_FIELDS, textValues } from '../shared/spec'
 import CheckItemPanel from './CheckItemPanel.vue'
+import { useKeptSelection } from '@/desktop/frame/keptSelection'
 
 /**
  * Пункты шаблона чек-листа (Ф-ЧЕК-02): дерево разделов и пунктов со значением. «+ Раздел», «+ Пункт» и двойной клик
@@ -92,7 +93,8 @@ const busy = provideBusy()
 const template = shallowRef<CheckTemplate | null>(null)
 const items = shallowRef<CheckItem[]>([])
 const dicts = shallowRef<CheckDict[]>([])
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 const panel = useSidePanel(selectedId)
 const loadError = ref<ShownError | null>(null)
 const templateId = computed(() => Number(props.id))

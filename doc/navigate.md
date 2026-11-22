@@ -11,3 +11,4 @@
 [База данных](db.html)
 ---
 [Прототип](app/prototype.dc.html)
+[Демо](https://ec2-13-63-20-196.eu-north-1.compute.amazonaws.com)

@@ -13,7 +13,7 @@ import java.util.Set;
  * обслуживает 1 вагон или 2 соседних; в хвостовые вагоны (первый и последний вагоны состава) - по 2 старших
  * проводника. Вагоны проводника, ставшие несоседними, в норму не засчитываются. Показ нормы - zhsr-web, crewNorm.ts.
  */
-final class TripNorm {
+public final class TripNorm {
 
     private TripNorm() {
     }
@@ -21,7 +21,7 @@ final class TripNorm {
     /**
      * @return номера пассажирских вагонов, у которых норма не выполнена, по порядку состава
      */
-    static List<String> notOk(List<TripCrew.Wagon> composition, List<TripCrew.Member> crew) {
+    public static List<String> notOk(List<TripCrew.Wagon> composition, List<TripCrew.Member> crew) {
         // норма - по вагонам, которые едут в поезде
         List<TripCrew.Wagon> wagons = composition.stream().filter(TripCrew.Wagon::isRiding).toList();
         List<String> order = wagons.stream().map(TripCrew.Wagon::getNumber).toList();

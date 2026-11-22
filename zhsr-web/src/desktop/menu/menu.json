@@ -31,13 +31,6 @@
       "route": "routes"
     },
     {
-      "id": "staff",
-      "label": "Сотрудники",
-      "icon": "staff",
-      "route": "staff",
-      "roles": [1, 12, 14]
-    },
-    {
       "id": "requests",
       "label": "Заявки",
       "icon": "requests",
@@ -71,6 +64,12 @@
     "label": "Администрирование",
     "icon": "settings",
     "items": [
+      {
+        "id": "staff",
+        "label": "Сотрудники",
+        "route": "staff",
+        "roles": [1, 12, 14]
+      },
       {
         "id": "admin-group-routes",
         "label": "Узлы",

@@ -36,7 +36,13 @@
     />
 
     <template #right>
-      <TrainPanel :train="selected" @close="panel.close" @open="selected && open(selected)" />
+      <TrainPanel
+        :train="selected"
+        :edit-reason="selected ? editReason(selected) : ''"
+        @close="panel.close"
+        @open="selected && open(selected)"
+        @edit="selected && rename(selected)"
+      />
     </template>
   </DesktopFrame>
 </template>
@@ -52,10 +58,11 @@ import { provideBusy } from '@/shared/busy'
 import type { ChoiceItem } from '@/shared/components/choice/choice'
 import CbButton from '@/shared/components/choice/CbButton.vue'
 import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
+import { openDialog } from '@/shared/components/dialog/openDialog'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { RowKey, RowMenuItem } from '@/shared/components/table/types'
+import type { RowMenuItem } from '@/shared/components/table/types'
 import { RoleType } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
@@ -64,8 +71,10 @@ import { roleReason } from '@/shared/roleReason'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { useSidePanel } from '../frame/useSidePanel'
 import { openTrainNew } from './openTrainNew'
+import TrainNameDialog from './TrainNameDialog.vue'
 import TrainPanel from './TrainPanel.vue'
 import { trainsColumns } from './trainsColumns'
+import { useKeptSelection } from '../frame/keptSelection'
 
 /**
  * Список поездов (Ф-ПОЕ-00): фильтр по состоянию и поиск по обозначению поезда и номеру вагона, таблица и правая
@@ -87,7 +96,8 @@ const filter = reactive<TrainFilter>({ states: ['active'], search: '' })
 const rows = shallowRef<TrainRow[]>([])
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок (справочник станций, список)
 const busy = provideBusy()
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 const panel = useSidePanel(selectedId)
 const selected = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null)
 
@@ -112,6 +122,20 @@ function open(train: TrainRow) {
 
 function create() {
   void openTrainNew(router)
+}
+
+/** Почему поезд не исправить: нет прав или поезд расформирован; пусто — можно (как canEdit карточки поезда). */
+function editReason(tr: TrainRow): string {
+  return (
+    roleReason([RoleType.WAGON_PLANNER], 'Поезд меняет планировщик вагонов') ||
+    (tr.dend ? t('Поезд расформирован') : '')
+  )
+}
+
+/** «Редактировать» — обозначение поезда; сохранили — список заново. */
+async function rename(tr: TrainRow) {
+  const saved = await openDialog<TrainRow>(TrainNameDialog, { train: { id: tr.id, name: tr.name } })
+  if (saved) await load()
 }
 
 const rowMenu: RowMenuItem<TrainRow>[] = [

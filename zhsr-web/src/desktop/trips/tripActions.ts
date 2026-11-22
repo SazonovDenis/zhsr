@@ -15,10 +15,11 @@ import TripCancelDialog from './TripCancelDialog.vue'
 import TripMarkDialog from './TripMarkDialog.vue'
 import TripNewDialog from './TripNewDialog.vue'
 import TripResponsiblesDialog from './TripResponsiblesDialog.vue'
+import { openTripTrain } from './openTripTrain'
 
 /** Тексты действий с рейсом по порядку кнопок. */
 export const TRIP_ACTION_LABELS = [
-  'Формирование',
+  'Формирование поезда',
   'Ответственные за вагоны',
   'Редактировать',
   'Отметить отправление',
@@ -29,17 +30,17 @@ export const TRIP_ACTION_LABELS = [
   'Отменить прибытие',
   'Отцепка',
   'Прицепка',
-  'Отметить прицепку',
   'Отменить рейс',
 ]
 
 /** Действия-переходы в другое окно, а не диалог: в панели — мягкими ссылками (SoftLink). */
-export const NAV_ACTIONS = ['Формирование', 'Отцепка', 'Прицепка', 'Отметить прицепку']
+export const NAV_ACTIONS = ['Формирование поезда', 'Отцепка', 'Прицепка']
 
 const FIX_REASON = 'Исправить можно в течение 10 минут после отметки'
 const CANCEL_REASON = 'Отменить можно в течение 10 минут после отметки'
 const PLANNER_REASON = 'Только планировщик вагонов'
 const MARK_REASON = 'Отмечает ЛНП этого рейса'
+const NO_TRAIN_REASON = 'У рейса не назначен поезд'
 const COUPLE_REASON = 'Прицепку и отцепку в рейсе оформляет ЛНП этого рейса или мастер депо'
 
 /** Почему действие недоступно: сначала нет прав (rights — права есть, reason — текст), затем status; пусто — доступно. */
@@ -83,7 +84,8 @@ export function useTripActions(changed: () => void) {
     const fixArrival = markEditable(trip.arrivalMarkedDt, now.value)
     const status = (...allowed: number[]) => statusReason(trip, ...allowed)
     return [
-      { label: 'Формирование', reason: '', run: () => openForm(trip) },
+      // состав поезда рейса: экран поезда с этим рейсом; без поезда — недоступно
+      { label: 'Формирование поезда', reason: trip.train ? '' : t(NO_TRAIN_REASON), run: () => openForm(trip) },
       // ответственные за вагоны поезда (Ф-РЕЙ-08) — диалог: план и факт; смотреть могут все, менять — по правам
       {
         label: 'Ответственные за вагоны',
@@ -135,12 +137,6 @@ export function useTripActions(changed: () => void) {
         reason: why(canCouple, COUPLE_REASON, status(TripStatus.IN_PROGRESS)),
         run: () => couple(trip, 'attach'),
       },
-      // плановые прицепки и отцепки рейса отмечаются в формировании рейса: список и кнопки «Отметить» там
-      {
-        label: 'Отметить прицепку',
-        reason: why(canMark, MARK_REASON, status(TripStatus.PLANNED, TripStatus.IN_PROGRESS)),
-        run: () => openForm(trip),
-      },
       {
         label: 'Отменить рейс',
         reason: why(isPlanner, PLANNER_REASON, status(TripStatus.PLANNED)),
@@ -150,7 +146,7 @@ export function useTripActions(changed: () => void) {
   }
 
   function openForm(trip: TripRow) {
-    void router.push({ name: 'trip-form', params: { id: trip.id } })
+    void openTripTrain(router, trip.id, trip.train?.id ?? null)
   }
 
   function couple(trip: TripRow, kind: string) {

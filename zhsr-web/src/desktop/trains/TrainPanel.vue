@@ -21,8 +21,9 @@
         <span>{{ t('По плану') }}</span>
         <span>{{ t('{n} прицепок и отцепок', { n: train.plannedCount }) }}</span>
       </SidePanelFields>
-      <!-- экран состава поезда: «Редактировать» — кнопкой, как у рейса; без прав видна, но неактивна, причина в подсказке -->
-      <div v-if="formPage" class="q-mt-md">
+      <!-- «Редактировать» — кнопкой, как у рейса, и в списке, и на экране состава; без прав видна, но неактивна,
+           причина в подсказке -->
+      <div class="q-mt-md">
         <q-btn
           unelevated
           outline
@@ -38,15 +39,16 @@
 
       <!-- рейсы — тем же блоком, что у вагона; от атрибутов — чертой во всю ширину панели -->
       <section v-if="trips.length > 0" class="train-panel__trips q-pt-md q-px-lg">
-        <TripLinks :trips="trips" />
+        <TripLinks :trips="trips" :title="pastTrips ? 'Прошлые рейсы' : 'Текущий и будущие рейсы'" />
       </section>
 
       <!-- вагоны поезда по порядку — под чертой ниже всего, таблицей с колонками «Номер» и «Тип» списка вагонов;
-           прокручивается только она. Справа от подписи — «Состав поезда», как «Редактировать» у маршрута -->
-      <section class="train-panel__wagons q-pt-md q-px-lg q-pb-md">
+           прокручивается только она. Справа от подписи — «Состав поезда», как «Редактировать» у маршрута. На экране
+           состава поезда блока нет: состав — в середине экрана -->
+      <section v-if="!formPage" class="train-panel__wagons q-pt-md q-px-lg q-pb-md">
         <div class="train-panel__head">
           <span class="train-panel__title">{{ t('Вагоны') }}</span>
-          <SoftLink v-if="!formPage" text="Состав поезда" @click="emit('open')" />
+          <SoftLink text="Состав поезда" @click="emit('open')" />
         </div>
         <!-- вагонов нет — без таблицы, одной надписью -->
         <DataTable v-if="train.wagons.length > 0" :columns="wagonColumns" :rows="train.wagons" row-key="id" />
@@ -75,25 +77,32 @@ import { trainPlaceText } from './trainPlace'
 
 /**
  * Панель поезда (Ф-ПОЕ-00): обозначение, где стоят вагоны (как расположение в списке вагонов), число плановых
- * прицепок и отцепок; ниже — вагоны списком по порядку, рейсы поезда ссылками на формирование рейса. На списке поездов
- * — кнопка «Состав поезда»; на экране состава поезда (formPage) её нет, вместо неё под атрибутами — кнопка
- * «Редактировать» (обозначение поезда). Справочники Station, Depot, Yard, LocationKind и
- * WagonType, WagonModel, TripState готовит страница.
+ * прицепок и отцепок; под атрибутами — кнопка «Редактировать» (обозначение поезда, событие edit; editReason — почему
+ * недоступна); ниже — рейсы поезда ссылками на состав поезда с рейсом и вагоны списком по порядку. На списке поездов —
+ * блок «Вагоны» с кнопкой «Состав поезда»; на экране состава поезда (formPage) блока «Вагоны» нет (состав — в середине
+ * экрана). Справочники Station, Depot, Yard, LocationKind, WagonType, WagonModel, TripState готовит страница.
  */
 const props = withDefaults(
-  defineProps<{ train: TrainRow | TrainCard | null; formPage?: boolean; closable?: boolean; editReason?: string }>(),
-  { formPage: false, closable: true, editReason: '' },
+  defineProps<{
+    train: TrainRow | TrainCard | null
+    formPage?: boolean
+    closable?: boolean
+    editReason?: string
+    /** прошлые рейсы вместо текущего и будущих (режим «Прошлое» экрана поезда); null — текущий и будущие */
+    pastTrips?: TripRef[] | null
+  }>(),
+  { formPage: false, closable: true, editReason: '', pastTrips: null },
 )
 const emit = defineEmits<{ close: []; open: []; edit: [] }>()
 
-/** Рейсы поезда: у карточки — все в плане и выполняющиеся, у строки списка — выполняющийся и ближайший. */
+/** Рейсы поезда — у строки списка и у карточки одинаково: выполняющийся и все в статусе «план». */
 const trips = computed<{ trip: TripRef; tripStatusType: number }[]>(() => {
   const tr = props.train
   if (!tr) return []
-  // выполняющийся — trip; остальные рейсы карточки — в плане
+  if (props.pastTrips) return props.pastTrips.map((x) => ({ trip: x, tripStatusType: TripStatus.DONE }))
+  // выполняющийся — trip; остальные — в плане
   const status = (x: TripRef) => (tr.trip?.id === x.id ? TripStatus.IN_PROGRESS : TripStatus.PLANNED)
-  const list = 'trips' in tr ? tr.trips : [tr.trip, tr.nextTrip].filter((x): x is TripRef => !!x)
-  return list.map((x) => ({ trip: x, tripStatusType: status(x) }))
+  return tr.trips.map((x) => ({ trip: x, tripStatusType: status(x) }))
 })
 
 // колонки «Номер» и «Тип» — те же, что в списке вагонов; строка вагона поезда несёт их поля

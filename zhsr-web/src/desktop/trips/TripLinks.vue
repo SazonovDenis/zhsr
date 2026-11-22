@@ -1,7 +1,7 @@
 <template>
-  <!-- рейсы ссылкой на формирование рейса и статус рейса плашкой -->
+  <!-- рейсы ссылкой на состав поезда рейса и статус рейса плашкой -->
   <div v-if="trips.length > 0" class="trip-links">
-    <div class="trip-links__title">{{ t('Рейсы') }}</div>
+    <div class="trip-links__title">{{ t(title) }}</div>
     <div v-for="tr in trips" :key="tr.trip.id" class="trip-links__trip">
       <button type="button" class="trip-links__link q-pa-none" @click="open(tr.trip.id)">
         {{ tripRefDatedText(tr.trip) }}
@@ -18,17 +18,21 @@ import type { TripRef } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import DictBadge from '@/shared/components/DictBadge.vue'
 import { tripRefDatedText } from '@/shared/trips/tripRefText'
+import { openTripTrain } from './openTripTrain'
 
 /**
- * Блок «Рейсы» правой панели — один для вагона и поезда: рейс ссылкой на формирование рейса и его статус плашкой.
- * Рейсов нет — блока нет. Справочник TripState готовит страница.
+ * Блок «Рейсы» правой панели — один для вагона и поезда: рейс ссылкой на экран поезда с этим рейсом (состав на
+ * отправление рейса) и его статус плашкой.
+ * title — подпись блока на русском, по умолчанию «Рейсы». Рейсов нет — блока нет. Справочник TripState готовит страница.
  */
-defineProps<{ trips: { trip: TripRef; tripStatusType: number }[] }>()
+withDefaults(defineProps<{ trips: { trip: TripRef; tripStatusType: number }[]; title?: string }>(), {
+  title: 'Рейсы',
+})
 
 const router = useRouter()
 
 function open(id: number) {
-  void router.push({ name: 'trip-form', params: { id } })
+  void openTripTrain(router, id)
 }
 </script>
 

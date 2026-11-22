@@ -1,3 +1,5 @@
+import { t } from '@/boot/i18n'
+
 const pad = (n: number) => String(n).padStart(2, '0')
 
 /**
@@ -37,4 +39,9 @@ export function dayStart(day: string, addDays = 0): string {
 /** Целое число с разбивкой на тысячи пробелом: 1234567 → «1 234 567». */
 export function formatThousands(value: number): string {
   return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
+
+/** Число вагонов с согласованным словом на языке интерфейса: 1 → «1 вагон», 3 → «3 вагона», 5 → «5 вагонов». */
+export function formatWagons(n: number): string {
+  return t('{n} вагонов', n)
 }

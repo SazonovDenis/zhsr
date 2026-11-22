@@ -306,10 +306,7 @@ const okHint = computed(() => {
 })
 const canSave = computed(() => !running.value && !okHint.value)
 
-const back = () => {
-  if (window.history.state?.back) router.back()
-  else void router.push({ name: 'acts' })
-}
+const back = () => void router.push({ name: 'acts' })
 
 // ответственные за вагоны акта; null — ещё не выбраны
 const responsible = ref<ResponsibleChoice>(null)

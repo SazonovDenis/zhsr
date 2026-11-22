@@ -47,13 +47,14 @@ import { moveSortOrder } from '@/api/admin'
 import { provideBusy } from '@/shared/busy'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { RowKey, RowMenuItem } from '@/shared/components/table/types'
+import type { RowMenuItem } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { nextOrder, openSpecDialog, ORDER_FIELDS, TEXT_FIELDS, textValues } from '../shared/spec'
 import CheckDictValuesDialog from './CheckDictValuesDialog.vue'
 import { canMoveIn, orderSort, provideSortOrder } from '../shared/sortOrder'
 import { textColumns } from './textColumns'
+import { useKeptSelection } from '@/desktop/frame/keptSelection'
 
 /**
  * Шаблоны ответов чек-листа (Ф-ЧЕК-01): «+ Шаблон» заводит шаблон ответов, «Варианты ответов» открывает варианты
@@ -62,7 +63,8 @@ import { textColumns } from './textColumns'
 
 const busy = provideBusy()
 const rows = shallowRef<CheckDict[]>([])
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 const loadError = ref<ShownError | null>(null)
 const selected = computed(() => rows.value.find((r) => r.id === selectedId.value) ?? null)
 const columns = textColumns<CheckDict>()

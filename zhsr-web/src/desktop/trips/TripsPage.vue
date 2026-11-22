@@ -79,7 +79,7 @@ import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
 import { actionsMenu } from '@/shared/components/table/rowMenu'
 import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
 import { tripRefDatedText } from '@/shared/trips/tripRefText'
-import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
+import type { RowMenuItem, TableSort } from '@/shared/components/table/types'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -94,10 +94,12 @@ import DesktopFrame from '../frame/DesktopFrame.vue'
 import { useSidePanel } from '../frame/useSidePanel'
 import TripPanel from './TripPanel.vue'
 import TripNewDialog from './TripNewDialog.vue'
+import { openTripTrain } from './openTripTrain'
 import { useTripDialogReturn } from './useTripDialogReturn'
 import { FUTURE_STATES, sidePeriod, sidePresets, statesForPeriod, statesSide } from './tripPeriod'
 import { createTripReason, TRIP_ACTION_LABELS, useTripActions } from './tripActions'
 import { tripsColumns } from './tripsColumns'
+import { useKeptSelection } from '../frame/keptSelection'
 
 /** Список рейсов: фильтры и таблица. */
 
@@ -145,8 +147,10 @@ watch(
   },
 )
 
+// двойной клик — состав поезда рейса на его отправление
 function openForm(row: unknown) {
-  void router.push({ name: 'trip-form', params: { id: (row as TripRow).id } })
+  const trip = row as TripRow
+  void openTripTrain(router, trip.id, trip.train?.id ?? null)
 }
 
 // рейс создаёт планировщик вагонов (Ф-РЕЙ-01)
@@ -174,7 +178,8 @@ const rowMenu: RowMenuItem<TripRow>[] = [
 const rows = shallowRef<TripRow[]>([])
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок (справочники, фильтры, список)
 const busy = provideBusy()
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 // правая панель: рядом со списком на широком окне, поверх него — на узком
 const panel = useSidePanel(selectedId)
 const sort = ref<TableSort | null>(null)

@@ -3,21 +3,15 @@
     <span>{{ t('Маршрут') }}</span>
     <span>
       <SoftRouteLink
-        text="№ {number} • {name}"
-        :params="{ number: trip.trainNumber, name: trip.name }"
+        text="{number}"
+        :params="{ number: trip.trainNumber }"
         :to="{ name: 'route-edit', params: { id: trip.route } }"
       />
+      • {{ trip.name }}
     </span>
     <span>{{ t('Поезд') }}</span>
     <span>
-      <template v-if="trip.train">
-        {{ trip.train.name }}
-        <SoftRouteLink
-          text="Состав поезда"
-          class="q-ml-sm"
-          :to="{ name: 'train-form', params: { id: trip.train.id } }"
-        />
-      </template>
+      <template v-if="trip.train">{{ trip.train.name }}</template>
       <template v-else>{{ t('не назначен') }}</template>
     </span>
     <span>{{ t('Вид маршрута') }}</span>
@@ -46,9 +40,8 @@ import SidePanelFields from '../frame/SidePanelFields.vue'
 import TripTimes from './TripTimes.vue'
 
 /**
- * Атрибуты рейса в правой панели — одни и те же в списке рейсов и в формировании рейса: маршрут ссылкой на редактор
- * маршрута, поезд и ссылка «Состав поезда»,
- * вид маршрута, время в пути, времена, состояние.
+ * Атрибуты рейса в правой панели — одни и те же в списке рейсов и в формировании рейса: маршрут (номер поезда
+ * маршрута ссылкой на редактор маршрута, название текстом), поезд, вид маршрута, время в пути, времена, состояние.
  */
 defineProps<{
   trip: {

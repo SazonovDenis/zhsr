@@ -1,4 +1,6 @@
 import type { TrainCard, TrainChange, TrainState, TrainWagon } from '@/api/trains'
+import type { TripRef } from '@/api/wagons'
+import { TripStatus } from '@/shared/constants/systemDicts'
 import { t } from '@/boot/i18n'
 import { TrainWagonChangeType, TrainWagonKind, TrainWagonPlanStatus } from '@/shared/constants/TrainWagonChange'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -107,6 +109,55 @@ export function deviationText(c: TrainChange): string {
   return parts.length ? t('по плану {what}', { what: parts.join(', ') }) : t('по плану')
 }
 
+/**
+ * Отметка рейса в журнале поезда: отправление или прибытие. Не изменение состава — момент, на который можно посмотреть
+ * состав. fact — время фактическое (прошлое), иначе плановое (настоящее).
+ */
+export interface JournalMark {
+  key: string
+  trip: TripRef
+  kind: 'departure' | 'arrival'
+  dt: string
+  fact: boolean
+}
+
+/**
+ * Отметки рейсов поезда: прошлое — фактические отправления и прибытия, настоящее — плановые отправления рейсов в
+ * статусе «план» и плановые прибытия рейсов в статусе «план» и «выполняется». По времени.
+ */
+export function tripMarksOf(card: TrainCard, past: boolean): JournalMark[] {
+  const res: JournalMark[] = []
+  const add = (m: Omit<JournalMark, 'key'>) => res.push({ ...m, key: `${m.trip.id}-${m.kind}-${m.fact ? 'f' : 'p'}` })
+  for (const r of card.tripMarks) {
+    if (past) {
+      if (r.departedDt) add({ trip: r.trip, kind: 'departure', dt: r.departedDt, fact: true })
+      if (r.arrivedDt) add({ trip: r.trip, kind: 'arrival', dt: r.arrivedDt, fact: true })
+    } else {
+      if (r.tripStatusType === TripStatus.PLANNED)
+        add({ trip: r.trip, kind: 'departure', dt: r.plannedDt, fact: false })
+      if (r.tripStatusType === TripStatus.PLANNED || r.tripStatusType === TripStatus.IN_PROGRESS)
+        add({ trip: r.trip, kind: 'arrival', dt: r.arrival, fact: false })
+    }
+  }
+  return res.sort((a, b) => new Date(a.dt).getTime() - new Date(b.dt).getTime())
+}
+
+/**
+ * Отметки одного рейса поезда: отправление и прибытие — фактические, если были, иначе плановые. По времени.
+ */
+export function tripMarksOfTrip(card: TrainCard, trip: number): JournalMark[] {
+  const r = card.tripMarks.find((x) => x.trip.id === trip)
+  if (!r) return []
+  const mark = (kind: JournalMark['kind'], fact: string | null, plan: string): JournalMark => ({
+    key: `${r.trip.id}-${kind}-${fact ? 'f' : 'p'}`,
+    trip: r.trip,
+    kind,
+    dt: fact ?? plan,
+    fact: fact !== null,
+  })
+  return [mark('departure', r.departedDt, r.plannedDt), mark('arrival', r.arrivedDt, r.arrival)]
+}
+
 /** Журнал поезда для показа: факты по времени, затем ожидающие планы по времени. */
 export function journalOf(card: TrainCard): { facts: TrainChange[]; plans: TrainChange[] } {
   const byTime = (a: TrainChange, b: TrainChange) => new Date(a.dt).getTime() - new Date(b.dt).getTime() || a.id - b.id
@@ -141,8 +192,8 @@ export interface ChangeAction {
 }
 
 /**
- * Действия с записью журнала — общие для экранов: у ожидающего плана «Отметить» и «Отменить план», у факта «Удалить
- * факт». Недоступное — с причиной (права на сервере: canMark, canCancel, canUndo; удалить факт нельзя, пока после него
+ * Действия с записью журнала — общие для экранов: у ожидающего плана «Редактировать» (если задан run.edit),
+ * «Отметить» и «Отменить план», у факта «Редактировать» (основания) и «Удалить факт». Недоступное — с причиной (права на сервере: canMark, canCancel, canUndo; удалить факт нельзя, пока после него
  * есть факты того же вагона).
  *
  * @param facts известные факты поезда или рейса: по ним — более поздние факты того же вагона
@@ -150,10 +201,19 @@ export interface ChangeAction {
 export function changeActions(
   c: TrainChange,
   facts: TrainChange[],
-  run: { mark: (c: TrainChange) => void; cancel: (c: TrainChange) => void; undo: (c: TrainChange) => void },
+  run: {
+    mark: (c: TrainChange) => void
+    cancel: (c: TrainChange) => void
+    undo: (c: TrainChange) => void
+    /** исправить запись; нет — пункта «Редактировать» нет */
+    edit?: (c: TrainChange) => void
+  },
 ): ChangeAction[] {
+  const editAction = (reason: string): ChangeAction[] =>
+    run.edit ? [{ label: 'Редактировать', reason: c.canEdit ? '' : t(reason), run: () => run.edit!(c) }] : []
   if (isWaiting(c)) {
     return [
+      ...editAction('Исправляет план планировщик вагонов или ЛНП рейса'),
       {
         label: 'Отметить',
         reason: c.canMark ? '' : t('Отмечает план планировщик вагонов, в рейсе — ЛНП рейса'),
@@ -172,7 +232,11 @@ export function changeActions(
       : laterFactsOfWagon(facts, c).length > 0
         ? t('Сначала удалите более позднюю прицепку или отцепку этого вагона')
         : ''
-    return [{ label: 'Удалить факт', reason, run: () => run.undo(c) }]
+    return [
+      ...editAction('Основания факта исправляет тот, кто может удалить факт'),
+      // факт, который отработал план, — отметка выполнения плана: её отменяют; факт без плана удаляют
+      { label: c.plan !== null ? 'Отменить отметку' : 'Удалить факт', reason, run: () => run.undo(c) },
+    ]
   }
   return []
 }

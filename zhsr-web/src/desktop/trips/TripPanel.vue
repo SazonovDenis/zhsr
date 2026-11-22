@@ -35,41 +35,6 @@
 
       <ErrorBox v-if="error" :error="error" :retry="load" class="q-mt-md" />
 
-      <!-- готовность к отправлению — у рейса в статусе «План» -->
-      <TripReadiness
-        v-if="crew && trip.tripStatusType === TripStatus.PLANNED"
-        :crew="crew"
-        :mark-reason="markAction?.reason ?? ''"
-        class="q-mt-md"
-        @mark="markAction?.run()"
-      />
-
-      <!-- ответственные за вагоны: на рейс или после рейса; «Изменить» — диалог ответственных -->
-      <div class="trip-panel__section q-mt-md">
-        <div class="trip-panel__head">
-          <span class="trip-panel__caption">{{ t('Ответственные') }}</span>
-          <CbSegment v-model="layer" single required :values="layers" />
-          <SoftLink
-            text="Изменить"
-            :disabled="!!respReason"
-            :title="respReason || undefined"
-            @click="editResponsibles"
-          />
-        </div>
-        <template v-if="resp">
-          <div class="trip-panel__muted">{{ respCaption }}</div>
-          <div class="trip-panel__list">
-            <template v-for="r in respLines" :key="r.key">
-              <span :class="{ 'trip-panel__muted': !r.usr }">
-                <UserName v-if="r.usr" :user="r.usr" /><template v-else>{{ r.empty }}</template>
-              </span>
-              <span>{{ t('вагон {n}', { n: r.number }) }}</span>
-            </template>
-          </div>
-          <div v-if="respLines.length === 0" class="trip-panel__muted">{{ t('В поезде рейса нет вагонов') }}</div>
-        </template>
-      </div>
-
       <!-- поездная бригада: ЛНП, ПЭМ, проводники; «Изменить» — диалог «Поездная бригада» -->
       <div class="trip-panel__section q-mt-md">
         <div class="trip-panel__head">
@@ -89,6 +54,35 @@
             </template>
           </div>
           <div v-if="crewMembers.length === 0" class="trip-panel__muted">{{ t('Бригада рейса не назначена') }}</div>
+        </template>
+      </div>
+
+      <!-- ответственные за вагоны: на рейс или после рейса; «Изменить» — диалог ответственных -->
+      <div class="trip-panel__section q-mt-md">
+        <div class="trip-panel__head">
+          <span class="trip-panel__caption">{{ t('Ответственные') }}</span>
+          <SoftLink
+            text="Изменить"
+            :disabled="!!respReason"
+            :title="respReason || undefined"
+            @click="editResponsibles"
+          />
+        </div>
+        <!-- переключатель «На рейс» / «После рейса» — строкой ниже подписи -->
+        <div>
+          <CbSegment v-model="layer" single required :values="layers" />
+        </div>
+        <template v-if="resp">
+          <div class="trip-panel__muted">{{ respCaption }}</div>
+          <div class="trip-panel__list">
+            <template v-for="r in respLines" :key="r.key">
+              <span :class="{ 'trip-panel__muted': !r.usr }">
+                <UserName v-if="r.usr" :user="r.usr" /><template v-else>{{ r.empty }}</template>
+              </span>
+              <span>{{ t('вагон {n}', { n: r.number }) }}</span>
+            </template>
+          </div>
+          <div v-if="respLines.length === 0" class="trip-panel__muted">{{ t('В поезде рейса нет вагонов') }}</div>
         </template>
       </div>
     </template>
@@ -119,16 +113,14 @@ import SidePanel from '../frame/SidePanel.vue'
 import CrewPickDialog from './CrewPickDialog.vue'
 import { NAV_ACTIONS, useTripActions } from './tripActions'
 import TripFields from './TripFields.vue'
-import TripReadiness from './TripReadiness.vue'
 import TripResponsiblesDialog from './TripResponsiblesDialog.vue'
 
 /**
  * Правая панель списка рейсов: заголовок — маршрут, атрибуты рейса (TripFields), кнопка «Редактировать», переходы
- * мягкими ссылками («Формирование» и другие). Ниже — «Ответственные» с переключателем «На рейс» / «После рейса»:
- * подпись «Ответственные с …» и строки «ФИО — вагон N», номера вагонов — колонкой; «Изменить» — диалог ответственных
- * (TripResponsiblesDialog). Затем «Поездная бригада» — сотрудники с должностью; «Изменить» — диалог «Поездная бригада»
- * (CrewPickDialog). У рейса в статусе «План» — готовность к отправлению с кнопкой «Отметить отправление»
- * (TripReadiness). Событие changed — рейс изменился.
+ * мягкими ссылками («Формирование поезда» и другие). Ниже — «Поездная бригада» — сотрудники с должностью; «Изменить» —
+ * диалог «Поездная бригада» (CrewPickDialog). Затем «Ответственные»: подпись и «Изменить», строкой ниже —
+ * переключатель «На рейс» / «После рейса», под ним подпись «Ответственные с …» и строки «ФИО — вагон N», номера
+ * вагонов — колонкой; «Изменить» — диалог ответственных (TripResponsiblesDialog). Готовность к отправлению — колонкой таблицы. Событие changed — рейс изменился.
  */
 const props = defineProps<{ trip: TripRow | null }>()
 
@@ -141,7 +133,6 @@ const actions = computed(() => (props.trip ? actionsOf(props.trip) : []))
 /** Переходы в другие окна; reason — почему недоступно сейчас. */
 const links = computed(() => actions.value.filter((a) => NAV_ACTIONS.includes(a.label)))
 const editAction = computed(() => actions.value.find((a) => a.label === EDIT))
-const markAction = computed(() => actions.value.find((a) => a.label === 'Отметить отправление'))
 
 const crew = shallowRef<TripCrew | null>(null)
 const resp = shallowRef<TripResponsibles | null>(null)
@@ -256,7 +247,11 @@ async function editResponsibles() {
   const trip = props.trip
   if (!trip) return
   const saved = await openDialog<boolean>(TripResponsiblesDialog, { tripId: trip.id, after: layer.value === 'after' })
-  if (saved) void load()
+  // ответственные меняют норму проводников: список перечитывается ради колонки «Готовность»
+  if (saved) {
+    void load()
+    emit('changed')
+  }
 }
 
 async function editCrew() {
@@ -268,7 +263,11 @@ async function editCrew() {
     station: c.trip.departureStation ? dictManager.getValue('Station', c.trip.departureStation) : '',
     crew: c.crew,
   })
-  if (saved) void load()
+  // бригада меняет готовность (ПЭМ, ЛНП, проводники): список перечитывается
+  if (saved) {
+    void load()
+    emit('changed')
+  }
 }
 
 onMounted(() => void loadCurrentUser())

@@ -78,6 +78,7 @@ import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
 import { tripOptionOf } from '../trips/tripOptionItem'
 import TripOptionView from '../trips/TripOptionView.vue'
 import type { StopGroup } from './attach'
+import type { ChangeInitial } from './changeWhere'
 import { useChangeWhere } from './changeWhere'
 import StopOption from './StopOption.vue'
 
@@ -89,7 +90,8 @@ import StopOption from './StopOption.vue'
  * время стоянки в списке справа) и плановое время; у факта — станция (неизменяемая — неактивным полем) и время; у
  * прицепки — позиция в поезде; основания и примечания — полем той же ширины, что соседние. Под полями подписей нет:
  * проверки — в build(), окно показывает их ошибкой диалога. Окно читает выбор через ref: build() — выбор или текст
- * ошибки, targetStation и moment — станция и момент. Справочник Station готовит окно.
+ * ошибки, targetStation и moment — станция и момент. initial — исправление плана: поля заполнены его значениями.
+ * Справочник Station готовит окно.
  */
 const props = withDefaults(
   defineProps<{
@@ -101,8 +103,9 @@ const props = withDefaults(
     at: string
     trip?: number | null
     plan?: boolean
+    initial?: ChangeInitial | null
   }>(),
-  { factAllowed: true, attach: false, trip: null, plan: false },
+  { factAllowed: true, attach: false, trip: null, plan: false, initial: null },
 )
 
 const w = useChangeWhere(props)

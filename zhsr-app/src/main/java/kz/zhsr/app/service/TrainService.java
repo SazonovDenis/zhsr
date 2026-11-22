@@ -26,6 +26,7 @@ import kz.zhsr.app.dto.train.TrainOption;
 import kz.zhsr.app.dto.train.TrainRow;
 import kz.zhsr.app.dto.train.TrainRowWagon;
 import kz.zhsr.app.dto.train.TrainState;
+import kz.zhsr.app.dto.train.TrainTripMark;
 import kz.zhsr.app.dto.train.TrainWagon;
 import kz.zhsr.app.dto.train.WagonBusy;
 import kz.zhsr.app.dto.trip.TripCrew;
@@ -33,6 +34,7 @@ import kz.zhsr.app.dto.trip.TripFilter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -209,15 +211,14 @@ public class TrainService {
         card.getChanges().forEach(c -> wagons.add(c.getWagon().getId()));
         card.setTrainWagons(wagons(List.copyOf(wagons), TrainWagon.class));
         card.setLastFactDt(trainJournal.lastFact(id));
-        // рейсы - только видимые сотруднику, как в списке рейсов: невидимый рейс не открывается и не загружается
-        Visibility.Access access = visibility.access(me, null);
-        List<TripRef> trips = new ArrayList<>();
-        for (DbRec trip : trips(List.of(id), ACTIVE).getOrDefault(id, List.of())) {
-            if (tripVisible(trip.getLong("id"), access)) {
-                trips.add(new TripRef(trip.getLong("id")));
-            }
+        List<TrainTripMark> marks = new ArrayList<>();
+        for (DbRec r : db.loadSql(TrainSql.tripMarks(), Map.of("train", id,
+                "states", List.of(TripStatus.PLANNED, TripStatus.IN_PROGRESS, TripStatus.DONE)))) {
+            TrainTripMark mark = DbRecMapper.toObject(r, TrainTripMark.class);
+            mark.setTrip(new TripRef(r.getLong("id")));
+            marks.add(mark);
         }
-        card.setTrips(trips);
+        card.setTripMarks(marks);
         card.setCanEdit(isPlanner(me) && train.get("dend") == null);
         // прицеплять и отцеплять: планировщик вагонов (к расформированному поезду - прицеплять, это снова открывает
         // поезд); поезд в рейсе - ещё начальник поезда рейса и мастер депо маршрута
@@ -229,7 +230,7 @@ public class TrainService {
         }
         card.setCanCouple(couple);
         refResolver.resolve(card);
-        refResolver.resolve(card.getTrips());
+        refResolver.resolve(card.getTripMarks());
         return card;
     }
 
@@ -347,6 +348,54 @@ public class TrainService {
             }
         }
         return res;
+    }
+
+    /**
+     * Перенести ожидающие планы прицепок и отцепок рейса trip вслед за его расписанием (после правки планового
+     * отправления рейса, TripService.update): время каждого плана сдвигается на shift - на сколько сдвинулось плановое
+     * отправление; ожидаемый состав поезда перестраивается. Вызывается внутри транзакции.
+     */
+    void shiftTripPlans(long trip, long train, Duration shift) throws Exception {
+        List<DbRec> plans = db.loadList("train_wagon_change", Map.of("trip", trip, "kind", TrainWagonKind.PLAN,
+                "plan_status", TrainWagonPlanStatus.WAITING));
+        if (plans.isEmpty()) {
+            return;
+        }
+        for (DbRec p : plans) {
+            db.updateRec("train_wagon_change", Map.of("id", p.getLong("id"), "dt", p.getDateTimeTZ("dt").plus(shift)));
+        }
+        trainJournal.rebuildPlan(train);
+        evictTrainCrew(train);
+    }
+
+    /**
+     * Отменить ожидающие планы прицепок и отцепок рейса trip у поезда train (после смены поезда или маршрута рейса,
+     * TripService.update: планы ссылаются на рейс прежнего поезда или на остановки прежнего маршрута) - как отмена
+     * плана (cancelPlan): ожидаемый состав перестраивается, вагоны отменённых прицепок освобождаются от планов
+     * ответственных, поезд без вагонов и планов расформировывается. Вызывается внутри транзакции.
+     */
+    void cancelTripPlans(long trip, long train) throws Exception {
+        List<DbRec> plans = db.loadList("train_wagon_change", Map.of("trip", trip, "train", train,
+                "kind", TrainWagonKind.PLAN, "plan_status", TrainWagonPlanStatus.WAITING));
+        if (plans.isEmpty()) {
+            return;
+        }
+        for (DbRec p : plans) {
+            db.updateRec("train_wagon_change", Map.of("id", p.getLong("id"),
+                    "plan_status", TrainWagonPlanStatus.CANCELLED));
+        }
+        trainJournal.rebuildPlan(train);
+        boolean attach = false;
+        for (DbRec p : plans) {
+            if (p.getInt("change_type") == TrainWagonChangeType.ATTACH) {
+                tripResponsibleService.releasePlanned(train, p.getLong("wagon"), null);
+                attach = true;
+            }
+        }
+        if (attach) {
+            dissolveIfEmpty(train, OffsetDateTime.now());
+        }
+        evictTrainCrew(train);
     }
 
     /**
@@ -621,6 +670,100 @@ public class TrainService {
     }
 
     /**
+     * Исправить запись журнала (PUT /train-changes/{id}). Ожидающий план - целиком: плановое время, место (станция или
+     * остановка рейса), позиция прицепки, основания; проверки - как у нового плана на новое время. Факт - только
+     * основания и примечания: время и место факта меняют журналы вагона, ошибочный факт удаляется и вносится заново.
+     * Права: план - как у отмены плана (и на новое место - как у нового плана), факт - как у удаления факта.
+     *
+     * @param body у плана - время, станция или остановка, позиция и основания (wagons и fact не используются); у факта -
+     *             только comment
+     */
+    @Transactional
+    public TrainCard edit(long changeId, ChangeBody body) throws Exception {
+        CurrentUser me = currentUserService.get();
+        DbRec change = requireChange(changeId);
+        long train = change.getLong("train");
+        Map<Long, DbRec> tripsById = new HashMap<>();
+        Long tripId = change.getLong("trip", null);
+        Place old = tripId == null ? new Place(null, false, null, change.getLong("station"), -1, 0, null)
+                : placeOf(tripId, change.getLong("route_station", null), tripsById);
+        String comment = body.comment() == null || body.comment().isBlank() ? null : body.comment().trim();
+        if (change.getInt("kind") == TrainWagonKind.FACT) {
+            if (!canUndo(me, old)) {
+                throw ApiException.forbidden("Основания факта исправляет тот, кто может удалить факт");
+            }
+            Map<String, Object> values = new HashMap<>();
+            values.put("id", changeId);
+            values.put("comment", comment);
+            try {
+                db.updateRec("train_wagon_change", values);
+            } catch (Exception e) {
+                throw DbErrors.translate(e);
+            }
+            return card(train);
+        }
+        if (change.getInt("plan_status") != TrainWagonPlanStatus.WAITING) {
+            throw ApiException.conflict("Исправляется только ожидающий план прицепки или отцепки");
+        }
+        if (!canCancelPlan(me, old)) {
+            throw ApiException.forbidden("План исправляет планировщик вагонов или начальник поезда рейса");
+        }
+        ChangeBody plan = new ChangeBody(List.of(), false, body.time(), body.station(), body.routeStation(),
+                body.seq(), comment, List.of());
+        Place place = placeFor(train, plan);
+        requireRight(me, place, false);
+        OffsetDateTime time = time(plan, place);
+        DbRec wagon = db.loadRec("wagon", change.getLong("wagon"));
+        long wagonId = wagon.getLong("id");
+        boolean attach = change.getInt("change_type") == TrainWagonChangeType.ATTACH;
+        try {
+            // проверки - по ожидаемому составу без исправляемого плана: он на время проверок отменён
+            db.updateRec("train_wagon_change", Map.of("id", changeId, "plan_status", TrainWagonPlanStatus.CANCELLED));
+            trainJournal.rebuildPlan(train);
+            Integer seq = null;
+            Place where = place;
+            if (attach) {
+                if (place.trip() == null && place.station() == 0) {
+                    throw ApiException.badRequest("Укажите станцию прицепки");
+                }
+                requireWorking(wagon);
+                requireNotIn(train, wagon, TrainWagonKind.PLAN, time);
+                requireFree(wagon, time, train);
+                seq = position(train, TrainWagonKind.PLAN, time, body.seq());
+            } else {
+                if (trainJournal.at(train, TrainWagonKind.PLAN, time).stream()
+                        .noneMatch(r -> r.getLong("wagon").longValue() == wagonId)) {
+                    throw ApiException.conflict("На момент " + format(time) + " вагона " + wagon.getString("number")
+                            + " в поезде по плану уже нет");
+                }
+                if (place.trip() == null && place.station() == 0) {
+                    where = stationOf(wagon);
+                }
+            }
+            Map<String, Object> values = new HashMap<>();
+            values.put("id", changeId);
+            values.put("plan_status", TrainWagonPlanStatus.WAITING);
+            values.put("dt", time);
+            values.put("seq", seq);
+            values.put("station", where.station());
+            values.put("trip", where.trip() == null ? null : where.trip().getLong("id"));
+            values.put("route_station", where.routeStation());
+            values.put("comment", comment);
+            db.updateRec("train_wagon_change", values);
+            if (!attach) {
+                tripResponsibleService.releasePlanned(train, wagonId, time);
+            }
+            trainJournal.rebuildPlan(train);
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw DbErrors.translate(e);
+        }
+        evictTrainCrew(train);
+        return card(train);
+    }
+
+    /**
      * Отменить план прицепки или отцепки (POST /train-changes/{id}/cancel): статус «отменён», ожидаемый состав
      * перестраивается.
      */
@@ -658,7 +801,8 @@ public class TrainService {
      * Вернуть отменённый план прицепки или отцепки (POST /train-changes/{id}/restore): статус снова «ожидает», ожидаемый
      * состав перестраивается. Проверки - как у нового плана на его время: прицепка - вагон рабочего парка, не в поезде и
      * свободен (расформированный поезд снова открывается); отцепка - вагон в ожидаемом составе, другой отцепки у вагона
-     * не запланировано. Права - как у отмены плана.
+     * не запланировано. План с прошедшим плановым временем не возвращается: он стал бы ожидающим задним числом (раньше
+     * уже отправленных рейсов) - нужен новый план. Права - как у отмены плана.
      */
     @Transactional
     public TrainCard restorePlan(long changeId) throws Exception {
@@ -673,6 +817,9 @@ public class TrainService {
                 plan.getLong("station"));
         if (!canCancelPlan(me, place)) {
             throw ApiException.forbidden("План возвращает планировщик вагонов или начальник поезда рейса");
+        }
+        if (!plan.getDateTimeTZ("dt").isAfter(OffsetDateTime.now())) {
+            throw ApiException.conflict("Плановое время прошло: внесите новый план");
         }
         DbRec wagon = db.loadRec("wagon", plan.getLong("wagon"));
         long wagonId = wagon.getLong("id");
@@ -1208,13 +1355,6 @@ public class TrainService {
 
     // --- права
 
-    /** Рейс виден сотруднику так же, как в списке рейсов. */
-    private boolean tripVisible(long trip, Visibility.Access access) throws Exception {
-        SqlQuery q = ListSql.trips(new TripFilter(trip, null, null, null, null, null, null, null), access,
-                new ListSort(null, false));
-        return !db.loadSql(q.sql(), q.params()).isEmpty();
-    }
-
     private static boolean isPlanner(CurrentUser me) {
         return me.hasRole(RoleType.WAGON_PLANNER) || me.hasRole(RoleType.ADMIN);
     }
@@ -1345,9 +1485,12 @@ public class TrainService {
             c.setCanMark(waiting && canMark(me, place));
             c.setCanCancel(waiting && canCancelPlan(me, place));
             c.setCanUndo(c.getKind() == TrainWagonKind.FACT && canUndo(me, place));
+            // исправить: ожидающий план - кто может его отменить, факт (только основания) - кто может его удалить
+            c.setCanEdit(waiting ? c.isCanCancel() : c.isCanUndo());
             boolean cancelled = c.getKind() == TrainWagonKind.PLAN && c.getPlanStatus() != null
                     && c.getPlanStatus() == TrainWagonPlanStatus.CANCELLED;
-            c.setCanRestore(cancelled && canCancelPlan(me, place));
+            // вернуть можно только план с плановым временем в будущем
+            c.setCanRestore(cancelled && c.getDt().isAfter(now) && canCancelPlan(me, place));
         }
         refResolver.resolve(res);
         return res;
@@ -1425,6 +1568,7 @@ public class TrainService {
         Map<Long, DbRec> counts = UtDb.collectGroupBy_record(db.loadSql(TrainSql.waitingCounts(),
                 Map.of("trains", ids, "plan", TrainWagonKind.PLAN, "waiting", TrainWagonPlanStatus.WAITING)), "train");
         Map<Long, List<DbRec>> trips = trips(ids, ACTIVE);
+        CurrentUser me = currentUserService.get();
         for (TrainRow row : rows) {
             List<TrainRowWagon> refs = new ArrayList<>();
             Set<Long> stations = new HashSet<>();
@@ -1458,15 +1602,25 @@ public class TrainService {
             row.setStation(!away && stations.size() == 1 ? stations.iterator().next() : null);
             DbRec count = counts.get(row.getId());
             row.setPlannedCount(count == null ? 0 : count.getInt("cnt"));
+            // рейсы поезда видны тому, кому виден поезд (Visibility.trainVisible), - для просмотра
+            List<TripRef> rowTrips = new ArrayList<>();
+            boolean trainVisible = visibility.trainVisible(me, row.getId());
             for (DbRec trip : trips.getOrDefault(row.getId(), List.of())) {
+                if (!trainVisible) {
+                    continue;
+                }
+                TripRef ref = new TripRef(trip.getLong("id"));
+                rowTrips.add(ref);
                 if (trip.getLong("trip_status_type") == TripStatus.IN_PROGRESS) {
-                    row.setTrip(new TripRef(trip.getLong("id")));
+                    row.setTrip(ref);
                 } else if (row.getNextTrip() == null) {
-                    row.setNextTrip(new TripRef(trip.getLong("id")));
+                    row.setNextTrip(ref);
                 }
             }
+            row.setTrips(rowTrips);
         }
         refResolver.resolve(rows);
+        refResolver.resolve(rows.stream().flatMap(r -> r.getTrips().stream()).toList());
     }
 
     private Map<Long, List<DbRec>> trips(List<Long> trains, List<Long> states) throws Exception {

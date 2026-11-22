@@ -48,12 +48,13 @@ import { moveSortOrder } from '@/api/admin'
 import { provideBusy } from '@/shared/busy'
 import { CHECK_OBJECTS, checkObjectText } from '@/shared/checks/labels'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { Column, RowKey, RowMenuItem } from '@/shared/components/table/types'
+import type { Column, RowMenuItem } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { nextOrder, openSpecDialog, ORDER_FIELDS, TEXT_FIELDS, textValues } from '../shared/spec'
 import { canMoveIn, orderSort, provideSortOrder } from '../shared/sortOrder'
 import { textColumns } from './textColumns'
+import { useKeptSelection } from '@/desktop/frame/keptSelection'
 
 /**
  * Шаблоны чек-листов (Ф-ЧЕК-02): название, объект проверки, порядок. «Пункты» и двойной клик открывают пункты и
@@ -63,7 +64,8 @@ import { textColumns } from './textColumns'
 const router = useRouter()
 const busy = provideBusy()
 const rows = shallowRef<CheckTemplate[]>([])
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 const loadError = ref<ShownError | null>(null)
 const selected = computed(() => rows.value.find((r) => r.id === selectedId.value) ?? null)
 

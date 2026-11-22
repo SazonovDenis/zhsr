@@ -14,6 +14,9 @@ export const routesColumns = defineColumns<RouteRow>([
     sortable: true,
     sortField: 'trainNumber',
   },
-  { field: 'routeKind', title: 'Вид', cell: CellRouteKind },
-  { field: 'duration', title: 'Время в пути', cell: CellRouteDuration, sortable: true },
+  // «Вид» — постоянной ширины, не тянется: вид маршрута и вид перевозки второй строкой
+  { field: 'routeKind', title: 'Вид', width: '8rem', cell: CellRouteKind },
+  // ширина постоянная, по самой длинной строке («23 ч 30 мин»), не тянется: по содержимому каждая строка сетки была бы
+  // своей ширины
+  { field: 'duration', title: 'В пути', width: '8.5rem', cell: CellRouteDuration, sortable: true },
 ])

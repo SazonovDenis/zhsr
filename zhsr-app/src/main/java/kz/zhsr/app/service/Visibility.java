@@ -84,6 +84,14 @@ public class Visibility {
     }
 
     /**
+     * Виден ли сотруднику поезд. Сейчас поезда видны всем: ограничений нет ни в списке поездов, ни на экране поезда.
+     * Рейсы поезда видны тому, кому виден поезд, - для просмотра (TripService.requireReadable).
+     */
+    public boolean trainVisible(CurrentUser user, long train) {
+        return true;
+    }
+
+    /**
      * @param user           сотрудник
      * @param requestedDepot депо из фильтра фронта; null - не указано
      */

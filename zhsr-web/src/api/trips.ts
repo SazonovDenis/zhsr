@@ -12,10 +12,24 @@ import type { ResponsibleCandidate } from '@/shared/wagons/responsible'
  * прицепка и отцепка в рейсе. Вагоны поезда меняет api/trains.ts.
  */
 
-/** Пункт готовности рейса к отправлению: состав, бригада и другие. */
+/** Данные готовности рейса в статусе «План» к отправлению; тексты пунктов строит фронт. */
 export interface TripReadiness {
-  text: string
-  level: 'ok' | 'warn' | 'bad'
+  /** поезд назначен */
+  train: boolean
+  /** номера вагонов с ожидающими планами, которые надо отметить или отменить до отправления */
+  pending: string[]
+  /** номера вагонов прицепок и отцепок, выполненных фактом до отправления */
+  done: string[]
+  /** сколько вагонов едет в поезде на отправлении */
+  riding: number
+  /** номера едущих вагонов не на станции отправления */
+  away: string[]
+  /** назначен ЛНП */
+  lnp: boolean
+  /** назначен ПЭМ */
+  pem: boolean
+  /** номера пассажирских вагонов, у которых не выполнена норма проводников */
+  normNotOk: string[]
 }
 
 /** Строка таблицы рейсов: вариант выбора рейса и поля таблицы. */
@@ -30,8 +44,8 @@ export interface TripRow extends TripOption {
   departureMarkedDt: string | null
   /** когда отмечено прибытие, ISO; null — не отмечено */
   arrivalMarkedDt: string | null
-  /** готовность рейса; сервер её пока не считает — пусто */
-  readiness: TripReadiness[]
+  /** готовность к отправлению — у рейса в статусе «План»; у остальных null */
+  readiness: TripReadiness | null
 }
 
 export interface TripFilter {
@@ -260,20 +274,6 @@ export async function fetchTripCrew(tripId: number): Promise<TripCrew> {
   return (await http.get<TripCrew>(`/trips/${tripId}/crew`)).data
 }
 
-/** Вагоны сотрудника бригады: один или два соседних по номеру; пусто — сотрудник без вагона. */
-export interface MemberWagons {
-  usr: number
-  wagons: string[]
-}
-
-/**
- * Распределить бригаду по вагонам — ответственные на рейс: до отправления меняется план на рейс, в пути — факт временем
- * time (ISO с часовым поясом; null — сейчас). Возвращает бригаду после изменения.
- */
-export async function setCrewWagons(tripId: number, members: MemberWagons[], time: string | null): Promise<TripCrew> {
-  return (await http.put<TripCrew>(`/trips/${tripId}/crew-wagons`, { time, members })).data
-}
-
 /** Проводники станции отправления и уже назначенные в рейс — для набора проводников рейса. */
 export async function fetchConductorCandidates(tripId: number): Promise<ConductorCandidate[]> {
   return (await http.get<ConductorCandidate[]>(`/trips/${tripId}/conductor-candidates`)).data
@@ -293,11 +293,6 @@ export async function setTripCrew(
 /** Сотрудники для должности начальника поезда или ПЭМ. duty — CrewDuty.LNP или CrewDuty.PEM. */
 export async function fetchStaffCandidates(tripId: number, duty: number): Promise<StaffCandidate[]> {
   return (await http.get<StaffCandidate[]>(`/trips/${tripId}/staff-candidates`, { params: { duty } })).data
-}
-
-/** Назначить начальника поезда или ПЭМ; null — снять с должности. */
-export async function setTripDuty(tripId: number, duty: number, user: number | null): Promise<TripCrew> {
-  return (await http.put<TripCrew>(`/trips/${tripId}/duty/${duty}`, { usr: user })).data
 }
 
 /** Ответственные одного вагона: usrs — id сотрудников, пусто — ответственный не назначен. */

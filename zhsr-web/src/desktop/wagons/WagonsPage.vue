@@ -60,7 +60,7 @@
 
     <DataTable
       v-model:selected="selectedId"
-      :columns="wagonsColumns"
+      :columns="columns"
       :rows="rows"
       :error="loadError"
       :retry="init"
@@ -90,7 +90,7 @@ import { deleteWagon, fetchWagons, wagonQuery } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import CbButton from '@/shared/components/choice/CbButton.vue'
 import CbList from '@/shared/components/choice/CbList.vue'
-import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
+import type { RowMenuItem, TableSort } from '@/shared/components/table/types'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -112,8 +112,12 @@ import WagonPanel from './WagonPanel.vue'
 import WagonNewDialog from './WagonNewDialog.vue'
 import { addWagonReason, TRANSFER_TARGETS, wagonTransfers } from './wagonActions'
 import { wagonsColumns } from './wagonsColumns'
+import { useKeptSelection } from '../frame/keptSelection'
 
 /** Список вагонов: фильтры и таблица. */
+
+// «Номер» и «Тип» — постоянной ширины, не тянутся; общие колонки (wagonsColumns) других таблиц не меняются
+const columns = wagonsColumns.map((c) => (c.field === 'wagonType' ? { ...c, width: '10rem' } : c))
 
 const router = useRouter()
 
@@ -177,7 +181,8 @@ const searching = computed(() => filter.number.trim() !== '')
 const rows = shallowRef<WagonRow[]>([])
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок (справочники, фильтры, список)
 const busy = provideBusy()
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 // правая панель: рядом со списком на широком окне, поверх него — на узком
 const panel = useSidePanel(selectedId)
 const sort = ref<TableSort | null>(null)

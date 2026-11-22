@@ -37,4 +37,6 @@ public class TrainRow {
     private TripRef trip;
     /** ближайший рейс поезда в статусе «план»; null - нет - вычисляемое */
     private TripRef nextTrip;
+    /** рейсы поезда в статусе «выполняется» и «план», видимые сотруднику, по плановому отправлению - вычисляемое */
+    private List<TripRef> trips = List.of();
 }

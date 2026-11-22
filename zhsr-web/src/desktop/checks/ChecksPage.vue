@@ -76,7 +76,7 @@ import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { RowKey, TableSort } from '@/shared/components/table/types'
+import type { TableSort } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { useLoad } from '@/shared/loadable'
@@ -86,6 +86,7 @@ import DesktopFrame from '../frame/DesktopFrame.vue'
 import { useSidePanel } from '../frame/useSidePanel'
 import CheckListPanel from './CheckListPanel.vue'
 import { checksColumns } from './checksColumns'
+import { useKeptSelection } from '../frame/keptSelection'
 
 /**
  * Список проверок по чек-листу (Ф-ЧЕК-04): поиск по номеру вагона, чек-лист, период начала (по умолчанию — месяц).
@@ -98,7 +99,8 @@ const route = useRoute()
 const busy = provideBusy()
 const filter = reactive<CheckListFilter>({ template: null, wagon: null, query: '', ...wagonRequestsPeriod() })
 const rows = shallowRef<CheckListRow[]>([])
-const selectedId = ref<RowKey | null>(route.query.id ? Number(route.query.id) : null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection(route.query.id ? Number(route.query.id) : null)
 const panel = useSidePanel(selectedId)
 // сортировка по колонке; null — сначала новые
 const sort = ref<TableSort | null>(null)

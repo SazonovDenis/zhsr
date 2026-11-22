@@ -12,6 +12,7 @@
     @error-close="dismiss"
   >
     <template #actions-left><slot name="actions-left" /></template>
+    <template v-if="$slots.warnings" #warnings><slot name="warnings" /></template>
     <!-- двойной клик по варианту с data-dialog-pick — выбор и основное действие; ввод текста убирает ошибку -->
     <div class="form-dialog__fields" @dblclick="onDblclick" @input="dismiss">
       <slot />

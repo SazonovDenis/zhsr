@@ -44,13 +44,13 @@ import TextInput from '@/shared/components/form/TextInput.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
-import type { RowKey } from '@/shared/components/table/types'
 import DesktopFrame from '@/desktop/frame/DesktopFrame.vue'
 import AdminPager from '../shared/AdminPager.vue'
 import { useAdminList } from '../shared/useAdminList'
 import AdminRowDialog from './AdminRowDialog.vue'
 import { provideSortOrder } from '../shared/sortOrder'
 import { adminColumns, adminTable, forgetAdminOptions, SORT_ORDER } from './adminTables'
+import { useKeptSelection } from '@/desktop/frame/keptSelection'
 
 /**
  * Общий редактор таблицы администрирования: поиск, страницы, сортировка по колонкам. «Добавить» и двойной клик по
@@ -64,7 +64,8 @@ const def = shallowRef<AdminTable | null>(null)
 const busy = provideBusy()
 // ошибка загрузки описания таблицы, переведённая; показывается на месте строк
 const loadError = ref<ShownError | null>(null)
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 const columns = computed(() => (def.value ? adminColumns(def.value) : []))
 
 const list = useAdminList((query) => fetchAdminRows(props.table, query), busy)

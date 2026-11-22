@@ -2,8 +2,8 @@
   <FormDialog
     v-model:show="show"
     height="sm"
-    :title="t(attach ? 'Удалить прицепку вагона {n}' : 'Удалить отцепку вагона {n}', { n: number })"
-    :ok-text="attach ? 'Удалить прицепку' : 'Удалить отцепку'"
+    :title="t(title, { n: number })"
+    :ok-text="marked ? 'Отменить отметку' : attach ? 'Удалить прицепку' : 'Удалить отцепку'"
     :running="running"
     :error="error"
     @ok="save"
@@ -24,9 +24,23 @@ import { shownError } from '@/shared/errors'
 /**
  * Удаление ошибочного факта прицепки или отцепки без истории (Ф-АКТ-01, Ф-ПОЕ-02): только последний факт поезда.
  * Система удаляет факт и записи журналов вагона, которые он открыл; состав поезда с этого времени строится заново,
- * отработанный фактом план снова ожидает. Открывается через openDialog, результат — true.
+ * отработанный фактом план снова ожидает. Факт, который отработал план (marked), — отметка выполнения: окно называет
+ * удаление «Отменить отметку». Открывается через openDialog, результат — true.
  */
-const props = defineProps<{ changeId: number; attach: boolean; number: string }>()
+const props = withDefaults(defineProps<{ changeId: number; attach: boolean; number: string; marked?: boolean }>(), {
+  marked: false,
+})
+
+// факт, который отработал план (marked), — отметка выполнения: окно называет это отменой отметки
+const title = computed(() =>
+  props.marked
+    ? props.attach
+      ? 'Отменить отметку прицепки вагона {n}'
+      : 'Отменить отметку отцепки вагона {n}'
+    : props.attach
+      ? 'Удалить прицепку вагона {n}'
+      : 'Удалить отцепку вагона {n}',
+)
 
 const show = defineModel<boolean>('show', { default: false })
 const emit = defineEmits<{ done: [undone: true] }>()

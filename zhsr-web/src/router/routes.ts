@@ -188,13 +188,6 @@ const routes: RouteRecordRaw[] = [
       },
       { path: 'trips', name: 'trips', component: () => desktop().then((m) => m.TripsPage) },
       { path: 'staff', name: 'staff', component: () => desktop().then((m) => m.StaffPage) },
-      {
-        path: 'trips/:id',
-        name: 'trip-form',
-        meta: { hideMenu: true },
-        props: true,
-        component: () => desktop().then((m) => m.TripFormPage),
-      },
       { path: 'acts', name: 'acts', component: () => desktop().then((m) => m.ActsPage) },
       {
         path: 'acts/new',
@@ -215,7 +208,8 @@ const routes: RouteRecordRaw[] = [
         path: 'trains/:id',
         name: 'train-form',
         meta: { hideMenu: true },
-        props: true,
+        // ?trip= — рейс поезда: состав на отправление рейса, журнал — записи рейса
+        props: (route) => ({ id: String(route.params.id), trip: String(route.query.trip ?? '') }),
         component: () => desktop().then((m) => m.TrainFormPage),
       },
       {

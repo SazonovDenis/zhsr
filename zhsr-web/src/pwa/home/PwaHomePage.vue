@@ -52,7 +52,7 @@
           <!-- три строки: операция и вагон; станция и время по плану; состояние — «не подтверждён», «просрочен»,
                «выполнено 21.12 23:00», «отменено» -->
           <div class="today__plan-text">
-            <span class="today__plan-what">{{ planTitle(c) }}</span>
+            <span class="today__plan-what"><ChangeTitle :change="c" :seq="false" /></span>
             <span class="today__plan-where">{{ planWhere(c) }}</span>
             <span v-if="statusText(c)" :class="statusClass(c)">{{ statusText(c) }}</span>
           </div>
@@ -225,7 +225,7 @@
     >
       <!-- операция и вагон — жирным; место и время, пояснение — каждое с новой строки -->
       <div v-if="cancelling" class="today__sheet-text">
-        <b>{{ planTitle(cancelling) }}</b>
+        <b><ChangeTitle :change="cancelling" :seq="false" /></b>
         <span>{{ planWhere(cancelling) }}</span>
         <span>{{ t('План останется в списке, его можно вернуть.') }}</span>
       </div>
@@ -256,12 +256,14 @@
          сначала отменить -->
     <BottomSheet :show="undoing !== null" :title="undoTitle" @update:show="(v) => !v && (undoing = null)">
       <div v-if="undoing" class="today__sheet-text">
-        <b>{{ planTitle(undoing) }}</b>
+        <b><ChangeTitle :change="undoing" :seq="false" /></b>
         <span>{{ planWhere(undoing) }}</span>
         <template v-if="undoBlockers">
           <span class="q-mt-sm">{{ t('После этого вагон ещё прицепляли или отцепляли.') }}</span>
           <span>{{ t('Сначала отмените, начиная с последней:') }}</span>
-          <span v-for="b in undoBlockers" :key="b.id">• {{ planTitle(b) }} — {{ planWhere(b) }}</span>
+          <span v-for="b in undoBlockers" :key="b.id"
+            >• <ChangeTitle :change="b" :seq="false" /> — {{ planWhere(b) }}</span
+          >
         </template>
         <span v-else>{{
           isFactRow(undoing)
@@ -327,6 +329,7 @@ import {
   retimeDeparture,
 } from '@/api/trips'
 import { t } from '@/boot/i18n'
+import ChangeTitle from '@/shared/trains/ChangeTitle.vue'
 import { bus } from '@/shared/bus'
 import { dictManager } from '@/shared/dict/DictManager'
 import { provideBusy } from '@/shared/busy'
@@ -339,7 +342,7 @@ import { formatDateTime, isoDateTime } from '@/shared/format'
 import { isOnline } from '@/shared/network'
 import { loadCached } from '@/shared/offline/cache'
 import { CrewDuty, LocationType, RoleType, TripStatus } from '@/shared/constants/systemDicts'
-import { TrainWagonChangeType, TrainWagonKind, TrainWagonPlanStatus } from '@/shared/constants/TrainWagonChange'
+import { TrainWagonKind, TrainWagonPlanStatus } from '@/shared/constants/TrainWagonChange'
 import { isWaiting, laterFactsOfWagon } from '@/shared/trains/trainJournal'
 import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
 import { crewNorm, normDone } from '@/shared/trips/crewNorm'
@@ -536,12 +539,6 @@ const planRows = computed(() =>
     ...(crew.value?.changes ?? []).filter((c) => isFactRow(c) && (c.plan === null || !shownDone.value.has(c.plan))),
   ].sort((a, b) => Date.parse(rowTime(a)) - Date.parse(rowTime(b)) || a.id - b.id),
 )
-
-/** «Прицепка вагона 958694» или «Отцепка вагона 958694». */
-const planTitle = (c: TrainChange) =>
-  t(c.changeType === TrainWagonChangeType.ATTACH ? 'Прицепка вагона {n}' : 'Отцепка вагона {n}', {
-    n: c.wagon.number,
-  })
 
 /** «Караганда, 23.12, в 21:32». */
 function planWhere(c: TrainChange): string {

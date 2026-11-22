@@ -563,11 +563,16 @@ function calcDropdownStyle() {
   // список не шире окна; слева — от поля, сдвиг внутрь окна — после замера ширины списка
   const maxWidth = window.innerWidth - 2 * gap
 
+  // простая строка (CbOption) — по ширине поля, но не уже 25rem: широкое поле показывает текст целиком, узкое не
+  // растягивает список на весь экран; без поля строки — отступы строки и, у списка с отметками, галочка
+  const optionInset = (props.single ? 2 : 4.5) * rem
+  const optionMax = Math.min(Math.max(rect.width, 25 * rem), maxWidth) - optionInset
   // положение считается от измеренного поля, поэтому в пикселях
   dropdownStyle.value = {
     position: 'fixed',
     minWidth: `${Math.min(rect.width, maxWidth)}px`,
     maxWidth: `${maxWidth}px`,
+    '--cb-option-max-width': `${optionMax}px`,
     left: `${rect.left}px`,
     ...vertical,
   }

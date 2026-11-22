@@ -1,6 +1,9 @@
 <template>
   <span class="change-line">
-    <span :class="{ 'change-line__plan': waiting, 'change-line__overdue': change.overdue }">{{ text }}</span>
+    <!-- вид — цветом вида, место и время — обычным цветом -->
+    <span :class="{ 'change-line__overdue': change.overdue }"
+      ><ChangeKindWord :attach="isAttach(change)" :text="kind" />{{ text }}</span
+    >
     <span v-if="deviation" class="change-line__muted">{{ deviation }}</span>
     <q-btn
       v-for="a in actions"
@@ -26,10 +29,12 @@ import type { TrainChange } from '@/api/trains'
 import { t } from '@/boot/i18n'
 import { dictManager } from '@/shared/dict/DictManager'
 import { formatDateTime } from '@/shared/format'
+import ChangeKindWord from '@/shared/trains/ChangeKindWord.vue'
 import { changeActions, deviationText, isAttach, isWaiting } from '@/shared/trains/trainJournal'
 
 /**
- * Прицепка или отцепка вагона одной строкой с действиями: план — «прицепка по плану: Астана, 30.10 11:00, на 7» с
+ * Прицепка или отцепка вагона одной строкой с действиями (слово вида — зелёным или красным, остальное — обычным
+ * цветом): план — «прицепка по плану: Астана, 30.10 11:00, на 7» с
  * «Отметить» и «Отменить план»; факт — «прицеплен: Астана, 28.10 06:00» с отклонением от плана и «Удалить факт».
  * Кнопки видны всегда; недоступные — неактивны, причина во всплывающей подсказке. Справочник Station готовит страница.
  *
@@ -46,19 +51,21 @@ const emit = defineEmits<{ mark: [change: TrainChange]; cancel: [change: TrainCh
 const waiting = computed(() => isWaiting(props.change))
 const deviation = computed(() => deviationText(props.change))
 
+/** Слово вида: план — «прицепка по плану», факт — «прицеплен». */
+const kind = computed(() => {
+  const attach = isAttach(props.change)
+  if (waiting.value) return attach ? t('прицепка по плану') : t('отцепка по плану')
+  return attach ? t('прицеплен') : t('отцеплен')
+})
+
+/** После слова вида: «: Астана, 30.10 11:00, на 7», у просроченного плана — «• просрочен». */
 const text = computed(() => {
   const c = props.change
   const where = dictManager.getValue('Station', c.station)
   const time = formatDateTime(c.dt)
   const seq = isAttach(c) && c.seq !== null ? `, ${t('на {n}', { n: c.seq })}` : ''
-  if (waiting.value) {
-    const base = t(isAttach(c) ? 'прицепка по плану: {where}, {time}' : 'отцепка по плану: {where}, {time}', {
-      where,
-      time,
-    })
-    return `${base}${seq}${c.overdue ? ` • ${t('просрочен')}` : ''}`
-  }
-  return `${t(isAttach(c) ? 'прицеплен: {where}, {time}' : 'отцеплен: {where}, {time}', { where, time })}${seq}`
+  const overdue = waiting.value && c.overdue ? ` • ${t('просрочен')}` : ''
+  return `: ${where}, ${time}${seq}${overdue}`
 })
 
 const actions = computed(() =>
@@ -78,11 +85,6 @@ const actions = computed(() =>
   gap: 0.5rem;
   color: $zs-text-muted;
   font-size: 0.8rem;
-}
-
-.change-line__plan {
-  color: $primary;
-  font-weight: 600;
 }
 
 .change-line__overdue {

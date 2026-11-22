@@ -17,17 +17,21 @@
       <span class="journal-item__time">{{ hideTime ? '' : formatDateTime(change.dt) }}</span>
       <span class="journal-item__main">
         <span class="journal-item__what">
-          <span :class="attach ? 'journal-item__attach' : 'journal-item__detach'">{{ attach ? '+' : '−' }}</span>
-          {{ changeKindText(change) }}
-          <span class="zs-mono journal-item__number">{{ change.wagon.number }}</span>
-          <!-- отступ классом: пробел между номером и текстом шаблон сжимает -->
-          <span v-if="attach && change.seq !== null" class="q-ml-xs">{{ t('на {n}', { n: change.seq }) }}</span>
+          <ChangeTitle :change="change" />
         </span>
-        <span>{{ t('Станция: {station}', { station: dictManager.getValue('Station', change.station) }) }}</span>
-        <!-- рейс — своей строкой под станцией -->
-        <span v-if="change.trip">{{ t('Рейс: {trip}', { trip: tripRefText(change.trip) }) }}</span>
+        <!-- отклонение от плана — сразу под видом и вагоном -->
         <span v-if="deviation" class="journal-item__muted">{{ deviation }}</span>
-        <span v-if="change.overdue" class="journal-item__overdue">{{ t('просрочен: не отмечен и не отменён') }}</span>
+        <span>{{ t('Станция: {station}', { station: dictManager.getValue('Station', change.station) }) }}</span>
+        <!-- рейс — своей строкой под станцией: номер мягкой ссылкой (выбрать рейс) и дата; клик по ссылке не выбирает
+             запись -->
+        <span v-if="change.trip">
+          {{ t('Рейс:') }}
+          <span @click.stop
+            ><SoftLink text="{n}" :params="{ n: change.trip.trainNumber }" @click="emit('trip', change.trip.id)"
+          /></span>
+          {{ t('от {date}', { date: formatDateTime(change.trip.plannedDt) }) }}
+        </span>
+        <span v-if="change.overdue" class="journal-item__overdue">{{ t('план просрочен') }}</span>
         <span v-if="change.comment" class="journal-item__muted">{{ change.comment }}</span>
       </span>
     </template>
@@ -52,19 +56,26 @@ import { t } from '@/boot/i18n'
 import { dictManager } from '@/shared/dict/DictManager'
 import { formatDateTime } from '@/shared/format'
 import { nowMinute } from '@/shared/since'
-import { changeKindText, deviationText, isAttach, isWaiting } from '@/shared/trains/trainJournal'
-import { tripRefText } from '@/shared/trips/tripRefText'
+import ChangeTitle from '@/shared/trains/ChangeTitle.vue'
+import { deviationText, isWaiting } from '@/shared/trains/trainJournal'
+import SoftLink from '@/shared/components/form/SoftLink.vue'
 
 /**
- * Запись журнала поезда: время, «+ Прицепка 12345 на 3» или «− Отцепка 12345», где («Станция: Астана», в рейсе ниже
- * строкой — «Рейс: …»), отклонение от плана, просрочка, основания серым. План — цветом плана. Без записи (change null) —
- * строка «Текущее состояние» с текущим временем, которое идёт само. hideTime — время то же, что у записи выше: не
- * показывается. Клик выбирает запись, три точки и правая кнопка — меню действий. Справочник Station готовит страница.
+ * Запись журнала поезда: время, «Прицепка вагона 12345 на 3» или «Отцепка вагона 12345» (слово вида — зелёным или
+ * красным, остальное — обычным цветом), под ней отклонение от плана серым, затем где («Станция: Астана», в рейсе ниже
+ * строкой — «Рейс: 655/656 от 22.12 12:45», номер — мягкой ссылкой, событие trip), просрочка, основания серым. Без
+ * записи (change null) — строка «Текущее состояние» с текущим временем, которое идёт само. hideTime — время то же, что
+ * у записи выше: не показывается. Клик выбирает запись, три точки и правая кнопка — меню действий. Справочник Station
+ * готовит страница.
  */
-const props = defineProps<{ change: TrainChange | null; selected: boolean; hasMenu?: boolean; hideTime?: boolean }>()
-const emit = defineEmits<{ select: []; menu: [e: MouseEvent] }>()
+const props = defineProps<{
+  change: TrainChange | null
+  selected: boolean
+  hasMenu?: boolean
+  hideTime?: boolean
+}>()
+const emit = defineEmits<{ select: []; menu: [e: MouseEvent]; trip: [id: number] }>()
 
-const attach = computed(() => !!props.change && isAttach(props.change))
 const plan = computed(() => !!props.change && isWaiting(props.change))
 const deviation = computed(() => (props.change ? deviationText(props.change) : ''))
 </script>
@@ -108,24 +119,6 @@ const deviation = computed(() => (props.change ? deviationText(props.change) : '
 
 .journal-item__what {
   font-weight: 600;
-}
-
-.journal-item--plan .journal-item__what {
-  color: $primary;
-}
-
-.journal-item__number {
-  font-weight: 700;
-}
-
-.journal-item__attach {
-  color: $zs-ok-fg;
-  font-weight: 700;
-}
-
-.journal-item__detach {
-  color: $zs-remove-fg;
-  font-weight: 700;
 }
 
 .journal-item__muted {

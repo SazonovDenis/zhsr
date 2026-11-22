@@ -2,7 +2,7 @@
   <div ref="frameEl" class="desktop-frame">
     <div class="desktop-frame__content q-pt-sm q-px-md q-pb-md">
       <header class="desktop-frame__header q-mb-sm">
-        <button v-if="back" type="button" class="desktop-frame__back q-pa-none" :title="t('Назад')" @click="back">
+        <button v-if="back" type="button" class="desktop-frame__back q-pa-none" :title="t('Назад')" @click="goBack">
           <SvgIcon name="arrow-back" size="1.1rem" />
         </button>
         <slot name="header">
@@ -29,10 +29,12 @@
 <script setup lang="ts">
 import { Screen } from 'quasar'
 import { onBeforeUnmount, onMounted, ref, useSlots, watch, watchEffect } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { t } from '@/boot/i18n'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { MENU_WIDTH, menuState } from '../menu/menuState'
+import { frameBackSteps } from './frameHistory'
 
 /**
  * Фрейм страницы десктопной части с оформлением по макету.
@@ -45,7 +47,10 @@ import { MENU_WIDTH, menuState } from '../menu/menuState'
  * - right — правая панель, например карточка выбранного вагона; без слота панели нет.
  *
  * back — возврат со страницы (например, из редактора маршрута в список): фрейм показывает кнопку «назад» перед
- * заголовком, и Escape делает то же самое. Escape не возвращает, пока открыто выпадающее окно или диалог: тогда он
+ * заголовком, и Escape делает то же самое. Кнопка возвращает туда, откуда пришёл пользователь (ближайшая запись истории
+ * приложения с другим маршрутом: например, из рейсов в состав поезда — обратно в рейсы, сколько бы рейсов ни
+ * переключили внутри поезда; см. frameHistory); back — запасной путь, когда истории нет (страницу
+ * открыли по ссылке или обновили). Escape не возвращает, пока открыто выпадающее окно или диалог: тогда он
  * закрывает их (они сами останавливают Escape или ещё видны в DOM в момент нажатия).
  *
  * Правая панель — одной ширины на всех страницах (RIGHT_WIDTH); показывается, пока rightOpen (когда — решает
@@ -63,6 +68,8 @@ import { MENU_WIDTH, menuState } from '../menu/menuState'
  */
 /** Ширина правой панели — одна на всех страницах, чтобы панель не прыгала при переходе между списками. */
 const RIGHT_WIDTH = '25rem'
+
+const router = useRouter()
 
 const props = withDefaults(
   defineProps<{
@@ -123,7 +130,17 @@ onBeforeUnmount(() => (menuState.panelNeedsSpace = false))
 function onKeydown(e: KeyboardEvent) {
   if (e.key !== 'Escape' || !props.back || e.defaultPrevented) return
   if (document.querySelector('.q-menu, .q-dialog')) return
-  props.back()
+  goBack()
+}
+
+/**
+ * Назад — в источник перехода, если он есть в истории приложения; иначе — back страницы. Записи того же фрейма
+ * (переключения параметров внутри него) пропускаются.
+ */
+function goBack() {
+  const steps = frameBackSteps(router)
+  if (steps > 0) router.go(-steps)
+  else props.back?.()
 }
 
 window.addEventListener('keydown', onKeydown)

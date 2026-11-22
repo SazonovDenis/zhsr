@@ -89,18 +89,18 @@ export async function fetchCurrentUser(): Promise<CurrentUser> {
   return (await http.get<CurrentUser>('/getUserInfo')).data
 }
 
-/**
- * Демо-пользователи для быстрого входа при dev-запуске (см. LoginPage): db-data/demo, пароль у всех — 123456; admin —
- * из db-data/default, пароль тоже 123456.
- */
+/** Пароль демо-пользователей: db-data/demo/03-usr.tsv; admin — db-data/demo/04-usr-admin.sql. */
+const DEMO_PASSWORD = 'qwerty-123456-QAZWSX-!@#$%^'
+
+/** Демо-пользователи для быстрого входа при dev-запуске (см. LoginPage). */
 export const DEMO_LOGINS = [
-  { login: 'plan', name: 'Жумабаева Г. С.', password: '123456' },
-  { login: 'lnp', name: 'Ахметов Б. К.', password: '123456' },
-  { login: 'cond', name: 'Абенова Д. С.', password: '123456' },
-  { login: 'pem', name: 'Касымов Д. Е.', password: '123456' },
-  { login: 'master', name: 'Оспанова М. Т.', password: '123456' },
-  { login: 'recv', name: 'Омарова С. К.', password: '123456' },
-  { login: 'instr', name: 'Сейткали Р. А.', password: '123456' },
-  { login: 'medic', name: 'Нурланова А. Б.', password: '123456' },
-  { login: 'admin', name: 'Администратор', password: '123456' },
+  { login: 'plan', name: 'Жумабаева Г. С.', password: DEMO_PASSWORD },
+  { login: 'lnp', name: 'Ахметов Б. К.', password: DEMO_PASSWORD },
+  { login: 'cond', name: 'Абенова Д. С.', password: DEMO_PASSWORD },
+  { login: 'pem', name: 'Касымов Д. Е.', password: DEMO_PASSWORD },
+  { login: 'master', name: 'Оспанова М. Т.', password: DEMO_PASSWORD },
+  { login: 'recv', name: 'Омарова С. К.', password: DEMO_PASSWORD },
+  { login: 'instr', name: 'Сейткали Р. А.', password: DEMO_PASSWORD },
+  { login: 'medic', name: 'Нурланова А. Б.', password: DEMO_PASSWORD },
+  { login: 'admin', name: 'Администратор', password: DEMO_PASSWORD },
 ]

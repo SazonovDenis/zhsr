@@ -1,14 +1,14 @@
 <template>
-  <div>{{ formatHm(row.duration) }}</div>
-  <div class="zs-sub">{{ t('{km} км', { km: row.km }) }}</div>
+  <div>{{ t('{km} км', { km: row.km }) }}</div>
+  <div>{{ formatHoursMin(row.duration) }}</div>
 </template>
 
 <script setup lang="ts">
 import type { RouteRow } from '@/api/routes'
 import { t } from '@/boot/i18n'
-import { formatHm } from '@/desktop/routes/duration'
+import { formatHoursMin } from '@/desktop/routes/duration'
 import type { CellProps } from '@/shared/components/table/types'
 
-/** Время в пути и длина маршрута второй строкой. */
+/** Путь маршрута в две строки, как в списке рейсов: длина («3921 км») и время в пути («23 ч 30 мин»). */
 defineProps<CellProps<RouteRow>>()
 </script>

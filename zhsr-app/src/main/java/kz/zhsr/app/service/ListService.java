@@ -16,6 +16,7 @@ import kz.zhsr.app.dto.route.RouteOption;
 import kz.zhsr.app.dto.route.RouteRow;
 import kz.zhsr.app.dto.trip.TripFilter;
 import kz.zhsr.app.dto.trip.TripOption;
+import kz.zhsr.app.dto.trip.TripReadiness;
 import kz.zhsr.app.dto.trip.TripRow;
 import kz.zhsr.app.dto.wagon.WagonFilter;
 import kz.zhsr.app.dto.wagon.WagonOption;
@@ -279,6 +280,11 @@ public class ListService {
             List<DbRec> points = stations.getOrDefault(trip.getRoute(), List.of());
             trip.setKm(RouteService.km(points));
             trip.setStops(RouteService.stops(points));
+            // готовность к отправлению - у строки списка рейса в статусе «План» и «Выполняется», вторым проходом
+            if (trip instanceof TripRow row && (row.getTripStatusType() == TripStatus.PLANNED
+                    || row.getTripStatusType() == TripStatus.IN_PROGRESS)) {
+                row.setReadiness(new TripReadiness(row.getId()));
+            }
         }
         refResolver.resolve(trips);
         return trips;

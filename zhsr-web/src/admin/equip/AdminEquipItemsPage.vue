@@ -54,13 +54,14 @@ import { moveSortOrder } from '@/api/admin'
 import { provideBusy } from '@/shared/busy'
 import { treeRows } from '@/shared/checks/tree'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { Column, RowKey, RowMenuItem } from '@/shared/components/table/types'
+import type { Column, RowMenuItem } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import CellTreeText from '../shared/CellTreeText.vue'
 import { canMoveIn, orderSort, provideSortOrder, sortOrderColumn } from '../shared/sortOrder'
 import { nextOrder, openSpecDialog, ORDER_FIELDS, TEXT_FIELDS, textValues } from '../shared/spec'
 import EquipItemPanel from './EquipItemPanel.vue'
+import { useKeptSelection } from '@/desktop/frame/keptSelection'
 
 /**
  * Позиции шаблона описи экипировки (Ф-ЭКП-01): дерево разделов и позиций с единицей измерения. «+ Раздел», «+ Позиция»
@@ -82,7 +83,8 @@ const router = useRouter()
 const busy = provideBusy()
 const template = shallowRef<EquipTemplate | null>(null)
 const items = shallowRef<EquipItem[]>([])
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 const panel = useSidePanel(selectedId)
 const loadError = ref<ShownError | null>(null)
 const templateId = computed(() => Number(props.id))

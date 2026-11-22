@@ -202,6 +202,21 @@ final class TrainSql {
     }
 
     /**
+     * Рейсы поезда для отметок журнала, по плановому отправлению. Поля: id, trip_status_type, planned_dt, departed_dt,
+     * arrived_dt, arrival (плановое прибытие). Параметры: train, states.
+     */
+    static String tripMarks() {
+        return """
+                select trip.id, trip.trip_status_type, trip.planned_dt, trip.departed_dt, trip.arrived_dt,
+                       trip.planned_dt + make_interval(mins => %s) as arrival
+                from trip
+                join route on route.id = trip.route
+                where trip.train = :train and trip.trip_status_type = any(:states)
+                order by trip.planned_dt, trip.id
+                """.formatted(RouteSql.DURATION);
+    }
+
+    /**
      * Поезда, у которых сейчас по факту есть вагон с номером, содержащим search. Параметры search, fact.
      */
     static String byWagonNumber() {

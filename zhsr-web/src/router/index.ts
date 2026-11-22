@@ -4,6 +4,7 @@ import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
 import { createMemoryHistory, createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 
 import { onLoginRequired, onPasswordChangeRequired } from '@/api/http'
+import { trackFrameHistory } from '@/desktop/frame/frameHistory'
 import { isMobile } from '@/shared/device'
 import { forgetUser } from '@/shared/user'
 import routes from './routes'
@@ -35,6 +36,9 @@ export default defineRouter(() => {
 
   // на телефоне открывается мобильная часть, на компьютере — десктопная
   router.beforeEach(partRedirect)
+
+  // выход из фрейма пропускает записи истории того же фрейма (см. frameHistory)
+  trackFrameHistory(router)
 
   // сервер требует сменить пароль (ответ 406) — на страницу смены пароля
   onPasswordChangeRequired(() => {

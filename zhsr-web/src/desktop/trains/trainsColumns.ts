@@ -1,30 +1,20 @@
 import type { TrainRow } from '@/api/trains'
-import { t } from '@/boot/i18n'
 import { defineColumns } from '@/shared/components/table/types'
-import { tripRefDatedText } from '@/shared/trips/tripRefText'
+import CellTrainName from './cells/CellTrainName.vue'
+import CellTrainTrip from './cells/CellTrainTrip.vue'
 import { trainPlaceText } from './trainPlace'
 
-/** Колонки таблицы «Поезда». Справочники Station, Depot, Yard и LocationKind готовит страница. */
+/** Колонки таблицы «Поезда». Справочники Station, Depot, Yard, LocationKind и TripState готовит страница. */
 export const trainsColumns = defineColumns<TrainRow>([
-  { field: 'name', title: 'Поезд', width: 'minmax(10rem, 1fr)' },
-  {
-    field: 'wagons',
-    title: 'Вагоны',
-    // количество: «23 вагона»; сами вагоны — в панели
-    width: '8rem',
-    format: (_, row) => (row.wagons.length ? t('{n} вагонов', row.wagons.length) : t('нет вагонов')),
-  },
+  // под обозначением — количество вагонов; колонки «Вагоны» нет, её место отдано соседним колонкам
+  { field: 'name', title: 'Поезд', width: 'minmax(9.3rem, 0.9fr)', cell: CellTrainName },
   // как расположение в списке вагонов
-  { field: 'station', title: 'Где вагоны', format: (_, row) => trainPlaceText(row) },
   {
-    field: 'trip',
-    title: 'Рейс',
-    width: 'minmax(14rem, 1.5fr)',
-    format: (_, row) =>
-      row.trip
-        ? t('выполняется: {trip}', { trip: tripRefDatedText(row.trip) })
-        : row.nextTrip
-          ? t('ближайший: {trip}', { trip: tripRefDatedText(row.nextTrip) })
-          : '',
+    field: 'station',
+    title: 'Где вагоны',
+    width: 'minmax(10.5rem, 1fr)',
+    format: (_, row) => trainPlaceText(row),
   },
+  // выполняющийся рейс, а если его нет — ближайший в статусе «план»; статус — плашкой
+  { field: 'trip', title: 'Ближайший рейс', width: 'minmax(17.5rem, 1.8fr)', cell: CellTrainTrip },
 ])

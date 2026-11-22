@@ -140,6 +140,7 @@
 import { Notify } from 'quasar'
 import { computed, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
+import { openTripTrain } from './openTripTrain'
 
 import { fetchTrain } from '@/api/trains'
 import { t } from '@/boot/i18n'
@@ -187,7 +188,8 @@ const kinds = [
   { id: 'detach', text: 'Отцепка' },
 ]
 
-const back = () => void router.push({ name: 'trip-form', params: { id: props.id } })
+// назад — к составу поезда рейса
+const back = () => void openTripTrain(router, Number(props.id))
 
 void card.value.load()
 

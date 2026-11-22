@@ -81,6 +81,11 @@ public class TrainController {
     }
 
     /** Отменить план прицепки или отцепки. */
+    @PutMapping("/train-changes/{id}")
+    public TrainCard edit(@PathVariable long id, @RequestBody TrainService.ChangeBody body) throws Exception {
+        return trainService.edit(id, body);
+    }
+
     @PostMapping("/train-changes/{id}/cancel")
     public TrainCard cancelPlan(@PathVariable long id) throws Exception {
         return trainService.cancelPlan(id);

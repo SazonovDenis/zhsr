@@ -53,7 +53,7 @@ import { t } from '@/boot/i18n'
 import type { ChoiceItem } from '@/shared/components/choice/choice'
 import CbButton from '@/shared/components/choice/CbButton.vue'
 import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
-import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
+import type { RowMenuItem, TableSort } from '@/shared/components/table/types'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -68,6 +68,7 @@ import { useSidePanel } from '../frame/useSidePanel'
 import { openRouteNew } from './openRouteNew'
 import RoutePanel from './RoutePanel.vue'
 import { routesColumns } from './routesColumns'
+import { useKeptSelection } from '../frame/keptSelection'
 
 /**
  * Список маршрутов: фильтры, таблица и правая панель выбранного маршрута. Двойной клик по строке или
@@ -89,7 +90,8 @@ const filter = reactive<RouteFilter>({ kinds: [], states: ['active'] })
 const rows = shallowRef<RouteRow[]>([])
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок (справочники, фильтры, список)
 const busy = provideBusy()
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 // правая панель: рядом со списком на широком окне, поверх него — на узком
 const panel = useSidePanel(selectedId)
 const selected = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null)

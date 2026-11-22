@@ -71,7 +71,7 @@ function stripComments(text) {
 
 const patterns = [
   /'((?:[^'\\\n]|\\.)*)'/g,
-  /(?<![:@\w-])(?:label|placeholder|title|empty|hint|ok-text|date-text|text)="([^"]+)"/g,
+  /(?<![:@\w-])(?:label|placeholder|title|empty|hint|ok-text|date-text|text|keypath)="([^"]+)"/g,
 ]
 
 const used = new Map()

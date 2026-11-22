@@ -57,6 +57,8 @@ export interface TrainChange {
   canUndo: boolean
   /** у отменённого плана: текущий сотрудник может вернуть план */
   canRestore: boolean
+  /** текущий сотрудник может исправить запись: ожидающий план — целиком, факт — основания */
+  canEdit: boolean
 }
 
 /** Запись участия вагона в поезде: позиция вагона с периодом действия, слой — факт или ожидаемый состав. */
@@ -134,6 +136,8 @@ export interface TrainRow {
   trip: TripRef | null
   /** ближайший рейс поезда в статусе «план» */
   nextTrip: TripRef | null
+  /** рейсы поезда в статусе «выполняется» и «план», видимые сотруднику, по плановому отправлению */
+  trips: TripRef[]
 }
 
 /** Поезд с журналом прицепок и отцепок и участием вагонов: состав на любой момент берётся из states. */
@@ -146,12 +150,27 @@ export interface TrainCard extends TrainRow {
   trainWagons: TrainWagon[]
   /** время последнего факта поезда, ISO: раньше него факт не вносится, удалить можно только факт этого времени */
   lastFactDt: string | null
-  /** рейсы в статусе «план» и «выполняется» */
-  trips: TripRef[]
+  /** рейсы в статусе «план», «выполняется» и «выполнен» — отметки отправления и прибытия в журнале */
+  tripMarks: TrainTripMark[]
   /** текущий сотрудник может менять поезд */
   canEdit: boolean
   /** текущий сотрудник может прицеплять и отцеплять: кто меняет поезд, у поезда в рейсе — ещё ЛНП рейса и мастер депо */
   canCouple: boolean
+}
+
+/** Рейс поезда для отметок отправления и прибытия в журнале поезда. */
+export interface TrainTripMark {
+  trip: TripRef
+  /** состояние рейса — константы TripStatus */
+  tripStatusType: number
+  /** плановое отправление, ISO */
+  plannedDt: string
+  /** фактическое отправление, ISO; null — рейс не отправлен */
+  departedDt: string | null
+  /** фактическое прибытие, ISO; null — рейс не прибыл */
+  arrivedDt: string | null
+  /** плановое прибытие, ISO */
+  arrival: string
 }
 
 /** Поезд как вариант выбора в рейсе. */
@@ -264,6 +283,14 @@ export async function cancelChangePlan(id: number): Promise<TrainCard> {
 /** Вернуть отменённый план прицепки или отцепки: снова «ожидает». */
 export async function restoreChangePlan(id: number): Promise<TrainCard> {
   return (await http.post<TrainCard>(`/train-changes/${id}/restore`)).data
+}
+
+/**
+ * Исправить запись журнала: ожидающий план — время, место, позицию и основания (wagons и fact не используются), факт —
+ * только основания (comment). Ответ — поезд после изменения.
+ */
+export async function editTrainChange(id: number, body: TrainChangeBody): Promise<TrainCard> {
+  return (await http.put<TrainCard>(`/train-changes/${id}`, body)).data
 }
 
 /** Удалить ошибочный факт прицепки или отцепки без истории. */

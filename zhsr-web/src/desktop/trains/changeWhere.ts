@@ -13,6 +13,17 @@ import type { AttachStop, ChangeChoice, StopGroup } from './attach'
 
 const INPUT_FORMAT = 'YYYY-MM-DDTHH:mm'
 
+/** Исходные значения полей при исправлении плана: время ISO, рейс, остановка, станция, позиция, основания, вагон. */
+export interface ChangeInitial {
+  time: string
+  trip: number | null
+  routeStation: number | null
+  station: number | null
+  seq: number | null
+  comment: string
+  wagon: number
+}
+
 /** Плановое время по умолчанию: at, а если оно не в будущем — следующий полный час. */
 function defaultPlanTime(at: string): Date {
   const time = new Date(at)
@@ -42,6 +53,8 @@ function defaultPlanTime(at: string): Date {
  * @param at          плановое время по умолчанию, ISO
  * @param trip        рейс, предложенный для плана первым (формирование рейса); null — вне рейса
  * @param plan        открыть сразу планом
+ * @param initial     исправление плана: его время, рейс, остановка, станция, позиция и основания; wagon — вагон плана: в
+ *                    позициях прицепки его нет (он и есть прицепляемый)
  */
 export function useChangeWhere(o: {
   card: TrainCard
@@ -52,14 +65,16 @@ export function useChangeWhere(o: {
   at: string
   trip?: number | null
   plan?: boolean
+  initial?: ChangeInitial | null
 }) {
+  const init = o.initial ?? null
   const live = o.groups.find((g) => g.inProgress) ?? null
   // в пути фактом — только на остановке после станции отправления
   const factStops: AttachStop[] = live ? live.stops.slice(1) : []
-  // план в рейсе — только у рейсов в статусе «план»
-  const planGroups = o.groups.filter((g) => !g.inProgress)
+  // план в рейсе — только у рейсов в статусе «план»; исправляемый план рейса в пути — ещё его рейс
+  const planGroups = o.groups.filter((g) => !g.inProgress || g.trip.id === init?.trip)
   const stopText = (s: AttachStop) => `${dictManager.getValue('Station', s.station)} • ${formatDateTime(s.time)}`
-  const firstGroup = planGroups.find((g) => g.trip.id === o.trip) ?? null
+  const firstGroup = planGroups.find((g) => g.trip.id === (init ? init.trip : o.trip)) ?? null
   const firstStop = firstGroup?.stops[0] ?? null
 
   const state = reactive<{
@@ -80,12 +95,12 @@ export function useChangeWhere(o: {
     mode: o.factAllowed && !o.plan ? 'fact' : 'plan',
     factStop: factStops.length > 0 ? 0 : null,
     trip: firstGroup?.trip.id ?? null,
-    stop: firstStop?.routeStation ?? null,
-    station: o.station,
+    stop: init?.routeStation ?? firstStop?.routeStation ?? null,
+    station: init ? init.station : o.station,
     factTime: date.formatDate(new Date(), INPUT_FORMAT),
-    planTime: date.formatDate(firstStop?.time ?? defaultPlanTime(o.at), INPUT_FORMAT),
-    seq: Number.MAX_SAFE_INTEGER,
-    comment: '',
+    planTime: date.formatDate(init ? new Date(init.time) : (firstStop?.time ?? defaultPlanTime(o.at)), INPUT_FORMAT),
+    seq: init?.seq ?? Number.MAX_SAFE_INTEGER,
+    comment: init?.comment ?? '',
   })
 
   const modes = computed<ChoiceItem[]>(() => [
@@ -149,7 +164,9 @@ export function useChangeWhere(o: {
 
   /** Состав на момент: факт — текущий, план — ожидаемый. */
   const composition = computed(() =>
-    state.mode === 'fact' ? currentComposition(o.card) : expectedAt(o.card, moment.value),
+    (state.mode === 'fact' ? currentComposition(o.card) : expectedAt(o.card, moment.value)).filter(
+      (m) => m.wagon.wagon !== init?.wagon,
+    ),
   )
   /** Позиции прицепки: «1 — перед 12345» … «в конец». */
   const seqChoices = computed<ChoiceItem[]>(() => [

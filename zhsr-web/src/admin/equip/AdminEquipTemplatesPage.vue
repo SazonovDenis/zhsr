@@ -47,13 +47,14 @@ import DesktopFrame from '@/desktop/frame/DesktopFrame.vue'
 import { moveSortOrder } from '@/api/admin'
 import { provideBusy } from '@/shared/busy'
 import DataTable from '@/shared/components/table/DataTable.vue'
-import type { Column, RowKey, RowMenuItem } from '@/shared/components/table/types'
+import type { Column, RowMenuItem } from '@/shared/components/table/types'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { canMoveIn, orderSort, provideSortOrder } from '../shared/sortOrder'
 import { textColumns } from '../checks/textColumns'
 import { nextOrder, openSpecDialog, ORDER_FIELDS, TEXT_FIELDS, textValues } from '../shared/spec'
+import { useKeptSelection } from '@/desktop/frame/keptSelection'
 
 /**
  * Шаблоны описей экипировки (Ф-ЭКП-01): название, неисправность заявки по недостаче, порядок. «Пункты» и двойной клик
@@ -63,7 +64,8 @@ import { nextOrder, openSpecDialog, ORDER_FIELDS, TEXT_FIELDS, textValues } from
 const router = useRouter()
 const busy = provideBusy()
 const rows = shallowRef<EquipTemplate[]>([])
-const selectedId = ref<RowKey | null>(null)
+// выбранная строка остаётся при возврате на страницу
+const selectedId = useKeptSelection()
 const loadError = ref<ShownError | null>(null)
 const selected = computed(() => rows.value.find((r) => r.id === selectedId.value) ?? null)
 
