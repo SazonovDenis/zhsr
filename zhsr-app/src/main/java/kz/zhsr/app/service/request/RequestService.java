@@ -1,6 +1,7 @@
 package kz.zhsr.app.service.request;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtDb;
 import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUser;
@@ -11,6 +12,7 @@ import kz.zhsr.app.constants.RequestStatus;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.ref.WagonRef;
 import kz.zhsr.app.dto.ref.CheckTemplateRef;
 import kz.zhsr.app.dto.ref.EquipTemplateRef;
 import kz.zhsr.app.dto.request.RequestActionBody;
@@ -28,13 +30,13 @@ import kz.zhsr.app.dto.request.StaffCandidate;
 import kz.zhsr.app.service.ApiException;
 import kz.zhsr.app.service.OfflineReceiptService;
 import kz.zhsr.app.service.SqlQuery;
+import kz.zhsr.app.service.TripLayerSql;
 import kz.zhsr.app.service.storage.FileStorage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -164,22 +166,18 @@ public class RequestService {
      */
     public List<StaffCandidate> serviceStaff(long service, Long trip) throws Exception {
         if (trip != null) {
-            // строка бригады - дежурство при вагоне: проводник двух вагонов - две строки, второй вагон - wagon2
-            Map<Long, StaffCandidate> byUsr = new LinkedHashMap<>();
-            for (StaffCandidate c : db.loadSql(RequestSql.crewStaff(), Map.of("service", service, "trip", trip),
-                    StaffCandidate.class)) {
-                StaffCandidate first = byUsr.get(c.getUsr().getId());
-                if (first == null) {
-                    byUsr.put(c.getUsr().getId(), c);
-                } else if (c.getWagon() != null) {
-                    if (first.getWagon() == null) {
-                        first.setWagon(c.getWagon());
-                    } else if (first.getWagon2() == null) {
-                        first.setWagon2(c.getWagon());
-                    }
-                }
+            List<StaffCandidate> res = db.loadSql(RequestSql.crewStaff(), Map.of("service", service, "trip", trip),
+                    StaffCandidate.class);
+            // вагоны сотрудника - за которые он отвечает на рейс: первые два по номеру
+            Map<String, Object> params = TripLayerSql.params();
+            params.put("trip", trip);
+            Map<Long, List<DbRec>> wagons = UtDb.collectGroupBy_records(db.loadSql(TripLayerSql.tripWagons(), params),
+                    "usr");
+            for (StaffCandidate c : res) {
+                List<DbRec> mine = wagons.getOrDefault(c.getUsr().getId(), List.of());
+                c.setWagon(mine.isEmpty() ? null : new WagonRef(mine.get(0).getLong("wagon")));
+                c.setWagon2(mine.size() < 2 ? null : new WagonRef(mine.get(1).getLong("wagon")));
             }
-            List<StaffCandidate> res = new ArrayList<>(byUsr.values());
             refResolver.resolve(res);
             return res;
         }

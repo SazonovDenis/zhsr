@@ -21,29 +21,39 @@
         <DictBadge :id="wagon.wagonStatusType" dict="WagonState" />
         <span class="zs-sub wagon-panel__since">{{ sinceText(wagon.dbegStatus, nowMinute) }}</span>
       </span>
-      <span>{{ t('Ответственный') }}</span>
+      <span>{{ t('Ответственные') }}</span>
       <span>
-        <UserName v-if="wagon.responsibleUsr" :user="wagon.responsibleUsr" /><template v-else>{{
-          t('не назначен')
-        }}</template>
-        <!-- сменить или снять ответственного без акта — как исполнителя заявки; ссылка видна всегда, нельзя —
+        <UserNames :users="wagon.responsibleUsrs" />
+        <!-- сменить или снять ответственных без акта — окно с галочками; кнопка видна всегда, нельзя —
              неактивна, причина во всплывающей подсказке -->
-        <SoftLink
-          :text="wagon.responsibleUsr ? 'Сменить' : 'Назначить'"
-          :disabled="!!responsibleReason"
+        <q-btn
+          unelevated
+          outline
+          dense
+          no-caps
+          color="primary"
+          class="zs-soft-border q-ml-sm"
+          padding="0.1rem 0.6rem"
+          :disable="!!responsibleReason"
           :title="responsibleReason || undefined"
-          class="q-ml-sm"
           @click="changeResponsible"
-        />
-        <span class="zs-sub wagon-panel__since">{{ sinceText(wagon.dbegResponsible, nowMinute) }}</span>
+        >
+          {{ wagon.responsibleUsrs.length > 0 ? t('Сменить') : t('Назначить') }}
+        </q-btn>
+        <span v-if="wagon.dbegResponsible" class="zs-sub wagon-panel__since">{{
+          sinceText(wagon.dbegResponsible, nowMinute)
+        }}</span>
       </span>
       <span>{{ t('Пробег') }}</span>
       <span>{{ t('{km} км', { km: formatThousands(wagon.runKm) }) }}</span>
       <span>{{ t('Поезд') }}</span>
       <span>
-        <button v-if="wagon.train" type="button" class="wagon-panel__link q-pa-none" @click="openTrain(wagon.train.id)">
-          {{ wagon.train.name }}
-        </button>
+        <SoftRouteLink
+          v-if="wagon.train"
+          text="{name}"
+          :params="{ name: wagon.train.name }"
+          :to="{ name: 'train-form', params: { id: wagon.train.id } }"
+        />
         <template v-else>{{ t('не в поезде') }}</template>
       </span>
       <template v-if="wagon.pendingTransfer">
@@ -101,7 +111,6 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import UserName from '@/shared/components/UserName.vue'
 import { fetchCheckLists } from '@/api/checks'
 import { fetchEquipLists } from '@/api/equip'
 import { fetchRequestCounts } from '@/api/requests'
@@ -118,7 +127,8 @@ import { transferPlaceText } from '@/shared/transferPlace'
 import { TripStatus } from '@/shared/constants/systemDicts'
 import { formatThousands } from '@/shared/format'
 import { wagonPlace } from '@/shared/wagonPlace'
-import { pickResponsible } from './responsibleAssign'
+import UserNames from '@/shared/components/UserNames.vue'
+import { pickResponsibles } from './responsibleAssign'
 import { changeResponsibleReason, wagonStation } from './wagonActions'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
@@ -144,17 +154,16 @@ const emit = defineEmits<{ close: []; changed: [wagon: WagonRow] }>()
 // ответственный без акта (Ф-ВАГ-07): почему нельзя; пусто — можно
 const responsibleReason = computed(() => (props.wagon ? changeResponsibleReason(props.wagon) : ''))
 
-// ответственный — во всплывающем окне, как исполнитель заявки: окно и сохраняет, ошибка — в окне; ответ сервера —
-// вагон после смены (событие changed)
+// ответственные — во всплывающем окне с галочками: окно и сохраняет, ошибка — в окне; ответ сервера — вагон после
+// смены (событие changed)
 async function changeResponsible() {
   const w = props.wagon
   if (!w) return
-  await pickResponsible({
+  await pickResponsibles({
     station: wagonStation(w),
     wagons: [w.number],
-    current: w.responsibleUsr,
-    reassign: w.responsibleUsr !== null,
-    save: async (usr) => emit('changed', await changeWagonResponsible(w.id, usr)),
+    current: w.responsibleUsrs,
+    save: async (usrs) => emit('changed', await changeWagonResponsible(w.id, usrs)),
   })
 }
 
@@ -219,24 +228,11 @@ function openEquip() {
   if (props.wagon)
     void router.push({ name: 'wagon-equip', params: { id: props.wagon.id }, query: { number: props.wagon.number } })
 }
-
-function openTrain(id: number) {
-  void router.push({ name: 'train-form', params: { id } })
-}
 </script>
 
 <style scoped lang="scss">
 .wagon-panel__since {
   display: block;
-}
-
-.wagon-panel__link {
-  border: 0;
-  background: none;
-  color: $primary;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 // подзаголовок блока — как «История» в панели заявки

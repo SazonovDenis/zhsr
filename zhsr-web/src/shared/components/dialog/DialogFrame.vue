@@ -12,7 +12,7 @@
       ref="cardEl"
       class="dialog-frame"
       :class="{ 'dialog-frame--maximized': isMaximized }"
-      :style="isMaximized ? undefined : { width }"
+      :style="isMaximized ? undefined : { width, height: dialogHeight(height) }"
       @keydown.stop="onKeydown"
     >
       <DialogHeader :title="title" @close="close" />
@@ -22,6 +22,15 @@
       </div>
 
       <slot name="actions-above" />
+
+      <!-- ошибка — полосой над кнопками, в своём месте: тело диалога уступает ей высоту -->
+      <ErrorBox
+        v-if="error"
+        :error="error"
+        closable
+        class="dialog-frame__error q-py-sm q-px-lg"
+        @close="emit('errorClose')"
+      />
 
       <DialogActions v-if="actions.length > 0" :actions="actions" :action-running="actionRunning" @action="onAction">
         <template #left>
@@ -38,10 +47,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
+import ErrorBox from '@/shared/components/ErrorBox.vue'
 import { isMobile } from '@/shared/device'
+import type { ShownError } from '@/shared/errors'
 import type { HistoryDialog } from './dialogHistory'
 import { dialogHistory } from './dialogHistory'
-import type { DialogAction } from './types'
+import type { DialogAction, DialogHeightValue } from './types'
+import { dialogHeight } from './types'
 import DialogActions from './DialogActions.vue'
 import DialogHeader from './DialogHeader.vue'
 
@@ -56,6 +68,11 @@ import DialogHeader from './DialogHeader.vue'
  *   zs-focusable внутри диалога. При открытии фокус встаёт на первый такой элемент — первый контрол формы. Класс
  *   zs-focusable ставят сами контролы: TextInput, DatePicker, CbList, CbSegment, CbButton, кнопки действий.
  * - На телефоне диалог развёрнут на весь экран, а кнопка «назад» закрывает его (см. dialogHistory).
+ * - Высота постоянная (height, DialogHeight): от высоты экрана в пределах min и max, содержимое её не меняет — лишнее
+ *   прокручивается в теле.
+ * - Ошибка (error) — полосой во всю ширину над кнопками, с крестиком (событие errorClose): тело уступает ей высоту.
+ * - Escape закрывает диалог и тогда, когда фокус ушёл на сам диалог Quasar вне карточки (щелчок по месту без
+ *   контрола).
  * - Пока выполняется действие actionRunning, диалог новых действий не принимает: повторный клик отправил бы второй
  *   такой же запрос. Ставит и снимает actionRunning владелец — только он знает, когда действие закончилось.
  *
@@ -69,6 +86,8 @@ const props = withDefaults(
     maximized?: boolean | null
     /** ширина диалога, если он не развёрнут */
     width?: string
+    /** постоянная высота диалога, если он не развёрнут: готовая (DialogHeight) или своя — значение CSS */
+    height?: DialogHeightValue
     actions?: DialogAction[]
     /** текст слева от кнопок, например почему основное действие недоступно */
     actionsStateText?: string
@@ -76,20 +95,24 @@ const props = withDefaults(
     actionRunning?: string | null
     /** идёт загрузка данных диалога: спиннер в подвале */
     busy?: boolean
+    /** ошибка полосой над кнопками; null — нет */
+    error?: ShownError | null
   }>(),
   {
     show: false,
     title: '',
     maximized: null,
     width: '32rem',
+    height: 'md',
     actions: () => [],
     actionsStateText: '',
     actionRunning: null,
     busy: false,
+    error: null,
   },
 )
 
-const emit = defineEmits<{ 'update:show': [show: boolean]; action: [name: string] }>()
+const emit = defineEmits<{ 'update:show': [show: boolean]; action: [name: string]; errorClose: [] }>()
 
 const cardEl = ref<HTMLElement | null>(null)
 
@@ -120,10 +143,21 @@ watch(
  */
 function onWindowKeydown(e: KeyboardEvent) {
   if (!props.show || !isTopDialog()) return
-  if (e.target !== document.body && e.target !== document.documentElement) return
+  if (!isLostFocus(e.target)) return
   e.stopPropagation()
   if (e.key !== 'Escape') focusFirst()
   onKeydown(e)
+}
+
+/**
+ * Фокус потерян для диалога: на body или на обёртке диалога Quasar вне карточки — туда фокус уходит после щелчка по
+ * месту без контрола (строка таблицы, подпись), и keydown карточки его не получает.
+ */
+function isLostFocus(target: EventTarget | null): boolean {
+  if (target === document.body || target === document.documentElement) return true
+  if (!(target instanceof Node) || !cardEl.value || cardEl.value.contains(target)) return false
+  const dialogs = document.querySelectorAll('.q-dialog')
+  return !!dialogs[dialogs.length - 1]?.contains(target)
 }
 
 /**
@@ -221,6 +255,14 @@ function onAction(action: DialogAction) {
   gap: 1rem;
   min-height: 0;
   overflow-y: auto;
+}
+
+.dialog-frame__error {
+  flex: none;
+  max-height: 40vh;
+  overflow-y: auto;
+  border-radius: 0;
+  font-size: 0.8rem;
 }
 
 .dialog-frame__busy {

@@ -67,9 +67,14 @@ export function modelOf(selected: ChoiceItem[], single: boolean): ChoiceModel {
   return selected.map((s) => s.id)
 }
 
+/** Текст для поиска: строчными, неразрывный пробел (ФИО, дата и время) — как обычный. */
+export function searchable(text: string): string {
+  return text.toLowerCase().replace(/\u00a0/g, ' ')
+}
+
 /** Совпадение со строкой поиска: по исходному тексту (он же ключ перевода) и по переведённому. */
 export function matchesQuery(item: ChoiceItem, query: string): boolean {
-  return labelOf(item).toLowerCase().includes(query) || displayOf(item).toLowerCase().includes(query)
+  return searchable(labelOf(item)).includes(query) || searchable(displayOf(item)).includes(query)
 }
 
 /**

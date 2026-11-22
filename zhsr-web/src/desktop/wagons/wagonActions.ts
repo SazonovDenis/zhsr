@@ -82,12 +82,12 @@ export function wagonStation(w: WagonRow): number | null {
 }
 
 /**
- * Почему нельзя сменить ответственного за вагон без акта (Ф-ВАГ-07); пусто — можно. Меняет мастер депо станции вагона;
+ * Почему нельзя сменить ответственных за вагон без акта (Ф-ВАГ-07); пусто — можно. Меняет мастер депо станции вагона;
  * администратор может всё. Вагон в рейсе и вагон, ждущий приёма по акту, — нельзя.
  */
 export function changeResponsibleReason(w: WagonRow): string {
   if (w.locationType === LocationType.TRIP) return t('Вагон в рейсе')
-  if (w.pendingTransfer) return t('Вагон ждёт приёма по акту — ответственного выбирают в акте')
+  if (w.pendingTransfer) return t('Вагон ждёт приёма по акту — ответственных выбирают в акте')
   const u = currentUser.value
   if (hasRole(u, RoleType.ADMIN)) return ''
   const station = wagonStation(w)

@@ -1,7 +1,7 @@
 package kz.zhsr.app.service;
 
 /**
- * SQL журнала вагона ({@link WagonService}), ответственного ({@link ResponsibleService}) и пробега ({@link WagonRun}).
+ * SQL журнала вагона ({@link WagonService}), ответственных ({@link ResponsibleService}, {@link WagonJournal}) и пробега ({@link WagonRun}).
  */
 final class WagonSql {
 
@@ -34,7 +34,7 @@ final class WagonSql {
     static String edits() {
         return """
                 select wagon_edit.id, wagon_edit.created_by_usr, wagon_edit.comment, wagon_edit.wagon_location,
-                       wagon_edit.wagon_status, wagon_edit.wagon_responsible
+                       wagon_edit.wagon_status, wagon_edit.wagon_responsible, wagon_edit.closed_wagon_responsible
                 from wagon_edit
                 where wagon_edit.wagon = :wagon
                 """;
@@ -84,14 +84,15 @@ final class WagonSql {
     }
 
     /**
-     * Поезда, в которых вагоны с номерами сейчас по факту. Параметр numbers.
+     * Поезда, в которых вагоны с номерами сейчас по факту. Параметры numbers, fact - слой «факт» участия в поезде.
+     * Список Db передаёт массивом чисел: номера приводятся к строкам.
      */
     static String currentTrainsOf() {
         return """
                 select distinct train_wagon.train
                 from train_wagon
                 join wagon on wagon.id = train_wagon.wagon
-                where wagon.number = any(:numbers) and train_wagon.dbeg is not null and train_wagon.dend is null
+                where wagon.number = any(cast(:numbers as varchar[])) and train_wagon.kind = :fact and train_wagon.dend is null
                 """;
     }
 
@@ -118,25 +119,73 @@ final class WagonSql {
                 """;
     }
 
-    /** Записи журнала ответственного за вагон по времени. Параметр wagon. */
+    /** Записи факта журнала ответственных за вагон по времени. Параметры wagon, fact - слой «факт». */
     static String responsibles() {
         return """
-                select wagon_responsible.id, wagon_responsible.dbeg, wagon_responsible.dend, wagon_responsible.usr
+                select wagon_responsible.id, wagon_responsible.dbeg, wagon_responsible.dend,
+                       wagon_responsible.created_by_usr
                 from wagon_responsible
-                where wagon_responsible.wagon = :wagon
+                where wagon_responsible.wagon = :wagon and wagon_responsible.kind = :fact
                 order by wagon_responsible.dbeg
                 """;
     }
 
-    /** Прицепки и отцепки вагона в рейсе и записи журналов, которые они открыли. Параметр wagon. */
+    /** Последняя запись факта журнала ответственных вагона. Параметры wagon, fact - слой «факт». */
+    static String lastResponsibleFact() {
+        return """
+                select wagon_responsible.id, wagon_responsible.dbeg, wagon_responsible.dend
+                from wagon_responsible
+                where wagon_responsible.wagon = :wagon and wagon_responsible.kind = :fact
+                order by wagon_responsible.dbeg desc
+                limit 1
+                """;
+    }
+
+    /**
+     * Текущие ответственные вагонов: состав открытых записей факта, по ФИО. Параметры wagons, fact - слой «факт».
+     */
+    static String currentResponsibleUsrs() {
+        return """
+                select wagon_responsible.wagon, wagon_responsible_usr.usr
+                from wagon_responsible
+                join wagon_responsible_usr on wagon_responsible_usr.wagon_responsible = wagon_responsible.id
+                join usr on usr.id = wagon_responsible_usr.usr
+                where wagon_responsible.wagon = any(:wagons) and wagon_responsible.kind = :fact
+                  and wagon_responsible.dend is null
+                order by usr.full_name, usr.id
+                """;
+    }
+
+    /** Начало текущих ответственных вагонов: открытая запись факта из кэша wagon_info. Параметр wagons. */
+    static String currentResponsibleStarts() {
+        return """
+                select wagon_info.wagon, wagon_responsible.dbeg
+                from wagon_info
+                join wagon_responsible on wagon_responsible.id = wagon_info.wagon_responsible
+                where wagon_info.wagon = any(:wagons)
+                """;
+    }
+
+    /** Состав записей журнала ответственных, по ФИО. Параметр records. */
+    static String responsibleUsrs() {
+        return """
+                select wagon_responsible_usr.wagon_responsible, wagon_responsible_usr.usr
+                from wagon_responsible_usr
+                join usr on usr.id = wagon_responsible_usr.usr
+                where wagon_responsible_usr.wagon_responsible = any(:records)
+                order by usr.full_name, usr.id
+                """;
+    }
+
+    /** Факты прицепки и отцепки вагона в рейсе и записи журналов, которые они открыли. Параметр wagon. */
     static String changes() {
         return """
                 select train_wagon_change.id, train_wagon_change.change_type, train_wagon_change.trip,
                        train_wagon_change.usr, train_wagon_change.comment, train_wagon_change.wagon_location,
-                       train_wagon_change.wagon_status, train_wagon_change.wagon_responsible
+                       train_wagon_change.wagon_status, train_wagon_change.wagon_responsible,
+                       train_wagon_change.closed_wagon_responsible
                 from train_wagon_change
-                join train_wagon on train_wagon.id = train_wagon_change.train_wagon
-                where train_wagon.wagon = :wagon and train_wagon_change.wagon_location is not null
+                where train_wagon_change.wagon = :wagon and train_wagon_change.wagon_location is not null
                 """;
     }
 
@@ -146,7 +195,8 @@ final class WagonSql {
      */
     static String transferActs() {
         return """
-                select transfer_act_wagon.wagon_location, transfer_act_wagon.wagon_responsible, transfer_act.id,
+                select transfer_act_wagon.wagon_location, transfer_act_wagon.wagon_responsible,
+                       transfer_act_wagon.closed_wagon_responsible, transfer_act.id,
                        transfer_act.number, transfer_act.transferred_by_usr, transfer_act.received_by_usr,
                        transfer_act.act_status_type
                 from transfer_act_wagon

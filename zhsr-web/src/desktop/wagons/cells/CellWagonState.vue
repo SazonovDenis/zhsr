@@ -1,6 +1,7 @@
 <template>
   <DictBadge :id="row.wagonStatusType" dict="WagonState" class="cell-wagon-state" />
-  <div class="zs-sub">{{ sinceText(row.dbegStatus, nowMinute) }}</div>
+  <!-- начала состояния нет в данных — строки «с …» нет, а не «с —, NaN мин» -->
+  <div v-if="row.dbegStatus" class="zs-sub">{{ sinceText(row.dbegStatus, nowMinute) }}</div>
 </template>
 
 <script setup lang="ts">

@@ -7,6 +7,12 @@
       "route": "wagons"
     },
     {
+      "id": "trains",
+      "label": "Поезда",
+      "sub": true,
+      "route": "trains"
+    },
+    {
       "id": "acts",
       "label": "Передача",
       "route": "acts",
@@ -19,16 +25,17 @@
       "route": "trips"
     },
     {
-      "id": "trains",
-      "label": "Поезда",
-      "sub": true,
-      "route": "trains"
-    },
-    {
       "id": "routes",
       "label": "Маршруты",
       "sub": true,
       "route": "routes"
+    },
+    {
+      "id": "staff",
+      "label": "Сотрудники",
+      "icon": "staff",
+      "route": "staff",
+      "roles": [1, 12, 14]
     },
     {
       "id": "requests",
@@ -64,11 +71,6 @@
     "label": "Администрирование",
     "icon": "settings",
     "items": [
-      {
-        "id": "admin-users",
-        "label": "Пользователи",
-        "route": "admin-users"
-      },
       {
         "id": "admin-group-routes",
         "label": "Узлы",

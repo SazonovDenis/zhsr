@@ -1,6 +1,7 @@
 package kz.zhsr.app.controller;
 
 import kz.zhsr.app.service.ApiException;
+import kz.zhsr.app.service.DbErrors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -69,8 +70,14 @@ public class ErrorHandler {
                 .body(Map.of("message", "Файл слишком большой: фото - до 20 МБ, все фото запроса - до 110 МБ"));
     }
 
+    // нарушенное ограничение БД, не перехваченное в сервисе (например, на удаляемую запись ссылаются) - сообщением
+    // для пользователя (DbErrors); остальное - внутренняя ошибка
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> other(Exception e) {
+        if (DbErrors.translate(e) instanceof ApiException api) {
+            log.warn("Нарушено ограничение БД: {}", api.getMessage());
+            return api(api);
+        }
         log.error("Ошибка запроса", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Внутренняя ошибка сервера"));
     }

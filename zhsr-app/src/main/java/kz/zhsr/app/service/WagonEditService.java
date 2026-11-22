@@ -38,19 +38,19 @@ public class WagonEditService {
      *
      * @param locationType   вид нового расположения: станция, депо или парк отстоя
      * @param place          место: station, depot или yard - по locationType
-     * @param responsibleUsr ответственный за вагон: сотрудник депо станции нового расположения; null - не назначен
-     * @param comment        комментарий
+     * @param responsibleUsrs ответственные за вагон: сотрудники депо станции нового расположения; пусто - не назначены
+     * @param comment         комментарий
      */
-    public record LocationBody(Long locationType, Long place, Long responsibleUsr, String comment) {
+    public record LocationBody(Long locationType, Long place, List<Long> responsibleUsrs, String comment) {
     }
 
     /**
-     * Смена ответственного.
+     * Смена ответственных.
      *
-     * @param responsibleUsr ответственный за вагон: сотрудник депо станции вагона или член бригады последнего и
-     *                       ближайшего рейса поезда вагона; null - не назначен
+     * @param responsibleUsrs ответственные за вагон: сотрудники депо станции вагона и члены бригады последнего и
+     *                        ближайшего рейса поезда вагона; пусто - не назначены
      */
-    public record ResponsibleBody(Long responsibleUsr) {
+    public record ResponsibleBody(List<Long> responsibleUsrs) {
     }
 
     private final Db db;
@@ -92,7 +92,7 @@ public class WagonEditService {
 
     /**
      * Сменить расположение вагона (POST /wagons/{id}/location): станция, депо или парк отстоя; состояние не меняется.
-     * Ответственный - выбранный при смене.
+     * Ответственные - выбранные при смене.
      *
      * @throws ApiException 403 - не администратор; 400 - не заполнено или неверно; 409 - вагон в рейсе или ждёт приёма
      *                      по акту
@@ -115,24 +115,24 @@ public class WagonEditService {
             throw ApiException.conflict("Вагон ждёт приёма по акту передачи - сначала примите или отмените акт");
         }
         Long station = "station".equals(column) ? body.place() : place.getLong("station", null);
-        responsibleService.check(body.responsibleUsr(), station, null);
+        responsibleService.check(body.responsibleUsrs(), station, null);
 
         OffsetDateTime now = OffsetDateTime.now();
         Long stationId = "station".equals(column) ? body.place() : null;
         Long depot = "depot".equals(column) ? body.place() : null;
         Long yard = "yard".equals(column) ? body.place() : null;
         long location = wagonJournal.moveLocation(id, now, body.locationType(), stationId, depot, yard);
-        long responsible = wagonJournal.assign(id, now, body.responsibleUsr());
+        WagonJournal.Responsibles responsibles = wagonJournal.assign(id, now, body.responsibleUsrs());
         Map<String, Object> edit = edit(id, me, now, comment);
         edit.put("wagon_location", location);
-        edit.put("wagon_responsible", responsible);
+        putResponsibles(edit, responsibles);
         db.insertRec("wagon_edit", edit);
         return listService.wagonByNumber(wagon.getString("number"));
     }
 
     /**
-     * Сменить ответственного за вагон без акта (POST /wagons/{id}/responsible, Ф-ВАГ-07): назначить сотрудника или
-     * снять назначение («не назначен»). Меняет мастер депо станции вагона или администратор; вагон не в рейсе и не ждёт
+     * Сменить ответственных за вагон без акта (POST /wagons/{id}/responsible, Ф-ВАГ-07): назначить сотрудников или
+     * снять всех («не назначен»). Меняет мастер депо станции вагона или администратор; вагон не в рейсе и не ждёт
      * приёма по акту. Время - сейчас; запись ручной правки - без комментария.
      *
      * @throws ApiException 403 - не мастер депо станции вагона и не администратор; 409 - вагон в рейсе или ждёт приёма
@@ -151,12 +151,12 @@ public class WagonEditService {
         if (db.loadSqlRec(WagonSql.pendingTransfer(), Map.of("wagon", id, "pending", ActStatus.PENDING)) != null) {
             throw ApiException.conflict("Вагон ждёт приёма по акту передачи - ответственного выбирают в акте");
         }
-        responsibleService.check(body.responsibleUsr(), station, null, List.of(wagon.getString("number")));
+        responsibleService.check(body.responsibleUsrs(), station, null, List.of(wagon.getString("number")));
 
         OffsetDateTime now = OffsetDateTime.now();
-        long responsible = wagonJournal.assign(id, now, body.responsibleUsr());
+        WagonJournal.Responsibles responsibles = wagonJournal.assign(id, now, body.responsibleUsrs());
         Map<String, Object> edit = edit(id, me, now, null);
-        edit.put("wagon_responsible", responsible);
+        putResponsibles(edit, responsibles);
         db.insertRec("wagon_edit", edit);
         return listService.wagonByNumber(wagon.getString("number"));
     }
@@ -218,6 +218,12 @@ public class WagonEditService {
         edit.put("created_dt", now);
         edit.put("comment", comment);
         return edit;
+    }
+
+    /** Записи факта ответственных, открытая и закрытая правкой. */
+    private static void putResponsibles(Map<String, Object> edit, WagonJournal.Responsibles responsibles) {
+        edit.put("wagon_responsible", responsibles.opened());
+        edit.put("closed_wagon_responsible", responsibles.closed());
     }
 
     /** Колонка места по виду расположения: станция, депо или парк отстоя. */

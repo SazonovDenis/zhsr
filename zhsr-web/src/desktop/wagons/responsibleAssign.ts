@@ -6,23 +6,24 @@ import { isMe } from '@/shared/user'
 import { fetchResponsibles, responsibleDuty, responsiblePlace } from '@/shared/wagons/responsible'
 
 /**
- * Назначение ответственного за вагоны в окне выбора сотрудника (UserPickDialog). Кандидаты — как у
+ * Назначение ответственных за вагон в окне выбора сотрудника с выбором нескольких (UserPickDialog, multiple). Кандидаты — как у
  * ResponsiblePicker: сотрудники депо станции station, бригада рейса trip и бригады рейсов поезда вагонов wagons.
- * current — ответственный сейчас; reassign — ответственный уже назначен (заголовок и кнопка «Переназначить»). save —
- * сохранить выбор (id сотрудника, null — не назначен): сохраняет окно, ошибка — в окне. Результат — выбор после
+ * current — ответственные сейчас (пусто — не назначены: заголовок и кнопка «Назначить», иначе «Сменить»). save —
+ * сохранить выбор (id сотрудников, пусто — не назначены): сохраняет окно, ошибка — в окне. Результат — выбор после
  * успешного сохранения; окно закрыли — undefined.
  */
-export async function pickResponsible(opts: {
+export async function pickResponsibles(opts: {
   station: number | null
   trip?: number | null
   wagons?: string[]
-  current: UserRef | null
-  reassign: boolean
-  save: (usr: number | null) => Promise<void>
-}): Promise<{ usr: number | null } | undefined> {
-  return openDialog<{ usr: number | null }>(UserPickDialog, {
-    title: opts.reassign ? 'Переназначить ответственного' : 'Назначить ответственного',
-    okText: opts.reassign ? 'Переназначить' : 'Назначить',
+  current: UserRef[]
+  save: (usrs: number[]) => Promise<void>
+}): Promise<{ usrs: number[] } | undefined> {
+  const change = opts.current.length > 0
+  return openDialog<{ usrs: number[] }>(UserPickDialog, {
+    multiple: true,
+    title: change ? 'Сменить ответственных' : 'Назначить ответственных',
+    okText: change ? 'Сменить' : 'Назначить',
     current: opts.current,
     save: opts.save,
     load: async (): Promise<UserPickRow[]> =>

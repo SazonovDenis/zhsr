@@ -4,6 +4,7 @@ import kz.zhsr.app.dto.check.CheckListFilter;
 import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.service.SqlQuery;
 import kz.zhsr.app.service.SqlWhere;
+import kz.zhsr.app.service.TripWagonSql;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -85,12 +86,7 @@ final class CheckSql {
             where.param("myWagons", scope.wagons());
         }
         if (scope.trip() != null) {
-            any.add("""
-                    check_list.wagon in (select train_wagon.wagon from train_wagon
-                                      join trip on trip.train = train_wagon.train
-                                      where trip.id = :myTrip
-                                        and (train_wagon.dend is null
-                                             or train_wagon.dend >= coalesce(trip.departed_dt, trip.planned_dt)))""");
+            any.add("check_list.wagon in " + TripWagonSql.wagonsOf("myTrip"));
             any.add("check_list.trip = :myTrip");
             where.param("myTrip", scope.trip());
         }

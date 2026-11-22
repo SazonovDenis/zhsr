@@ -73,18 +73,17 @@ public class ActCancelService {
         long cancellation = cancellation(me, body);
         for (DbRec row : db.loadList("transfer_act_wagon", Map.of("transfer_act", id))) {
             Long location = row.getLong("wagon_location", null);
-            Long responsible = row.getLong("wagon_responsible", null);
+            WagonJournal.Responsibles responsibles = TransferService.responsibles(row);
             Map<String, Object> values = new HashMap<>();
             values.put("id", row.getLong("id"));
             values.put("wagon_location", null);
             values.put("wagon_responsible", null);
+            values.put("closed_wagon_responsible", null);
             db.updateRec("transfer_act_wagon", values);
             if (location != null) {
                 wagonJournal.undoLocation(location);
             }
-            if (responsible != null) {
-                wagonJournal.unassign(responsible);
-            }
+            wagonJournal.unassign(row.getLong("wagon"), responsibles);
         }
         db.updateRec("transfer_act", Map.of("id", id, "act_status_type", ActStatus.CANCELLED,
                 "act_cancellation", cancellation));

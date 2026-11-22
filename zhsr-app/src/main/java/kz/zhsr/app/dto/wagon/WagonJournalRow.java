@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * Строка журнала вагона (Ф-ВАГ-05): одно событие - записи журналов расположения, состояния и ответственного, которые
@@ -52,11 +53,11 @@ public class WagonJournalRow {
     private Long prevWagonStatusType;
     /** событие открыло запись журнала состояния */
     private boolean statusChanged;
-    /** ответственный после события (wagon_responsible.usr); null - не назначен */
-    private UserRef responsibleUsr;
-    /** ответственный до события; null - не назначен, ответственный событием не менялся или это первая запись */
-    private UserRef prevResponsibleUsr;
-    /** событие открыло запись журнала ответственного: назначение ответственного */
+    /** ответственные после события (состав записи факта wagon_responsible), по ФИО; пусто - не назначены */
+    private List<UserRef> responsibleUsrs = List.of();
+    /** ответственные до события; пусто - не назначены или ответственные событием не менялись */
+    private List<UserRef> prevResponsibleUsrs = List.of();
+    /** событие сменило ответственных: открыло или закрыло запись факта журнала ответственных */
     private boolean responsibleChanged;
     /** основание - константы BASIS_* */
     private int basisType;

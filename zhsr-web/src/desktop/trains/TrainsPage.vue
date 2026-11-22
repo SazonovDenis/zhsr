@@ -46,12 +46,12 @@ import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { TrainFilter, TrainRow } from '@/api/trains'
-import { fetchTrains } from '@/api/trains'
+import { deleteTrain, fetchTrains } from '@/api/trains'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
 import type { ChoiceItem } from '@/shared/components/choice/choice'
 import CbButton from '@/shared/components/choice/CbButton.vue'
-import { openDialog } from '@/shared/components/dialog/openDialog'
+import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
@@ -63,7 +63,7 @@ import { shownError } from '@/shared/errors'
 import { roleReason } from '@/shared/roleReason'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { useSidePanel } from '../frame/useSidePanel'
-import TrainNameDialog from './TrainNameDialog.vue'
+import { openTrainNew } from './openTrainNew'
 import TrainPanel from './TrainPanel.vue'
 import { trainsColumns } from './trainsColumns'
 
@@ -110,13 +110,24 @@ function open(train: TrainRow) {
   void router.push({ name: 'train-form', params: { id: train.id } })
 }
 
-async function create() {
-  const created = await openDialog<TrainRow>(TrainNameDialog)
-  if (created) void router.push({ name: 'train-form', params: { id: created.id } })
+function create() {
+  void openTrainNew(router)
 }
 
 const rowMenu: RowMenuItem<TrainRow>[] = [
   { label: 'Состав поезда', run: open },
+  // удалить можно поезд без рейсов, в котором никогда не было вагонов: иначе причина от сервера в окне
+  {
+    label: 'Удалить',
+    separator: true,
+    disabled: () => roleReason([RoleType.WAGON_PLANNER], 'Удаляет планировщик вагонов'),
+    run: (tr: TrainRow) =>
+      void confirmDelete('Удаление поезда', 'Удалить поезд {name}?', { name: tr.name }, () => deleteTrain(tr.id)).then(
+        (ok) => {
+          if (ok) void load()
+        },
+      ),
+  },
   { label: 'Создать поезд', separator: true, disabled: () => createReason.value, run: () => void create() },
 ]
 

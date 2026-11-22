@@ -1,5 +1,11 @@
 <template>
-  <DialogFrame v-model:show="show" :title="t('Неотправленные записи будут удалены')" width="30rem" :actions="actions">
+  <DialogFrame
+    v-model:show="show"
+    height="sm"
+    :title="t('Неотправленные записи будут удалены')"
+    width="30rem"
+    :actions="actions"
+  >
     <div>{{ text }}</div>
   </DialogFrame>
 </template>

@@ -1,5 +1,11 @@
 <template>
-  <DialogFrame v-model:show="show" :title="t('База данных сервера изменилась')" width="30rem" :actions="actions">
+  <DialogFrame
+    v-model:show="show"
+    height="sm"
+    :title="t('База данных сервера изменилась')"
+    width="30rem"
+    :actions="actions"
+  >
     <div>{{ t('Сервер сменил базу данных. Неотправленные заявки будут удалены: {n}.', { n: count }) }}</div>
   </DialogFrame>
 </template>

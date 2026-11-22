@@ -20,7 +20,18 @@
       <template v-else>
         <div class="item-panel__head q-mt-lg">
           <span class="item-panel__title">{{ t('Нормативы') }}</span>
-          <SoftLink text="Добавить норматив" @click="editNorm(null)" />
+          <q-btn
+            unelevated
+            outline
+            dense
+            no-caps
+            color="primary"
+            class="zs-soft-border"
+            padding="0.1rem 0.6rem"
+            @click="editNorm(null)"
+          >
+            {{ t('Добавить норматив') }}
+          </q-btn>
         </div>
         <LoadSpinner v-if="busy.active.value && norms.length === 0" />
         <ErrorBox v-else-if="error" :error="error" :retry="load" />
@@ -64,7 +75,6 @@ import { provideBusy } from '@/shared/busy'
 import { EQUIP_BASES, EQUIP_QUANTITY_KINDS, equipBasisText, equipQuantityKindText } from '@/shared/checks/labels'
 import { numText } from '@/shared/checks/texts'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
-import SoftLink from '@/shared/components/form/SoftLink.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
 import { dictManager } from '@/shared/dict/DictManager'

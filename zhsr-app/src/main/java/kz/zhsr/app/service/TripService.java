@@ -11,8 +11,12 @@ import kz.zhsr.app.constants.ConductorCategory;
 import kz.zhsr.app.constants.CrewDuty;
 import kz.zhsr.app.constants.LocationType;
 import kz.zhsr.app.constants.RoleType;
-import kz.zhsr.app.constants.TrainWagonChangeStatus;
+import kz.zhsr.app.constants.TrainWagonKind;
+import kz.zhsr.app.constants.TrainWagonPlanStatus;
+import kz.zhsr.app.constants.TripResponsibleLayer;
+import kz.zhsr.app.constants.WagonResponsibleTripPoint;
 import kz.zhsr.app.constants.TripStatus;
+import kz.zhsr.app.constants.WagonResponsibleKind;
 import kz.zhsr.app.constants.WagonStatus;
 import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.dto.ref.TrainRef;
@@ -22,6 +26,7 @@ import kz.zhsr.app.dto.train.TrainChange;
 import kz.zhsr.app.dto.trip.ConductorCandidate;
 import kz.zhsr.app.dto.trip.StaffCandidate;
 import kz.zhsr.app.dto.trip.TripCrew;
+import kz.zhsr.app.dto.trip.TripResponsibles;
 import kz.zhsr.app.dto.trip.TripFilter;
 import kz.zhsr.app.dto.trip.TripRow;
 import org.springframework.stereotype.Service;
@@ -33,7 +38,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,8 +54,9 @@ import java.util.Set;
  * <p>
  * Права: рейс создают, исправляют и отменяют планировщик вагонов и администратор. В рейсе в статусе «план»
  * начальника поезда и ПЭМ меняют планировщик вагонов и администратор, список проводников - планировщик проводников и
- * администратор. Проводников по вагонам распределяют в статусе «план» планировщик проводников и начальник поезда этого
- * рейса, в статусе «выполняется» - начальник поезда этого рейса; администратор - всегда. Отправление и прибытие
+ * администратор. Распределение по вагонам - ответственные на рейс в журнале ответственных ({@link
+ * TripResponsibleService}): в статусе «план» - план на рейс (планировщик проводников и начальник поезда этого рейса),
+ * в статусе «выполняется» - факт (начальник поезда этого рейса); администратор - всегда. Отправление и прибытие
  * отмечает начальник поезда этого рейса. Администратор может всё. Смотреть формирование может тот, кому рейс виден в
  * списке рейсов. Вагоны поезда меняет {@link TrainService}.
  * <p>
@@ -92,24 +97,53 @@ public class TripService {
     }
 
     /**
-     * Отметка отправления или прибытия.
+     * Поездная бригада рейса.
      *
-     * @param time              фактическое время, ISO с часовым поясом; null - сейчас
-     * @param assignResponsible прибытие: ответственного за вагоны выбрали сразу при отметке; null или false - не
-     *                          выбрали, ответственные - проводники до назначения. Отправление и исправление времени его
-     *                          не используют
-     * @param responsibleUsr    выбранный ответственный - из бригады рейса или сотрудников депо станции прибытия; null -
-     *                          не назначен
+     * @param lnp        начальник поезда (usr.id); null - не назначен
+     * @param pem        ПЭМ (usr.id); null - не назначен
+     * @param conductors проводники (usr.id); пусто - проводников нет
      */
-    public record MarkBody(OffsetDateTime time, Boolean assignResponsible, Long responsibleUsr) {
+    public record CrewBody(Long lnp, Long pem, List<Long> conductors) {
     }
 
     /**
-     * Назначение ответственного за вагоны прибывшего рейса.
+     * Отметка отправления или прибытия.
      *
-     * @param responsibleUsr ответственный - из бригады рейса или сотрудников депо станции прибытия; null - не назначен
+     * @param time         фактическое время, ISO с часовым поясом; null - сейчас
+     * @param responsibles ответственные за вагоны, сохранённые в окне отметки: записываются временем отметки у вагонов,
+     *                     где отличаются от текущих; null - не менять. Исправление времени их не использует
      */
-    public record ResponsibleBody(Long responsibleUsr) {
+    public record MarkBody(OffsetDateTime time, List<TripResponsibleService.WagonUsrs> responsibles) {
+    }
+
+    /**
+     * Ответственные за вагоны рейса (Ф-РЕЙ-08).
+     *
+     * @param layer  что меняется: TripResponsibleLayer.TRIP, AFTER или FACT; null - TRIP
+     * @param time   время изменения факта, ISO с часовым поясом; null - сейчас; у плана не используется
+     * @param wagons ответственные изменённых вагонов
+     */
+    public record ResponsiblesBody(Integer layer, OffsetDateTime time,
+                                   List<TripResponsibleService.WagonUsrs> wagons) {
+    }
+
+    /**
+     * Распределение бригады по вагонам: ответственные на рейс.
+     *
+     * @param time    время изменения у выполняющегося рейса, ISO с часовым поясом; null - сейчас; до отправления не
+     *                используется - меняется план на рейс
+     * @param members вагоны сотрудников бригады
+     */
+    public record CrewWagonsBody(OffsetDateTime time, List<MemberWagons> members) {
+    }
+
+    /**
+     * Вагоны сотрудника бригады.
+     *
+     * @param usr    сотрудник (usr.id)
+     * @param wagons номера вагонов: один или два соседних; пусто - сотрудник без вагона
+     */
+    public record MemberWagons(long usr, List<String> wagons) {
     }
 
     private final Db db;
@@ -118,23 +152,27 @@ public class TripService {
     private final RouteService routeService;
     private final ListService listService;
     private final WagonJournal wagonJournal;
-    private final ResponsibleService responsibleService;
+    private final TripResponsibleService tripResponsibleService;
     private final WagonRun wagonRun;
     private final TrainService trainService;
+    private final TrainJournal trainJournal;
     private final RefResolver refResolver;
 
     public TripService(Db db, CurrentUserService currentUserService, Visibility visibility, RouteService routeService,
-                       ListService listService, WagonJournal wagonJournal, ResponsibleService responsibleService,
-                       WagonRun wagonRun, TrainService trainService, RefResolver refResolver) {
+                       ListService listService, WagonJournal wagonJournal,
+                       TripResponsibleService tripResponsibleService,
+                       WagonRun wagonRun, TrainService trainService, TrainJournal trainJournal,
+                       RefResolver refResolver) {
         this.db = db;
         this.currentUserService = currentUserService;
         this.visibility = visibility;
         this.routeService = routeService;
         this.listService = listService;
         this.wagonJournal = wagonJournal;
-        this.responsibleService = responsibleService;
+        this.tripResponsibleService = tripResponsibleService;
         this.wagonRun = wagonRun;
         this.trainService = trainService;
+        this.trainJournal = trainJournal;
         this.refResolver = refResolver;
     }
 
@@ -156,8 +194,26 @@ public class TripService {
     }
 
     /**
+     * Удалить рейс (DELETE /trips/{id}): планировщик вагонов и администратор. Бригада рейса удаляется каскадом;
+     * на рейс ссылаются вагоны, заявки, чек-листы... - удалить не даст внешний ключ (сообщение - FkMessages).
+     */
+    @Transactional
+    public void delete(long id) throws Exception {
+        requireTrip(id);
+        requirePlanner();
+        try {
+            cancelResponsiblePlans(load(id));
+            db.deleteRec("trip", id);
+        } catch (Exception e) {
+            throw DbErrors.translate(e);
+        }
+    }
+
+    /**
      * Исправить маршрут, поезд и плановое отправление рейса в статусе «план» (Ф-РЕЙ-07). Исправляют планировщик
-     * вагонов и администратор. При смене поезда проводники снимаются с вагонов.
+     * вагонов и администратор. Планы ответственных рейса - на рейс и после рейса - связаны с рейсом ссылкой: их
+     * справочное начало переносится на новые плановые отправление и прибытие; при смене поезда они отменяются: бригада
+     * остаётся без вагонов.
      */
     @Transactional
     public TripRow update(long id, TripBody body) throws Exception {
@@ -170,9 +226,13 @@ public class TripService {
         values.put("id", id);
         try {
             db.updateRec("trip", values);
-            if (!Objects.equals(trip.getLong("train", null), body.train())) {
-                unassignConductors(id);
+            if (Objects.equals(trip.getLong("train", null), body.train())) {
+                tripResponsibleService.retimePlans(load(id));
+            } else {
+                tripResponsibleService.cancelPlans(id);
             }
+        } catch (ApiException e) {
+            throw e;
         } catch (Exception e) {
             throw DbErrors.translate(e);
         }
@@ -193,6 +253,7 @@ public class TripService {
         if (trip.getLong("trip_status_type") != TripStatus.PLANNED) {
             throw ApiException.conflict("Отменяется только рейс в статусе «План»");
         }
+        cancelResponsiblePlans(load(id));
         db.updateRec("trip", Map.of("id", id, "trip_status_type", TripStatus.CANCELLED));
         evictCrew(load(id));
         return row(id);
@@ -289,27 +350,54 @@ public class TripService {
     }
 
     /**
-     * Проводники рейса: кто в списке - в бригаде, кого нет - уходит из бригады и с вагонов. Новые проводники
-     * становятся нераспределёнными: строка бригады без вагона.
+     * Поездная бригада рейса: начальник поезда, ПЭМ и проводники одной операцией. Начальника поезда и ПЭМ меняет
+     * планировщик вагонов, проводников - планировщик проводников; то, что не изменилось, право не проверяет. Проводник,
+     * которого нет в списке, уходит из бригады и из планов ответственных рейса; новые проводники - нераспределённые.
      */
     @Transactional
-    public TripCrew setConductors(long id, List<Long> users) throws Exception {
-        DbRec trip = requirePlanEdit(id, isCrewPlanner(currentUserService.get()),
-                "Проводников рейса набирает планировщик проводников");
-        Set<Long> keep = new HashSet<>(users);
-        Set<Long> present = new HashSet<>();
+    public TripCrew setCrew(long id, CrewBody body) throws Exception {
+        CurrentUser me = currentUserService.get();
+        DbRec trip = requirePlanEdit(id, isWagonPlanner(me) || isCrewPlanner(me),
+                "Поездную бригаду меняют планировщик вагонов и планировщик проводников");
+        List<DbRec> crew = db.loadList("trip_crew", Map.of("trip", id));
+        Set<Long> keep = new LinkedHashSet<>(body.conductors() == null ? List.of() : body.conductors());
+        Set<Long> conductors = new HashSet<>();
+        for (DbRec r : crew) {
+            if (r.getLong("crew_duty_type") == CrewDuty.CONDUCTOR) {
+                conductors.add(r.getLong("usr"));
+            }
+        }
+        boolean dutiesChanged = !Objects.equals(dutyUsr(crew, CrewDuty.LNP), body.lnp())
+                || !Objects.equals(dutyUsr(crew, CrewDuty.PEM), body.pem());
+        if (dutiesChanged && !isWagonPlanner(me)) {
+            throw ApiException.forbidden("Начальника поезда и ПЭМ назначает планировщик вагонов");
+        }
+        if (!conductors.equals(keep) && !isCrewPlanner(me)) {
+            throw ApiException.forbidden("Проводников рейса набирает планировщик проводников");
+        }
+        Set<Long> removed = new HashSet<>();
         Set<Long> changed = new HashSet<>();
         try {
-            for (DbRec r : db.loadList("trip_crew", Map.of("trip", id))) {
+            // сначала уходят снятые проводники: сотрудник может перейти из проводников в начальники поезда или ПЭМ
+            for (DbRec r : crew) {
                 long usr = r.getLong("usr");
-                present.add(usr);
                 if (r.getLong("crew_duty_type") == CrewDuty.CONDUCTOR && !keep.contains(usr)) {
                     db.deleteRec("trip_crew", r.getLong("id"));
+                    removed.add(usr);
                     changed.add(usr);
                 }
             }
+            changed.addAll(applyDuty(trip, CrewDuty.LNP, body.lnp(), removed));
+            changed.addAll(applyDuty(trip, CrewDuty.PEM, body.pem(), removed));
+            Set<Long> present = new HashSet<>();
+            for (DbRec r : db.loadList("trip_crew", Map.of("trip", id))) {
+                present.add(r.getLong("usr"));
+            }
             for (long usr : keep) {
                 if (present.contains(usr)) {
+                    if (!conductors.contains(usr)) {
+                        throw ApiException.conflict("Сотрудник уже в бригаде рейса");
+                    }
                     continue;
                 }
                 requireRole(usr, RoleType.CONDUCTOR);
@@ -317,6 +405,7 @@ public class TripService {
                 db.insertRec("trip_crew", Map.of("trip", id, "usr", usr, "crew_duty_type", CrewDuty.CONDUCTOR));
                 changed.add(usr);
             }
+            tripResponsibleService.dropFromPlans(load(id), removed);
         } catch (ApiException e) {
             throw e;
         } catch (Exception e) {
@@ -326,13 +415,50 @@ public class TripService {
         return load(id);
     }
 
+    /** Сотрудник на должности duty в бригаде crew; null - должность не занята. */
+    private static Long dutyUsr(List<DbRec> crew, long duty) {
+        return crew.stream().filter(r -> r.getLong("crew_duty_type") == duty).map(r -> r.getLong("usr"))
+                .findFirst().orElse(null);
+    }
+
     /**
-     * Закрепить проводника за вагонами: один вагон или два соседних; пустой список - проводник снимается с вагона и
-     * становится нераспределённым. В рейсе в статусе «план» строки проводника заменяются; в статусе «выполняется»
-     * открытые строки закрываются и открываются новые.
+     * Назначить на должность начальника поезда или ПЭМ сотрудника user (null - снять с должности) без проверки прав.
+     * Снятый с должности попадает в removed - его убирают из планов ответственных.
+     *
+     * @return сотрудники, чьё дежурство изменилось
+     */
+    private Set<Long> applyDuty(DbRec trip, long duty, Long user, Set<Long> removed) throws Exception {
+        long id = trip.getLong("id");
+        DbRec current = db.loadRec("trip_crew", Map.of("trip", id, "crew_duty_type", duty));
+        if (current != null && user != null && current.getLong("usr") == user) {
+            return Set.of();
+        }
+        Set<Long> changed = new HashSet<>();
+        if (current != null) {
+            db.deleteRec("trip_crew", current.getLong("id"));
+            removed.add(current.getLong("usr"));
+            changed.add(current.getLong("usr"));
+        }
+        if (user != null) {
+            if (!db.loadList("trip_crew", Map.of("trip", id, "usr", user)).isEmpty()) {
+                throw ApiException.conflict("Сотрудник уже в бригаде рейса");
+            }
+            requireRole(user, roleOf(duty));
+            requireFree(trip, user);
+            db.insertRec("trip_crew", Map.of("trip", id, "usr", user, "crew_duty_type", duty));
+            removed.remove(user);
+            changed.add(user);
+        }
+        return changed;
+    }
+
+    /**
+     * Распределить бригаду по вагонам: у каждого сотрудника - один вагон или два соседних; пустой список - сотрудник
+     * без вагона. Рейс в статусе «план» - меняется план ответственных на рейс, «выполняется» - факт временем
+     * body.time. Состав вагона - сотрудники, которых распределение на нём оставило, и другие его ответственные.
      */
     @Transactional
-    public TripCrew setConductorWagons(long id, long user, List<String> numbers) throws Exception {
+    public TripCrew setCrewWagons(long id, CrewWagonsBody body) throws Exception {
         DbRec trip = requireTrip(id);
         CurrentUser me = currentUserService.get();
         long state = trip.getLong("trip_status_type");
@@ -345,52 +471,65 @@ public class TripService {
                     ? "Распределяет проводников планировщик проводников или начальник поезда рейса"
                     : "Рейс закончен");
         }
-        List<DbRec> rows = db.loadList("trip_crew", Map.of("trip", id, "usr", user, "crew_duty_type",
-                CrewDuty.CONDUCTOR)).stream().filter(r -> r.get("dend") == null).toList();
-        if (rows.isEmpty()) {
-            throw ApiException.notFound("Проводника нет в бригаде рейса");
-        }
-        List<String> list = new ArrayList<>(new LinkedHashSet<>(numbers));
-        if (list.size() > 2) {
-            throw ApiException.badRequest("Проводник обслуживает один вагон или два соседних");
-        }
         TripCrew crew = load(id);
         List<TripCrew.Wagon> riding = crew.getWagons().stream().filter(TripCrew.Wagon::isRiding).toList();
         List<String> order = riding.stream().map(TripCrew.Wagon::getNumber).toList();
-        if (!order.containsAll(list)) {
-            throw ApiException.badRequest("Вагона нет в поезде рейса");
+        List<Long> ids = riding.stream().map(TripCrew.Wagon::getWagon).toList();
+        Map<Long, List<String>> targets = new LinkedHashMap<>();
+        for (MemberWagons m : body.members() == null ? List.<MemberWagons>of() : body.members()) {
+            if (crew.getCrew().stream().noneMatch(c -> c.getUsr().getId() == m.usr())) {
+                throw ApiException.notFound("Сотрудника нет в бригаде рейса");
+            }
+            List<String> list = new ArrayList<>(new LinkedHashSet<>(m.wagons() == null ? List.of() : m.wagons()));
+            if (list.size() > 2) {
+                throw ApiException.badRequest("Проводник обслуживает один вагон или два соседних");
+            }
+            if (!order.containsAll(list)) {
+                throw ApiException.badRequest("Вагона нет в поезде рейса");
+            }
+            if (list.size() == 2 && Math.abs(order.indexOf(list.get(0)) - order.indexOf(list.get(1))) != 1) {
+                throw ApiException.badRequest("Вторым вагоном можно выбрать только соседний");
+            }
+            targets.put(m.usr(), list);
         }
-        if (list.size() == 2 && Math.abs(order.indexOf(list.get(0)) - order.indexOf(list.get(1))) != 1) {
-            throw ApiException.badRequest("Вторым вагоном можно выбрать только соседний");
+        // ответственные на рейс вагонов: до отправления - план на рейс, в пути - текущий факт
+        Map<Long, List<Long>> was = new HashMap<>();
+        if (state == TripStatus.PLANNED) {
+            for (Long wagon : ids) {
+                List<Long> plan = wagonJournal.waitingPlanUsrs(wagon, crew.getTrip().getId(),
+                        WagonResponsibleTripPoint.DEPARTURE);
+                was.put(wagon, plan == null ? List.of() : plan);
+            }
+        } else {
+            was.putAll(wagonJournal.currentUsrs(ids));
         }
-        List<Long> wagons = list.stream().map(n -> riding.get(order.indexOf(n)).getWagon()).toList();
-        List<Long> current = rows.stream().map(r -> r.getLong("wagon", null)).filter(Objects::nonNull).toList();
-        if (new HashSet<>(current).equals(new HashSet<>(wagons)) && rows.size() == Math.max(1, wagons.size())) {
-            return crew;
-        }
-        OffsetDateTime now = OffsetDateTime.now();
-        try {
-            for (DbRec r : rows) {
-                if (state == TripStatus.PLANNED) {
-                    db.deleteRec("trip_crew", r.getLong("id"));
-                } else {
-                    db.updateRec("trip_crew", Map.of("id", r.getLong("id"), "dend", now));
+        List<TripResponsibleService.WagonUsrs> changes = new ArrayList<>();
+        for (int i = 0; i < ids.size(); i++) {
+            long wagon = ids.get(i);
+            String number = order.get(i);
+            List<Long> usrs = new ArrayList<>(was.getOrDefault(wagon, List.of()));
+            for (Map.Entry<Long, List<String>> t : targets.entrySet()) {
+                usrs.remove(t.getKey());
+                if (t.getValue().contains(number)) {
+                    usrs.add(t.getKey());
                 }
             }
-            List<Long> targets = wagons.isEmpty() ? Collections.singletonList(null) : wagons;
-            for (Long wagon : targets) {
-                Map<String, Object> values = new HashMap<>();
-                values.put("trip", id);
-                values.put("usr", user);
-                values.put("crew_duty_type", CrewDuty.CONDUCTOR);
-                values.put("wagon", wagon);
-                values.put("dbeg", state == TripStatus.PLANNED ? null : now);
-                db.insertRec("trip_crew", values);
+            if (!WagonJournal.sameUsrs(usrs, was.getOrDefault(wagon, List.of()))) {
+                changes.add(new TripResponsibleService.WagonUsrs(wagon, usrs));
             }
+        }
+        if (changes.isEmpty()) {
+            return crew;
+        }
+        OffsetDateTime time = state == TripStatus.PLANNED ? null : ActTime.check(body.time());
+        try {
+            tripResponsibleService.save(crew, TripResponsibleLayer.TRIP, time, changes);
+        } catch (ApiException e) {
+            throw e;
         } catch (Exception e) {
             throw DbErrors.translate(e);
         }
-        currentUserService.evict(user);
+        targets.keySet().forEach(currentUserService::evict);
         return load(id);
     }
 
@@ -410,6 +549,7 @@ public class TripService {
         try {
             if (current != null) {
                 db.deleteRec("trip_crew", current.getLong("id"));
+                tripResponsibleService.dropFromPlans(load(id), Set.of(current.getLong("usr")));
                 currentUserService.evict(current.getLong("usr"));
             }
             if (user != null) {
@@ -431,8 +571,8 @@ public class TripService {
 
     /**
      * Отметить отправление (Ф-РЕЙ-03): рейс - «выполняется», вагоны поезда - «в рейсе» и «в пути», бригада заступает
-     * на дежурство. Ответственный за вагон - его проводник (первый по составу бригады, если их несколько); у вагона без
-     * проводника - начальник поезда.
+     * на дежурство. Отработка плана ответственных на рейс: ответственные вагонов временем отправления - по плану или
+     * по правке в окне отправления, вагон без плана - без ответственных; план - «отработан».
      */
     @Transactional
     public TripCrew depart(long id, MarkBody body) throws Exception {
@@ -449,32 +589,29 @@ public class TripService {
         if (time.isAfter(OffsetDateTime.now())) {
             throw ApiException.badRequest("Укажите время не позже текущего");
         }
-        for (TripCrew.Wagon w : crew.getWagons()) {
-            if (w.isRiding() && !time.isAfter(w.getDbeg())) {
-                throw ApiException.badRequest("Отправление должно быть позже прицепки вагона " + w.getNumber());
-            }
+        OffsetDateTime lastFact = trainJournal.lastFact(crew.getTrip().getTrain().getId());
+        if (lastFact != null && !time.isAfter(lastFact)) {
+            throw ApiException.badRequest("Отправление должно быть позже последней прицепки или отцепки поезда");
         }
         db.updateRec("trip", Map.of("id", id, "trip_status_type", TripStatus.IN_PROGRESS, "departed_dt", time,
                 "departed_by_usr", me.id(), "departure_marked_dt", OffsetDateTime.now()));
-        Map<Long, Long> conductors = conductorsByWagon(id);
-        Long chief = chiefOf(id);
         for (TripCrew.Wagon w : crew.getWagons()) {
             if (w.isRiding()) {
-                wagonJournal.move(w.getWagon(), time, LocationType.TRIP, null, id, WagonStatus.IN_TRIP,
-                        conductors.getOrDefault(w.getWagon(), chief));
+                wagonJournal.moveKeepResponsible(w.getWagon(), time, LocationType.TRIP, null, id,
+                        WagonStatus.IN_TRIP);
             }
         }
         db.updateRec("trip_crew", Map.of("dbeg", time), nullParam("trip", id, "dbeg"));
+        tripResponsibleService.markDeparture(load(id), time, body.responsibles());
         evictCrew(crew);
         return load(id);
     }
 
     /**
      * Отметить прибытие (Ф-РЕЙ-04): рейс - «выполнен», вагоны, которые едут в поезде, - на станции прибытия и «в
-     * простое»; ответственный - выбранный при отметке, если его выбрали; иначе не меняется - до назначения
-     * ({@link #assignResponsible}) им остаётся проводник; вносятся
-     * участки пробега, бригада заканчивает дежурство. Вагоны остаются в поезде. Вагоны, отцепленные в пути, не
-     * меняются.
+     * простое»; отработка плана ответственных после рейса: ответственные временем прибытия - по плану или по правке в
+     * окне прибытия, вагон без плана и правки не меняется; вносятся участки пробега, бригада заканчивает дежурство.
+     * Вагоны остаются в поезде. Вагоны, отцепленные в пути, не меняются.
      */
     @Transactional
     public TripCrew arrive(long id, MarkBody body) throws Exception {
@@ -493,16 +630,12 @@ public class TripService {
             throw ApiException.badRequest("Прибытие должно быть позже отправления");
         }
         TripCrew crew = load(id);
-        if (crew.getChanges().stream().anyMatch(c -> c.getStatus() == TrainWagonChangeStatus.PLANNED)) {
+        if (crew.getChanges().stream().anyMatch(c -> c.getKind() == TrainWagonKind.PLAN)) {
             throw ApiException.conflict("Отметьте или отмените плановые прицепки и отцепки рейса");
         }
         Long station = crew.getTrip().getArrivalStation();
         if (station == null) {
             throw ApiException.conflict("У маршрута рейса нет станции прибытия");
-        }
-        boolean assign = Boolean.TRUE.equals(body.assignResponsible());
-        if (assign) {
-            responsibleService.check(body.responsibleUsr(), station, id);
         }
 
         db.updateRec("trip", Map.of("id", id, "trip_status_type", TripStatus.DONE, "arrived_dt", time,
@@ -511,60 +644,75 @@ public class TripService {
             if (!w.isRiding()) {
                 continue;
             }
-            if (assign) {
-                wagonJournal.move(w.getWagon(), time, LocationType.STATION, station, null, WagonStatus.IN_IDLE,
-                        body.responsibleUsr());
-            } else {
-                wagonJournal.moveKeepResponsible(w.getWagon(), time, LocationType.STATION, station, null,
-                        WagonStatus.IN_IDLE);
+            wagonJournal.moveKeepResponsible(w.getWagon(), time, LocationType.STATION, station, null,
+                    WagonStatus.IN_IDLE);
+            Long attach = trainJournal.attachOf(crew.getTrip().getTrain().getId(), w.getWagon(), time);
+            if (attach != null) {
+                wagonRun.addSegment(id, attach, null);
             }
-            wagonRun.addSegment(id, db.loadRec("train_wagon", w.getId()), null);
         }
         db.updateRec("trip_crew", Map.of("dend", time), nullParam("trip", id, "dend"));
+        tripResponsibleService.markArrival(load(id), time, body.responsibles());
         evictCrew(crew);
         return load(id);
     }
 
     /**
-     * Назначить ответственного за вагоны прибывшего рейса (Ф-РЕЙ-04): начальник поезда рейса (или администратор), рейс
-     * «выполнен». Ответственный - один на вагоны, которые приехали в поезде и стоят на станции прибытия; время
-     * назначения - сейчас. Назначить можно снова - новым ответственным.
+     * Ответственные за вагоны рейса (GET /trips/{id}/responsibles, Ф-РЕЙ-08): вагоны поезда рейса, их ответственные
+     * слоя layer и кого можно назначить; readonlyReason - почему сотрудник не может менять.
+     *
+     * @param layer TripResponsibleLayer; null - TRIP
+     */
+    public TripResponsibles responsibles(long id, Integer layer) throws Exception {
+        CurrentUser me = currentUserService.get();
+        requireTrip(id);
+        return tripResponsibleService.view(load(id), layerOf(layer), responsiblesReadonly(id, me));
+    }
+
+    /**
+     * Сменить ответственных за вагоны рейса (POST /trips/{id}/responsibles, Ф-РЕЙ-08) у вагонов, где состав отличается
+     * от показанного: план на рейс (до отправления) и план после рейса - планом, ответственных на рейс в пути и после
+     * прибытия - фактом одним временем. Меняют начальник поезда рейса, планировщики вагонов и проводников,
+     * администратор.
+     *
+     * @throws ApiException 403 - нет права; 409 - слой не меняется в этом статусе рейса; 400 - время, вагон или
+     *                      сотрудник неверны
      */
     @Transactional
-    public TripCrew assignResponsible(long id, ResponsibleBody body) throws Exception {
+    public TripResponsibles saveResponsibles(long id, ResponsiblesBody body) throws Exception {
         CurrentUser me = currentUserService.get();
-        DbRec trip = requireTrip(id);
-        requireChief(id, me, "Ответственного за вагоны назначает начальник поезда этого рейса");
-        if (trip.getLong("trip_status_type") != TripStatus.DONE) {
-            throw ApiException.conflict("Ответственного за вагоны назначают после прибытия рейса");
+        requireTrip(id);
+        String reason = responsiblesReadonly(id, me);
+        if (reason != null) {
+            throw ApiException.forbidden(reason);
         }
+        int layer = layerOf(body.layer());
         TripCrew crew = load(id);
-        Long station = crew.getTrip().getArrivalStation();
-        if (station == null) {
-            throw ApiException.conflict("У маршрута рейса нет станции прибытия");
-        }
-        responsibleService.check(body.responsibleUsr(), station, id);
-        List<Long> riding = crew.getWagons().stream().filter(TripCrew.Wagon::isRiding).map(TripCrew.Wagon::getWagon)
-                .toList();
-        if (riding.isEmpty()) {
-            throw ApiException.conflict("В поезде рейса нет вагонов");
-        }
-        OffsetDateTime now = OffsetDateTime.now();
-        int assigned = 0;
-        for (DbRec info : db.loadList("wagon_info", Map.of("wagon", riding))) {
-            // вагон уже в другом рейсе или на другой станции - его ответственного не трогаем; на станции прибытия -
-            // и в её депо и парках отстоя (после передачи по акту)
-            if (!station.equals(stationOf(info))) {
-                continue;
-            }
-            wagonJournal.assign(info.getLong("wagon"), now, body.responsibleUsr());
-            assigned++;
-        }
-        if (assigned == 0) {
-            throw ApiException.conflict("Вагоны поезда уже не на станции прибытия - ответственного меняют у вагона");
-        }
+        boolean fact = layer == TripResponsibleLayer.FACT
+                || (layer == TripResponsibleLayer.TRIP && crew.getTrip().getTripStatusType() != TripStatus.PLANNED);
+        OffsetDateTime time = fact ? ActTime.check(body.time()) : null;
+        tripResponsibleService.save(crew, layer, time, body.wagons());
         evictCrew(crew);
-        return load(id);
+        return tripResponsibleService.view(load(id), layer, null);
+    }
+
+    /** Почему сотрудник не может менять ответственных за вагоны рейса; может - null. Статус рейса - отдельно. */
+    private String responsiblesReadonly(long id, CurrentUser me) throws Exception {
+        boolean allowed = me.hasRole(RoleType.ADMIN) || me.hasRole(RoleType.WAGON_PLANNER)
+                || me.hasRole(RoleType.CREW_PLANNER) || isChief(id, me);
+        return allowed ? null : "Ответственных за вагоны меняют начальник поезда рейса и планировщики";
+    }
+
+    private static int layerOf(Integer layer) {
+        if (layer == null) {
+            return TripResponsibleLayer.TRIP;
+        }
+        if (layer != TripResponsibleLayer.TRIP && layer != TripResponsibleLayer.AFTER
+                && layer != TripResponsibleLayer.ARRIVAL && layer != TripResponsibleLayer.FACT) {
+            throw ApiException.badRequest("Неизвестный слой ответственных: " + layer
+                    + "; сервер, возможно, не обновлён");
+        }
+        return layer;
     }
 
     /** Сколько после отметки отправления или прибытия её можно исправить или отменить. */
@@ -573,9 +721,9 @@ public class TripService {
     /** Отметка отправления или прибытия: колонки рейса, статус рейса с отметкой и без неё. */
     private enum Mark {
         DEPART("departed_dt", "departed_by_usr", "departure_marked_dt", "dbeg", TripStatus.IN_PROGRESS,
-                TripStatus.PLANNED, "отправления"),
+                TripStatus.PLANNED, WagonResponsibleTripPoint.DEPARTURE, "отправления"),
         ARRIVE("arrived_dt", "arrived_by_usr", "arrival_marked_dt", "dend", TripStatus.DONE,
-                TripStatus.IN_PROGRESS, "прибытия");
+                TripStatus.IN_PROGRESS, WagonResponsibleTripPoint.ARRIVAL, "прибытия");
 
         final String time;
         final String by;
@@ -584,15 +732,19 @@ public class TripService {
         final String crewColumn;
         final long status;
         final long statusBefore;
+        /** стадия рейса в журнале ответственных: WagonResponsibleTripPoint */
+        final int point;
         final String text;
 
-        Mark(String time, String by, String marked, String crewColumn, long status, long statusBefore, String text) {
+        Mark(String time, String by, String marked, String crewColumn, long status, long statusBefore, int point,
+             String text) {
             this.time = time;
             this.by = by;
             this.marked = marked;
             this.crewColumn = crewColumn;
             this.status = status;
             this.statusBefore = statusBefore;
+            this.point = point;
             this.text = text;
         }
     }
@@ -614,15 +766,19 @@ public class TripService {
 
     /**
      * Отменить отправление (Ф-РЕЙ-03): в течение {@link #MARK_EDIT_PERIOD} после отметки, начальник поезда рейса.
-     * Рейс - снова «план», записи журналов вагонов, открытые отправлением, удаляются, бригада снова не на дежурстве.
-     * Если после отправления были изменения (отцепка, прицепка, передача, перевод проводника), отмены нет.
+     * Рейс - снова «план», записи журналов вагонов, открытые отправлением, удаляются, бригада снова не на дежурстве,
+     * план ответственных на рейс - снова «ожидает». Если после отправления были изменения (отцепка, прицепка, передача,
+     * смена ответственных), отмены нет.
      */
     @Transactional
     public TripCrew cancelDeparture(long id) throws Exception {
         return cancel(id, Mark.DEPART);
     }
 
-    /** Отменить прибытие (Ф-РЕЙ-04): как {@link #cancelDeparture}; рейс - снова «выполняется». */
+    /**
+     * Отменить прибытие (Ф-РЕЙ-04): как {@link #cancelDeparture}; рейс - снова «выполняется», план ответственных после
+     * рейса - снова «ожидает».
+     */
     @Transactional
     public TripCrew cancelArrival(long id) throws Exception {
         return cancel(id, Mark.ARRIVE);
@@ -644,16 +800,10 @@ public class TripService {
                     + "» после отметки");
         }
         OffsetDateTime since = trip.getDateTimeTZ(mark.time);
-        if (mark == Mark.ARRIVE) {
-            OffsetDateTime assigned = assignedAfter(trip, since).stream().map(r -> r.getDateTimeTZ("dbeg"))
-                    .min(Comparator.naturalOrder()).orElse(null);
-            if (assigned != null && !time.isBefore(assigned)) {
-                throw ApiException.badRequest("Время прибытия должно быть раньше назначения ответственного за вагоны");
-            }
-        }
         for (WagonJournal.Opened opened : opened(trip, mark)) {
             wagonJournal.retime(opened, time);
         }
+        tripResponsibleService.retimeMarks(id, mark.point, trainWagons(trip), since, time);
         db.updateRec("trip_crew", Map.of(mark.crewColumn, time), Map.of("trip", id, mark.crewColumn, since));
         db.updateRec("trip", Map.of("id", id, mark.time, time));
         evictCrew(load(id));
@@ -665,24 +815,26 @@ public class TripService {
         DbRec change = changeAfter(id, trip, mark);
         if (change != null) {
             throw ApiException.conflict("После отметки " + mark.text + " были изменения («" + change.getString("number")
-                    + "»: отцепка, прицепка, передача или перевод проводника) - сначала отмените их");
+                    + "»: отцепка, прицепка, передача или смена ответственных) - сначала отмените их");
         }
         OffsetDateTime since = trip.getDateTimeTZ(mark.time);
         if (mark == Mark.ARRIVE) {
             // отмена прибытия снимает участки пробега, внесённые прибытием: у вагонов, которые остались в поезде
-            for (DbRec row : db.loadList("train_wagon", nullParam("train", trip.getLong("train"), "dend"))) {
-                wagonRun.removeSegment(id, row.getLong("id"));
-            }
-            // и назначения ответственного после прибытия: ответственным снова становится проводник; позднее - первым
-            List<DbRec> assigned = new ArrayList<>(assignedAfter(trip, since));
-            assigned.sort(Comparator.comparing((DbRec r) -> r.getDateTimeTZ("dbeg")).reversed());
-            for (DbRec r : assigned) {
-                wagonJournal.unassign(r.getLong("id"));
+            long train = trip.getLong("train");
+            Map<String, Object> open = nullParam("train", train, "dend");
+            open.put("kind", TrainWagonKind.FACT);
+            for (DbRec row : db.loadList("train_wagon", open)) {
+                Long attach = trainJournal.attachOf(train, row.getLong("wagon"), since);
+                if (attach != null) {
+                    wagonRun.removeSegment(id, attach);
+                }
             }
         }
         for (WagonJournal.Opened opened : opened(trip, mark)) {
             wagonJournal.undo(opened);
         }
+        // отработка плана ответственных отменяется: факты отметки удаляются, план - снова «ожидает»
+        tripResponsibleService.unmark(id, mark.point, trainWagons(trip), since);
         Map<String, Object> crewValues = new HashMap<>();
         crewValues.put(mark.crewColumn, null);
         db.updateRec("trip_crew", crewValues, Map.of("trip", id, mark.crewColumn, since));
@@ -703,7 +855,8 @@ public class TripService {
      */
     private List<WagonJournal.Opened> opened(DbRec trip, Mark mark) throws Exception {
         OffsetDateTime since = trip.getDateTimeTZ(mark.time);
-        List<Long> wagons = db.loadList("train_wagon", Map.of("train", trip.getLong("train"))).stream()
+        List<Long> wagons = db.loadList("train_wagon", Map.of("train", trip.getLong("train"),
+                        "kind", TrainWagonKind.FACT)).stream()
                 .map(r -> r.getLong("wagon")).distinct().toList();
         List<WagonJournal.Opened> res = new ArrayList<>();
         if (wagons.isEmpty()) {
@@ -719,17 +872,13 @@ public class TripService {
         }
         Map<Long, DbRec> statuses = UtDb.collectGroupBy_record(db.loadList("wagon_status",
                 Map.of("wagon", wagons, "dbeg", since)), "wagon");
-        Map<Long, DbRec> responsibles = UtDb.collectGroupBy_record(db.loadList("wagon_responsible",
-                Map.of("wagon", wagons, "dbeg", since)), "wagon");
         for (DbRec location : db.loadList("wagon_location", params)) {
             long wagon = location.getLong("wagon");
             DbRec status = statuses.get(wagon);
             if (status == null) {
                 continue;
             }
-            DbRec responsible = responsibles.get(wagon);
-            res.add(new WagonJournal.Opened(location.getLong("id"), status.getLong("id"),
-                    responsible == null ? null : responsible.getLong("id")));
+            res.add(new WagonJournal.Opened(location.getLong("id"), status.getLong("id"), null));
         }
         return res;
     }
@@ -752,84 +901,31 @@ public class TripService {
         return trip;
     }
 
-    /** Станция расположения вагона (wagon_info): сама станция, станция депо или парка отстоя; вагон в рейсе - null. */
-    private Long stationOf(DbRec info) throws Exception {
-        long type = info.getLong("location_type");
-        if (type == LocationType.STATION) {
-            return info.getLong("station", null);
-        }
-        if (type == LocationType.DEPOT) {
-            return db.loadRec("depot", info.getLong("depot")).getLong("station", null);
-        }
-        if (type == LocationType.YARD) {
-            return db.loadRec("yard", info.getLong("yard")).getLong("station", null);
-        }
-        return null;
-    }
-
-    /**
-     * Записи журнала ответственного вагонов поезда рейса, открытые после прибытия since (назначения ответственного
-     * отдельным действием). Назначение при самой отметке открыто временем прибытия и сюда не входит: его исправляет и
-     * отменяет сама отметка.
-     */
-    private List<DbRec> assignedAfter(DbRec trip, OffsetDateTime since) throws Exception {
-        return assignedSince(trip, since).stream().filter(r -> r.getDateTimeTZ("dbeg").isAfter(since)).toList();
-    }
-
-    /** Записи журнала ответственного вагонов поезда рейса, открытые не раньше since. */
-    private List<DbRec> assignedSince(DbRec trip, OffsetDateTime since) throws Exception {
-        List<Long> wagons = db.loadList("train_wagon", Map.of("train", trip.getLong("train"))).stream()
-                .map(r -> r.getLong("wagon")).distinct().toList();
-        if (wagons.isEmpty()) {
-            return List.of();
-        }
-        return db.loadList("wagon_responsible", Map.of("wagon", wagons)).stream()
-                .filter(r -> !r.getDateTimeTZ("dbeg").isBefore(since)).toList();
-    }
-
     /** Первое изменение после отметки; нет - null. */
     private DbRec changeAfter(long id, DbRec trip, Mark mark) throws Exception {
-        return db.loadSqlRec(TripSql.changesAfter(), Map.of("train", trip.getLong("train"), "trip", id,
-                "since", trip.getDateTimeTZ(mark.time)));
-    }
-
-    /** Проводник каждого вагона рейса; у вагона несколько - первый по составу бригады. */
-    private Map<Long, Long> conductorsByWagon(long trip) throws Exception {
-        List<DbRec> rows = new ArrayList<>(
-                db.loadList("trip_crew", Map.of("trip", trip, "crew_duty_type", CrewDuty.CONDUCTOR)));
-        rows.sort(Comparator.comparingLong(r -> r.getLong("id")));
-        Map<Long, Long> res = new HashMap<>();
-        for (DbRec r : rows) {
-            Long wagon = r.getLong("wagon", null);
-            if (wagon != null && r.get("dend") == null) {
-                res.putIfAbsent(wagon, r.getLong("usr"));
-            }
-        }
-        return res;
-    }
-
-    /** Начальник поезда рейса; нет - null. */
-    private Long chiefOf(long trip) throws Exception {
-        DbRec r = db.loadRec("trip_crew", Map.of("trip", trip, "crew_duty_type", CrewDuty.LNP));
-        return r == null ? null : r.getLong("usr");
+        return db.loadSqlRec(TripSql.changesAfter(), Map.of("train", trip.getLong("train"),
+                "since", trip.getDateTimeTZ(mark.time), "fact", WagonResponsibleKind.FACT,
+                "trainFact", TrainWagonKind.FACT));
     }
 
     // --- внутреннее
 
-    /** Снять всех проводников рейса с вагонов: каждый проводник - одна строка без вагона. */
-    private void unassignConductors(long trip) throws Exception {
-        Set<Long> seen = new HashSet<>();
-        for (DbRec r : db.loadList("trip_crew", Map.of("trip", trip, "crew_duty_type", CrewDuty.CONDUCTOR))) {
-            long usr = r.getLong("usr");
-            if (!seen.add(usr)) {
-                db.deleteRec("trip_crew", r.getLong("id"));
-            } else if (r.get("wagon") != null) {
-                Map<String, Object> values = new HashMap<>();
-                values.put("id", r.getLong("id"));
-                values.put("wagon", null);
-                db.updateRec("trip_crew", values);
-            }
+    /** Вагоны поезда рейса: все, кто был в поезде по факту, без повторов. */
+    private List<Long> trainWagons(DbRec trip) throws Exception {
+        Long train = trip.getLong("train", null);
+        if (train == null) {
+            return List.of();
         }
+        return db.loadList("train_wagon", Map.of("train", train, "kind", TrainWagonKind.FACT)).stream()
+                .map(r -> r.getLong("wagon")).distinct().toList();
+    }
+
+    /** Отменить планы ответственных рейса в статусе «план»: на рейс и после рейса. */
+    private void cancelResponsiblePlans(TripCrew crew) throws Exception {
+        if (crew.getTrip().getTripStatusType() != TripStatus.PLANNED) {
+            return;
+        }
+        tripResponsibleService.cancelPlans(crew.getTrip().getId());
     }
 
     /**
@@ -842,7 +938,7 @@ public class TripService {
         }
         if (!crew.getPending().isEmpty()) {
             throw ApiException.conflict("Отметьте или отмените плановые прицепки и отцепки до отправления: "
-                    + String.join(", ", crew.getPending().stream().map(TrainChange::getNumber).toList()));
+                    + String.join(", ", crew.getPending().stream().map(c -> c.getWagon().getNumber()).toList()));
         }
         List<TripCrew.Wagon> riding = crew.getWagons().stream().filter(TripCrew.Wagon::isRiding).toList();
         if (riding.isEmpty()) {
@@ -881,77 +977,36 @@ public class TripService {
         trip.setDepartureStation(stops.isEmpty() ? null : stops.get(0));
         trip.setArrivalStation(stops.isEmpty() ? null : stops.get(stops.size() - 1));
 
-        OffsetDateTime start = tripRec.getDateTimeTZ("departure");
-        OffsetDateTime end = trip.getArrivedDt() != null ? trip.getArrivedDt() : tripRec.getDateTimeTZ("arrival");
-        List<TripCrew.Wagon> wagons = train == null ? List.of()
-                : trainService.wagons(train, start, end, TripCrew.Wagon.class);
-        for (TripCrew.Wagon w : wagons) {
-            w.setRiding(riding(w, trip, id, start));
-        }
+        List<TrainChange> changes = trainService.tripChanges(id);
+        List<TripCrew.Wagon> wagons = trainService.tripWagons(trip, changes);
 
-        Map<Long, String> numbers = new HashMap<>();
-        wagons.forEach(w -> numbers.put(w.getWagon(), w.getNumber()));
+        // вагоны сотрудников - ответственные на рейс в журнале ответственных, у вагонов, которые едут в поезде
+        Map<Long, List<String>> crewWagons = tripResponsibleService.crewWagons(id,
+                wagons.stream().filter(TripCrew.Wagon::isRiding).map(TripCrew.Wagon::getWagon).distinct().toList());
         Map<String, Object> params = new HashMap<>();
         params.put("trip", id);
         params.put("senior", ConductorCategory.SENIOR);
         params.put("arrived", trip.getArrivedDt());
         Map<Long, TripCrew.Member> members = new LinkedHashMap<>();
         for (DbRec r : db.loadSql(TripSql.crew(), params)) {
-            TripCrew.Member member = members.get(r.getLong("usr"));
-            if (member == null) {
-                member = DbRecMapper.toObject(r, TripCrew.Member.class);
-                member.setWagons(new ArrayList<>());
-                members.put(r.getLong("usr"), member);
-            }
-            Long wagon = r.getLong("wagon", null);
-            if (wagon != null) {
-                String number = numbers.get(wagon);
-                if (number == null) {
-                    number = db.loadRec("wagon", wagon).getString("number");
-                }
-                member.getWagons().add(number);
-            }
-        }
-
-        // ответственный за вагоны после прибытия - последнее назначение, в том числе при самой отметке прибытия
-        if (trip.getArrivedDt() != null && train != null) {
-            DbRec last = assignedSince(tripRec, trip.getArrivedDt()).stream()
-                    .max(Comparator.comparing((DbRec r) -> r.getDateTimeTZ("dbeg"))).orElse(null);
-            trip.setResponsibleAssigned(last != null);
-            Long usr = last == null ? null : last.getLong("usr", null);
-            trip.setResponsibleUsr(usr == null ? null : new UserRef(usr));
+            TripCrew.Member member = DbRecMapper.toObject(r, TripCrew.Member.class);
+            member.setWagons(crewWagons.getOrDefault(r.getLong("usr"), List.of()));
+            members.putIfAbsent(r.getLong("usr"), member);
         }
 
         TripCrew res = new TripCrew();
         res.setTrip(trip);
         res.setWagons(wagons);
         res.setCrew(new ArrayList<>(members.values()));
-        res.setChanges(trainService.tripChanges(id));
+        res.setChanges(changes);
+        res.setCancelled(trainService.tripPlans(id, TrainWagonPlanStatus.CANCELLED));
+        res.setDone(trainService.tripPlans(id, TrainWagonPlanStatus.DONE));
+        res.setLastFactDt(train == null ? null : trainJournal.lastFact(train));
         res.setPending(train == null || trip.getTripStatusType() != TripStatus.PLANNED || stopRecs.isEmpty()
                 ? List.of()
                 : trainService.pendingBefore(train, id, stopRecs.get(0).getLong("id"), trip.getPlannedDt()));
         refResolver.resolve(res);
         return res;
-    }
-
-    /**
-     * Едет ли вагон в поезде рейса: в рейсе в статусе «план» - в поезде на отправлении (по факту или плану); в рейсе
-     * в статусе «выполняется» - сейчас в рейсе; в закончившемся - доехал до станции прибытия.
-     */
-    private static boolean riding(TripCrew.Wagon w, TripCrew.Trip trip, long id, OffsetDateTime start) {
-        long status = trip.getTripStatusType();
-        if (status == TripStatus.IN_PROGRESS) {
-            return w.getDbeg() != null && w.getDend() == null && w.getLocationType() == LocationType.TRIP
-                    && w.getTrip() != null && w.getTrip().getId() == id;
-        }
-        if (status == TripStatus.DONE) {
-            return w.getDbeg() != null && (w.getDend() == null || w.getDend().isAfter(trip.getArrivedDt()));
-        }
-        OffsetDateTime beg = w.getDbeg() != null ? w.getDbeg()
-                : w.getAttachPlan() == null ? null : w.getAttachPlan().getPlannedDt();
-        OffsetDateTime end = w.getDend() != null ? w.getDend()
-                : w.getDetachPlan() == null ? null : w.getDetachPlan().getPlannedDt();
-        return beg != null && !beg.isAfter(start) && (end == null || end.isAfter(start));
     }
 
     /** Время стоянки на остановках по расписанию рейса: отправление, у конечной - прибытие. */
@@ -976,7 +1031,10 @@ public class TripService {
         }
         DbRec route = db.loadRec("route", body.route());
         LocalDate end = route == null ? null : RouteService.localDate(route, "dend");
-        if (route == null || (end != null && end.isBefore(LocalDate.now()))) {
+        // при правке рейса его прежний маршрут допустим и после окончания действия: маршрут не меняется
+        boolean sameRoute = id != null && route != null
+                && db.loadRec("trip", id).getLong("route") == body.route();
+        if (route == null || (!sameRoute && end != null && end.isBefore(LocalDate.now()))) {
             throw ApiException.badRequest("Маршрут не действует");
         }
         if (body.train() != null) {

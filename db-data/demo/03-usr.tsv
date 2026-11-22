@@ -57,3 +57,17 @@ id	login	full_name	password_hash	phone	disabled	change_password	created_dt
 132	990101400210	Ибраева Динара Нурлановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
 133	990101400211	Бригадир клининга ПК «Марат»	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2026-10-09 12:42:31+05:00
 134	medic	Нурланова Айгерим Болатовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+135	shu1	Абдрахманов Ерлан Маратович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+136	shu2	Сыздыкова Айжан Болатовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+137	ssg1	Тулегенов Нурлан Сапарович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+138	ssg2	Мухамеджанова Гульмира Ерлановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+139	krg1	Жакупов Арман Серикович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+140	krg2	Каримова Алия Талгатовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+141	krg3	Нургалиев Даурен Аскарович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+142	krg4	Смагулова Жанар Муратовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+143	krg5	Бекенов Ильяс Канатович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+144	nrz1	Сагинтаев Ерболат Маратович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+145	nrz2	Кенжебаева Айнур Сериковна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+146	nrz3	Абылкасымов Талгат Ерланович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+147	nrz4	Мусина Жанна Болатовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00
+148	nrz5	Оразбаев Бауыржан Канатович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	false	2025-01-01 00:00:00+05:00

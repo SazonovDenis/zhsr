@@ -13,6 +13,14 @@ export function formatDuration(minutes: number): string {
   return m === 0 ? t('{h} ч', { h }) : t('{h} ч {m} м', { h, m })
 }
 
+/** Длительность в минутах — словами полностью: «23 ч 34 мин», «34 мин», «3 ч». */
+export function formatHoursMin(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return t('{m} мин', { m })
+  return m === 0 ? t('{h} ч', { h }) : t('{h} ч {m} мин', { h, m })
+}
+
 /** Длительность в минутах — часы и минуты: «0:34», «2:32», «19:05». */
 export function formatHm(minutes: number): string {
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`

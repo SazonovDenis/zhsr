@@ -1,27 +1,22 @@
 <template>
   <span v-if="!row.responsibleChanged" class="zs-sub">—</span>
   <span v-else>
-    <template v-if="row.prevResponsibleUsr !== null">
-      <span class="zs-sub"><UserName :user="row.prevResponsibleUsr" /></span>
+    <template v-if="row.prevResponsibleUsrs.length > 0">
+      <span class="zs-sub"><UserNames :users="row.prevResponsibleUsrs" /></span>
       <span class="zs-sub"> → </span>
     </template>
-    <span class="cell-journal__to"
-      ><UserName v-if="row.responsibleUsr" :user="row.responsibleUsr" /><template v-else>{{
-        t('не назначен')
-      }}</template></span
-    >
+    <span class="cell-journal__to"><UserNames :users="row.responsibleUsrs" /></span>
   </span>
 </template>
 
 <script setup lang="ts">
-import { t } from '@/boot/i18n'
 import type { CellProps } from '@/shared/components/table/types'
 import type { JournalRow } from '../journalColumns'
 
-import UserName from '@/shared/components/UserName.vue'
+import UserNames from '@/shared/components/UserNames.vue'
 /**
- * Назначение ответственного: было → стало; прежде ответственного не было — только стало; событие ответственного не
- * назначало — прочерк.
+ * Смена ответственных: были → стали; прежде ответственных не было — только стали; событие ответственных не меняло —
+ * прочерк.
  */
 defineProps<CellProps<JournalRow>>()
 </script>

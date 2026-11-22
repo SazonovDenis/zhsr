@@ -88,11 +88,6 @@ public class AdminController {
 
     // --- сотрудники
 
-    @GetMapping("/users")
-    public AdminPage<AdminUserRow> users(AdminQuery query) throws Exception {
-        return adminUserService.page(query);
-    }
-
     @GetMapping("/users/{id}")
     public AdminUserRow user(@PathVariable long id) throws Exception {
         return adminUserService.get(id);

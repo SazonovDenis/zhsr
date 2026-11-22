@@ -53,7 +53,19 @@
         </createTable>
     </changeSet>
 
-    <!-- журнал ответственного за вагон: usr пуст - ответственный явно не назначен -->
+    <!-- журнал ответственных за вагон: два слоя в одной таблице - план и факт (kind: 1 - план, 2 - факт,
+         WagonResponsibleKind). Запись - период с dbeg по dend (не включая); dend пуст - период открыт: у факта -
+         текущие ответственные, у плана - держать ответственных, пока план не изменят. Состав ответственных периода -
+         wagon_responsible_usr. Периоды факта вагона не пересекаются; слои между собой не сверяются. Отсутствие
+         открытой записи факта - ответственных нет.
+         plan_status - статус плана (1 - ожидает, 2 - отработан, 3 - отменён, WagonResponsiblePlanStatus): только у
+         плана; отметка факта переводит план в "отработан", совпали даты или нет.
+         trip, trip_point - рейс и его стадия (1 - отправление, 2 - прибытие, WagonResponsibleTripPoint). План есть
+         только у рейса: план ответственных на рейс - стадия "отправление", после рейса - "прибытие"; план ищется по
+         рейсу и стадии, его dbeg - справочно, время стадии по плану рейса, dend пуст. Факт: trip и trip_point - отметка
+         рейса, которая его записала; только trip - смена ответственных в рейсе без отметки; пусто - не рейс.
+         created_by_usr, created_dt - кто и когда внёс: запланировал или отметил факт; comment - основания,
+         примечания -->
     <changeSet id="02-location-tables-wagon_responsible" author="zhsr">
         <createTable tableName="wagon_responsible">
             <column name="id" type="bigint" autoIncrement="true">
@@ -62,17 +74,43 @@
             <column name="wagon" type="bigint">
                 <constraints nullable="false"/>
             </column>
+            <column name="kind" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="plan_status" type="integer"/>
+            <column name="trip" type="bigint"/>
+            <column name="trip_point" type="integer"/>
             <column name="dbeg" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
             <column name="dend" type="timestamptz"/>
-            <column name="usr" type="bigint"/>
+            <column name="created_by_usr" type="bigint"/>
+            <column name="created_dt" type="timestamptz"/>
+            <column name="comment" type="text"/>
+        </createTable>
+    </changeSet>
+
+    <!-- состав ответственных периода журнала wagon_responsible: строка - один ответственный; сотрудник в периоде
+         один раз -->
+    <changeSet id="02-location-tables-wagon_responsible_usr" author="zhsr">
+        <createTable tableName="wagon_responsible_usr">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="wagon_responsible" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
     </changeSet>
 
     <!-- ручная правка вагона (Ф-ВАГ-02, Ф-ВАГ-03): смена состояния или расположения администратором с комментарием;
          wagon_location, wagon_status, wagon_responsible - записи журналов, открытые правкой (ровно одна из
-         wagon_location и wagon_status; ответственный - вместе со сменой расположения) -->
+         wagon_location и wagon_status; ответственные - вместе со сменой расположения);
+         closed_wagon_responsible - запись факта ответственных, закрытая правкой: отмена правки открывает её снова,
+         в том числе когда правка сняла всех ответственных и новой записи не открыла -->
     <changeSet id="02-location-tables-wagon_edit" author="zhsr">
         <createTable tableName="wagon_edit">
             <column name="id" type="bigint" autoIncrement="true">
@@ -91,11 +129,12 @@
             <column name="wagon_location" type="bigint"/>
             <column name="wagon_status" type="bigint"/>
             <column name="wagon_responsible" type="bigint"/>
+            <column name="closed_wagon_responsible" type="bigint"/>
         </createTable>
     </changeSet>
 
     <!-- кэш текущего состояния вагона для быстрого доступа; поля вычисляемые - копия текущих записей
-         wagon_location, wagon_status и wagon_responsible и общий пробег, обновляется в той же транзакции, что и
+         wagon_location, wagon_status, ссылка на открытую запись факта wagon_responsible и общий пробег, обновляется в той же транзакции, что и
          журналы -->
     <changeSet id="02-location-tables-wagon_info" author="zhsr">
         <createTable tableName="wagon_info">
@@ -118,11 +157,9 @@
             <column name="wagon_status_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="dbeg_responsible" type="timestamptz">
-                <constraints nullable="false"/>
-            </column>
-            <!-- текущий ответственный: usr текущей записи wagon_responsible; пусто - не назначен -->
-            <column name="responsible_usr" type="bigint"/>
+            <!-- открытая запись факта wagon_responsible: начало и состав текущих ответственных; пусто -
+                 ответственных нет -->
+            <column name="wagon_responsible" type="bigint"/>
             <!-- общий пробег, км: wagon.initial_run_km плюс сумма wagon_run.km -->
             <column name="run_km" type="integer">
                 <constraints nullable="false"/>
@@ -176,11 +213,14 @@
         </createTable>
     </changeSet>
 
-    <!-- участие вагона в поезде: период нахождения вагона в поезде по факту; прицепка и отцепка - изменения
-         train_wagon_change. Вагон, отцепленный и снова прицепленный к тому же поезду, - вторая строка;
-         dbeg, dend - фактическое время выполненных прицепки и отцепки (fact_dt изменений), обновляются в одной
-         транзакции с изменениями; dbeg пуст - прицепка только запланирована; dend пуст - вагон в поезде.
-         Отмена без истории: отмена прицепки удаляет строку, отмена отцепки удаляет изменение и очищает dend -->
+    <!-- участие вагона в поезде - состояние (doc/db-doc/journal-state-plan-fact.md): поезд и позиция вагона с периодом
+         действия; строится журналом прицепок и отцепок train_wagon_change, напрямую не правится.
+         kind - слой, константы TrainWagonKind в коде (1 - план, 2 - факт): факт - история, план - ожидаемый состав:
+         открытые записи факта на время последнего факта поезда и ожидающие планы журнала после него; слой план поезда
+         перестраивается при каждом изменении журнала поезда.
+         seq - позиция в поезде, с 1: прицепка на позицию сдвигает вагоны с неё на 1 назад, отцепка - вагоны за
+         отцепленным на 1 вперёд; сдвиг закрывает запись вагона и создаёт новую.
+         dbeg, dend - период: dend пуст - запись открыта -->
     <changeSet id="02-location-tables-train_wagon" author="zhsr">
         <createTable tableName="train_wagon">
             <column name="id" type="bigint" autoIncrement="true">
@@ -192,45 +232,58 @@
             <column name="wagon" type="bigint">
                 <constraints nullable="false"/>
             </column>
+            <column name="kind" type="integer">
+                <constraints nullable="false"/>
+            </column>
             <column name="seq" type="integer">
                 <constraints nullable="false"/>
             </column>
-            <column name="dbeg" type="timestamptz"/>
+            <column name="dbeg" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
             <column name="dend" type="timestamptz"/>
         </createTable>
     </changeSet>
 
-    <!-- изменение участия вагона в поезде: прицепка вагона к поезду или отцепка от него; прицепки и отцепки идут
-         по очереди;
-         change_type - константы TrainWagonChangeType в коде (1 - прицепка, 2 - отцепка);
-         status - константы TrainWagonChangeStatus в коде (1 - план, 2 - выполнено, 3 - отменено);
-         planned_dt - плановое время; fact_dt - фактическое время, заполнено у выполненного;
-         station - станция изменения; trip и route_station - рейс и остановка его маршрута, если изменение - прицепка
-         или отцепка в пути; пусто - вне рейса;
-         usr - кто внёс: запланировал или отметил факт; comment - основания, примечания: приказ, причина;
-         wagon_location, wagon_status, wagon_responsible - записи журналов вагона, открытые прицепкой или отцепкой в
-         пути; вне рейса и до выполнения пусты -->
+    <!-- прицепка и отцепка вагона - журнал (doc/db-doc/journal-state-plan-fact.md): событие поезда и вагона в момент
+         времени; по нему строится участие вагона в поезде train_wagon.
+         kind - слой, константы TrainWagonKind в коде (1 - план, 2 - факт); plan_status - только у плана, константы
+         TrainWagonPlanStatus (1 - ожидает, 2 - отработан, 3 - отменён); plan - у факта: отработанный им план.
+         change_type - константы TrainWagonChangeType (1 - прицепка, 2 - отцепка); dt - время: у плана плановое, у
+         факта фактическое; seq - позиция, на которую прицепляют вагон, у отцепки пусто.
+         station - станция; trip и route_station - рейс и остановка его маршрута, если прицепка или отцепка в рейсе;
+         пусто - вне рейса. usr - кто внёс: запланировал или отметил факт; comment - основания, примечания: приказ,
+         причина.
+         wagon_location, wagon_status, wagon_responsible - записи журналов вагона, открытые фактом в пути рейса;
+         closed_wagon_responsible - запись факта ответственных, закрытая им: удаление факта открывает её снова -->
     <changeSet id="02-location-tables-train_wagon_change" author="zhsr">
         <createTable tableName="train_wagon_change">
             <column name="id" type="bigint" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
-            <column name="train_wagon" type="bigint">
+            <column name="train" type="bigint">
                 <constraints nullable="false"/>
             </column>
+            <column name="wagon" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="kind" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="plan_status" type="integer"/>
             <column name="change_type" type="integer">
                 <constraints nullable="false"/>
             </column>
-            <column name="status" type="integer">
+            <column name="dt" type="timestamptz">
                 <constraints nullable="false"/>
             </column>
-            <column name="planned_dt" type="timestamptz"/>
-            <column name="fact_dt" type="timestamptz"/>
+            <column name="seq" type="integer"/>
             <column name="station" type="bigint">
                 <constraints nullable="false"/>
             </column>
             <column name="trip" type="bigint"/>
             <column name="route_station" type="bigint"/>
+            <column name="plan" type="bigint"/>
             <column name="usr" type="bigint">
                 <constraints nullable="false"/>
             </column>
@@ -238,14 +291,15 @@
             <column name="wagon_location" type="bigint"/>
             <column name="wagon_status" type="bigint"/>
             <column name="wagon_responsible" type="bigint"/>
+            <column name="closed_wagon_responsible" type="bigint"/>
         </createTable>
     </changeSet>
 
     <!-- пробег вагона за участок рейса: от отправления или прицепки до прибытия или отцепки; строку вносит прибытие рейса
          или отцепка в пути, отмена прибытия или отцепки удаляет её;
-         train_wagon - участие в поезде, на котором пройден участок; km - по route_station.km от начальной станции
-         маршрута или остановки прицепки до конечной станции или остановки отцепки; общий пробег (wagon_info.run_km) -
-         wagon.initial_run_km плюс сумма km -->
+         train_wagon_change - факт прицепки, с которого началось участие вагона в поезде; km - по route_station.km от
+         начальной станции маршрута или остановки прицепки до конечной станции или остановки отцепки; общий пробег
+         (wagon_info.run_km) - wagon.initial_run_km плюс сумма km -->
     <changeSet id="02-location-tables-wagon_run" author="zhsr">
         <createTable tableName="wagon_run">
             <column name="id" type="bigint" autoIncrement="true">
@@ -257,7 +311,7 @@
             <column name="trip" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="train_wagon" type="bigint">
+            <column name="train_wagon_change" type="bigint">
                 <constraints nullable="false"/>
             </column>
             <column name="km" type="integer">
@@ -266,12 +320,11 @@
         </createTable>
     </changeSet>
 
-    <!-- бригада рейса: проводники, начальник поезда, поездной электромеханик; строка - сотрудник на дежурстве при
-         вагоне: проводник двух вагонов - две строки; wagon - только у проводника, может быть пуст; начальник поезда и
-         ПЭМ - не больше одного на рейс;
-         dbeg - заступление на дежурство (отправление рейса или назначение в пути); dend - окончание: прибытие рейса
-         или перевод проводника на другой вагон в рейсе; до отправления строки правятся и удаляются, с отправления -
-         не удаляются: перевод закрывает строку и открывает новую -->
+    <!-- бригада рейса: проводники, начальник поезда, поездной электромеханик; строка - дежурство сотрудника в рейсе
+         с должностью: один сотрудник - одна строка; начальник поезда и ПЭМ - не больше одного на рейс; за какие вагоны
+         отвечает сотрудник - журнал ответственных (wagon_responsible), не бригада;
+         dbeg - заступление на дежурство (отправление рейса); dend - окончание (прибытие рейса); до отправления строки
+         правятся и удаляются, с отправления - не удаляются -->
     <changeSet id="02-location-tables-trip_crew" author="zhsr">
         <createTable tableName="trip_crew">
             <column name="id" type="bigint" autoIncrement="true">
@@ -286,7 +339,6 @@
             <column name="crew_duty_type" type="bigint">
                 <constraints nullable="false"/>
             </column>
-            <column name="wagon" type="bigint"/>
             <column name="dbeg" type="timestamptz"/>
             <column name="dend" type="timestamptz"/>
         </createTable>
@@ -353,9 +405,10 @@
     </changeSet>
 
     <!-- вагоны акта приёма-передачи; wagon_location - запись журнала расположения, открытая приёмом: расположение
-         "куда"; пуста, пока акт не принят; wagon_responsible - запись журнала ответственного, открытая актом при
-         передаче (при приёме ответственного можно сменить в той же записи); обе пусты у отменённого акта и при отказе:
-         отмена и отказ удаляют записи -->
+         "куда"; пуста, пока акт не принят; wagon_responsible - запись факта ответственных, открытая актом при
+         передаче (при приёме состав ответственных можно сменить в той же записи); closed_wagon_responsible - запись
+         факта ответственных, закрытая актом; все три пусты у отменённого акта и при отказе: отмена и отказ удаляют
+         открытые записи и снова открывают закрытую -->
     <changeSet id="02-location-tables-transfer_act_wagon" author="zhsr">
         <createTable tableName="transfer_act_wagon">
             <column name="id" type="bigint" autoIncrement="true">
@@ -376,6 +429,7 @@
             <column name="note" type="text"/>
             <column name="wagon_location" type="bigint"/>
             <column name="wagon_responsible" type="bigint"/>
+            <column name="closed_wagon_responsible" type="bigint"/>
         </createTable>
     </changeSet>
 

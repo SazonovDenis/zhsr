@@ -5,10 +5,12 @@ import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.ActStatus;
+import kz.zhsr.app.constants.TrainWagonKind;
 import kz.zhsr.app.constants.TripStatus;
 import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.dto.ref.TrainRef;
 import kz.zhsr.app.dto.ref.TripRef;
+import kz.zhsr.app.dto.ref.UserRef;
 import kz.zhsr.app.dto.route.RouteFilter;
 import kz.zhsr.app.dto.route.RouteOption;
 import kz.zhsr.app.dto.route.RouteRow;
@@ -71,6 +73,7 @@ public class ListService {
     public List<WagonRow> wagons(WagonFilter filter, ListSort sort) throws Exception {
         List<WagonRow> rows = wagonRows(filter, sort, WagonRow.class, false);
         addWagonTripsAndTransfers(rows);
+        addWagonResponsibles(rows);
         if (filter.at() != null) {
             addWagonStateAt(rows, filter.at());
         }
@@ -85,7 +88,7 @@ public class ListService {
      */
     public WagonRow wagonByNumber(String number) throws Exception {
         String value = number == null ? "" : number.trim();
-        WagonFilter filter = new WagonFilter(null, value, null, null, null, null, null);
+        WagonFilter filter = new WagonFilter(null, value, null, null, null, null, null, null);
         List<WagonRow> rows = wagonRows(filter, new ListSort(null, false), WagonRow.class, false).stream()
                 .filter(w -> w.getNumber().equals(value))
                 .toList();
@@ -96,6 +99,7 @@ public class ListService {
             throw ApiException.forbidden("Вы не имеете доступа к данным по вагону " + value);
         }
         addWagonTripsAndTransfers(rows);
+        addWagonResponsibles(rows);
         return rows.get(0);
     }
 
@@ -149,7 +153,7 @@ public class ListService {
                 row.getTrips().add(trip);
             }
         }
-        for (DbRec rec : db.loadSql(ListSql.currentTrains(), Map.of())) {
+        for (DbRec rec : db.loadSql(ListSql.currentTrains(), Map.of("fact", TrainWagonKind.FACT))) {
             WagonRow row = byId.get(rec.getLong("wagon"));
             if (row != null) {
                 row.setTrain(new TrainRef(rec.getLong("train")));
@@ -169,6 +173,30 @@ public class ListService {
             }
         }
         refResolver.resolve(rows);
+    }
+
+    /**
+     * Второй проход списка вагонов: текущие ответственные - состав и начало открытой записи факта журнала
+     * ответственных.
+     */
+    public void addWagonResponsibles(List<? extends WagonRow> rows) throws Exception {
+        Map<Long, WagonRow> byRecord = new HashMap<>();
+        for (WagonRow row : rows) {
+            if (row.getWagonResponsible() != null) {
+                byRecord.put(row.getWagonResponsible(), row);
+            }
+        }
+        if (byRecord.isEmpty()) {
+            return;
+        }
+        List<Long> records = List.copyOf(byRecord.keySet());
+        for (DbRec rec : db.loadList("wagon_responsible", Map.of("id", records))) {
+            byRecord.get(rec.getLong("id")).setDbegResponsible(rec.getDateTimeTZ("dbeg"));
+        }
+        for (DbRec rec : db.loadSql(WagonSql.responsibleUsrs(), Map.of("records", records))) {
+            byRecord.get(rec.getLong("wagon_responsible")).getResponsibleUsrs().add(new UserRef(rec.getLong("usr")));
+        }
+        refResolver.resolve(rows.stream().flatMap(r -> r.getResponsibleUsrs().stream()).toList());
     }
 
     /**

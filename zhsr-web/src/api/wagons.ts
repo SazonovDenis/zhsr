@@ -34,10 +34,10 @@ export interface WagonRow extends WagonOption {
   wagonStatusType: number
   /** с какого времени вагон в этом состоянии, ISO с часовым поясом */
   dbegStatus: string
-  /** текущий ответственный за вагон; null — не назначен */
-  responsibleUsr: UserRef | null
-  /** с какого времени ответственный назначен, ISO с часовым поясом */
-  dbegResponsible: string
+  /** текущие ответственные за вагон, по ФИО; пусто — не назначены */
+  responsibleUsrs: UserRef[]
+  /** с какого времени текущие ответственные, ISO с часовым поясом; null — не назначены */
+  dbegResponsible: string | null
   /** общий пробег, км: пробег на момент ввода плюс пробеги в рейсах */
   runKm: number
   /** изготовитель; null — не указан */
@@ -79,6 +79,8 @@ export interface WagonPendingTransfer {
 export interface WagonFilter {
   /** поиск по номеру вагона */
   number: string
+  /** номера вагонов целиком: только эти вагоны (например, состав поезда); не задано — без отбора */
+  numbers?: string[]
   /** станция — id справочника Station */
   station: number | null
   /** рейс — id рейса (api/trips.ts) */
@@ -137,11 +139,11 @@ export async function fetchWagons(filter: WagonFilter, sort: TableSort | null): 
  * пользователю по роли — «Вы не имеете доступа к данным по вагону …».
  */
 /**
- * Сменить ответственного за вагон без акта (Ф-ВАГ-07): мастер депо станции вагона или администратор. responsibleUsr —
- * сотрудник, null — ответственный не назначен. Ответ — вагон после смены.
+ * Сменить ответственных за вагон без акта (Ф-ВАГ-07): мастер депо станции вагона или администратор. responsibleUsrs —
+ * сотрудники, пусто — ответственный не назначен. Ответ — вагон после смены.
  */
-export async function changeWagonResponsible(id: number, responsibleUsr: number | null): Promise<WagonRow> {
-  return (await http.post<WagonRow>(`/wagons/${id}/responsible`, { responsibleUsr })).data
+export async function changeWagonResponsible(id: number, responsibleUsrs: number[]): Promise<WagonRow> {
+  return (await http.post<WagonRow>(`/wagons/${id}/responsible`, { responsibleUsrs })).data
 }
 
 export async function fetchWagonByNumber(number: string): Promise<WagonRow> {
@@ -274,11 +276,11 @@ export interface WagonJournalRow {
   prevWagonStatusType: number | null
   /** событие сменило состояние */
   statusChanged: boolean
-  /** ответственный после события; null — не назначен */
-  responsibleUsr: UserRef | null
-  /** ответственный до события; null — не назначен, не менялся или это первая запись */
-  prevResponsibleUsr: UserRef | null
-  /** событие назначило ответственного */
+  /** ответственные после события, по ФИО; пусто — не назначены */
+  responsibleUsrs: UserRef[]
+  /** ответственные до события; пусто — не назначены или не менялись */
+  prevResponsibleUsrs: UserRef[]
+  /** событие сменило ответственных */
   responsibleChanged: boolean
   /** основание — константы JournalBasis */
   basisType: number
@@ -316,4 +318,9 @@ export async function fetchWagonJournal(
   to: string | null,
 ): Promise<WagonJournalRow[]> {
   return (await http.get<WagonJournalRow[]>(`/wagons/${wagonId}/journal`, { params: { from, to } })).data
+}
+
+/** Удалить вагон: на него ссылаются другие записи — ошибка 409 с причиной. */
+export async function deleteWagon(id: number): Promise<void> {
+  await http.delete(`/wagons/${id}`)
 }

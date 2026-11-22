@@ -27,8 +27,11 @@ export function placeText(kind: number, ref: number | null, trip: string | null 
   }
 }
 
-/** Где вагон из списка вагонов сейчас. */
-export function wagonPlace(w: WagonRow): string {
-  const inTrip = w.locationType === LocationType.TRIP
-  return placeText(w.locationType, inTrip ? null : w.place, w.trip ? tripRefText(w.trip) : null)
+/**
+ * Где вагон из списка вагонов сейчас: в рейсе — «Рейс: 002 • Алматы — Астана», иначе место. Принимает и вагон поезда
+ * с теми же полями.
+ */
+export function wagonPlace(w: Pick<WagonRow, 'locationType' | 'place' | 'trip'>): string {
+  if (w.locationType === LocationType.TRIP) return t('Рейс: {trip}', { trip: w.trip ? tripRefText(w.trip) : '' })
+  return placeText(w.locationType, w.place)
 }

@@ -7,6 +7,7 @@ import kz.zhsr.app.dto.route.RouteDraft;
 import kz.zhsr.app.dto.route.RouteSave;
 import kz.zhsr.app.dto.route.RouteStop;
 import kz.zhsr.app.service.RouteService;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,4 +57,10 @@ public class RouteController {
         return routeService.recalc(body);
     }
 
+
+    /** Удалить, если на запись никто не ссылается: иначе 409 с причиной. */
+    @DeleteMapping("/routes/{id}")
+    public void delete(@PathVariable long id) throws Exception {
+        routeService.delete(id);
+    }
 }

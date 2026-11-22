@@ -120,8 +120,9 @@ export interface AdminUserDraft {
   password: string
 }
 
-export async function fetchAdminUsers(query: AdminQuery): Promise<AdminPage<AdminUser>> {
-  return (await http.get<AdminPage<AdminUser>>('/admin/users', { params: params(query) })).data
+/** Сотрудник по id: карточка для правки. */
+export async function fetchAdminUser(id: number): Promise<AdminUser> {
+  return (await http.get<AdminUser>(`/admin/users/${id}`)).data
 }
 
 export async function createAdminUser(draft: AdminUserDraft): Promise<AdminUser> {

@@ -3,31 +3,31 @@
     v-model:show="show"
     :title="t(title)"
     :width="width"
+    :height="height"
     :actions="actions"
     :action-running="running ? 'ok' : null"
     :busy="busy.active.value"
+    :error="shown"
     @action="onAction"
+    @error-close="dismiss"
   >
     <template #actions-left><slot name="actions-left" /></template>
-    <!-- двойной клик по варианту с data-dialog-pick — выбор и основное действие; любое действие в полях (нажатие,
-         ввод) убирает ошибку -->
-    <div class="form-dialog__fields" @dblclick="onDblclick" @pointerdown="dismiss" @keydown="dismiss" @input="dismiss">
+    <!-- двойной клик по варианту с data-dialog-pick — выбор и основное действие; ввод текста убирает ошибку -->
+    <div class="form-dialog__fields" @dblclick="onDblclick" @input="dismiss">
       <slot />
     </div>
-    <!-- ошибка с крестиком: крестик (на телефоне и нажатие на неё) — убрать -->
-    <ErrorBox v-if="shown" :error="shown" closable class="form-dialog__error" @close="dismiss" />
     <div v-if="hint" class="form-dialog__hint">{{ t(hint) }}</div>
   </DialogFrame>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, provide, ref, watch } from 'vue'
 
 import { t } from '@/boot/i18n'
 import { useBusy } from '@/shared/busy'
-import ErrorBox from '@/shared/components/ErrorBox.vue'
 import type { ShownError } from '@/shared/errors'
-import type { DialogAction } from './types'
+import type { DialogAction, DialogHeightValue } from './types'
+import { DIALOG_EDIT } from './dialogEdit'
 import DialogFrame from './DialogFrame.vue'
 
 /**
@@ -36,8 +36,9 @@ import DialogFrame from './DialogFrame.vue'
  *
  * Слот actions-left — кнопки слева на панели диалога, например «Удалить запись».
  *
- * Ошибка (error) — с крестиком в правом верхнем углу; крестик (на телефоне и нажатие на неё) или любое действие в
- * полях формы её убирают, новая ошибка показывается снова.
+ * Ошибка (error) — полосой над кнопками (место ошибки DialogFrame), с крестиком. Убирают её только крестик и реальный
+ * ввод: набор текста (событие input) и смена значения контролом (DIALOG_EDIT: выбор в списке, переключатель,
+ * календарь). Клавиши без ввода, щелчки и смена фокуса её не трогают. Новая ошибка показывается снова.
  *
  * Основное действие отправляет событие ok; что проверить и какой запрос отправить, решает конкретный диалог. Пока
  * running = true, кнопка основного действия крутит спиннер, а повторно действие не запускается.
@@ -59,6 +60,8 @@ const props = withDefaults(
     /** текст кнопки «Отмена» на русском, например «Не отменять» у отмены заявки */
     cancelText?: string
     width?: string
+    /** постоянная высота: готовая (DialogHeight) или своя — значение CSS */
+    height?: DialogHeightValue
     running?: boolean
     /** ошибка над кнопками: проверки формы (formError) или запроса (shownError, запрос второй строкой); null — нет */
     error?: ShownError | null
@@ -71,6 +74,7 @@ const props = withDefaults(
     okText: 'Сохранить',
     cancelText: 'Отмена',
     width: '35rem',
+    height: 'md',
     running: false,
     error: null,
     hint: '',
@@ -82,7 +86,7 @@ const emit = defineEmits<{ ok: [] }>()
 
 const show = defineModel<boolean>('show', { default: false })
 
-// ошибку убрал пользователь (крестик, нажатие на неё, действие в полях); новая ошибка показывается снова
+// ошибку убрал пользователь (крестик, ввод); новая ошибка показывается снова
 const dismissed = ref(false)
 watch(
   () => props.error,
@@ -93,6 +97,7 @@ const shown = computed(() => (dismissed.value ? null : props.error))
 function dismiss() {
   if (props.error) dismissed.value = true
 }
+provide(DIALOG_EDIT, dismiss)
 
 // ожидание диалога (provideBusy в диалоге-наследнике): спиннер в подвале — на всю цепочку загрузок формы
 const busy = useBusy()
@@ -117,10 +122,6 @@ function onDblclick(e: MouseEvent) {
 .form-dialog__fields {
   // обёртка только ловит двойной клик: поля раскладываются, как будто её нет
   display: contents;
-}
-
-.form-dialog__error {
-  font-size: 0.8rem;
 }
 
 .form-dialog__hint {

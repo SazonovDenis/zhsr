@@ -127,6 +127,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { t } from '@/boot/i18n'
 import type { HistoryDialog } from '@/shared/components/dialog/dialogHistory'
 import { dialogHistory } from '@/shared/components/dialog/dialogHistory'
+import { useDialogEdit } from '@/shared/components/dialog/dialogEdit'
 import { SCALE0_MAX_PX, screenScale, screenScaleMin } from '@/shared/screen'
 import type { QuickDate } from './quickDates'
 import DateCalendar from './DateCalendar.vue'
@@ -183,6 +184,12 @@ const props = withDefaults(
 )
 
 const model = defineModel<string | null>({ default: null })
+// значение, выбранное пользователем: в диалоге убирает ошибку диалога
+const dialogEdit = useDialogEdit()
+function setModel(value: string | null) {
+  model.value = value
+  dialogEdit()
+}
 
 const popup = ref<QPopupProxy | null>(null)
 
@@ -190,7 +197,7 @@ const popup = ref<QPopupProxy | null>(null)
 const inner = ref<string | null>(null)
 // выбор в окне с applyImmediately применяется сразу
 watch(inner, (value) => {
-  if (props.applyImmediately && value !== model.value) model.value = value
+  if (props.applyImmediately && value !== model.value) setModel(value)
 })
 
 // только для мобильного: какая из двух панелей сейчас видна
@@ -388,7 +395,7 @@ function onTypedInput(e: Event) {
  */
 function applyText(text: string): boolean {
   if (!text) {
-    if (props.nullable) model.value = null
+    if (props.nullable) setModel(null)
     return props.nullable
   }
   const m = /^(\d{1,2})\.(\d{1,2})\.(\d{1,2}|\d{4})(?: (\d{1,2}):(\d{2}))?$/.exec(text)
@@ -400,7 +407,7 @@ function applyText(text: string): boolean {
   if (date.formatDate(date.extractDate(day, DATE_FORMAT), DATE_FORMAT) !== day) return false
   if (h !== undefined && (Number(h) > 23 || Number(mi) > 59)) return false
   const time = h !== undefined ? `${pad(h)}:${mi}` : (split(model.value)[1] ?? null)
-  model.value = join(day, time)
+  setModel(join(day, time))
   return true
 }
 
@@ -433,11 +440,11 @@ function onShortClick(value: string) {
   // выбор кнопкой заменяет набранный текст
   cancelTyped()
   if (value === shortModel.value) {
-    if (props.clearable) model.value = null
+    if (props.clearable) setModel(null)
     return
   }
   const [, time] = split(model.value)
-  model.value = join(date.formatDate(quickDateValue(value as QuickDate), DATE_FORMAT), time)
+  setModel(join(date.formatDate(quickDateValue(value as QuickDate), DATE_FORMAT), time))
 }
 
 // --- окно ---
@@ -532,7 +539,7 @@ function onQuickUpdate(code: QuickDate) {
 }
 
 function apply() {
-  model.value = inner.value
+  setModel(inner.value)
   close()
 }
 </script>

@@ -45,16 +45,23 @@
         <span>{{ t('Исполнитель') }}</span>
         <span>
           <UserName v-if="r.executorUsr" :user="r.executorUsr" /><template v-else>{{ t('не назначен') }}</template>
-          <!-- статус не подходит (выполнена, закрыта…) — ссылки нет; нет прав — неактивна, причина во всплывающей
+          <!-- статус не подходит (выполнена, закрыта…) — кнопки нет; нет прав — неактивна, причина во всплывающей
                подсказке -->
-          <SoftLink
+          <q-btn
             v-if="card.assignStatusOk.value"
-            :text="card.reassign.value ? 'Переназначить' : 'Назначить'"
-            :disabled="!card.assignable.value"
+            unelevated
+            outline
+            dense
+            no-caps
+            color="primary"
+            class="zs-soft-border q-ml-sm"
+            padding="0.1rem 0.6rem"
+            :disable="!card.assignable.value"
             :title="card.assignable.value ? undefined : card.assignHint.value || undefined"
-            class="q-ml-sm"
             @click="assign"
-          />
+          >
+            {{ card.reassign.value ? t('Переназначить') : t('Назначить') }}
+          </q-btn>
         </span>
       </SidePanelFields>
 
@@ -102,7 +109,19 @@
       <div class="request-panel__section">
         <div class="request-panel__section-head">
           <span class="request-panel__section-title">{{ t('История') }}</span>
-          <SoftLink text="Добавить примечание" :disabled="card.blocked.value" @click="addNote" />
+          <q-btn
+            unelevated
+            outline
+            dense
+            no-caps
+            color="primary"
+            class="zs-soft-border"
+            padding="0.1rem 0.6rem"
+            :disable="card.blocked.value"
+            @click="addNote"
+          >
+            {{ t('Добавить примечание') }}
+          </q-btn>
         </div>
         <RequestHistory :nodes="tree.nodes" :status="r.requestStatusType" />
       </div>

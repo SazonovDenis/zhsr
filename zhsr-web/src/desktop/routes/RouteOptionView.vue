@@ -1,5 +1,13 @@
 <template>
-  <div class="route-option">
+  <!-- line — в одну строку: номер и сообщение, справа время в пути и длина; без вида маршрута и станций -->
+  <div v-if="line" class="route-option">
+    <span class="route-option__name route-option__line-name">№ {{ route.trainNumber }} • {{ route.name }}</span>
+    <span class="route-option__totals route-option__totals--line">
+      <span>{{ duration }}</span>
+      <span v-if="km">{{ km }}</span>
+    </span>
+  </div>
+  <div v-else class="route-option">
     <div class="route-option__main">
       <div class="route-option__title">
         <span class="route-option__name">№ {{ route.trainNumber }} • {{ route.name }}</span>
@@ -22,19 +30,24 @@ import { computed } from 'vue'
 import type { RouteOption } from '@/api/routes'
 import { t } from '@/boot/i18n'
 import { dictManager } from '@/shared/dict/DictManager'
-import { formatHm } from './duration'
+import { formatHm, formatHoursMin } from './duration'
 
 /**
  * Маршрут одной строкой по макету: слева номер поезда, сообщение и вид маршрута, под ними цепочка остановок; справа
- * время в пути и длина маршрута. Одинаково и в списке, и в поле выбора (RouteOption).
+ * время в пути и длина маршрута. Одинаково и в списке, и в поле выбора (RouteOption). line — одной строкой: номер и
+ * сообщение, время в пути и длина, без вида маршрута и станций: для выбранного значения в поле. words — время в пути словами
+ * («23 ч 34 мин»): для строки выпадающего списка.
  */
-const props = defineProps<{ route: RouteOption }>()
+const props = withDefaults(defineProps<{ route: RouteOption; line?: boolean; words?: boolean }>(), {
+  line: false,
+  words: false,
+})
 
 // цепочка остановок; станции следования (без остановки) не показываются
 const path = computed(() => props.route.stops.map((station) => dictManager.getValue('Station', station)).join(' → '))
 
-// время в пути — атрибут маршрута (route.duration)
-const duration = computed(() => formatHm(props.route.duration))
+// время в пути — атрибут маршрута (route.duration); words — словами
+const duration = computed(() => (props.words ? formatHoursMin : formatHm)(props.route.duration))
 
 const km = computed(() => (props.route.km > 0 ? t('{km} км', { km: props.route.km }) : ''))
 </script>
@@ -91,6 +104,11 @@ const km = computed(() => (props.route.km > 0 ? t('{km} км', { km: props.route
   line-height: 1.35;
 }
 
+.route-option__line-name {
+  flex: 1;
+  min-width: 0;
+}
+
 .route-option__totals {
   display: flex;
   flex: none;
@@ -100,5 +118,11 @@ const km = computed(() => (props.route.km > 0 ? t('{km} км', { km: props.route
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+// в одну строку: время и длина рядом
+.route-option__totals--line {
+  flex-direction: row;
+  gap: 0.8rem;
 }
 </style>

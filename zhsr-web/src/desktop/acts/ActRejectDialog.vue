@@ -1,6 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
+    height="sm"
     title="Отказ в приёме"
     ok-text="Отказать"
     :running="running"

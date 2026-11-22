@@ -27,7 +27,7 @@
           placeholder="Станция"
           :values="dictChoices('Station')"
           :source="dictSource('Station')"
-          style="width: 8.9rem"
+          style="width: 11.9rem"
         />
         <CbList
           v-model="filter.trip"
@@ -35,7 +35,7 @@
           placeholder="Рейс"
           :values="tripChoices"
           :source="tripLoad"
-          style="width: 17.7rem"
+          style="width: 26.6rem"
         >
           <template #option="{ item }">
             <TripOptionView :trip="tripOptionOf(item)" class="trip-option--list" />
@@ -86,7 +86,7 @@ import { useRoute, useRouter } from 'vue-router'
 import type { TripOption } from '@/api/trips'
 import { fetchTripOptions } from '@/api/trips'
 import type { WagonRow, WagonFilter } from '@/api/wagons'
-import { fetchWagons, wagonQuery } from '@/api/wagons'
+import { deleteWagon, fetchWagons, wagonQuery } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import CbButton from '@/shared/components/choice/CbButton.vue'
 import CbList from '@/shared/components/choice/CbList.vue'
@@ -98,6 +98,8 @@ import { TripStatus, WagonStatus } from '@/shared/constants/systemDicts'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import { openDialog } from '@/shared/components/dialog/openDialog'
+import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
+import { roleReason } from '@/shared/roleReason'
 import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
 import { provideBusy } from '@/shared/busy'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -142,6 +144,18 @@ const rowMenu: RowMenuItem<WagonRow>[] = [
     run: openJournal,
   },
   ...transferItems,
+  // удалить можно вагон, на который ничего не ссылается: иначе причина от сервера в окне
+  {
+    label: 'Удалить',
+    separator: true,
+    disabled: () => roleReason([], 'Вагон удаляет администратор'),
+    run: (w: WagonRow) =>
+      void confirmDelete('Удаление вагона', 'Удалить вагон {number}?', { number: w.number }, () =>
+        deleteWagon(w.id),
+      ).then((ok) => {
+        if (ok) void load()
+      }),
+  },
   { label: 'Ввести вагон', separator: true, disabled: () => addReason.value, run: () => void addWagon() },
 ]
 
@@ -170,7 +184,8 @@ const sort = ref<TableSort | null>(null)
 const selected = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null)
 // фильтр «Рейс»: все рейсы, у каждого — его маршрут (остановки, длина и вид маршрута в строке рейса)
 const trips = shallowRef<TripOption[]>([])
-const tripChoices = computed(() => trips.value.map((trip) => tripOptionItem(trip)))
+// у выбранного рейса — ещё плановое отправление: регулярный рейс отличается от других только им
+const tripChoices = computed(() => trips.value.map((trip) => tripOptionItem(trip, true)))
 
 // ошибка загрузки показывается на месте строк таблицы
 const loadError = ref<ShownError | null>(null)

@@ -45,18 +45,12 @@
               {{ t(tab.label) }}
             </button>
           </div>
-          <q-btn
-            unelevated
-            outline
-            no-caps
-            color="ink"
-            class="zs-soft-border"
-            :disable="!!editReason"
+          <SoftLink
+            text="Редактировать"
+            :disabled="!!editReason"
             :title="editReason || undefined"
             @click="emit('edit')"
-          >
-            {{ t('Редактировать') }}
-          </q-btn>
+          />
         </div>
         <!-- станции маршрута — из карточки маршрута: грузятся при выборе строки -->
         <LoadSpinner v-if="loading" />
@@ -89,6 +83,7 @@ import { dictManager } from '@/shared/dict/DictManager'
 import RouteMap from '@/shared/components/map/RouteMap.vue'
 import { RoleType } from '@/shared/constants/systemDicts'
 import { roleReason } from '@/shared/roleReason'
+import SoftLink from '@/shared/components/form/SoftLink.vue'
 import SidePanel from '../frame/SidePanel.vue'
 import SidePanelFields from '../frame/SidePanelFields.vue'
 import RouteStops from './RouteStops.vue'

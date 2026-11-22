@@ -19,6 +19,8 @@ export interface MenuItem {
    * иначе первыми двумя буквами названия («Ма»)
    */
   sub?: boolean
+  /** роли, которым пункт виден, — константы RoleType; нет — виден всем */
+  roles?: number[]
 }
 
 export interface MenuGroup extends MenuItem {

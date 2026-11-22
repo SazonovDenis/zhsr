@@ -63,9 +63,9 @@
           <FormField v-if="mode === 'immediate'" label="Кто сдал вагоны">
             <CbList v-model="giver" single placeholder="Выберите…" :values="giverChoices" :source="giverLoad" />
           </FormField>
-          <!-- ответственный за вагоны акта ("кому") назначается сразу, при оформлении: сотрудники депо станции и бригады
+          <!-- ответственные за вагоны акта ("кому") назначаются сразу, при оформлении: сотрудники депо станции и бригады
                рейсов поезда вагонов -->
-          <FormField label="Ответственный за вагоны">
+          <FormField label="Ответственные за вагоны">
             <ResponsiblePicker v-model="responsible" :station="station" :wagons="selected" :disabled="!station" />
           </FormField>
           <div v-if="toCode" class="transfer__mode q-py-sm q-px-md" :class="{ 'transfer__mode--none': !mode }">
@@ -130,7 +130,7 @@ import {
 } from '@/shared/transferPlace'
 import { currentUser, hasRole, loadCurrentUser, userName } from '@/shared/user'
 import type { ResponsibleChoice } from '@/shared/wagons/responsible'
-import { responsibleUsr } from '@/shared/wagons/responsible'
+import { responsibleUsrs } from '@/shared/wagons/responsible'
 import ResponsiblePicker from '@/shared/wagons/ResponsiblePicker.vue'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import { wagonsColumns } from '../wagons/wagonsColumns'
@@ -300,7 +300,7 @@ const okHint = computed(() => {
   if (!work.value) return t('Выберите вид работ')
   if (!time.value) return t('Укажите время акта')
   if (immediate.value && !giver.value) return t('Выберите, кто сдал вагоны')
-  if (responsible.value === null) return t('Выберите ответственного за вагоны')
+  if (responsible.value === null) return t('Выберите ответственных за вагоны')
   if (selected.value.length === 0) return t('Отметьте вагоны')
   return ''
 })
@@ -311,7 +311,7 @@ const back = () => {
   else void router.push({ name: 'acts' })
 }
 
-// ответственный за вагоны акта; null — ещё не выбран
+// ответственные за вагоны акта; null — ещё не выбраны
 const responsible = ref<ResponsibleChoice>(null)
 
 // кто сдал — свой выпадающий список, страница его не ждёт; ошибка — в самом списке
@@ -391,7 +391,7 @@ async function save() {
       transferredByUsr: giver.value,
       transferredDt: time.value!,
       wagons: selected.value.map((number) => ({ number, withProperty: chosen.value[number]! })),
-      responsibleUsr: responsibleUsr(responsible.value),
+      responsibleUsrs: responsibleUsrs(responsible.value),
     })
     Notify.create({
       message:

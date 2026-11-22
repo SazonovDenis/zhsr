@@ -116,5 +116,6 @@ export function isMe(u: { id: number }): boolean {
  * Реактивно: зависит от currentUser.
  */
 export function userName(u: { id: number; name: string }): string {
-  return isMe(u) ? t('{name} (вы)', { name: u.name }) : u.name
+  // ФИО не разрывается переносом: пробелы неразрывные (поиск в списках выбора их не различает)
+  return (isMe(u) ? t('{name} (вы)', { name: u.name }) : u.name).replace(/ /g, '\u00a0')
 }

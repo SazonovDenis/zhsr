@@ -4,6 +4,7 @@ import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.dto.equip.EquipListFilter;
 import kz.zhsr.app.service.SqlQuery;
 import kz.zhsr.app.service.SqlWhere;
+import kz.zhsr.app.service.TripWagonSql;
 import kz.zhsr.app.service.check.CheckRights;
 
 import java.util.ArrayList;
@@ -82,12 +83,7 @@ final class EquipSql {
             where.param("myWagons", scope.wagons());
         }
         if (scope.trip() != null) {
-            any.add("""
-                    equip_list.wagon in (select train_wagon.wagon from train_wagon
-                                      join trip on trip.train = train_wagon.train
-                                      where trip.id = :myTrip
-                                        and (train_wagon.dend is null
-                                             or train_wagon.dend >= coalesce(trip.departed_dt, trip.planned_dt)))""");
+            any.add("equip_list.wagon in " + TripWagonSql.wagonsOf("myTrip"));
             any.add("equip_list.trip = :myTrip");
             where.param("myTrip", scope.trip());
         }

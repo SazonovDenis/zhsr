@@ -1,6 +1,7 @@
 package kz.zhsr.app.auth;
 
 import kz.zhsr.app.service.RouteSql;
+import kz.zhsr.app.service.TripLayerSql;
 
 /**
  * SQL {@link CurrentUserService}: запросы с соединениями и условиями, которые не покрываются методами Db.
@@ -60,19 +61,19 @@ final class CurrentUserSql {
     }
 
     /**
-     * Вагоны, за которыми закреплён сотрудник в рейсе: действующие строки бригады (незакрытые или закрытые прибытием
-     * рейса), по порядку строк. Параметры: usr, trip.
+     * Вагоны, за которые сотрудник отвечает на рейс trip: журнал ответственных (условие {@link TripLayerSql#WHERE}),
+     * по номеру. Параметры: usr, trip и {@link TripLayerSql#params}.
      */
     static String tripWagons() {
         return """
-                select trip_crew.wagon, wagon.number
-                from trip_crew
-                join trip on trip.id = trip_crew.trip
-                join wagon on wagon.id = trip_crew.wagon
-                where trip_crew.usr = :usr and trip_crew.trip = :trip
-                  and (trip_crew.dend is null or trip_crew.dend = trip.arrived_dt)
-                order by trip_crew.id
-                """;
+                select wagon.id as wagon, wagon.number
+                from wagon_responsible
+                join wagon_responsible_usr on wagon_responsible_usr.wagon_responsible = wagon_responsible.id
+                join wagon on wagon.id = wagon_responsible.wagon
+                join trip on trip.id = :trip
+                where wagon_responsible_usr.usr = :usr and %s
+                order by wagon.number
+                """.formatted(TripLayerSql.WHERE);
     }
 
 }

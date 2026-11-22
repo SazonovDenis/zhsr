@@ -10,27 +10,27 @@ diagrams:
 
   train:
     title: "Поезд и вагоны в нём"
-    description: "Вагоны, которые ходят вместе из рейса в рейс. Прицепка и отцепка меняют поезд."
-    tables: [ train, train_wagon, train_wagon_change, trip, wagon: { hide_references: [ "depot" ] }, wagon_run, station, route_station, wagon_location: { hide_references: [ "trip", "wagon", "station" ] }, wagon_status: { hide_references: [ "wagon" ] }, wagon_responsible: { hide_references: [ "usr", "wagon" ] } ]
+    description: "Вагоны, которые ходят вместе из рейса в рейс. Журнал прицепок и отцепок (план и факт) строит участие вагонов: историю составов и ожидаемый состав."
+    tables: [ train, train_wagon, train_wagon_change, trip, wagon: { hide_references: [ "depot" ] }, wagon_run, station, route_station, wagon_location: { hide_references: [ "trip", "wagon", "station" ] }, wagon_status: { hide_references: [ "wagon" ] }, wagon_responsible: { hide_references: [ "created_by_usr", "wagon" ] } ]
     hide_fields: [ "station", "route_station", "wagon", "wagon_location", "wagon_status", "wagon_responsible" ]
     top: [ wagon_status, wagon_responsible, wagon_location ]
 
   trip_crew:
     title: "Бригада рейса"
-    tables: [ trip, trip_crew, usr, crew_duty_type, wagon, route, train ]
-    hide_fields: [ "crew_duty_type", "wagon", "usr", route, train ]
-    top: [ usr ]
+    tables: [ trip, trip_crew, usr, crew_duty_type, route, train ]
+    hide_fields: [ "crew_duty_type", "usr", route, train ]
+    top: [ crew_duty_type, usr ]
 
   wagon_location_status:
     title: "Вагоны: перемещение и смена состояния"
     description: "Главные журналы для любых изменений вагона. Другие таблицы могут хранить дополнительную информацию, но ссылаются сюда."
-    tables: [ wagon_location, wagon_status, wagon_responsible, wagon_edit: { hide_references: [ "wagon", "created_by_usr" ] }, wagon: { hide_references: [ "depot" ] }, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, station, trip, location_type, usr ]
+    tables: [ wagon_location, wagon_status, wagon_responsible: { hide_references: [ "created_by_usr" ] }, wagon_responsible_usr, wagon_edit: { hide_references: [ "wagon", "created_by_usr" ] }, wagon: { hide_references: [ "depot" ] }, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, station, trip, location_type, usr ]
     hide_fields: [ "depot", "yard", "station" , "wagon", "trip", "location_type", "usr" ]
 
   transfer_act:
     title: "Передача вагонов между депо, станцией и парком отстоя"
     description: "Акт приёма-передачи вагонов между станцией, её депо и парками отстоя"
-    tables: [ wagon: { hide_references: [ "depot" ] }, transfer_act, transfer_act_wagon, act_status_type, act_cancellation, station, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, wagon_location: { hide_references: [ "station", "depot", "wagon", "yard" ] }, wagon_responsible: { hide_references: [ "wagon", "usr" ] } ]
+    tables: [ wagon: { hide_references: [ "depot" ] }, transfer_act, transfer_act_wagon, act_status_type, act_cancellation, station, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, wagon_location: { hide_references: [ "station", "depot", "wagon", "yard" ] }, wagon_responsible: { hide_references: [ "wagon", "created_by_usr" ] } ]
     hide_fields: [ "wagon", "act_status_type", "station", "depot", "yard", "wagon_location", "wagon_responsible" ]
     top: [ transfer_act_wagon, act_cancellation, act_status_type ]
 
@@ -50,8 +50,8 @@ diagrams:
     description: |
       Для каждого объекта (вагон, заявка на ремонт) в таблицах ***_info хранится одна запись, в которую копируются последние данные со всех версионных таблиц объекта. 
       Предназначены для быстрого построения списков.
-    tables: [ wagon_info: { hide_references: [ "responsible_usr" ] }, wagon, wagon_location, wagon_status, wagon_responsible: { hide_references: [ "usr" ] }, repair_request_info, repair_request: { hide_references: [ "wagon" ] }, repair_request_status, repair_request_executor ]
-    hide_fields: [ "wagon", "wagon_location", "wagon_status", "wagon_responsible", "repair_request", "repair_request_status", "repair_request_executor" ]
+    tables: [ wagon_info, wagon, wagon_location, wagon_status, wagon_responsible: { hide_references: [ "created_by_usr" ] }, wagon_responsible_usr: { hide_references: [ "usr" ] }, repair_request_info, repair_request: { hide_references: [ "wagon" ] }, repair_request_status, repair_request_executor ]
+    hide_fields: [ "wagon", "wagon_location", "wagon_status", "wagon_responsible", "wagon_responsible_usr", "repair_request", "repair_request_status", "repair_request_executor" ]
 
   system_dict:
     title: "Справочники: системные константы"
@@ -659,7 +659,8 @@ tables:
   train:
     title: "Поезд"
     description: |
-      Вагоны, которые ходят вместе из рейса в рейс. Вагоны поезда - train_wagon; рейс ссылается на поезд.
+      Вагоны, которые ходят вместе из рейса в рейс. Прицепки и отцепки - train_wagon_change, участие вагонов -
+      train_wagon; рейс ссылается на поезд.
     columns:
       name:
         title: "Обозначение"
@@ -671,55 +672,76 @@ tables:
         description: "Пусто - поезд действует"
 
   train_wagon:
-    title: "Участие вагона в поезде"
+    title: "Участие вагона в поезде: история и ожидаемый состав"
     description: |
-      Период нахождения вагона в поезде по факту. Прицепка и отцепка - изменения train_wagon_change. Вагон,
-      отцепленный и снова прицепленный к тому же поезду, - вторая строка. Вагон в каждый момент - не больше чем в
-      одном поезде. Отмена без истории: отмена прицепки удаляет строку, отмена отцепки удаляет изменение и очищает
-      dend.
+      Состояние по технике «журнал и состояние» (journal-state-plan-fact.md): поезд и позиция вагона с периодом
+      действия. Строится журналом прицепок и отцепок train_wagon_change, напрямую не правится. Два слоя (kind): факт -
+      история составов, план - ожидаемый состав: открытые записи факта на время последнего факта поезда и ожидающие
+      планы журнала после него; просроченный план - временем последнего факта поезда. Слой план поезда
+      перестраивается при каждом изменении журнала поезда. Прицепка на позицию сдвигает вагоны с неё на 1 назад,
+      отцепка - вагоны за отцепленным на 1 вперёд; каждый сдвиг закрывает запись вагона и создаёт новую. Вагон в
+      каждый момент - не больше чем в одном поезде по факту; позиция поезда в каждый момент - у одного вагона.
+      Состав поезда на момент t - записи слоя с dbeg <= t < dend.
     columns:
       train:
         title: "Поезд"
       wagon:
         title: "Вагон"
+      kind:
+        title: "Слой"
+        constants_from: kz.zhsr.app.constants.TrainWagonKind
       seq:
         title: "Позиция в поезде"
+        description: "С 1"
       dbeg:
-        title: "Дата прицепки к поезду"
-        description: "Совпадает с train_wagon_change.fact_dt выполненной прицепки. Пусто - прицепка только запланирована"
+        title: "Начало периода"
       dend:
-        title: "Дата отцепки от поезда"
-        description: "Совпадает с train_wagon_change.fact_dt выполненной отцепки. Пусто - вагон в поезде"
+        title: "Конец периода"
+        description: "Пусто - запись открыта"
 
   train_wagon_change:
-    title: "Нахождение вагона в поезде"
+    title: "Прицепка и отцепка вагона: план и факт"
     description: |
-      Прицепка вагона к поезду или отцепка от него. Изменение бывает плановым, выполненным и отменённым.
-      Выполненные прицепки и отцепки идут по очереди. Любая прицепка и отцепка задаёт станцию. 
-      Выполненная прицепка или отцепка заполняет период участия (train_wagon.dbeg или train_wagon.dend).
-      Прицепка и отцепка в рейсе задают рейс и остановку маршрута и открывают записи журналов вагона, прицепка и отцепка вне рейса журналы вагона не меняют.
+      Журнал по технике «журнал и состояние» (journal-state-plan-fact.md): прицепка вагона к поезду или отцепка от
+      него в момент времени; по журналу строится участие вагонов в поезде train_wagon. Два слоя (kind): план -
+      запланированное событие со статусом, факт - произошедшее. Отметка исполнения плана создаёт факт со ссылкой на
+      план и переводит план в «отработан»; время и место факта могут отличаться от плана. Факт вносится временем не
+      раньше последнего факта поезда и вагона; удалить ошибочный факт можно только со временем последнего факта
+      поезда: участие поезда с этого времени строится заново, отработанный план снова «ожидает». Любая прицепка и
+      отцепка задаёт станцию. Факт в рейсе в статусе «выполняется» задаёт рейс и остановку маршрута и открывает записи
+      журналов вагона; вне рейса журналы вагона не меняются.
     columns:
-      train_wagon:
-        title: "Участие в поезде"
+      train:
+        title: "Поезд"
+      wagon:
+        title: "Вагон"
+      kind:
+        title: "Слой"
+        constants_from: kz.zhsr.app.constants.TrainWagonKind
+      plan_status:
+        title: "Статус плана"
+        description: "Только у плана"
+        constants_from: kz.zhsr.app.constants.TrainWagonPlanStatus
       change_type:
-        title: "Вид изменения"
+        title: "Вид"
         constants_from: kz.zhsr.app.constants.TrainWagonChangeType
-      status:
-        title: "Статус"
-        constants_from: kz.zhsr.app.constants.TrainWagonChangeStatus
-      planned_dt:
-        title: "Плановое время"
-      fact_dt:
-        title: "Фактическое время"
-        description: "Заполнено у выполненного изменения"
+      dt:
+        title: "Время"
+        description: "У плана - плановое, у факта - фактическое"
+      seq:
+        title: "Позиция прицепки"
+        description: "Позиция, на которую прицепляют вагон, с 1; больше числа вагонов - вагон встаёт последним; у отцепки пусто"
       station:
-        title: "Станция, на которой произошло изменение"
+        title: "Станция"
       trip:
-        title: "Рейс, в котором произошло изменение"
-        description: "Пусто - изменение вне рейса"
+        title: "Рейс"
+        description: "Пусто - вне рейса"
       route_station:
-        title: "Станция рейса, на которой произошло изменение"
+        title: "Остановка маршрута рейса"
         description: "Не дублирует station, а даёт определенность в определении маршрута пробега между станциями - порядок станций есть только в станциях рейса."
+      plan:
+        title: "Отработанный план"
+        description: "Только у факта; пусто - факт без плана"
       usr:
         title: "Кто внёс"
         description: "Запланировал или отметил факт"
@@ -727,14 +749,17 @@ tables:
         title: "Основания, примечания"
         description: "Приказ, причина"
       wagon_location:
-        title: "Запись расположения, открытая прицепкой или отцепкой"
-        description: "Пусто - изменение вне рейса или не выполнено"
+        title: "Запись расположения, открытая фактом"
+        description: "Пусто - факт вне рейса или план"
       wagon_status:
-        title: "Запись состояния, открытая прицепкой или отцепкой"
-        description: "Пусто - изменение вне рейса или не выполнено"
+        title: "Запись состояния, открытая фактом"
+        description: "Пусто - факт вне рейса или план"
       wagon_responsible:
-        title: "Запись ответственного, открытая прицепкой или отцепкой"
-        description: "Пусто - изменение вне рейса или не выполнено"
+        title: "Запись ответственных, открытая фактом"
+        description: "Факт wagon_responsible; пусто - факт вне рейса, план или сняты все ответственные"
+      closed_wagon_responsible:
+        title: "Запись ответственных, закрытая фактом"
+        description: "Факт wagon_responsible; удаление факта открывает её снова; пусто - ответственных не было"
 
   wagon_run:
     title: "Пробег вагона за участок рейса"
@@ -747,9 +772,9 @@ tables:
         title: "Вагон"
       trip:
         title: "Рейс"
-      train_wagon:
+      train_wagon_change:
         title: "Участие в поезде"
-        description: "Участие, на котором пройден участок; вагон, отцепленный и снова прицепленный в рейсе, - два участка"
+        description: "Факт прицепки, с которого началось участие вагона в поезде; вагон, отцепленный и снова прицепленный в рейсе, - два участка"
       km:
         title: "Пробег, км"
         description: "Разность километража route_station конца и начала участка"
@@ -758,8 +783,10 @@ tables:
     title: "Бригада рейса"
     description: |
       Сотрудник на дежурстве в рейсе с должностью: проводник, начальник поезда, поездной электромеханик (ПЭМ).
-      Строка - дежурство при вагоне: проводник двух вагонов - две строки. Начальник поезда и ПЭМ - не больше одного
-      на дежурстве. До отправления строки правятся и удаляются, с отправления - не удаляются.
+      Строка - дежурство сотрудника: один сотрудник - одна строка рейса. Начальник поезда и ПЭМ - не больше одного
+      на дежурстве. До отправления строки правятся и удаляются, с отправления - не удаляются. Бригада - роль на
+      рейсе; за какие вагоны отвечает сотрудник, хранит журнал ответственных (wagon_responsible): на период рейса
+      ответственных выбирают из бригады.
     columns:
       trip:
         title: "Рейс"
@@ -768,16 +795,12 @@ tables:
       crew_duty_type:
         title: "Должность на рейсе"
         constants_from: zhsr-database/src/main/resources/db/dict/crew_duty_type.tsv
-      wagon:
-        title: "Вагон, если должность на рейсе - проводник"
-        description: "Пусто - проводник назначен на рейс без привязки к вагону"
       dbeg:
         title: "Заступление на дежурство"
-        description: "Отправление рейса или назначение в пути; пусто - рейс ещё не отправлен"
+        description: "Отправление рейса; пусто - рейс ещё не отправлен"
       dend:
         title: "Окончание дежурства"
-        description: |
-          Прибытие рейса или перевод проводника на другой вагон в рейсе. Пусто - на дежурстве
+        description: "Прибытие рейса; пусто - на дежурстве"
 
   act_cancellation:
     title: "Акт отмены"
@@ -860,8 +883,11 @@ tables:
         title: "Запись расположения"
         description: "wagon_location, открытая приёмом: депо или парк отстоя акта либо их станция; пусто, пока акт не принят"
       wagon_responsible:
-        title: "Запись ответственного"
-        description: "wagon_responsible, открытая актом при передаче; при приёме ответственного можно сменить в этой записи; пусто у отменённого акта и при отказе"
+        title: "Запись ответственных, открытая актом"
+        description: "Факт wagon_responsible, открытый актом при передаче; при приёме состав ответственных можно сменить в этой записи; пусто у отменённого акта, при отказе и когда акт снял всех ответственных"
+      closed_wagon_responsible:
+        title: "Запись ответственных, закрытая актом"
+        description: "Факт wagon_responsible; отмена акта и отказ открывают её снова; пусто - ответственных не было"
 
   repair_request:
     title: "Заявка на ремонт"
@@ -1058,10 +1084,10 @@ tables:
   wagon_edit:
     title: "Ручная правка вагона"
     description: |
-      Смена состояния (Ф-ВАГ-02) или расположения (Ф-ВАГ-03) администратором с комментарием, смена ответственного
+      Смена состояния (Ф-ВАГ-02) или расположения (Ф-ВАГ-03) администратором с комментарием, смена ответственных
       (Ф-ВАГ-07) - без акта. Ссылается на записи журналов, которые открыла: при смене состояния - wagon_status, при
-      смене расположения - wagon_location и запись ответственного, при смене ответственного - только запись
-      ответственного.
+      смене расположения - wagon_location и запись ответственных, при смене ответственных - только запись
+      ответственных. Запись ответственных, которую правка закрыла, - closed_wagon_responsible.
     columns:
       wagon:
         title: "Вагон"
@@ -1071,7 +1097,7 @@ tables:
         title: "Когда"
       comment:
         title: "Комментарий"
-        description: "Обязателен при смене состояния и расположения; при смене ответственного - пусто"
+        description: "Обязателен при смене состояния и расположения; при смене ответственных - пусто"
       wagon_location:
         title: "Запись расположения"
         description: "wagon_location, открытая сменой расположения"
@@ -1079,31 +1105,70 @@ tables:
         title: "Запись состояния"
         description: "wagon_status, открытая сменой состояния"
       wagon_responsible:
-        title: "Запись ответственного"
-        description: "wagon_responsible, открытая сменой расположения или ответственного"
+        title: "Запись ответственных, открытая правкой"
+        description: "Факт wagon_responsible, открытый сменой расположения или ответственных; пусто - правка сняла всех ответственных"
+      closed_wagon_responsible:
+        title: "Запись ответственных, закрытая правкой"
+        description: "Факт wagon_responsible; отмена правки открывает её снова; пусто - ответственных не было"
 
   wagon_responsible:
-    title: "Журнал ответственного за вагон"
+    title: "Журнал ответственных за вагон: план и факт"
     description: |
-      Запись действует с dbeg по dend (не включая); dend пуст - текущий ответственный. Периоды вагона не пересекаются.
-      Документы и другие таблицы ссылаются на записи, которые они открыли.
+      Два слоя в одной таблице: план и факт (kind). Запись - период с dbeg по dend (не включая), состав ответственных
+      периода - wagon_responsible_usr. dend пуст - период открыт: у факта - текущие ответственные. Периоды факта вагона
+      не пересекаются; план и факт между собой не сверяются. Отсутствие открытой записи факта - ответственных нет.
+      План есть только у рейса и связан с ним ссылкой и стадией (trip, trip_point): план ответственных на рейс -
+      стадия "отправление" (его строит распределение ответственных из бригады рейса, отрабатывает отметка
+      отправления), план ответственных после рейса - "прибытие" (отрабатывает отметка прибытия); у вагона один
+      ожидающий план на стадию рейса. dbeg плана - справочно: время стадии по плану рейса, при правке рейса
+      переносится; dend плана пуст. Отметка создаёт запись факта с рейсом и стадией и переводит план в статус
+      "отработан"; отмена отметки находит её факты по рейсу и стадии. План правится, пока его не отработали и не
+      отменили; факт пишется временем не позже текущего. Документы и другие таблицы ссылаются на записи факта, которые
+      они открыли и закрыли.
     columns:
       wagon:
         title: "Вагон"
+      kind:
+        title: "Слой"
+        constants_from: kz.zhsr.app.constants.WagonResponsibleKind
+      plan_status:
+        title: "Статус плана"
+        description: "Только у плана"
+        constants_from: kz.zhsr.app.constants.WagonResponsiblePlanStatus
+      trip:
+        title: "Рейс"
+        description: "План - рейс плана (обязательно); факт - рейс, в котором сменили ответственных; пусто - не рейс"
+      trip_point:
+        title: "Стадия рейса"
+        description: "План - какую отметку ждёт (обязательно); факт - какая отметка его записала; пусто - не отметка"
+        constants_from: kz.zhsr.app.constants.WagonResponsibleTripPoint
       dbeg:
-        title: "Начало ответственности"
+        title: "Начало периода"
       dend:
-        title: "Конец ответственности"
-        description: "Пусто - текущая запись"
+        title: "Конец периода"
+        description: "Пусто - период открыт"
+      created_by_usr:
+        title: "Кто внёс"
+        description: "Запланировал или отметил факт"
+      created_dt:
+        title: "Когда внесли"
+      comment:
+        title: "Основания, примечания"
+
+  wagon_responsible_usr:
+    title: "Ответственный в периоде журнала"
+    description: "Состав ответственных периода wagon_responsible: строка - один ответственный; сотрудник в периоде один раз."
+    columns:
+      wagon_responsible:
+        title: "Период журнала ответственных"
       usr:
         title: "Ответственный"
-        description: "Пусто - ответственный явно не назначен"
 
   wagon_info:
     title: "Текущие данные вагона"
     description: |
       Кэш состояния вагона для быстрого доступа. Все поля вычисляемые: копия текущих записей журналов wagon_location,
-      wagon_status и wagon_responsible, обновляется в одной транзакции с журналами. Одна запись на вагон. Расположение ровно одно из:
+      wagon_status и ссылка на открытую запись факта wagon_responsible, обновляется в одной транзакции с журналами. Одна запись на вагон. Расположение ровно одно из:
       станция, депо, парк отстоя, рейс.
     columns:
       wagon:
@@ -1134,12 +1199,9 @@ tables:
         title: "Состояние"
         description: "Вычисляемое: из текущей записи wagon_status"
         constants_from: zhsr-database/src/main/resources/db/dict/wagon_status_type.tsv
-      dbeg_responsible:
-        title: "Начало текущей ответственности"
-        description: "Вычисляемое: dbeg текущей записи wagon_responsible"
-      responsible_usr:
-        title: "Ответственный"
-        description: "Вычисляемое: usr текущей записи wagon_responsible; пусто - не назначен"
+      wagon_responsible:
+        title: "Текущие ответственные"
+        description: "Вычисляемое: открытая запись факта wagon_responsible - начало и состав; пусто - ответственных нет"
       run_km:
         title: "Общий пробег, км"
         description: "Вычисляемое: wagon.initial_run_km плюс сумма wagon_run.km"

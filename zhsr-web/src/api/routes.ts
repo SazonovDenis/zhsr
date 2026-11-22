@@ -171,3 +171,8 @@ export async function recalcStops(stops: RouteStop[], changed: number[]): Promis
 export function stateOf(route: RouteAttrs): RouteState {
   return !route.dend || route.dend >= new Date().toISOString().slice(0, 10) ? 'active' : 'closed'
 }
+
+/** Удалить маршрут: на него ссылаются другие записи — ошибка 409 с причиной. */
+export async function deleteRoute(id: number): Promise<void> {
+  await http.delete(`/routes/${id}`)
+}

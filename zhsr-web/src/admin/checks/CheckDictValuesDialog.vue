@@ -1,5 +1,5 @@
 <template>
-  <FormDialog v-model:show="show" :title="title" ok-text="Готово" width="40rem" @ok="emit('done', true)">
+  <FormDialog v-model:show="show" height="lg" :title="title" ok-text="Готово" width="40rem" @ok="emit('done', true)">
     <div class="dict-values">
       <ErrorBox v-if="loadError" :error="loadError" :retry="load" />
       <template v-else>
@@ -111,8 +111,8 @@ async function edit(value: CheckDictValue | null) {
 .dict-values {
   display: flex;
   flex-direction: column;
+  flex: 1 1 0;
   min-height: 6rem;
-  max-height: 24rem;
   overflow-y: auto;
   border: 0.0625rem solid $zs-border;
   border-radius: 0.3rem;

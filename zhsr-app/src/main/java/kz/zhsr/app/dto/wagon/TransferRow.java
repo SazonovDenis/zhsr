@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -45,7 +46,9 @@ public class TransferRow {
     public static class Wagon {
         private String number;
         private boolean withProperty;
-        /** ответственный, назначенный актом (wagon_responsible.usr); null - не назначен */
-        private UserRef usr;
+        /** запись факта ответственных, открытая актом (transfer_act_wagon.wagon_responsible); null - не назначены */
+        private Long wagonResponsible;
+        /** ответственные, назначенные актом, по ФИО; пусто - не назначены; второй проход */
+        private List<UserRef> usrs = new ArrayList<>();
     }
 }

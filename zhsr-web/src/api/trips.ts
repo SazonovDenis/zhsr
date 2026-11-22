@@ -1,11 +1,11 @@
 import type { TableSort } from '@/shared/components/table/types'
+import { TripResponsibleLayer } from '@/shared/constants/TripResponsibleLayer'
 import { dayStart, isoDateTime } from '@/shared/format'
 import { http } from './http'
 import type { UserRef } from './requests'
 import type { TrainChange, TrainRef, TrainWagon, WagonBusy } from './trains'
 import type { TripRef } from './wagons'
-import type { ResponsibleChoice } from '@/shared/wagons/responsible'
-import { responsibleUsr } from '@/shared/wagons/responsible'
+import type { ResponsibleCandidate } from '@/shared/wagons/responsible'
 
 /**
  * API рейсов: список, создание, правка и отмена, формирование рейса (поезд и бригада), отправление и прибытие,
@@ -141,22 +141,31 @@ export interface CrewMember {
   crewDutyType: number
   /** категория «старший проводник» — нужна для хвостовых вагонов */
   senior: boolean
-  /** вагоны проводника по номеру: один или два соседних; пусто — проводник не распределён */
+  /**
+   * вагоны, за которые сотрудник отвечает на рейс (журнал ответственных: до отправления — план на рейс, в пути — факт),
+   * по номеру; пусто — сотрудник не распределён
+   */
   wagons: string[]
 }
 
-/** Вагон поезда рейса. */
+/** Вагон поезда рейса: до отправления — по ожидаемому составу, после — по факту. */
 export interface CrewWagon extends TrainWagon {
+  /** позиция в поезде: на отправлении (у прицепляемого в пути — при прицепке) */
+  seq: number
   /**
-   * вагон едет в поезде рейса: в рейсе «план» — на отправлении, иначе — сейчас; иначе отцеплен или прицепляется в
-   * пути
+   * вагон едет в поезде рейса: в рейсе «план» — на отправлении, «выполняется» — сейчас, «выполнен» — на прибытии;
+   * иначе отцеплен или прицепляется в пути
    */
   riding: boolean
+  /** прицепки и отцепки вагона в этом рейсе: факты и ожидающие планы, по времени */
+  changes: TrainChange[]
 }
 
 /** Вагон для прицепки или отцепки в рейсе. */
 export interface CouplingWagon {
   number: string
+  /** отцепка: позиция вагона в поезде; прицепка — null */
+  seq: number | null
   /** тип вагона — id справочника WagonType */
   wagonType: number
   /** вид расположения — id справочника LocationKind */
@@ -201,12 +210,6 @@ export interface TripCrew {
     departureMarkedDt: string | null
     /** когда отмечено прибытие, ISO; null — не отмечено */
     arrivalMarkedDt: string | null
-    /**
-     * после прибытия назначен ответственный за вагоны; false — не назначен, ответственные — проводники вагонов
-     */
-    responsibleAssigned: boolean
-    /** ответственный за вагоны, назначенный после прибытия; null — «не назначен» или назначения нет */
-    responsibleUsr: UserRef | null
     /** станция отправления — id справочника Station; null — у маршрута нет остановок */
     departureStation: number | null
     /** станция прибытия — id справочника Station; null — у маршрута нет остановок */
@@ -218,13 +221,19 @@ export interface TripCrew {
     /** время стоянки на остановках по расписанию рейса, ISO, по порядку stops */
     stopTimes: string[]
   }
-  /** вагоны поезда на время рейса: по факту и по плану */
+  /** вагоны поезда на время рейса: до отправления — ожидаемый состав, после — факт; сначала едущие, по позиции */
   wagons: CrewWagon[]
   crew: CrewMember[]
-  /** прицепки и отцепки рейса: плановые и выполненные */
+  /** прицепки и отцепки рейса: факты и ожидающие планы, по времени */
   changes: TrainChange[]
-  /** плановые прицепки и отцепки, которые надо отметить до отправления */
+  /** ожидающие планы, которые надо отметить или отменить до отправления: на станции отправления и вне рейса раньше */
   pending: TrainChange[]
+  /** отменённые планы рейса, по времени: их можно вернуть */
+  cancelled: TrainChange[]
+  /** отработанные (подтверждённые) планы рейса, по времени */
+  done: TrainChange[]
+  /** время последнего факта прицепки или отцепки поезда рейса, ISO: удалить можно только факт этого времени */
+  lastFactDt: string | null
 }
 
 /** Проводник для набора в бригаду рейса (диалог «Проводники…»). */
@@ -251,12 +260,18 @@ export async function fetchTripCrew(tripId: number): Promise<TripCrew> {
   return (await http.get<TripCrew>(`/trips/${tripId}/crew`)).data
 }
 
+/** Вагоны сотрудника бригады: один или два соседних по номеру; пусто — сотрудник без вагона. */
+export interface MemberWagons {
+  usr: number
+  wagons: string[]
+}
+
 /**
- * Закрепить проводника за вагонами: один вагон или два соседних; пустой список — проводник снимается с вагона и
- * становится нераспределённым. Возвращает бригаду после изменения.
+ * Распределить бригаду по вагонам — ответственные на рейс: до отправления меняется план на рейс, в пути — факт временем
+ * time (ISO с часовым поясом; null — сейчас). Возвращает бригаду после изменения.
  */
-export async function setConductorWagons(tripId: number, user: number, wagons: string[]): Promise<TripCrew> {
-  return (await http.put<TripCrew>(`/trips/${tripId}/crew/${user}/wagons`, wagons)).data
+export async function setCrewWagons(tripId: number, members: MemberWagons[], time: string | null): Promise<TripCrew> {
+  return (await http.put<TripCrew>(`/trips/${tripId}/crew-wagons`, { time, members })).data
 }
 
 /** Проводники станции отправления и уже назначенные в рейс — для набора проводников рейса. */
@@ -265,11 +280,14 @@ export async function fetchConductorCandidates(tripId: number): Promise<Conducto
 }
 
 /**
- * Проводники рейса: кто в списке — в бригаде, кого нет — убирается из бригады и с вагона. Новые проводники
- * становятся нераспределёнными.
+ * Поездная бригада рейса одной операцией: начальник поезда и ПЭМ (null — не назначен) и проводники. Проводник, которого
+ * нет в списке, убирается из бригады и с вагона; новые проводники становятся нераспределёнными.
  */
-export async function setTripConductors(tripId: number, users: number[]): Promise<TripCrew> {
-  return (await http.put<TripCrew>(`/trips/${tripId}/conductors`, users)).data
+export async function setTripCrew(
+  tripId: number,
+  crew: { lnp: number | null; pem: number | null; conductors: number[] },
+): Promise<TripCrew> {
+  return (await http.put<TripCrew>(`/trips/${tripId}/crew`, crew)).data
 }
 
 /** Сотрудники для должности начальника поезда или ПЭМ. duty — CrewDuty.LNP или CrewDuty.PEM. */
@@ -282,32 +300,85 @@ export async function setTripDuty(tripId: number, duty: number, user: number | n
   return (await http.put<TripCrew>(`/trips/${tripId}/duty/${duty}`, { usr: user })).data
 }
 
-/** Отметить отправление рейса. time — ISO с часовым поясом. */
-export async function markDeparture(tripId: number, time: string): Promise<TripCrew> {
-  return (await http.post<TripCrew>(`/trips/${tripId}/depart`, { time })).data
+/** Ответственные одного вагона: usrs — id сотрудников, пусто — ответственный не назначен. */
+export interface WagonUsrs {
+  /** вагон — wagon.id */
+  wagon: number
+  usrs: number[]
+}
+
+/** Ответственные за вагоны рейса (Ф-РЕЙ-08): вагоны поезда рейса с ответственными слоя layer и кого можно назначить. */
+export interface TripResponsibles {
+  trip: number
+  /** статус рейса — константы TripStatus */
+  tripStatusType: number
+  /** что показано — константы TripResponsibleLayer */
+  layer: number
+  /** показан план: изменения записываются планом, без времени изменения */
+  plan: boolean
+  /** станция, сотрудники депо которой могут быть ответственными; null — только бригада рейса */
+  station: number | null
+  /** почему пользователь не может менять ответственных; null — может */
+  readonlyReason: string | null
+  /** вагоны поезда рейса, по позиции в поезде */
+  wagons: {
+    /** вагон: номер и тип — id справочника WagonType */
+    wagon: { id: number; number: string; wagonType: number }
+    seq: number
+    /** начало показанных ответственных — записи факта или плана, ISO; null — ответственных нет */
+    dbeg: string | null
+    /** показанные ответственные, по ФИО: факт или план слоя layer */
+    usrs: UserRef[]
+  }[]
+  /** кого можно назначить: бригада рейса, затем сотрудники депо станции; по ФИО */
+  candidates: ResponsibleCandidate[]
+}
+
+/** Ответственные за вагоны рейса (Ф-РЕЙ-08). layer — константы TripResponsibleLayer. */
+export async function fetchTripResponsibles(
+  tripId: number,
+  layer: number = TripResponsibleLayer.TRIP,
+): Promise<TripResponsibles> {
+  return (await http.get<TripResponsibles>(`/trips/${tripId}/responsibles`, { params: { layer } })).data
 }
 
 /**
- * Отметить прибытие рейса. time — ISO с часовым поясом. responsible — ответственный за вагоны, выбранный при отметке:
- * id сотрудника или «не назначен»; не выбран (null) — ответственный не меняется, до назначения (assignTripResponsible)
- * им остаётся проводник.
+ * Сменить ответственных за вагоны рейса (Ф-РЕЙ-08): только изменённые вагоны. layer — TripResponsibleLayer.TRIP,
+ * AFTER или FACT. План записывается без времени, факт — одним временем time (ISO с часовым поясом; null — сейчас). У плана
+ * после рейса пустой состав снимает план.
+ */
+export async function saveTripResponsibles(
+  tripId: number,
+  time: string | null,
+  wagons: WagonUsrs[],
+  layer: number = TripResponsibleLayer.TRIP,
+): Promise<TripResponsibles> {
+  return (await http.post<TripResponsibles>(`/trips/${tripId}/responsibles`, { layer, time, wagons })).data
+}
+
+/**
+ * Отметить отправление рейса. time — ISO с часовым поясом. Отправление отрабатывает план ответственных на рейс;
+ * responsibles — правки плана в окне отправления: записываются вместо плана у своих вагонов; null — только план.
+ */
+export async function markDeparture(
+  tripId: number,
+  time: string,
+  responsibles: WagonUsrs[] | null = null,
+): Promise<TripCrew> {
+  return (await http.post<TripCrew>(`/trips/${tripId}/depart`, { time, responsibles })).data
+}
+
+/**
+ * Отметить прибытие рейса. time — ISO с часовым поясом. Прибытие отрабатывает план ответственных после рейса;
+ * responsibles — правки в окне прибытия: записываются вместо плана (у вагона без плана — вместо текущих) у своих
+ * вагонов; null — только план.
  */
 export async function markArrival(
   tripId: number,
   time: string,
-  responsible: ResponsibleChoice = null,
+  responsibles: WagonUsrs[] | null = null,
 ): Promise<TripCrew> {
-  const body =
-    responsible === null ? { time } : { time, assignResponsible: true, responsibleUsr: responsibleUsr(responsible) }
-  return (await http.post<TripCrew>(`/trips/${tripId}/arrive`, body)).data
-}
-
-/**
- * Назначить ответственного за вагоны прибывшего рейса — на все вагоны поезда на станции прибытия. responsibleUsr —
- * сотрудник, null — ответственный не назначен.
- */
-export async function assignTripResponsible(tripId: number, responsibleUsr: number | null): Promise<TripCrew> {
-  return (await http.post<TripCrew>(`/trips/${tripId}/responsible`, { responsibleUsr })).data
+  return (await http.post<TripCrew>(`/trips/${tripId}/arrive`, { time, responsibles })).data
 }
 
 /** Исправить время отправления (10 минут после отметки). time — ISO с часовым поясом. */
@@ -356,9 +427,16 @@ export async function coupleWagons(
     wagons: string[]
     /** фактическое время, ISO */
     time: string
-    /** ответственный за вагоны; null — не назначен */
-    responsibleUsr: number | null
+    /** прицепка: позиция первого вагона в поезде, с 1; null — в конец */
+    seq: number | null
+    /** ответственные за вагоны; пусто — не назначены */
+    responsibleUsrs: number[]
   },
 ): Promise<TripCrew> {
   return (await http.post<TripCrew>(`/trips/${tripId}/coupling`, body)).data
+}
+
+/** Удалить рейс: на него ссылаются другие записи — ошибка 409 с причиной. */
+export async function deleteTrip(id: number): Promise<void> {
+  await http.delete(`/trips/${id}`)
 }

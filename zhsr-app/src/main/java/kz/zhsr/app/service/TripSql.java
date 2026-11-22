@@ -20,14 +20,14 @@ final class TripSql {
 
     /**
      * Первое изменение после отметки отправления или прибытия: записи журналов вагонов, которые были в поезде в момент
-     * отметки, прицепки и отцепки поезда и строки бригады рейса - позже отметки; номер вагона (ФИО сотрудника
-     * бригады) и время. Записи, которые открыла сама отметка, начинаются временем отметки и не попадают. Не попадают и
-     * назначения ответственного за вагоны рейса после прибытия - записи ответственного без документа (прицепки и
-     * отцепки, акта, ручной правки): отмена прибытия снимает их сама. Параметры: train, trip, since - время отметки.
+     * отметки (расположение, состояние, факт ответственных), прицепки и отцепки поезда - позже отметки; номер вагона и
+     * время. Записи, которые открыла сама отметка, начинаются временем отметки и не попадают. Параметры: train,
+     * since - время отметки, fact - слой «факт» журнала ответственных, trainFact - слой «факт» участия в поезде и
+     * журнала прицепок и отцепок.
      */
     static String changesAfter() {
         String inTrain = """
-                train_wagon.train = :train and train_wagon.dbeg <= :since
+                train_wagon.train = :train and train_wagon.kind = :trainFact and train_wagon.dbeg <= :since
                   and (train_wagon.dend is null or train_wagon.dend > :since)""";
         return """
                 select wagon.number, wagon_location.dbeg
@@ -42,27 +42,17 @@ final class TripSql {
                 join wagon on wagon.id = train_wagon.wagon
                 where %1$s and wagon_status.dbeg > :since
                 union all
+                select wagon.number, train_wagon_change.dt
+                from train_wagon_change
+                join wagon on wagon.id = train_wagon_change.wagon
+                where train_wagon_change.train = :train and train_wagon_change.kind = :trainFact
+                  and train_wagon_change.dt > :since
+                union all
                 select wagon.number, wagon_responsible.dbeg
                 from train_wagon
                 join wagon_responsible on wagon_responsible.wagon = train_wagon.wagon
                 join wagon on wagon.id = train_wagon.wagon
-                where %1$s and wagon_responsible.dbeg > :since
-                  and (exists (select 1 from train_wagon_change
-                               where train_wagon_change.wagon_responsible = wagon_responsible.id)
-                    or exists (select 1 from transfer_act_wagon
-                               where transfer_act_wagon.wagon_responsible = wagon_responsible.id)
-                    or exists (select 1 from wagon_edit where wagon_edit.wagon_responsible = wagon_responsible.id))
-                union all
-                select wagon.number, train_wagon_change.fact_dt
-                from train_wagon_change
-                join train_wagon on train_wagon.id = train_wagon_change.train_wagon
-                join wagon on wagon.id = train_wagon.wagon
-                where train_wagon.train = :train and train_wagon_change.fact_dt > :since
-                union all
-                select usr.full_name, trip_crew.dbeg
-                from trip_crew
-                join usr on usr.id = trip_crew.usr
-                where trip_crew.trip = :trip and trip_crew.dbeg > :since
+                where %1$s and wagon_responsible.kind = :fact and wagon_responsible.dbeg > :since
                 order by dbeg
                 limit 1
                 """.formatted(inTrain);
@@ -91,7 +81,7 @@ final class TripSql {
      */
     static String crew() {
         return """
-                select trip_crew.id, trip_crew.usr, trip_crew.crew_duty_type, trip_crew.wagon,
+                select trip_crew.id, trip_crew.usr, trip_crew.crew_duty_type,
                        %s
                 from trip_crew
                 join usr on usr.id = trip_crew.usr

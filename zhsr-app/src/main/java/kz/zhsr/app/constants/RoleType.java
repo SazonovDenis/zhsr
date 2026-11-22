@@ -22,7 +22,7 @@ public final class RoleType {
     public static final long MASTER = 5;
     /** Приёмщик */
     public static final long RECEIVER = 6;
-    /** Клининг - учётная запись подрядчика */
+    /** Клининг - может быть учётной записью для подрядчика */
     public static final long CLEANING = 7;
     /** Руководитель */
     public static final long MANAGER = 8;
@@ -32,12 +32,12 @@ public final class RoleType {
     public static final long INSTRUCTOR = 10;
     /** Инструктор-нормировщик (нарядный стол) */
     public static final long SCHEDULER = 11;
-    /** Планировщик вагонов - нет в zholserik; вагоны, маршруты, рейсы, состав, ЛНП и ПЭМ (tz.actors.md) */
+    /** Планировщик вагонов - вагоны, маршруты, рейсы, состав, ЛНП и ПЭМ (tz.actors.md) */
     public static final long WAGON_PLANNER = 12;
+    /** Планировщик проводников - проводники рейса (tz.actors.md) */
+    public static final long CREW_PLANNER = 14;
     /** Эксплуатационщик */
     public static final long OPERATOR = 13;
-    /** Планировщик проводников - нет в zholserik; проводники рейса (tz.actors.md) */
-    public static final long CREW_PLANNER = 14;
     /** Медик */
     public static final long MEDIC = 15;
 

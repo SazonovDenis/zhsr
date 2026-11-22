@@ -19,10 +19,38 @@ import { join, relative } from 'node:path'
 
 const root = new URL('..', import.meta.url).pathname
 const src = join(root, 'src')
-const cyr = /[А-Яа-яЁё]/
+// текст интерфейса — с кириллицей или знаком «№»
+const cyr = /[А-Яа-яЁё№]/
 
-// тексты из данных сервера, которые показываются через t()
-const DATA_KEYS = ['Пассажирский', 'Состав', 'Бригада', 'Неверный логин или пароль']
+// тексты из данных сервера, которые показываются через t(): данные, сообщения об ошибках (errorText), заголовки колонок
+// таблиц администрирования (AdminTables.java)
+const DATA_KEYS = [
+  'Пассажирский',
+  'Состав',
+  'Бригада',
+  'Неверный логин или пароль',
+  // сообщения сервера
+  'Задайте пароль',
+  'Запись не найдена',
+  'Маршрут не найден',
+  'Новый пароль совпадает с текущим',
+  'Нужна роль «Администратор компании»',
+  'Смените пароль',
+  'Сотрудник не найден',
+  'Станции перегона должны быть разными',
+  'Текущий пароль неверен',
+  // колонки таблиц администрирования
+  'В избранном',
+  'Группа',
+  'Избранные неисправности',
+  'Код',
+  'Критичность по умолчанию',
+  'Порядок показа',
+  'Расстояние, км',
+  'Служба-исполнитель',
+  'Станция 1',
+  'Станция 2',
+]
 
 function files(dir) {
   return readdirSync(dir).flatMap((name) => {
@@ -33,16 +61,17 @@ function files(dir) {
   })
 }
 
+// блочный комментарий — с начала строки или после пробела: «image/*» в атрибуте accept комментарием не считается
 function stripComments(text) {
   return text
-    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|\s)\/\*[\s\S]*?\*\//g, '$1')
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/(^|\s)\/\/.*$/gm, '$1')
 }
 
 const patterns = [
   /'((?:[^'\\\n]|\\.)*)'/g,
-  /(?<![:@\w-])(?:label|placeholder|title|empty|hint|ok-text|date-text|text)="([^"{}]+)"/g,
+  /(?<![:@\w-])(?:label|placeholder|title|empty|hint|ok-text|date-text|text)="([^"]+)"/g,
 ]
 
 const used = new Map()
@@ -66,8 +95,16 @@ for (const name of i18nDicts) {
 }
 for (const key of DATA_KEYS) add(key, 'данные сервера')
 
+// пункты меню на любой глубине: label всех вложенных объектов
 const menu = JSON.parse(readFileSync(join(src, 'desktop/menu/menu.json'), 'utf8'))
-for (const item of [...menu.items, menu.admin, ...menu.admin.items]) add(item.label, 'src/desktop/menu/menu.json')
+function addLabels(node) {
+  if (Array.isArray(node)) node.forEach(addLabels)
+  else if (node && typeof node === 'object') {
+    if (typeof node.label === 'string') add(node.label, 'src/desktop/menu/menu.json')
+    Object.values(node).forEach(addLabels)
+  }
+}
+addLabels(menu)
 
 let missing = 0
 for (const lang of ['kk', 'en']) {

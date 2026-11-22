@@ -12,5 +12,5 @@ id	text	code	service	description
 11	Инструктор-нормировщик (нарядный стол)	SCHEDULER	4	
 12	Планировщик вагонов	WAGON_PLANNER		вагоны, маршруты, рейсы, состав, ЛНП и ПЭМ (tz.actors.md)
 14	Планировщик проводников	CREW_PLANNER		проводники рейса (tz.actors.md)
-13	Эксплуатационщик	OPERATOR	5   	""
-15	Медик	MEDIC	4	""
+13	Эксплуатационщик	OPERATOR	5	
+15	Медик	MEDIC	4	

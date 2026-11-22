@@ -1,6 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
+    height="lg"
     :title="user ? 'Пользователь' : 'Новый пользователь'"
     :ok-text="user ? 'Сохранить' : 'Создать пользователя'"
     width="40rem"

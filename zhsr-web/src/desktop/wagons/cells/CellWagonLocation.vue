@@ -3,8 +3,8 @@
   <div v-if="row.locationType === LocationType.TRIP">{{ wagonPlace(row) }}</div>
   <div v-else>{{ dictManager.getValue('LocationKind', row.locationType) }}: {{ wagonPlace(row) }}</div>
   <div class="zs-sub">
-    {{ t('ответственный:') }}
-    <UserName v-if="row.responsibleUsr" :user="row.responsibleUsr" /><template v-else>{{ t('не назначен') }}</template>
+    {{ row.responsibleUsrs.length > 1 ? t('ответственные:') : t('ответственный:') }}
+    <UserNames :users="row.responsibleUsrs" />
   </div>
 </template>
 
@@ -16,10 +16,10 @@ import { LocationType } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
 import { wagonPlace } from '@/shared/wagonPlace'
 
-import UserName from '@/shared/components/UserName.vue'
+import UserNames from '@/shared/components/UserNames.vue'
 /**
- * Расположение вагона: в рейсе — рейс («Рейс 2/1 • Алматы — Астана»), иначе вид и место («Депо: Вагонное депо
- * Астана»); второй строкой — текущий ответственный.
+ * Расположение вагона: в рейсе — рейс («Рейс: 2/1 • Алматы — Астана»), иначе вид и место («Депо: Вагонное депо
+ * Астана»); второй строкой — текущие ответственные.
  */
 defineProps<CellProps<WagonRow>>()
 </script>

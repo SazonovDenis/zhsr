@@ -26,9 +26,11 @@ public class WagonRow extends WagonOption {
     private long wagonStatusType;
     /** с какого времени вагон в этом состоянии */
     private OffsetDateTime dbegStatus;
-    /** текущий ответственный за вагон (wagon_info.responsible_usr); null - не назначен */
-    private UserRef responsibleUsr;
-    /** с какого времени ответственный назначен */
+    /** открытая запись факта журнала ответственных (wagon_info.wagon_responsible); null - ответственных нет */
+    private Long wagonResponsible;
+    /** текущие ответственные за вагон, по ФИО; пусто - не назначены; второй проход */
+    private List<UserRef> responsibleUsrs = new ArrayList<>();
+    /** с какого времени текущие ответственные; null - не назначены; второй проход */
     private OffsetDateTime dbegResponsible;
     /** общий пробег, км (wagon_info.run_km) */
     private int runKm;

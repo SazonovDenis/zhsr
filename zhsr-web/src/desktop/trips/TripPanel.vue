@@ -1,84 +1,134 @@
 <template>
   <SidePanel
     :empty="trip ? '' : 'Выберите рейс в списке'"
-    :title="trip ? t('Поезд № {train}', { train: trip.trainNumber }) : ''"
-    :subtitle="trip?.name ?? ''"
+    :title="trip?.name ?? ''"
+    :subtitle="trip ? t('№ {train}', { train: trip.trainNumber }) : ''"
     @close="emit('close')"
   >
-    <SidePanelFields v-if="trip">
-      <span>{{ t('Вид маршрута') }}</span>
-      <span>{{ dictManager.getValue('TransportType', trip.transportType) }}</span>
-      <span>{{ t('Время в пути') }}</span>
-      <span>{{ formatHm(trip.duration) }}</span>
-      <TripTimes
-        :planned-dt="trip.plannedDt"
-        :departed-dt="trip.departedDt"
-        :arrived-dt="trip.arrivedDt"
-        :duration="trip.duration"
+    <template v-if="trip">
+      <TripFields :trip="trip" />
+      <!-- «Редактировать» — кнопкой, под ней переходы в другие окна мягкими ссылками -->
+      <div v-if="editAction" class="q-mt-md">
+        <q-btn
+          unelevated
+          outline
+          no-caps
+          color="primary"
+          class="zs-soft-border"
+          :disable="!!editAction.reason"
+          :title="editAction.reason || undefined"
+          @click="editAction.run()"
+        >
+          {{ t(editAction.label) }}
+        </q-btn>
+      </div>
+      <div class="trip-panel__links q-mt-md">
+        <SoftLink
+          v-for="l in links"
+          :key="l.label"
+          :text="l.label"
+          :disabled="!!l.reason"
+          :title="l.reason || undefined"
+          @click="l.run()"
+        />
+      </div>
+
+      <ErrorBox v-if="error" :error="error" :retry="load" class="q-mt-md" />
+
+      <!-- готовность к отправлению — у рейса в статусе «План» -->
+      <TripReadiness
+        v-if="crew && trip.tripStatusType === TripStatus.PLANNED"
+        :crew="crew"
+        :mark-reason="markAction?.reason ?? ''"
+        class="q-mt-md"
+        @mark="markAction?.run()"
       />
-      <span>{{ t('Состояние') }}</span>
-      <span><DictBadge :id="trip.tripStatusType" dict="TripState" /></span>
-      <span>{{ t('Поезд') }}</span>
-      <span>{{ trip.train?.name ?? t('не назначен') }}</span>
-      <!-- после прибытия: ответственный за вагоны поезда — как исполнитель заявки: строка и ссылка; ссылка видна всегда,
-           нельзя — неактивна, причина во всплывающей подсказке -->
-      <template v-if="trip.tripStatusType === TripStatus.DONE">
-        <span>{{ t('Ответственный за вагоны') }}</span>
-        <span>
-          <UserName v-if="responsibleUser" :user="responsibleUser" />
-          <template v-else>{{ responsibleText }}</template>
+
+      <!-- ответственные за вагоны: на рейс или после рейса; «Изменить» — диалог ответственных -->
+      <div class="trip-panel__section q-mt-md">
+        <div class="trip-panel__head">
+          <span class="trip-panel__caption">{{ t('Ответственные') }}</span>
+          <CbSegment v-model="layer" single required :values="layers" />
           <SoftLink
-            :text="crewTrip?.responsibleAssigned ? 'Переназначить' : 'Назначить'"
-            :disabled="!assign || !!assign.reason"
-            :title="assign?.reason || undefined"
-            class="q-ml-sm"
-            @click="assign?.run()"
+            text="Изменить"
+            :disabled="!!respReason"
+            :title="respReason || undefined"
+            @click="editResponsibles"
           />
-        </span>
-      </template>
-    </SidePanelFields>
-    <!-- действия: видны все; нет прав или не тот статус рейса — кнопка неактивна, причина во всплывающей подсказке -->
-    <div v-if="trip" class="trip-panel__actions">
-      <q-btn
-        v-for="b in buttons"
-        :key="b.label"
-        unelevated
-        outline
-        no-caps
-        color="primary"
-        class="zs-soft-border"
-        :disable="!!b.reason"
-        :title="b.reason || undefined"
-        @click="b.run()"
-      >
-        {{ t(b.label) }}
-      </q-btn>
-    </div>
+        </div>
+        <template v-if="resp">
+          <div class="trip-panel__muted">{{ respCaption }}</div>
+          <div class="trip-panel__list">
+            <template v-for="r in respLines" :key="r.key">
+              <span :class="{ 'trip-panel__muted': !r.usr }">
+                <UserName v-if="r.usr" :user="r.usr" /><template v-else>{{ r.empty }}</template>
+              </span>
+              <span>{{ t('вагон {n}', { n: r.number }) }}</span>
+            </template>
+          </div>
+          <div v-if="respLines.length === 0" class="trip-panel__muted">{{ t('В поезде рейса нет вагонов') }}</div>
+        </template>
+      </div>
+
+      <!-- поездная бригада: ЛНП, ПЭМ, проводники; «Изменить» — диалог «Поездная бригада» -->
+      <div class="trip-panel__section q-mt-md">
+        <div class="trip-panel__head">
+          <span class="trip-panel__caption">{{ t('Поездная бригада') }}</span>
+          <SoftLink
+            text="Изменить"
+            :disabled="!!crewReason || !crew"
+            :title="crewReason || undefined"
+            @click="editCrew"
+          />
+        </div>
+        <template v-if="crew">
+          <div class="trip-panel__list">
+            <template v-for="m in crewMembers" :key="m.usr.id">
+              <span><UserName :user="m.usr" /></span>
+              <span class="trip-panel__muted">{{ dutyText(m) }}</span>
+            </template>
+          </div>
+          <div v-if="crewMembers.length === 0" class="trip-panel__muted">{{ t('Бригада рейса не назначена') }}</div>
+        </template>
+      </div>
+    </template>
   </SidePanel>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, shallowRef, watch } from 'vue'
+import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 
-import UserName from '@/shared/components/UserName.vue'
-import type { TripCrew, TripRow } from '@/api/trips'
-import { fetchTripCrew } from '@/api/trips'
+import type { CrewMember, TripCrew, TripResponsibles, TripRow } from '@/api/trips'
+import { fetchTripCrew, fetchTripResponsibles } from '@/api/trips'
+import type { UserRef } from '@/api/requests'
 import { t } from '@/boot/i18n'
-import { formatHm } from '@/desktop/routes/duration'
-import DictBadge from '@/shared/components/DictBadge.vue'
-import { dictManager } from '@/shared/dict/DictManager'
+import type { ChoiceItem } from '@/shared/components/choice/choice'
+import CbSegment from '@/shared/components/choice/CbSegment.vue'
+import { openDialog } from '@/shared/components/dialog/openDialog'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
-import { TripStatus } from '@/shared/constants/systemDicts'
-import { notifyError } from '@/shared/errors'
-import { loadCurrentUser } from '@/shared/user'
+import UserName from '@/shared/components/UserName.vue'
+import { CrewDuty, RoleType, TripStatus } from '@/shared/constants/systemDicts'
+import { TripResponsibleLayer } from '@/shared/constants/TripResponsibleLayer'
+import { dictManager } from '@/shared/dict/DictManager'
+import type { ShownError } from '@/shared/errors'
+import { shownError } from '@/shared/errors'
+import { formatDateTime } from '@/shared/format'
+import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
 import SidePanel from '../frame/SidePanel.vue'
-import SidePanelFields from '../frame/SidePanelFields.vue'
-import { useTripActions } from './tripActions'
-import TripTimes from './TripTimes.vue'
+import CrewPickDialog from './CrewPickDialog.vue'
+import { NAV_ACTIONS, useTripActions } from './tripActions'
+import TripFields from './TripFields.vue'
+import TripReadiness from './TripReadiness.vue'
+import TripResponsiblesDialog from './TripResponsiblesDialog.vue'
 
 /**
- * Правая панель списка рейсов: карточка выбранного рейса и кнопки действий с рейсом (useTripActions) — те же, что в
- * меню строки списка. Событие changed — рейс изменился.
+ * Правая панель списка рейсов: заголовок — маршрут, атрибуты рейса (TripFields), кнопка «Редактировать», переходы
+ * мягкими ссылками («Формирование» и другие). Ниже — «Ответственные» с переключателем «На рейс» / «После рейса»:
+ * подпись «Ответственные с …» и строки «ФИО — вагон N», номера вагонов — колонкой; «Изменить» — диалог ответственных
+ * (TripResponsiblesDialog). Затем «Поездная бригада» — сотрудники с должностью; «Изменить» — диалог «Поездная бригада»
+ * (CrewPickDialog). У рейса в статусе «План» — готовность к отправлению с кнопкой «Отметить отправление»
+ * (TripReadiness). Событие changed — рейс изменился.
  */
 const props = defineProps<{ trip: TripRow | null }>()
 
@@ -86,47 +136,179 @@ const emit = defineEmits<{ close: []; changed: [] }>()
 
 const { actionsOf } = useTripActions(() => emit('changed'))
 
-/** Кнопки панели: видны все; reason — почему недоступно сейчас. */
-// «Ответственный за вагоны» — не кнопкой, а ссылкой в строке панели
-const ASSIGN = 'Ответственный за вагоны'
+const EDIT = 'Редактировать'
 const actions = computed(() => (props.trip ? actionsOf(props.trip) : []))
-const buttons = computed(() => actions.value.filter((a) => a.label !== ASSIGN))
-const assign = computed(() => actions.value.find((a) => a.label === ASSIGN))
+/** Переходы в другие окна; reason — почему недоступно сейчас. */
+const links = computed(() => actions.value.filter((a) => NAV_ACTIONS.includes(a.label)))
+const editAction = computed(() => actions.value.find((a) => a.label === EDIT))
+const markAction = computed(() => actions.value.find((a) => a.label === 'Отметить отправление'))
 
-// ответственный за вагоны прибывшего рейса — из формирования рейса; рейс сменился или обновился — загружается заново
-const crewTrip = shallowRef<TripCrew['trip'] | null>(null)
+const crew = shallowRef<TripCrew | null>(null)
+const resp = shallowRef<TripResponsibles | null>(null)
+const error = ref<ShownError | null>(null)
+
+type Layer = 'trip' | 'after'
+const layer = ref<Layer>('trip')
+const layers: ChoiceItem[] = [
+  { id: 'trip', text: 'На рейс' },
+  { id: 'after', text: 'После рейса' },
+]
+
+async function loadResp() {
+  const trip = props.trip
+  if (!trip) return
+  resp.value = null
+  const d = await fetchTripResponsibles(
+    trip.id,
+    layer.value === 'after' ? TripResponsibleLayer.AFTER : TripResponsibleLayer.TRIP,
+  )
+  if (props.trip?.id === trip.id) resp.value = d
+}
+
+async function loadCrew() {
+  const trip = props.trip
+  if (!trip) return
+  const c = await fetchTripCrew(trip.id)
+  if (props.trip?.id === trip.id) crew.value = c
+}
+
+async function load() {
+  error.value = null
+  try {
+    await Promise.all([loadCrew(), loadResp(), dictManager.prepareDict('Station')])
+  } catch (e) {
+    error.value = shownError(e)
+  }
+}
+
 watch(
-  () => props.trip,
-  async (trip) => {
-    crewTrip.value = null
-    if (trip?.tripStatusType !== TripStatus.DONE) return
-    try {
-      const crew = await fetchTripCrew(trip.id)
-      if (props.trip?.id === trip.id) crewTrip.value = crew.trip
-    } catch (e) {
-      notifyError(e)
-    }
+  () => props.trip?.id,
+  () => {
+    crew.value = null
+    resp.value = null
+    void load()
   },
   { immediate: true },
 )
-
-/** Назначенный ответственный; null — не назначен или ещё не назначали (тогда — responsibleText). */
-const responsibleUser = computed(() => (crewTrip.value?.responsibleAssigned ? crewTrip.value.responsibleUsr : null))
-
-/** Ответственный словами, когда сотрудника нет: «не назначен» или до назначения «проводники вагонов»; не загружен — многоточие. */
-const responsibleText = computed(() => {
-  const ct = crewTrip.value
-  if (!ct) return '…'
-  return ct.responsibleAssigned ? t('не назначен') : t('проводники вагонов')
+watch(layer, async () => {
+  error.value = null
+  try {
+    await loadResp()
+  } catch (e) {
+    error.value = shownError(e)
+  }
 })
+
+/** Подпись: «Ответственные с …» — с начала самых поздних показанных ответственных; ответственных нет — без даты. */
+const respCaption = computed(() => {
+  const starts = (resp.value?.wagons ?? []).map((w) => w.dbeg).filter((d): d is string => !!d)
+  if (starts.length === 0) return t(layer.value === 'after' ? 'Плана после рейса нет' : 'Ответственные не назначены')
+  const last = starts.reduce((a, b) => (new Date(b) > new Date(a) ? b : a))
+  return t('Ответственные с {at}', { at: formatDateTime(last) })
+})
+
+/** Строки ответственных: каждый сотрудник вагона — своей строкой; вагон без ответственных — одной строкой. */
+const respLines = computed(() => {
+  const res: { key: string; usr: UserRef | null; empty: string; number: string }[] = []
+  for (const w of resp.value?.wagons ?? []) {
+    if (w.usrs.length === 0) {
+      const empty = t(layer.value === 'after' ? 'без плана' : 'не назначен')
+      res.push({ key: `${w.wagon.id}`, usr: null, empty, number: w.wagon.number })
+    }
+    for (const u of w.usrs) res.push({ key: `${w.wagon.id}-${u.id}`, usr: u, empty: '', number: w.wagon.number })
+  }
+  return res
+})
+
+// бригада: ЛНП, ПЭМ, затем проводники
+const DUTY_ORDER: number[] = [CrewDuty.LNP, CrewDuty.PEM, CrewDuty.CONDUCTOR]
+const crewMembers = computed(() =>
+  [...(crew.value?.crew ?? [])].sort((a, b) => DUTY_ORDER.indexOf(a.crewDutyType) - DUTY_ORDER.indexOf(b.crewDutyType)),
+)
+const dutyText = (m: CrewMember) =>
+  dictManager.getValue('CrewDuty', m.crewDutyType) + (m.senior ? ` • ${t('ст.')}` : '')
+
+/** Почему действие недоступно в статусе рейса; пусто — доступно. */
+function statusReason(...allowed: number[]): string {
+  const s = props.trip?.tripStatusType
+  if (s !== undefined && allowed.includes(s)) return ''
+  return t('Недоступно в статусе «{status}»', { status: dictManager.getValue('TripState', s) })
+}
+
+/** Почему ответственных не изменить: нет прав или рейс отменён; пусто — можно. */
+const respReason = computed(() => {
+  const u = currentUser.value
+  const chief = u?.trip?.id === props.trip?.id && u?.trip?.crewDutyType === CrewDuty.LNP
+  const rights = chief || [RoleType.ADMIN, RoleType.WAGON_PLANNER, RoleType.CREW_PLANNER].some((r) => hasRole(u, r))
+  if (!rights) return t('Ответственных за вагоны меняют начальник поезда рейса и планировщики')
+  return statusReason(TripStatus.PLANNED, TripStatus.IN_PROGRESS, TripStatus.DONE)
+})
+
+/** Почему поездную бригаду не поменять: нет прав или рейс не в статусе «План»; пусто — можно. */
+const crewReason = computed(() => {
+  const u = currentUser.value
+  if (![RoleType.ADMIN, RoleType.WAGON_PLANNER, RoleType.CREW_PLANNER].some((r) => hasRole(u, r)))
+    return t('Поездную бригаду меняют планировщик вагонов и планировщик проводников')
+  return statusReason(TripStatus.PLANNED)
+})
+
+async function editResponsibles() {
+  const trip = props.trip
+  if (!trip) return
+  const saved = await openDialog<boolean>(TripResponsiblesDialog, { tripId: trip.id, after: layer.value === 'after' })
+  if (saved) void load()
+}
+
+async function editCrew() {
+  const c = crew.value
+  if (!c) return
+  const saved = await openDialog<boolean>(CrewPickDialog, {
+    tripId: c.trip.id,
+    tripName: `${c.trip.trainNumber} • ${c.trip.name}`,
+    station: c.trip.departureStation ? dictManager.getValue('Station', c.trip.departureStation) : '',
+    crew: c.crew,
+  })
+  if (saved) void load()
+}
 
 onMounted(() => void loadCurrentUser())
 </script>
 
 <style scoped lang="scss">
-.trip-panel__actions {
+.trip-panel__links {
   display: flex;
   flex-wrap: wrap;
+  gap: 0.5rem 1.2rem;
+}
+
+.trip-panel__section {
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.trip-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.trip-panel__caption {
+  color: $zs-text-muted;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+// ФИО — каждое своей строкой, вторая колонка (вагон, должность) — вровень
+.trip-panel__list {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) max-content;
+  gap: 0.2rem 1.2rem;
+}
+
+.trip-panel__muted {
+  color: $zs-text-muted;
 }
 </style>

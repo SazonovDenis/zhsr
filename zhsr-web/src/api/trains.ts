@@ -1,10 +1,10 @@
 import { http } from './http'
-import type { UserRef } from './requests'
+import type { UserRef, WagonRef } from './requests'
 import type { TripRef } from './wagons'
 
 /**
- * API поездов: список, создание и обозначение, состав поезда, прицепка и отцепка фактом и планом, отметка и отмена
- * плана, отмена выполненной прицепки и отцепки, занятость вагонов.
+ * API поездов: список, создание и обозначение, журнал прицепок и отцепок и участие вагонов (план и факт), прицепка и
+ * отцепка, отметка и отмена плана, удаление ошибочного факта, занятость вагонов.
  */
 
 /** Поезд в данных. */
@@ -14,54 +14,75 @@ export interface TrainRef {
   name: string
 }
 
-/** Прицепка или отцепка вагона. */
+/** Прицепка или отцепка вагона — запись журнала поезда: план или факт. */
 export interface TrainChange {
   id: number
-  /** участие вагона в поезде (train_wagon) */
-  trainWagon: number
+  train: TrainRef
+  wagon: WagonRef
+  /** слой — константы TrainWagonKind */
+  kind: number
+  /** статус плана — константы TrainWagonPlanStatus; у факта null */
+  planStatus: number | null
   /** вид — константы TrainWagonChangeType */
   changeType: number
-  /** статус — константы TrainWagonChangeStatus */
-  status: number
-  /** плановое время, ISO; null — не планировалось */
-  plannedDt: string | null
-  /** фактическое время, ISO; null — не выполнено */
-  factDt: string | null
+  /** время, ISO: у плана плановое, у факта фактическое */
+  dt: string
+  /** позиция, на которую прицепляют вагон, с 1; у отцепки null */
+  seq: number | null
   /** станция — id справочника Station */
   station: number
   /** рейс прицепки или отцепки; null — вне рейса */
   trip: TripRef | null
   /** остановка маршрута рейса (route_station.id); null — вне рейса */
   routeStation: number | null
+  /** у факта: отработанный им план (id записи журнала); null — факт без плана */
+  plan: number | null
   /** кто внёс */
   usr: UserRef
   /** основания, примечания */
   comment: string | null
-  /** номер вагона */
-  number: string
-  /** текущий сотрудник может отметить план выполненным */
+  /** у факта по плану: плановое время, ISO */
+  planDt: string | null
+  /** у факта по плану: плановая станция — id справочника Station */
+  planStation: number | null
+  /** у отработанного плана: факт, который его отработал (id записи журнала); иначе null */
+  fact: number | null
+  /** у плана: плановое время прошло, план не отмечен */
+  overdue: boolean
+  /** текущий сотрудник может отметить план */
   canMark: boolean
-  /** текущий сотрудник может отменить план: кто может отметить, и планировщик вагонов */
+  /** текущий сотрудник может отменить план */
   canCancel: boolean
-  /** текущий сотрудник может отменить выполненное изменение без истории */
+  /** текущий сотрудник может удалить ошибочный факт (если факт последний у поезда) */
   canUndo: boolean
+  /** у отменённого плана: текущий сотрудник может вернуть план */
+  canRestore: boolean
 }
 
-/** Вагон поезда: участие вагона в поезде с текущим расположением. */
-export interface TrainWagon {
-  /** train_wagon.id */
+/** Запись участия вагона в поезде: позиция вагона с периодом действия, слой — факт или ожидаемый состав. */
+export interface TrainState {
   id: number
+  /** вагон — wagon.id */
+  wagon: number
+  /** слой — константы TrainWagonKind */
+  kind: number
+  /** позиция в поезде, с 1 */
+  seq: number
+  /** начало периода, ISO */
+  dbeg: string
+  /** конец периода, ISO; null — запись открыта */
+  dend: string | null
+}
+
+/** Вагон поезда с текущими расположением и состоянием. */
+export interface TrainWagon {
   /** wagon.id */
   wagon: number
   number: string
   /** тип вагона — id справочника WagonType */
   wagonType: number
-  /** позиция в поезде */
-  seq: number
-  /** дата прицепки, ISO; null — прицепка запланирована */
-  dbeg: string | null
-  /** дата отцепки, ISO; null — вагон в поезде */
-  dend: string | null
+  /** модель вагона — id справочника WagonModel; null — не задана */
+  modelType: number | null
   /** вид расположения — id справочника LocationKind (константы LocationType) */
   locationType: number
   /** место расположения по виду: станция, депо, парк отстоя или рейс */
@@ -72,12 +93,14 @@ export interface TrainWagon {
   trip: TripRef | null
   /** состояние — id справочника WagonState */
   wagonStatusType: number
+  /** с какого времени текущее состояние, ISO */
+  dbegStatus: string
+  /** текущая запись журнала ответственных (wagon_responsible.id); null — журнал ответственных пуст */
+  wagonResponsible: number | null
+  /** текущие ответственные за вагон, по ФИО; пусто — не назначены */
+  responsibleUsrs: UserRef[]
   /** пассажирский вагон: норма проводников — только для пассажирских */
   passenger: boolean
-  attachPlan: TrainChange | null
-  detachPlan: TrainChange | null
-  attached: TrainChange | null
-  detached: TrainChange | null
 }
 
 /** Вагон в строке поезда: поля для колонок «Номер» и «Тип» списка вагонов. */
@@ -113,14 +136,22 @@ export interface TrainRow {
   nextTrip: TripRef | null
 }
 
-/** Поезд с вагонами и рейсами. */
+/** Поезд с журналом прицепок и отцепок и участием вагонов: состав на любой момент берётся из states. */
 export interface TrainCard extends TrainRow {
-  /** вагоны сейчас и с плановой прицепкой, по порядку */
+  /** журнал: факты и ожидающие планы, по времени */
+  changes: TrainChange[]
+  /** участие вагонов в поезде: оба слоя, вся история */
+  states: TrainState[]
+  /** вагоны из журнала и участия с текущими расположением и состоянием */
   trainWagons: TrainWagon[]
+  /** время последнего факта поезда, ISO: раньше него факт не вносится, удалить можно только факт этого времени */
+  lastFactDt: string | null
   /** рейсы в статусе «план» и «выполняется» */
   trips: TripRef[]
   /** текущий сотрудник может менять поезд */
   canEdit: boolean
+  /** текущий сотрудник может прицеплять и отцеплять: кто меняет поезд, у поезда в рейсе — ещё ЛНП рейса и мастер депо */
+  canCouple: boolean
 }
 
 /** Поезд как вариант выбора в рейсе. */
@@ -150,19 +181,35 @@ export interface TrainFilter {
 
 /**
  * Прицепка или отцепка вагонов.
- * fact — факт (уже совершилась) или план; time — факт: фактическое время (null — сейчас), план: плановое время (в рейсе
- * null — время стоянки на остановке); station — вне рейса: станция; trip и routeStation — рейс поезда и остановка его
- * маршрута; responsibleUsr — у факта в рейсе в статусе «выполняется», null — не назначен.
+ * Одна операция над составом поезда, откуда бы её ни вызвали: рейс сервер определяет сам по поезду и остановке.
+ * fact — факт (уже совершилась) или план; time — факт: фактическое время (null — сейчас), план: плановое время (на
+ * остановке — время стоянки); station — вне рейса: станция; routeStation — остановка рейса поезда; seq — прицепка:
+ * позиция первого вагона, вагоны встают подряд (null — в конец); responsibleUsrs — у факта в рейсе в статусе
+ * «выполняется», пусто — не назначены.
  */
 export interface TrainChangeBody {
   wagons: string[]
   fact: boolean
   time: string | null
   station: number | null
-  trip: number | null
+  /** остановка рейса поезда (route_station.id): рейс сервер находит сам; null — вне рейса */
   routeStation: number | null
+  seq: number | null
   comment: string
-  responsibleUsr: number | null
+  responsibleUsrs: number[]
+}
+
+/**
+ * Отметка исполнения плана: time — фактическое время (null — сейчас); station — фактическая станция плана вне рейса
+ * (null — станция плана); seq — фактическая позиция прицепки (null — позиция плана); comment — основания, примечания факта
+ * (null — как у плана); responsibleUsrs — в рейсе в статусе «выполняется».
+ */
+export interface MarkBody {
+  time: string | null
+  station: number | null
+  seq: number | null
+  comment: string | null
+  responsibleUsrs: number[]
 }
 
 /** Список поездов. */
@@ -194,11 +241,6 @@ export async function renameTrain(id: number, name: string): Promise<TrainRow> {
   return (await http.put<TrainRow>(`/trains/${id}`, { name })).data
 }
 
-/** Порядок вагонов поезда: номера по порядку. */
-export async function orderTrain(id: number, wagons: string[]): Promise<TrainCard> {
-  return (await http.put<TrainCard>(`/trains/${id}/order`, wagons)).data
-}
-
 /** Прицепить вагоны к поезду фактом или планом. */
 export async function attachWagons(id: number, body: TrainChangeBody): Promise<TrainCard> {
   return (await http.post<TrainCard>(`/trains/${id}/attach`, body)).data
@@ -209,9 +251,9 @@ export async function detachWagons(id: number, body: TrainChangeBody): Promise<T
   return (await http.post<TrainCard>(`/trains/${id}/detach`, body)).data
 }
 
-/** Отметить плановую прицепку или отцепку выполненной; time — ISO, null — сейчас. */
-export async function markChange(id: number, time: string | null, responsibleUsr: number | null): Promise<TrainCard> {
-  return (await http.post<TrainCard>(`/train-changes/${id}/done`, { time, responsibleUsr })).data
+/** Отметить исполнение плана прицепки или отцепки: факт по плану. */
+export async function markChange(id: number, body: MarkBody): Promise<TrainCard> {
+  return (await http.post<TrainCard>(`/train-changes/${id}/done`, body)).data
 }
 
 /** Отменить план прицепки или отцепки. */
@@ -219,7 +261,12 @@ export async function cancelChangePlan(id: number): Promise<TrainCard> {
   return (await http.post<TrainCard>(`/train-changes/${id}/cancel`)).data
 }
 
-/** Отменить выполненную прицепку или отцепку без истории. */
+/** Вернуть отменённый план прицепки или отцепки: снова «ожидает». */
+export async function restoreChangePlan(id: number): Promise<TrainCard> {
+  return (await http.post<TrainCard>(`/train-changes/${id}/restore`)).data
+}
+
+/** Удалить ошибочный факт прицепки или отцепки без истории. */
 export async function undoChange(id: number): Promise<TrainCard> {
   return (await http.delete<TrainCard>(`/train-changes/${id}`)).data
 }
@@ -228,4 +275,9 @@ export async function undoChange(id: number): Promise<TrainCard> {
 export async function fetchWagonBusy(wagons: string[], from: string | null): Promise<WagonBusy[]> {
   if (wagons.length === 0) return []
   return (await http.get<WagonBusy[]>('/trains/busy', { params: { wagons, from } })).data
+}
+
+/** Удалить поезд: на него ссылаются другие записи — ошибка 409 с причиной. */
+export async function deleteTrain(id: number): Promise<void> {
+  await http.delete(`/trains/${id}`)
 }

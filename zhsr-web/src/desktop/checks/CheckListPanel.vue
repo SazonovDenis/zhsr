@@ -39,9 +39,7 @@
 
       <!-- исправить — автор в течение 10 минут после сохранения; кнопка исчезает сама, когда срок вышел -->
       <div v-if="listEditable(detail, now)" class="q-mt-md">
-        <q-btn unelevated outline no-caps class="zs-soft-border" color="ink" @click="edit">{{
-          t('Внести изменения')
-        }}</q-btn>
+        <SoftLink text="Внести изменения" @click="edit" />
       </div>
 
       <div class="check-panel__items q-mt-md">
@@ -108,6 +106,7 @@ import type { ChoiceId, ChoiceItem } from '@/shared/components/choice/choice'
 import CbButton from '@/shared/components/choice/CbButton.vue'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import SoftRouteLink from '@/shared/components/form/SoftRouteLink.vue'
+import SoftLink from '@/shared/components/form/SoftLink.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'

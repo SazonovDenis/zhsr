@@ -1,28 +1,26 @@
 package kz.zhsr.app.dto.train;
 
 import kz.zhsr.app.dto.ref.TripRef;
+import kz.zhsr.app.dto.ref.UserRef;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Вагон поезда: участие вагона в поезде (train_wagon) с текущим расположением вагона.
+ * Вагон поезда с текущими расположением и состоянием (wagon_info).
  */
 @Getter
 @Setter
 public class TrainWagon {
-    /** train_wagon.id */
-    private long id;
+    /** вагон (wagon.id) */
     private long wagon;
     private String number;
     private long wagonType;
-    /** позиция в поезде */
-    private int seq;
-    /** дата прицепки; null - прицепка запланирована */
-    private OffsetDateTime dbeg;
-    /** дата отцепки; null - вагон в поезде */
-    private OffsetDateTime dend;
+    /** модель вагона; null - не задана */
+    private Long modelType;
     private long locationType;
     /** место расположения по виду: станция, депо, парк отстоя или рейс */
     private long place;
@@ -31,14 +29,12 @@ public class TrainWagon {
     /** рейс, в котором вагон сейчас; null - вагон не в рейсе */
     private TripRef trip;
     private long wagonStatusType;
+    /** с какого времени текущее состояние */
+    private OffsetDateTime dbegStatus;
+    /** текущая запись журнала ответственных (wagon_responsible); null - журнал ответственных пуст */
+    private Long wagonResponsible;
+    /** текущие ответственные за вагон, по ФИО; пусто - не назначены - вычисляемое */
+    private List<UserRef> responsibleUsrs = new ArrayList<>();
     /** пассажирский вагон: норма проводников - только для пассажирских - вычисляемое */
     private boolean passenger;
-    /** плановая прицепка; null - нет */
-    private TrainChange attachPlan;
-    /** плановая отцепка; null - нет */
-    private TrainChange detachPlan;
-    /** выполненная прицепка; null - нет */
-    private TrainChange attached;
-    /** выполненная отцепка; null - нет */
-    private TrainChange detached;
 }

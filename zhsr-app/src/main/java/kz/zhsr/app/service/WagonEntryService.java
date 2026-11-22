@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -53,8 +54,37 @@ public class WagonEntryService {
     }
 
     /**
-     * Ввести вагон (POST /wagons): вагон, первые записи журналов расположения и состояния, запись журнала
-     * ответственного «не назначен», кэш wagon_info. Записи журналов начинаются временем ввода в систему.
+     * Кэш и журналы вагона: удаляются вместе с ним, от ссылающихся на другие к остальным; кэш wagon_info ссылается на
+     * журнал ответственных - первым; состав ответственных (wagon_responsible_usr) - каскадом.
+     */
+    private static final List<String> WAGON_JOURNALS = List.of(
+            "wagon_info", "wagon_edit", "wagon_responsible", "wagon_status", "wagon_location");
+
+    /**
+     * Удалить вагон (DELETE /wagons/{id}): администратор. Журналы вагона удаляются вместе с ним; на вагон ссылаются
+     * поезда, заявки, чек-листы, акты... - удалить не даст внешний ключ (сообщение - FkMessages), всё откатывается.
+     */
+    @Transactional
+    public void delete(long id) throws Exception {
+        if (!currentUserService.get().hasRole(RoleType.ADMIN)) {
+            throw ApiException.forbidden("Вагон удаляет администратор");
+        }
+        if (db.loadRec("wagon", id) == null) {
+            throw ApiException.notFound("Вагон не найден");
+        }
+        try {
+            for (String table : WAGON_JOURNALS) {
+                db.execSql("delete from " + table + " where wagon = :id", Map.of("id", id));
+            }
+            db.deleteRec("wagon", id);
+        } catch (Exception e) {
+            throw DbErrors.translate(e);
+        }
+    }
+
+    /**
+     * Ввести вагон (POST /wagons): вагон, первые записи журналов расположения и состояния, кэш wagon_info;
+     * ответственных у нового вагона нет. Записи журналов начинаются временем ввода в систему.
      *
      * @return вагон как строка списка вагонов
      * @throws ApiException 403 - не администратор; 400 - не заполнено или неверно; 409 - номер уже есть
@@ -105,7 +135,6 @@ public class WagonEntryService {
                     placeColumn, body.place()));
             db.insertRec("wagon_status", Map.of("wagon", id, "dbeg", now,
                     "wagon_status_type", body.wagonStatusType()));
-            db.insertRec("wagon_responsible", Map.of("wagon", id, "dbeg", now));
 
             Map<String, Object> info = new HashMap<>();
             info.put("wagon", id);
@@ -114,7 +143,6 @@ public class WagonEntryService {
             info.put(placeColumn, body.place());
             info.put("dbeg_status", now);
             info.put("wagon_status_type", body.wagonStatusType());
-            info.put("dbeg_responsible", now);
             info.put("run_km", initialRunKm);
             db.insertRec("wagon_info", info);
         } catch (Exception e) {

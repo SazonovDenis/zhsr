@@ -8,6 +8,7 @@ import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.LocationType;
 import kz.zhsr.app.constants.TrainWagonChangeType;
+import kz.zhsr.app.constants.WagonResponsibleKind;
 import kz.zhsr.app.dto.ref.CheckTemplateRef;
 import kz.zhsr.app.dto.ref.EquipTemplateRef;
 import kz.zhsr.app.dto.ref.TripRef;
@@ -23,6 +24,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * Журнал вагона (Ф-ВАГ-05): история расположения, состояния и ответственного с основаниями.
@@ -44,13 +46,18 @@ public class WagonService {
     private record Basis(int type, long id, String number, Long trip, Long byUsr, String reason, boolean canCancel) {
     }
 
-    /** Событие журнала: записи расположения, состояния и ответственного, открытые одним документом в одно время. */
+    /**
+     * Событие журнала: записи расположения, состояния и ответственных, открытые одним документом в одно время; снятие
+     * всех ответственных - закрытая запись ответственных без новой.
+     */
     private static final class Event {
         OffsetDateTime dbeg;
         Basis basis;
         DbRec location;
         DbRec status;
         DbRec responsible;
+        /** запись факта ответственных, которую событие закрыло без новой: сняты все ответственные */
+        DbRec responsibleClosed;
         /** проверка (check_list) или опись (equip_list) вагона; null - событие журналов */
         DbRec document;
         /** число нарушений документа */
@@ -82,11 +89,15 @@ public class WagonService {
         }
         List<DbRec> locations = db.loadSql(WagonSql.locations(), Map.of("wagon", wagon));
         List<DbRec> statuses = db.loadSql(WagonSql.statuses(), Map.of("wagon", wagon));
-        List<DbRec> responsibles = db.loadSql(WagonSql.responsibles(), Map.of("wagon", wagon));
+        List<DbRec> responsibles = db.loadSql(WagonSql.responsibles(),
+                Map.of("wagon", wagon, "fact", WagonResponsibleKind.FACT));
+        Map<Long, List<UserRef>> usrs = responsibleUsrs(responsibles);
         Map<Long, Basis> locationBasis = new HashMap<>();
         Map<Long, Basis> statusBasis = new HashMap<>();
         Map<Long, Basis> responsibleBasis = new HashMap<>();
-        loadBases(wagon, locations, statuses, responsibles, locationBasis, statusBasis, responsibleBasis);
+        Map<Long, Basis> closedBasis = new HashMap<>();
+        loadBases(wagon, locations, statuses, responsibles, locationBasis, statusBasis, responsibleBasis,
+                closedBasis);
 
         // события по времени и документу: перевод открывает записи обоих журналов одним временем
         Map<String, Event> events = new LinkedHashMap<>();
@@ -97,13 +108,16 @@ public class WagonService {
             event(events, rec, statusBasis.get(rec.getLong("id"))).status = rec;
         }
         for (DbRec rec : responsibles) {
-            Basis basis = responsibleBasis.get(rec.getLong("id"));
-            // первая запись «не назначен» без документа (ввод вагона) отдельной строкой не показывается
-            if (basis == null && previous(responsibles, rec) == null && rec.get("usr") == null
-                    && !events.containsKey(key(rec.getDateTimeTZ("dbeg"), null))) {
-                continue;
+            event(events, rec, responsibleBasis.get(rec.getLong("id"))).responsible = rec;
+        }
+        // сняты все ответственные: запись закрыта, а следующая с её концом не начинается
+        for (DbRec rec : responsibles) {
+            OffsetDateTime dend = rec.getDateTimeTZ("dend");
+            if (dend != null && responsibles.stream().noneMatch(r -> r.getDateTimeTZ("dbeg").isEqual(dend))) {
+                DbRec time = new DbRec();
+                time.put("dbeg", dend);
+                event(events, time, closedBasis.get(rec.getLong("id"))).responsibleClosed = rec;
             }
-            event(events, rec, basis).responsible = rec;
         }
 
         documents(events, wagon, "check_list", WagonJournalRow.BASIS_CHECK);
@@ -114,10 +128,26 @@ public class WagonService {
             if ((from != null && e.dbeg.isBefore(from)) || (to != null && !e.dbeg.isBefore(to))) {
                 continue;
             }
-            res.add(row(e, locations, statuses, responsibles));
+            res.add(row(e, locations, statuses, responsibles, usrs));
         }
         res.sort((a, b) -> b.getDbeg().compareTo(a.getDbeg()));
         refResolver.resolve(res);
+        refResolver.resolve(res.stream().flatMap(r -> Stream.concat(
+                r.getResponsibleUsrs().stream(), r.getPrevResponsibleUsrs().stream())).toList());
+        return res;
+    }
+
+    /** Состав записей журнала ответственных: запись - ответственные по ФИО. */
+    private Map<Long, List<UserRef>> responsibleUsrs(List<DbRec> responsibles) throws Exception {
+        Map<Long, List<UserRef>> res = new HashMap<>();
+        if (responsibles.isEmpty()) {
+            return res;
+        }
+        List<Long> records = responsibles.stream().map(r -> r.getLong("id")).toList();
+        for (DbRec rec : db.loadSql(WagonSql.responsibleUsrs(), Map.of("records", records))) {
+            res.computeIfAbsent(rec.getLong("wagon_responsible"), k -> new ArrayList<>())
+                    .add(new UserRef(rec.getLong("usr")));
+        }
         return res;
     }
 
@@ -160,7 +190,7 @@ public class WagonService {
     }
 
     private static WagonJournalRow row(Event e, List<DbRec> locations, List<DbRec> statuses,
-                                       List<DbRec> responsibles) {
+                                       List<DbRec> responsibles, Map<Long, List<UserRef>> usrs) {
         WagonJournalRow row = new WagonJournalRow();
         row.setDbeg(e.dbeg);
 
@@ -176,19 +206,22 @@ public class WagonService {
         row.setPrevWagonStatusType(prevStatus == null ? null : prevStatus.getLong("wagon_status_type"));
         row.setStatusChanged(e.status != null);
 
-        DbRec responsible = e.responsible != null ? e.responsible : actual(responsibles, e.dbeg);
-        DbRec prevResponsible = e.responsible != null ? previous(responsibles, e.responsible) : null;
-        row.setResponsibleUsr(userRef(responsible));
-        row.setPrevResponsibleUsr(userRef(prevResponsible));
-        row.setResponsibleChanged(e.responsible != null);
+        boolean responsibleChanged = e.responsible != null || e.responsibleClosed != null;
+        row.setResponsibleUsrs(usrsOf(covering(responsibles, e.dbeg), usrs));
+        row.setPrevResponsibleUsrs(responsibleChanged ? usrsOf(coveringBefore(responsibles, e.dbeg), usrs) : List.of());
+        row.setResponsibleChanged(responsibleChanged);
 
         Basis basis = e.basis;
         if (basis == null) {
             // без документа: первая запись журнала - ввод вагона, иначе ручная правка
-            boolean first = (e.location == null || previous(locations, e.location) == null)
-                    && (e.status == null || previous(statuses, e.status) == null)
-                    && (e.responsible == null || previous(responsibles, e.responsible) == null);
+            boolean first = (e.location != null || e.status != null)
+                    && (e.location == null || previous(locations, e.location) == null)
+                    && (e.status == null || previous(statuses, e.status) == null);
             row.setBasisType(first ? WagonJournalRow.BASIS_ENTRY : WagonJournalRow.BASIS_MANUAL);
+            // смена ответственных без документа (Ф-РЕЙ-08): кто внёс - в записи
+            if (e.responsible != null && e.responsible.get("created_by_usr") != null) {
+                row.setByUsr(new UserRef(e.responsible.getLong("created_by_usr")));
+            }
             return row;
         }
         row.setBasisType(basis.type());
@@ -214,10 +247,34 @@ public class WagonService {
         return row;
     }
 
-    /** Ответственный записи журнала; записи нет или ответственный не назначен - null. */
-    private static UserRef userRef(DbRec rec) {
-        Long usr = rec == null ? null : rec.getLong("usr", null);
-        return usr == null ? null : new UserRef(usr);
+    /** Ответственные записи журнала; записи нет - пусто. Копии ссылок: строка журнала - своя. */
+    private static List<UserRef> usrsOf(DbRec rec, Map<Long, List<UserRef>> usrs) {
+        if (rec == null) {
+            return List.of();
+        }
+        return usrs.getOrDefault(rec.getLong("id"), List.of()).stream().map(u -> new UserRef(u.getId())).toList();
+    }
+
+    /** Запись журнала ответственных, действующая в момент time (dbeg <= time < dend); нет - null. */
+    private static DbRec covering(List<DbRec> records, OffsetDateTime time) {
+        for (DbRec rec : records) {
+            OffsetDateTime dend = rec.getDateTimeTZ("dend");
+            if (!rec.getDateTimeTZ("dbeg").isAfter(time) && (dend == null || dend.isAfter(time))) {
+                return rec;
+            }
+        }
+        return null;
+    }
+
+    /** Запись журнала ответственных, действовавшая перед моментом time (dbeg < time <= dend); нет - null. */
+    private static DbRec coveringBefore(List<DbRec> records, OffsetDateTime time) {
+        for (DbRec rec : records) {
+            OffsetDateTime dend = rec.getDateTimeTZ("dend");
+            if (rec.getDateTimeTZ("dbeg").isBefore(time) && (dend == null || !dend.isBefore(time))) {
+                return rec;
+            }
+        }
+        return null;
     }
 
     /** Запись журнала, действующая в момент time; null - вагона ещё не было. */
@@ -253,7 +310,7 @@ public class WagonService {
      */
     private void loadBases(long wagon, List<DbRec> locations, List<DbRec> statuses, List<DbRec> responsibles,
                            Map<Long, Basis> locationBasis, Map<Long, Basis> statusBasis,
-                           Map<Long, Basis> responsibleBasis) throws Exception {
+                           Map<Long, Basis> responsibleBasis, Map<Long, Basis> closedBasis) throws Exception {
         CurrentUser me = currentUserService.get();
         Map<String, Object> params = Map.of("wagon", wagon);
         for (DbRec rec : db.loadSql(WagonSql.changes(), params)) {
@@ -267,6 +324,7 @@ public class WagonService {
             put(locationBasis, rec.getLong("wagon_location", null), basis);
             put(statusBasis, rec.getLong("wagon_status", null), basis);
             put(responsibleBasis, rec.getLong("wagon_responsible", null), basis);
+            put(closedBasis, rec.getLong("closed_wagon_responsible", null), basis);
         }
         for (DbRec rec : db.loadSql(WagonSql.transferActs(), params)) {
             // приём (расположение) провёл принявший, назначение ответственного при оформлении - сдавший
@@ -278,6 +336,7 @@ public class WagonService {
                     null, rec.getLong("transferred_by_usr", null), null, canCancel);
             put(locationBasis, rec.getLong("wagon_location", null), received);
             put(responsibleBasis, rec.getLong("wagon_responsible", null), transferred);
+            put(closedBasis, rec.getLong("closed_wagon_responsible", null), transferred);
         }
         for (DbRec rec : db.loadSql(WagonSql.edits(), params)) {
             Basis basis = new Basis(WagonJournalRow.BASIS_MANUAL, rec.getLong("id"), null, null,
@@ -285,6 +344,7 @@ public class WagonService {
             put(locationBasis, rec.getLong("wagon_location", null), basis);
             put(statusBasis, rec.getLong("wagon_status", null), basis);
             put(responsibleBasis, rec.getLong("wagon_responsible", null), basis);
+            put(closedBasis, rec.getLong("closed_wagon_responsible", null), basis);
         }
         markBases(locations, statuses, responsibles, locationBasis, statusBasis, responsibleBasis);
     }

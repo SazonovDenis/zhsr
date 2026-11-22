@@ -4,14 +4,11 @@ import kz.kis.kiscore.model.DbRec;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.RoleType;
-import kz.zhsr.app.dto.admin.AdminPage;
-import kz.zhsr.app.dto.admin.AdminQuery;
 import kz.zhsr.app.dto.admin.AdminUserDraft;
 import kz.zhsr.app.dto.admin.AdminUserRow;
 import kz.zhsr.app.service.ApiException;
 import kz.zhsr.app.service.DbErrors;
 import kz.zhsr.app.service.PasswordPolicy;
-import kz.zhsr.app.service.SqlQuery;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,26 +46,6 @@ public class AdminUserService {
         this.adminService = adminService;
         this.currentUserService = currentUserService;
         this.passwordEncoder = passwordEncoder;
-    }
-
-    /**
-     * Сотрудники: поиск по логину, ФИО и телефону; по умолчанию - по ФИО.
-     */
-    public AdminPage<AdminUserRow> page(AdminQuery query) throws Exception {
-        adminService.requireAdmin();
-        int size = query.sizeOrDefault();
-        if (size > AdminQuery.MAX_SIZE) {
-            throw ApiException.badRequest("На странице - не больше " + AdminQuery.MAX_SIZE + " строк");
-        }
-        String orderBy = AdminUserSql.SORT.get(query.sort() == null || query.sort().isBlank() ? "fullName" : query.sort());
-        if (orderBy == null) {
-            throw ApiException.badRequest("Сортировка по полю '" + query.sort() + "' не поддерживается");
-        }
-        SqlQuery count = AdminUserSql.count(query.search());
-        long total = db.loadSqlRec(count.sql(), count.params()).getLong("total");
-        SqlQuery page = AdminUserSql.page(query.search(), orderBy, query.desc(), size,
-                query.pageOrZero() * size);
-        return new AdminPage<>(total, withRoles(db.loadSql(page.sql(), page.params(), AdminUserRow.class)));
     }
 
     public AdminUserRow get(long id) throws Exception {

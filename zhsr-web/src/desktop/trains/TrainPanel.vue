@@ -21,6 +21,20 @@
         <span>{{ t('По плану') }}</span>
         <span>{{ t('{n} прицепок и отцепок', { n: train.plannedCount }) }}</span>
       </SidePanelFields>
+      <!-- экран состава поезда: «Редактировать» — кнопкой, как у рейса; без прав видна, но неактивна, причина в подсказке -->
+      <div v-if="formPage" class="q-mt-md">
+        <q-btn
+          unelevated
+          outline
+          no-caps
+          color="primary"
+          class="zs-soft-border"
+          :disable="!!editReason"
+          :title="editReason || undefined"
+          :label="t('Редактировать')"
+          @click="emit('edit')"
+        />
+      </div>
 
       <!-- рейсы — тем же блоком, что у вагона; от атрибутов — чертой во всю ширину панели -->
       <section v-if="trips.length > 0" class="train-panel__trips q-pt-md q-px-lg">
@@ -32,9 +46,7 @@
       <section class="train-panel__wagons q-pt-md q-px-lg q-pb-md">
         <div class="train-panel__head">
           <span class="train-panel__title">{{ t('Вагоны') }}</span>
-          <q-btn v-if="!formPage" unelevated outline no-caps color="ink" class="zs-soft-border" @click="emit('open')">
-            {{ t('Состав поезда') }}
-          </q-btn>
+          <SoftLink v-if="!formPage" text="Состав поезда" @click="emit('open')" />
         </div>
         <!-- вагонов нет — без таблицы, одной надписью -->
         <DataTable v-if="train.wagons.length > 0" :columns="wagonColumns" :rows="train.wagons" row-key="id" />
@@ -56,6 +68,7 @@ import SidePanelFields from '../frame/SidePanelFields.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { Column } from '@/shared/components/table/types'
 import { TripStatus } from '@/shared/constants/systemDicts'
+import SoftLink from '@/shared/components/form/SoftLink.vue'
 import TripLinks from '../trips/TripLinks.vue'
 import { wagonsColumns } from '../wagons/wagonsColumns'
 import { trainPlaceText } from './trainPlace'
@@ -63,14 +76,15 @@ import { trainPlaceText } from './trainPlace'
 /**
  * Панель поезда (Ф-ПОЕ-00): обозначение, где стоят вагоны (как расположение в списке вагонов), число плановых
  * прицепок и отцепок; ниже — вагоны списком по порядку, рейсы поезда ссылками на формирование рейса. На списке поездов
- * — кнопка «Состав поезда»; на экране состава поезда (formPage) её нет. Справочники Station, Depot, Yard, LocationKind и
+ * — кнопка «Состав поезда»; на экране состава поезда (formPage) её нет, вместо неё под атрибутами — кнопка
+ * «Редактировать» (обозначение поезда). Справочники Station, Depot, Yard, LocationKind и
  * WagonType, WagonModel, TripState готовит страница.
  */
 const props = withDefaults(
-  defineProps<{ train: TrainRow | TrainCard | null; formPage?: boolean; closable?: boolean }>(),
-  { formPage: false, closable: true },
+  defineProps<{ train: TrainRow | TrainCard | null; formPage?: boolean; closable?: boolean; editReason?: string }>(),
+  { formPage: false, closable: true, editReason: '' },
 )
-const emit = defineEmits<{ close: []; open: [] }>()
+const emit = defineEmits<{ close: []; open: []; edit: [] }>()
 
 /** Рейсы поезда: у карточки — все в плане и выполняющиеся, у строки списка — выполняющийся и ближайший. */
 const trips = computed<{ trip: TripRef; tripStatusType: number }[]>(() => {

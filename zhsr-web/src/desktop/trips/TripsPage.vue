@@ -71,12 +71,14 @@ import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { TripRow, TripFilter } from '@/api/trips'
-import { fetchTrips } from '@/api/trips'
+import { deleteTrip, fetchTrips } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import CbButton from '@/shared/components/choice/CbButton.vue'
 import CbList from '@/shared/components/choice/CbList.vue'
 import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
 import { actionsMenu } from '@/shared/components/table/rowMenu'
+import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
+import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
@@ -92,6 +94,7 @@ import DesktopFrame from '../frame/DesktopFrame.vue'
 import { useSidePanel } from '../frame/useSidePanel'
 import TripPanel from './TripPanel.vue'
 import TripNewDialog from './TripNewDialog.vue'
+import { useTripDialogReturn } from './useTripDialogReturn'
 import { FUTURE_STATES, sidePeriod, sidePresets, statesForPeriod, statesSide } from './tripPeriod'
 import { createTripReason, TRIP_ACTION_LABELS, useTripActions } from './tripActions'
 import { tripsColumns } from './tripsColumns'
@@ -153,6 +156,18 @@ const createReason = computed(() => createTripReason())
 const { actionsOf } = useTripActions(() => void load())
 const rowMenu: RowMenuItem<TripRow>[] = [
   ...actionsMenu(TRIP_ACTION_LABELS, actionsOf),
+  // удалить можно рейс, на который ничего не ссылается (вагоны, заявки, чек-листы...): иначе причина от сервера в окне
+  {
+    label: 'Удалить',
+    separator: true,
+    disabled: () => createReason.value,
+    run: (trip: TripRow) =>
+      void confirmDelete('Удаление рейса', 'Удалить рейс {trip}?', { trip: tripRefDatedText(trip) }, () =>
+        deleteTrip(trip.id),
+      ).then((ok) => {
+        if (ok) void load()
+      }),
+  },
   { label: 'Создать рейс', separator: true, disabled: () => createReason.value, run: () => void addTrip() },
 ]
 
@@ -180,6 +195,11 @@ async function load() {
 
 // фильтр или сортировка изменились — данные загружаются заново
 watch([filter, sort], load, { deep: true })
+
+// окно рейса снова открыто после перехода к новому маршруту или поезду: сохранили — список заново, рейс выбран
+useTripDialogReturn((trip) => {
+  void load().then(() => (selectedId.value = trip.id))
+})
 
 // рейс создан — список загружается заново, рейс становится выбранным
 async function addTrip() {

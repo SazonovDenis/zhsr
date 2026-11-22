@@ -1,6 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
+    height="lg"
     :title="row ? 'Изменение записи' : 'Новая запись'"
     :ok-text="row ? 'Сохранить' : 'Добавить'"
     :running="running"

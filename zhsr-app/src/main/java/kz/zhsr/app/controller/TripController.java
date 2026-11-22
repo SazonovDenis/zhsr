@@ -5,6 +5,7 @@ import kz.zhsr.app.dto.trip.ConductorCandidate;
 import kz.zhsr.app.dto.trip.StaffCandidate;
 import kz.zhsr.app.dto.trip.CouplingWagon;
 import kz.zhsr.app.dto.trip.TripCrew;
+import kz.zhsr.app.dto.trip.TripResponsibles;
 import kz.zhsr.app.dto.trip.TripRow;
 import kz.zhsr.app.service.CouplingService;
 import kz.zhsr.app.service.TripService;
@@ -77,15 +78,15 @@ public class TripController {
     }
 
 
-    @PutMapping("/trips/{id}/conductors")
-    public TripCrew setConductors(@PathVariable long id, @RequestBody List<Long> users) throws Exception {
-        return tripService.setConductors(id, users);
+    @PutMapping("/trips/{id}/crew")
+    public TripCrew setCrew(@PathVariable long id, @RequestBody TripService.CrewBody body) throws Exception {
+        return tripService.setCrew(id, body);
     }
 
-    @PutMapping("/trips/{id}/crew/{user}/wagons")
-    public TripCrew setConductorWagons(@PathVariable long id, @PathVariable long user,
-                                       @RequestBody List<String> wagons) throws Exception {
-        return tripService.setConductorWagons(id, user, wagons);
+    @PutMapping("/trips/{id}/crew-wagons")
+    public TripCrew setCrewWagons(@PathVariable long id, @RequestBody TripService.CrewWagonsBody body)
+            throws Exception {
+        return tripService.setCrewWagons(id, body);
     }
 
     @PutMapping("/trips/{id}/duty/{duty}")
@@ -104,10 +105,16 @@ public class TripController {
         return tripService.arrive(id, body);
     }
 
-    @PostMapping("/trips/{id}/responsible")
-    public TripCrew assignResponsible(@PathVariable long id, @RequestBody TripService.ResponsibleBody body)
+    @GetMapping("/trips/{id}/responsibles")
+    public TripResponsibles responsibles(@PathVariable long id, @RequestParam(required = false) Integer layer)
             throws Exception {
-        return tripService.assignResponsible(id, body);
+        return tripService.responsibles(id, layer);
+    }
+
+    @PostMapping("/trips/{id}/responsibles")
+    public TripResponsibles saveResponsibles(@PathVariable long id, @RequestBody TripService.ResponsiblesBody body)
+            throws Exception {
+        return tripService.saveResponsibles(id, body);
     }
 
     @PutMapping("/trips/{id}/depart")
@@ -130,4 +137,10 @@ public class TripController {
         return tripService.cancelArrival(id);
     }
 
+
+    /** Удалить, если на запись никто не ссылается: иначе 409 с причиной. */
+    @DeleteMapping("/trips/{id}")
+    public void delete(@PathVariable long id) throws Exception {
+        tripService.delete(id);
+    }
 }

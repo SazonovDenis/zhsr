@@ -8,6 +8,7 @@ import kz.zhsr.app.service.WagonEditService;
 import kz.zhsr.app.service.WagonEntryService;
 import kz.zhsr.app.service.WagonService;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -87,4 +88,10 @@ public class WagonController {
         return wagonService.journal(id, from, to);
     }
 
+
+    /** Удалить, если на запись никто не ссылается: иначе 409 с причиной. */
+    @DeleteMapping("/wagons/{id}")
+    public void delete(@PathVariable long id) throws Exception {
+        wagonEntryService.delete(id);
+    }
 }

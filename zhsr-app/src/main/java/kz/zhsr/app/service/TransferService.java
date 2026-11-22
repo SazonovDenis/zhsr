@@ -60,11 +60,11 @@ public class TransferService {
      * @param transferredByUsr кто сдал вагоны: для акта, проведённого сразу; null - сам составитель
      * @param transferredDt    время акта, ISO с часовым поясом; null - сейчас
      * @param wagons           вагоны
-     * @param responsibleUsr   ответственный за вагоны акта; null - ответственный не назначен
+     * @param responsibleUsrs  ответственные за вагоны акта; пусто - ответственный не назначен
      */
     public record TransferBody(Long fromStation, Long fromDepot, Long fromYard, Long toStation, Long toDepot,
                                Long toYard, long workType, Long transferredByUsr, OffsetDateTime transferredDt,
-                               List<WagonItem> wagons, Long responsibleUsr) {
+                               List<WagonItem> wagons, List<Long> responsibleUsrs) {
 
         TransferPlace from() {
             return new TransferPlace(fromStation, fromDepot, fromYard);
@@ -78,9 +78,9 @@ public class TransferService {
     /**
      * Приём.
      *
-     * @param responsibleUsr ответственный за вагоны акта; null - ответственный не назначен
+     * @param responsibleUsrs ответственные за вагоны акта; пусто - ответственный не назначен
      */
-    public record AcceptBody(Long responsibleUsr) {
+    public record AcceptBody(List<Long> responsibleUsrs) {
     }
 
     /**
@@ -96,16 +96,18 @@ public class TransferService {
     private final Visibility visibility;
     private final WagonJournal wagonJournal;
     private final ResponsibleService responsibleService;
+    private final ListService listService;
     private final RefResolver refResolver;
 
     public TransferService(Db db, CurrentUserService currentUserService, Visibility visibility,
                            WagonJournal wagonJournal, ResponsibleService responsibleService,
-                           RefResolver refResolver) {
+                           ListService listService, RefResolver refResolver) {
         this.db = db;
         this.currentUserService = currentUserService;
         this.visibility = visibility;
         this.wagonJournal = wagonJournal;
         this.responsibleService = responsibleService;
+        this.listService = listService;
         this.refResolver = refResolver;
     }
 
@@ -142,6 +144,7 @@ public class TransferService {
         }
         List<TransferWagon> res = DbRecMapper.toList(candidates(from), TransferWagon.class);
         refResolver.resolve(res);
+        listService.addWagonResponsibles(res);
         return res;
     }
 
@@ -222,7 +225,7 @@ public class TransferService {
         if (immediate && giver != me.id() && db.loadRec("usr", giver) == null) {
             throw ApiException.badRequest("Сотрудник не найден");
         }
-        responsibleService.check(body.responsibleUsr(), station, null,
+        responsibleService.check(body.responsibleUsrs(), station, null,
                 items.stream().map(WagonItem::number).toList());
 
         Map<String, Object> act = new HashMap<>();
@@ -247,9 +250,15 @@ public class TransferService {
             int seq = 1;
             for (WagonItem item : items) {
                 long wagon = db.loadRec("wagon", Map.of("number", item.number())).getLong("id");
-                long responsible = wagonJournal.assign(wagon, time, body.responsibleUsr());
-                db.insertRec("transfer_act_wagon", Map.of("transfer_act", id, "wagon", wagon, "seq", seq++,
-                        "with_property", item.withProperty(), "wagon_responsible", responsible));
+                WagonJournal.Responsibles responsibles = wagonJournal.assign(wagon, time, body.responsibleUsrs());
+                Map<String, Object> row = new HashMap<>();
+                row.put("transfer_act", id);
+                row.put("wagon", wagon);
+                row.put("seq", seq++);
+                row.put("with_property", item.withProperty());
+                row.put("wagon_responsible", responsibles.opened());
+                row.put("closed_wagon_responsible", responsibles.closed());
+                db.insertRec("transfer_act_wagon", row);
             }
             if (immediate) {
                 moveWagons(id, time);
@@ -263,8 +272,8 @@ public class TransferService {
     }
 
     /**
-     * Принять все вагоны акта: вагоны переходят в новое расположение. Ответственный, назначенный актом, меняется на
-     * выбранного при приёме; без тела запроса - остаётся.
+     * Принять все вагоны акта: вагоны переходят в новое расположение. Ответственные, назначенные актом, меняются на
+     * выбранных при приёме; без тела запроса - остаются.
      */
     @Transactional
     public TransferRow accept(long id, AcceptBody body) throws Exception {
@@ -276,12 +285,15 @@ public class TransferService {
             List<String> numbers = db.loadList("wagon", Map.of("id",
                     actWagons.stream().map(r -> r.getLong("wagon")).toList())).stream()
                     .map(r -> r.getString("number")).toList();
-            responsibleService.check(body.responsibleUsr(), stationOf(from(act)), null, numbers);
+            responsibleService.check(body.responsibleUsrs(), stationOf(from(act)), null, numbers);
+            OffsetDateTime time = act.getDateTimeTZ("transferred_dt");
             for (DbRec row : actWagons) {
-                Long opened = row.getLong("wagon_responsible", null);
-                if (opened != null) {
-                    wagonJournal.reassign(opened, body.responsibleUsr());
-                }
+                WagonJournal.Responsibles responsibles = wagonJournal.reassign(row.getLong("wagon"), time,
+                        responsibles(row), body.responsibleUsrs());
+                Map<String, Object> values = new HashMap<>();
+                values.put("id", row.getLong("id"));
+                values.put("wagon_responsible", responsibles.opened());
+                db.updateRec("transfer_act_wagon", values);
             }
         }
         db.updateRec("transfer_act", Map.of("id", id, "act_status_type", ActStatus.DONE, "received_by_usr", me.id(),
@@ -302,21 +314,29 @@ public class TransferService {
         }
         db.updateRec("transfer_act", Map.of("id", id, "act_status_type", ActStatus.REJECTED, "received_by_usr", me.id(),
                 "received_dt", OffsetDateTime.now(), "reject_reason", body.reason().trim()));
-        // назначение ответственного, сделанное актом, снимается: сначала ссылка, на запись стоит внешний ключ
+        // назначение ответственных, сделанное актом, снимается: прежние снова текущие; сначала ссылки - на записи
+        // стоят внешние ключи
         for (DbRec row : db.loadList("transfer_act_wagon", Map.of("transfer_act", id))) {
-            Long opened = row.getLong("wagon_responsible", null);
-            if (opened != null) {
+            WagonJournal.Responsibles responsibles = responsibles(row);
+            if (responsibles.opened() != null || responsibles.closed() != null) {
                 Map<String, Object> values = new HashMap<>();
                 values.put("id", row.getLong("id"));
                 values.put("wagon_responsible", null);
+                values.put("closed_wagon_responsible", null);
                 db.updateRec("transfer_act_wagon", values);
-                wagonJournal.unassign(opened);
+                wagonJournal.unassign(row.getLong("wagon"), responsibles);
             }
         }
         return row(id, me);
     }
 
     // --- внутреннее
+
+    /** Записи факта ответственных, открытая и закрытая актом по вагону (строка transfer_act_wagon). */
+    static WagonJournal.Responsibles responsibles(DbRec row) {
+        return new WagonJournal.Responsibles(row.getLong("wagon_responsible", null),
+                row.getLong("closed_wagon_responsible", null));
+    }
 
     /** Перевести вагоны акта в расположение «куда»; запись журнала, открытая приёмом, - в строке вагона акта. */
     private void moveWagons(long id, OffsetDateTime time) throws Exception {
@@ -444,6 +464,7 @@ public class TransferService {
             wagons.computeIfAbsent(r.getLong("transfer_act"), k -> new ArrayList<>())
                     .add(DbRecMapper.toObject(r, TransferRow.Wagon.class));
         }
+        addActResponsibles(wagons.values().stream().flatMap(List::stream).toList());
         for (TransferRow a : acts) {
             a.setWagons(wagons.getOrDefault(a.getId(), List.of()));
             a.setCanReceive(a.getActStatusType() == ActStatus.PENDING
@@ -454,6 +475,23 @@ public class TransferService {
         }
         refResolver.resolve(acts);
         return acts;
+    }
+
+    /** Второй проход вагонов актов: ответственные, назначенные актом, - состав открытых актом записей. */
+    private void addActResponsibles(List<TransferRow.Wagon> wagons) throws Exception {
+        Map<Long, TransferRow.Wagon> byRecord = new HashMap<>();
+        for (TransferRow.Wagon w : wagons) {
+            if (w.getWagonResponsible() != null) {
+                byRecord.put(w.getWagonResponsible(), w);
+            }
+        }
+        if (byRecord.isEmpty()) {
+            return;
+        }
+        for (DbRec rec : db.loadSql(WagonSql.responsibleUsrs(), Map.of("records", List.copyOf(byRecord.keySet())))) {
+            byRecord.get(rec.getLong("wagon_responsible")).getUsrs().add(new UserRef(rec.getLong("usr")));
+        }
+        refResolver.resolve(wagons.stream().flatMap(w -> w.getUsrs().stream()).toList());
     }
 
 }

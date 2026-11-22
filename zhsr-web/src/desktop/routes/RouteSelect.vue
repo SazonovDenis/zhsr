@@ -1,11 +1,12 @@
 <template>
   <CbList v-model="model" single :placeholder="placeholder" :values="choices" :source="load" class="route-choice">
     <template #option="{ item }">
-      <RouteOptionView :route="routeOptionOf(item)" class="route-option--list" />
+      <RouteOptionView :route="routeOptionOf(item)" words class="route-option--list" />
     </template>
-    <!-- compact: в поле — только номер и сообщение, строка остаётся одной высоты с соседними полями (FilterBar) -->
+    <!-- compact: в поле — только номер и сообщение, строка остаётся одной высоты с соседними полями (FilterBar);
+         иначе в поле — одной строкой без станций, они видны только в списке при выборе -->
     <template v-if="!compact" #value="{ item }">
-      <RouteOptionView :route="routeOptionOf(item)" />
+      <RouteOptionView :route="routeOptionOf(item)" line words />
     </template>
   </CbList>
 </template>

@@ -325,7 +325,7 @@ final class RequestSql {
      */
     static String crewStaff() {
         return """
-                select trip_crew.usr, trip_crew.crew_duty_type, trip_crew.wagon,
+                select trip_crew.usr, trip_crew.crew_duty_type,
                        trip_crew.usr in (select usr_role.usr from usr_role
                                          join role_type on role_type.id = usr_role.role_type
                                          where role_type.service = :service) as in_service

@@ -25,8 +25,11 @@ public final class DbErrors {
         String constraint = msg == null || msg.getConstraint() == null ? "" : " (" + msg.getConstraint() + ")";
         return switch (pg.getSQLState()) {
             case "23505" -> ApiException.conflict("Запись с таким значением уже есть" + constraint);
-            case "23503" -> ApiException.conflict("Запись связана с другими данными" + constraint
-                    + ": её нельзя удалить, а ссылка должна вести на существующую запись");
+            // на удаляемую запись ссылаются - заготовленное сообщение по имени ключа (FkMessages); иначе ссылка ведёт
+            // на несуществующую запись
+            case "23503" -> FkUtils.isReferenced(e)
+                    ? ApiException.conflict(FkMessages.of(FkUtils.fkName(e)))
+                    : ApiException.conflict("Ссылка ведёт на несуществующую запись" + constraint);
             case "23514", "23P01" -> ApiException.badRequest("Значение не проходит проверку" + constraint);
             case "23502" -> ApiException.badRequest("Не заполнено обязательное поле"
                     + (msg == null || msg.getColumn() == null ? "" : " (" + msg.getColumn() + ")"));

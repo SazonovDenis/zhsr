@@ -40,31 +40,12 @@
         placeholder="Введите цифры номера вагона"
       />
       <!-- «Другой вагон» до ввода цифр: списка нет совсем, кроме уже выбранного вагона -->
-      <div v-if="!(pick.mode.value === 'other' && !pick.query.value && !selected)" class="wagon-modes__list">
-        <!-- выбранный вагон, которого нет в списке (вагон исправляемой записи), — первым -->
-        <button
-          v-if="selected && !pick.wagons.value.some((w) => w.id === selected!.id)"
-          type="button"
-          class="wagon-modes__wagon wagon-modes__wagon--on q-py-sm q-px-md"
-        >
-          <WagonOption :number="selected.number" :type="dictManager.getValue('WagonType', selected.wagonType)" />
-        </button>
-        <button
-          v-for="w in pick.wagons.value"
-          :key="w.number"
-          type="button"
-          class="wagon-modes__wagon q-py-sm q-px-md"
-          :class="{ 'wagon-modes__wagon--on': selected?.id === w.id }"
-          @click="emit('pick', w)"
-        >
-          <!-- строка вагона: слева номер и под ним тип, справа расположение и под ним плашка -->
-          <WagonOption
-            :number="w.number"
-            :type="dictManager.getValue('WagonType', w.wagonType)"
-            :place="placeOf(w)"
-            :badge="badgeOf(w)"
-          />
-        </button>
+      <WagonList
+        v-if="!(pick.mode.value === 'other' && !pick.query.value && !selected)"
+        :items="listItems"
+        :selected="selected ? [String(selected.id)] : []"
+        @pick="onPick"
+      >
         <div v-if="pick.limited.value" class="wagon-modes__empty q-py-md q-px-md">
           {{ t('Показаны первые {n} — уточните номер', { n: WAGON_SEARCH_LIMIT }) }}
         </div>
@@ -78,19 +59,18 @@
         >
           {{ t('Вагоны не найдены') }}
         </div>
-      </div>
+      </WagonList>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onMounted, useTemplateRef, watch } from 'vue'
 
 import type { CurrentUser } from '@/api/session'
 import type { RequestWagon } from '@/api/wagons'
 import { WAGON_SEARCH_LIMIT } from '@/api/wagons'
 import { t } from '@/boot/i18n'
-import WagonOption from '@/shared/components/WagonOption.vue'
 import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
@@ -101,6 +81,8 @@ import { tripRefText } from '@/shared/trips/tripRefText'
 import { placeText } from '@/shared/wagonPlace'
 import type { WagonMode } from '../requests/useWizardWagon'
 import { useWizardWagon } from '../requests/useWizardWagon'
+import type { WagonListItem } from './WagonList.vue'
+import WagonList from './WagonList.vue'
 
 /**
  * Выбор вагона на телефоне — общий для подачи заявки, чек-листа и описи: три режима (useWizardWagon).
@@ -135,6 +117,28 @@ function badgeOf(w: RequestWagon): string {
 /** Где вагон сейчас. */
 function placeOf(w: RequestWagon): string {
   return placeText(w.locationType, w.place, w.trip ? tripRefText(w.trip) : null)
+}
+
+/** Строки списка: выбранный вагон, которого нет в списке (вагон исправляемой записи), — первым. */
+const listItems = computed<WagonListItem[]>(() => {
+  const sel = props.selected
+  const rows: WagonListItem[] = pick.wagons.value.map((w) => ({
+    key: String(w.id),
+    number: w.number,
+    type: dictManager.getValue('WagonType', w.wagonType),
+    place: placeOf(w),
+    badge: badgeOf(w),
+  }))
+  if (sel && !pick.wagons.value.some((w) => w.id === sel.id)) {
+    rows.unshift({ key: String(sel.id), number: sel.number, type: dictManager.getValue('WagonType', sel.wagonType) })
+  }
+  return rows
+})
+
+/** Выбор строки списка: вагон из списка; выбранный вне списка — без изменений. */
+function onPick(key: string) {
+  const w = pick.wagons.value.find((x) => String(x.id) === key)
+  if (w) emit('pick', w)
 }
 
 /** Сменить режим: выбор снимается; «Мой вагон» выбирается сам; «Другой вагон» — фокус в поле номера. */
@@ -196,46 +200,6 @@ onMounted(async () => {
 // переключатель, карточки и поле номера не сжимаются: прокручивается только список вагонов
 .wagon-modes__fixed {
   flex: none;
-}
-
-.wagon-modes__list {
-  display: flex;
-  flex: 0 1 auto;
-  flex-direction: column;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  border: 0.0625rem solid $zs-border;
-  border-radius: 0.3rem;
-  background: #fff;
-
-  // строки списка не сжимаются по высоте: прокручивается список
-  > * {
-    flex: none;
-  }
-}
-
-.wagon-modes__wagon {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 3.3rem;
-  border: 0;
-  border-top: 0.0625rem solid $zs-border-row;
-  background: #fff;
-  color: $zs-text;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &:first-child {
-    border-top: 0;
-  }
-
-  // выбранный вагон — фоном выбранной кнопки CbButton
-  &--on {
-    background: $zs-selected-bg;
-  }
 }
 
 .wagon-modes__mine {

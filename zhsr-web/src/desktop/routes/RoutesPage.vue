@@ -48,10 +48,11 @@ import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { RouteFilter, RouteRow } from '@/api/routes'
-import { fetchRoutes } from '@/api/routes'
+import { deleteRoute, fetchRoutes } from '@/api/routes'
 import { t } from '@/boot/i18n'
 import type { ChoiceItem } from '@/shared/components/choice/choice'
 import CbButton from '@/shared/components/choice/CbButton.vue'
+import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
 import type { RowKey, RowMenuItem, TableSort } from '@/shared/components/table/types'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { ShownError } from '@/shared/errors'
@@ -120,6 +121,21 @@ const rowMenu: RowMenuItem<RouteRow>[] = [
     label: 'Редактировать',
     disabled: () => roleReason([RoleType.WAGON_PLANNER], 'Правит планировщик вагонов'),
     run: edit,
+  },
+  // удалить можно маршрут без рейсов: иначе причина от сервера в окне
+  {
+    label: 'Удалить',
+    separator: true,
+    disabled: () => roleReason([RoleType.WAGON_PLANNER], 'Удаляет планировщик вагонов'),
+    run: (r: RouteRow) =>
+      void confirmDelete(
+        'Удаление маршрута',
+        'Удалить маршрут № {number} {name}?',
+        { number: r.trainNumber, name: r.name },
+        () => deleteRoute(r.id),
+      ).then((ok) => {
+        if (ok) void load()
+      }),
   },
   { label: 'Новый маршрут', separator: true, disabled: () => createReason.value, run: () => void openRouteNew(router) },
 ]

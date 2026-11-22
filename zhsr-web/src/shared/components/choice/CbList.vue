@@ -164,7 +164,8 @@ import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { screenScale } from '@/shared/screen'
 import type { ChoiceItem, ChoiceModel } from './choice'
 import CbOption from './CbOption.vue'
-import { displayOf, effectiveOf, isDisabled, labelOf, modelIds, modelOf, nextEnabledIndex } from './choice'
+import { useDialogEdit } from '@/shared/components/dialog/dialogEdit'
+import { displayOf, effectiveOf, isDisabled, labelOf, modelIds, modelOf, nextEnabledIndex, searchable } from './choice'
 
 /**
  * CbList — поле выбора с выпадающим списком и поиском.
@@ -254,6 +255,8 @@ const emit = defineEmits<{
   /** изменился текст поиска: варианты, которые ищет сервер, можно загрузить по нему */
   search: [text: string]
 }>()
+// выбор пользователя в диалоге убирает ошибку диалога
+const dialogEdit = useDialogEdit()
 
 const slots = defineSlots<{
   option?: (props: { item: ChoiceItem }) => unknown
@@ -359,6 +362,7 @@ function syncSelected() {
 }
 
 function emitChange() {
+  dialogEdit()
   emit('update:modelValue', modelOf(selected.value, props.single))
   emit('change', effective.value)
 }
@@ -378,10 +382,10 @@ function isSelected(item: ChoiceItem): boolean {
 
 /** Совпадение со строкой поиска: по тексту, переводу, id и эффективным значениям («jpg» находит «Изображения»). */
 function matches(item: ChoiceItem, q: string): boolean {
-  if (labelOf(item).toLowerCase().includes(q)) return true
-  if (displayOf(item).toLowerCase().includes(q)) return true
+  if (searchable(labelOf(item)).includes(q)) return true
+  if (searchable(displayOf(item)).includes(q)) return true
   if (String(item.id).toLowerCase().includes(q)) return true
-  if (item.search?.toLowerCase().includes(q)) return true
+  if (item.search && searchable(item.search).includes(q)) return true
   if (item.value === undefined || item.value === null) return false
   return effectiveOf(item).some((v) => String(v).toLowerCase().includes(q))
 }

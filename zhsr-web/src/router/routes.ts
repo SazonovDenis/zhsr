@@ -133,17 +133,33 @@ const routes: RouteRecordRaw[] = [
         component: () => pwa().then((m) => m.PwaProfilePage),
       },
       {
-        path: 'trip',
-        name: 'pwa-trip',
-        meta: { pair: 'trips', title: 'Формирование рейса' },
-        component: () => pwa().then((m) => m.PwaTripCrewPage),
-      },
-      {
         path: 'trip/:id/coupling/:kind',
         name: 'pwa-trip-coupling',
         meta: { pair: 'trips' },
         props: true,
         component: () => pwa().then((m) => m.PwaCouplingPage),
+      },
+      {
+        path: 'trip/:id/wagons',
+        name: 'pwa-trip-wagons',
+        meta: { pair: 'trips' },
+        props: true,
+        component: () => pwa().then((m) => m.PwaTripWagonsPage),
+      },
+      {
+        path: 'trip/:id/mark/:change',
+        name: 'pwa-trip-mark',
+        meta: { pair: 'trips' },
+        props: true,
+        component: () => pwa().then((m) => m.PwaChangeMarkPage),
+      },
+      {
+        path: 'trip/:id/responsibles',
+        name: 'pwa-trip-responsibles',
+        meta: { pair: 'trips' },
+        // after=1 — план ответственных после рейса
+        props: (route) => ({ id: route.params.id, after: route.query.after === '1' }),
+        component: () => pwa().then((m) => m.PwaResponsiblesPage),
       },
     ],
   },
@@ -171,10 +187,11 @@ const routes: RouteRecordRaw[] = [
         component: () => desktop().then((m) => m.EquipLastPage),
       },
       { path: 'trips', name: 'trips', component: () => desktop().then((m) => m.TripsPage) },
+      { path: 'staff', name: 'staff', component: () => desktop().then((m) => m.StaffPage) },
       {
         path: 'trips/:id',
         name: 'trip-form',
-        meta: { hideMenu: true, pair: 'pwa-trip' },
+        meta: { hideMenu: true },
         props: true,
         component: () => desktop().then((m) => m.TripFormPage),
       },
@@ -230,7 +247,6 @@ const routes: RouteRecordRaw[] = [
       },
       // администрирование: пункты меню десктопной части, страницы загружаются чанком admin при первом переходе
       { path: 'admin', name: 'admin-home', component: () => admin().then((m) => m.AdminHomePage) },
-      { path: 'admin/users', name: 'admin-users', component: () => admin().then((m) => m.AdminUsersPage) },
       {
         path: 'admin/check-dicts',
         name: 'admin-check-dicts',

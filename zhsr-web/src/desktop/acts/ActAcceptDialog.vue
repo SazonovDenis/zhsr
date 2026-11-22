@@ -1,7 +1,7 @@
 <template>
   <FormDialog v-model:show="show" title="Приём вагонов" ok-text="Принять" :running="running" :error="error" @ok="save">
-    <!-- ответственного назначил акт при оформлении; при приёме его можно сменить -->
-    <FormField label="Ответственный за вагоны">
+    <!-- ответственных назначил акт при оформлении; при приёме их можно сменить -->
+    <FormField label="Ответственные за вагоны">
       <ResponsiblePicker
         v-model="responsible"
         :station="act.station"
@@ -22,20 +22,20 @@ import FormField from '@/shared/components/form/FormField.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import type { ResponsibleChoice } from '@/shared/wagons/responsible'
-import { responsibleChoice, responsibleUsr } from '@/shared/wagons/responsible'
+import { responsibleChoice, responsibleUsrs } from '@/shared/wagons/responsible'
 import ResponsiblePicker from '@/shared/wagons/ResponsiblePicker.vue'
 
 /**
- * Приём всех вагонов акта (Ф-АКТ-02): ответственный за вагоны — назначенный актом, его можно сменить на сотрудника депо
- * станции или «не назначен». Открывается через openDialog, результат — акт после приёма.
+ * Приём всех вагонов акта (Ф-АКТ-02): ответственные за вагоны — назначенные актом, их можно сменить на сотрудников
+ * депо станции или «не назначен». Открывается через openDialog, результат — акт после приёма.
  */
 const props = defineProps<{ act: Transfer }>()
 
 const show = defineModel<boolean>('show', { default: false })
 const emit = defineEmits<{ done: [act: Transfer] }>()
 
-// ответственный, назначенный актом: один на все вагоны акта
-const current = props.act.wagons[0]?.usr ?? null
+// ответственные, назначенные актом: одни на все вагоны акта
+const current = props.act.wagons[0]?.usrs ?? []
 const responsible = ref<ResponsibleChoice>(responsibleChoice(current))
 const running = ref(false)
 const error = ref<ShownError | null>(null)
@@ -44,7 +44,7 @@ async function save() {
   error.value = null
   running.value = true
   try {
-    emit('done', await acceptTransfer(props.act.id, responsibleUsr(responsible.value)))
+    emit('done', await acceptTransfer(props.act.id, responsibleUsrs(responsible.value)))
   } catch (e) {
     error.value = shownError(e)
   } finally {

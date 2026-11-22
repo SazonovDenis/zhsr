@@ -64,11 +64,6 @@ public class TrainController {
         return trainService.rename(id, body);
     }
 
-    @PutMapping("/trains/{id}/order")
-    public TrainCard order(@PathVariable long id, @RequestBody List<String> wagons) throws Exception {
-        return trainService.order(id, wagons);
-    }
-
     @PostMapping("/trains/{id}/attach")
     public TrainCard attach(@PathVariable long id, @RequestBody TrainService.ChangeBody body) throws Exception {
         return trainService.attach(id, body);
@@ -79,7 +74,7 @@ public class TrainController {
         return trainService.detach(id, body);
     }
 
-    /** Отметить плановую прицепку или отцепку выполненной. */
+    /** Отметить исполнение плана прицепки или отцепки: факт по плану. */
     @PostMapping("/train-changes/{id}/done")
     public TrainCard mark(@PathVariable long id, @RequestBody TrainService.MarkBody body) throws Exception {
         return trainService.mark(id, body);
@@ -91,10 +86,22 @@ public class TrainController {
         return trainService.cancelPlan(id);
     }
 
-    /** Отменить выполненную прицепку или отцепку без истории. */
+    /** Вернуть отменённый план прицепки или отцепки. */
+    @PostMapping("/train-changes/{id}/restore")
+    public TrainCard restorePlan(@PathVariable long id) throws Exception {
+        return trainService.restorePlan(id);
+    }
+
+    /** Удалить ошибочный факт прицепки или отцепки без истории. */
     @DeleteMapping("/train-changes/{id}")
     public TrainCard undo(@PathVariable long id) throws Exception {
         return trainService.undo(id);
     }
 
+
+    /** Удалить, если на запись никто не ссылается: иначе 409 с причиной. */
+    @DeleteMapping("/trains/{id}")
+    public void delete(@PathVariable long id) throws Exception {
+        trainService.delete(id);
+    }
 }

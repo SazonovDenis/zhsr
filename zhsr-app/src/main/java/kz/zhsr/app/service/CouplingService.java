@@ -33,10 +33,11 @@ public class CouplingService {
      * @param comment        основания, примечания (приказ, причина); может быть пусто
      * @param wagons         номера вагонов
      * @param time           фактическое время, ISO с часовым поясом; null - сейчас
-     * @param responsibleUsr ответственный за вагоны; null - не назначен
+     * @param seq            прицепка: позиция первого вагона в поезде, с 1; null - в конец
+     * @param responsibleUsrs ответственные за вагоны; пусто - не назначены
      */
     public record CouplingBody(int changeType, long routeStation, String comment, List<String> wagons,
-                               OffsetDateTime time, Long responsibleUsr) {
+                               OffsetDateTime time, Integer seq, List<Long> responsibleUsrs) {
     }
 
     private final Db db;
@@ -52,8 +53,8 @@ public class CouplingService {
     }
 
     /**
-     * Вагоны для прицепки или отцепки: для отцепки - которые едут в поезде рейса; для прицепки - станции, её депо и
-     * парка отстоя. Прицепить можно только вагон на самой станции, не занятый в другом поезде.
+     * Вагоны для прицепки или отцепки: для отцепки - которые едут в поезде рейса, по позиции; для прицепки - станции,
+     * её депо и парка отстоя. Прицепить можно только вагон на самой станции, не занятый в другом поезде.
      *
      * @param station станция остановки; для отцепки не нужна
      */
@@ -65,6 +66,7 @@ public class CouplingService {
                     .map(w -> {
                         CouplingWagon c = new CouplingWagon();
                         c.setNumber(w.getNumber());
+                        c.setSeq(w.getSeq());
                         c.setWagonType(w.getWagonType());
                         c.setLocationType(w.getLocationType());
                         c.setPlace(w.getPlace());
@@ -94,7 +96,7 @@ public class CouplingService {
     /**
      * Прицепить или отцепить вагоны в рейсе фактом. Отцепленный вагон встаёт на станцию остановки, «в простое», и
      * снимается с проводников; они остаются на рейсе. Прицепленный вагон уходит «в рейс», «в пути», и входит в поезд
-     * рейса. Ответственный - выбранный; null - не назначен.
+     * рейса. Ответственные - выбранные; пусто - не назначены.
      */
     @Transactional
     public TripCrew couple(long id, CouplingBody body) throws Exception {
@@ -103,8 +105,8 @@ public class CouplingService {
         if (train == null) {
             throw ApiException.conflict("Поезд рейса не назначен");
         }
-        TrainService.ChangeBody change = new TrainService.ChangeBody(body.wagons(), true, body.time(), null, id,
-                body.routeStation(), body.comment(), body.responsibleUsr());
+        TrainService.ChangeBody change = new TrainService.ChangeBody(body.wagons(), true, body.time(), null,
+                body.routeStation(), body.seq(), body.comment(), body.responsibleUsrs());
         if (body.changeType() == TrainWagonChangeType.ATTACH) {
             trainService.attach(train, change);
         } else if (body.changeType() == TrainWagonChangeType.DETACH) {

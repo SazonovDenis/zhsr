@@ -11,6 +11,8 @@ import lombok.Setter;
 @Setter
 public class CouplingWagon {
     private String number;
+    /** отцепка: позиция вагона в поезде; прицепка - null */
+    private Integer seq;
     private long wagonType;
     private long locationType;
     private long place;

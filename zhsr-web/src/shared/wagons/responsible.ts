@@ -6,22 +6,22 @@ import { dictManager } from '@/shared/dict/DictManager'
 import { tripRefText } from '@/shared/trips/tripRefText'
 
 /**
- * Ответственный за вагон в форме: id сотрудника, NOT_ASSIGNED — явно «ответственный не назначен», null — ещё не
- * выбран.
+ * Ответственные за вагон в форме: id сотрудников (непустой список), NOT_ASSIGNED — явно «ответственный не назначен»,
+ * null — ещё не выбраны.
  */
-export type ResponsibleChoice = number | typeof NOT_ASSIGNED | null
+export type ResponsibleChoice = number[] | typeof NOT_ASSIGNED | null
 
 /** Выбор «ответственный не назначен». */
 export const NOT_ASSIGNED = 'none'
 
-/** Ответственный для запроса: id сотрудника; не назначен (или не выбран) — null. */
-export function responsibleUsr(choice: ResponsibleChoice): number | null {
-  return typeof choice === 'number' ? choice : null
+/** Ответственные для запроса: id сотрудников; не назначены (или не выбраны) — пусто. */
+export function responsibleUsrs(choice: ResponsibleChoice): number[] {
+  return Array.isArray(choice) ? choice : []
 }
 
-/** Ответственный из данных — выбор формы: null в данных — «не назначен». */
-export function responsibleChoice(usr: UserRef | null): ResponsibleChoice {
-  return usr ? usr.id : NOT_ASSIGNED
+/** Ответственные из данных — выбор формы: пусто в данных — «не назначен». */
+export function responsibleChoice(usrs: UserRef[]): ResponsibleChoice {
+  return usrs.length > 0 ? usrs.map((u) => u.id) : NOT_ASSIGNED
 }
 
 /** Кого можно назначить ответственным: сотрудник и кто он — член бригады рейса поезда вагонов или сотрудник депо. */
@@ -37,6 +37,14 @@ export interface ResponsibleCandidate extends UserRef {
 /** Должность кандидата в бригаде рейса; не в бригаде — пусто. */
 export function responsibleDuty(c: ResponsibleCandidate | null): string {
   return c && c.crewDutyType !== null ? dictManager.getValue('CrewDuty', c.crewDutyType) : ''
+}
+
+/**
+ * Строка под ФИО в таблицах ответственных рейса (десктоп и телефон): должность в бригаде; не в бригаде — служба
+ * («депо станции»); не известно — пусто.
+ */
+export function candidateDuty(c: ResponsibleCandidate): string {
+  return c.crewDutyType !== null ? responsibleDuty(c) : responsiblePlace(c)
 }
 
 /** Где кандидат: «рейс 002 • Алматы — Астана» или «депо станции»; не известно — пусто. */

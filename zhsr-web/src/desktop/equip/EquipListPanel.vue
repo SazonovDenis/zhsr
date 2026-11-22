@@ -11,9 +11,7 @@
     <EquipListView v-if="detail" :detail="detail">
       <!-- исправить — автор в течение 10 минут после сохранения; кнопка исчезает сама, когда срок вышел -->
       <div v-if="listEditable(detail, now)" class="q-mt-md">
-        <q-btn unelevated outline no-caps class="zs-soft-border" color="ink" @click="edit">{{
-          t('Внести изменения')
-        }}</q-btn>
+        <SoftLink text="Внести изменения" @click="edit" />
       </div>
     </EquipListView>
   </SidePanel>
@@ -25,7 +23,6 @@ import { useRouter } from 'vue-router'
 
 import type { EquipListDetail } from '@/api/equip'
 import { fetchEquipList } from '@/api/equip'
-import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
 import { textOf } from '@/shared/checks/texts'
 import { listEditable } from '@/shared/checks/rights'
@@ -37,6 +34,7 @@ import { shownError } from '@/shared/errors'
 import { formatDateTime } from '@/shared/format'
 import { useNow } from '@/shared/trips/tripTimes'
 import { loadCurrentUser } from '@/shared/user'
+import SoftLink from '@/shared/components/form/SoftLink.vue'
 import SidePanel from '../frame/SidePanel.vue'
 import EquipListView from './EquipListView.vue'
 

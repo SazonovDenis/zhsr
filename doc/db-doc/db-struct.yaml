@@ -443,27 +443,32 @@ tables:
       id: {type: bigint, required: true}
       train: {type: bigint, required: true, references: train}
       wagon: {type: bigint, required: true, references: wagon}
+      kind: {type: integer, required: true}
       seq: {type: integer, required: true}
-      dbeg: {type: timestamptz}
+      dbeg: {type: timestamptz, required: true}
       dend: {type: timestamptz}
 
   train_wagon_change:
     primary_key: [id]
     columns:
       id: {type: bigint, required: true}
-      train_wagon: {type: bigint, required: true, references: train_wagon}
+      train: {type: bigint, required: true, references: train}
+      wagon: {type: bigint, required: true, references: wagon}
+      kind: {type: integer, required: true}
+      plan_status: {type: integer}
       change_type: {type: integer, required: true}
-      status: {type: integer, required: true}
-      planned_dt: {type: timestamptz}
-      fact_dt: {type: timestamptz}
+      dt: {type: timestamptz, required: true}
+      seq: {type: integer}
       station: {type: bigint, required: true, references: station}
       trip: {type: bigint, references: trip}
       route_station: {type: bigint, references: route_station}
+      plan: {type: bigint, references: train_wagon_change}
       usr: {type: bigint, required: true, references: usr}
       comment: {type: text}
       wagon_location: {type: bigint, references: wagon_location}
       wagon_status: {type: bigint, references: wagon_status}
       wagon_responsible: {type: bigint, references: wagon_responsible}
+      closed_wagon_responsible: {type: bigint, references: wagon_responsible}
 
   transfer_act:
     primary_key: [id]
@@ -496,6 +501,7 @@ tables:
       note: {type: text}
       wagon_location: {type: bigint, references: wagon_location}
       wagon_responsible: {type: bigint, references: wagon_responsible}
+      closed_wagon_responsible: {type: bigint, references: wagon_responsible}
 
   transport_type:
     primary_key: [id]
@@ -526,7 +532,6 @@ tables:
       trip: {type: bigint, required: true, references: trip}
       usr: {type: bigint, required: true, references: usr}
       crew_duty_type: {type: bigint, required: true, references: crew_duty_type}
-      wagon: {type: bigint, references: wagon}
       dbeg: {type: timestamptz}
       dend: {type: timestamptz}
 
@@ -600,6 +605,7 @@ tables:
       wagon_location: {type: bigint, references: wagon_location}
       wagon_status: {type: bigint, references: wagon_status}
       wagon_responsible: {type: bigint, references: wagon_responsible}
+      closed_wagon_responsible: {type: bigint, references: wagon_responsible}
 
   wagon_info:
     primary_key: [wagon]
@@ -613,8 +619,7 @@ tables:
       trip: {type: bigint, references: trip}
       dbeg_status: {type: timestamptz, required: true}
       wagon_status_type: {type: bigint, required: true, references: wagon_status_type}
-      dbeg_responsible: {type: timestamptz, required: true}
-      responsible_usr: {type: bigint, references: usr}
+      wagon_responsible: {type: bigint, references: wagon_responsible}
       run_km: {type: integer, required: true}
 
   wagon_location:
@@ -635,9 +640,22 @@ tables:
     columns:
       id: {type: bigint, required: true}
       wagon: {type: bigint, required: true, references: wagon}
+      kind: {type: integer, required: true}
+      plan_status: {type: integer}
+      trip: {type: bigint, references: trip}
+      trip_point: {type: integer}
       dbeg: {type: timestamptz, required: true}
       dend: {type: timestamptz}
-      usr: {type: bigint, references: usr}
+      created_by_usr: {type: bigint, references: usr}
+      created_dt: {type: timestamptz}
+      comment: {type: text}
+
+  wagon_responsible_usr:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      wagon_responsible: {type: bigint, required: true, references: wagon_responsible}
+      usr: {type: bigint, required: true, references: usr}
 
   wagon_run:
     primary_key: [id]
@@ -645,7 +663,7 @@ tables:
       id: {type: bigint, required: true}
       wagon: {type: bigint, required: true, references: wagon}
       trip: {type: bigint, required: true, references: trip}
-      train_wagon: {type: bigint, required: true, references: train_wagon}
+      train_wagon_change: {type: bigint, required: true, references: train_wagon_change}
       km: {type: integer, required: true}
 
   wagon_status:

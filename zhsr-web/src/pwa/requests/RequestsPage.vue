@@ -20,7 +20,24 @@
     <ErrorBox v-if="error" :error="error" :retry="load" class="requests__error q-py-sm q-px-md" />
     <LoadSpinner v-if="busy.active.value" />
 
-    <RequestSection :title="t(MODE_TITLE[mode])" :requests="shown" :queued="queued" :empty="t('Ничего не найдено')" />
+    <!-- «Все» открытые — группами, как были на вкладке «Рейс»; иначе — одним списком -->
+    <template v-if="groups">
+      <RequestSection
+        v-for="g in groups"
+        :key="g.key"
+        :title="t(g.title)"
+        :requests="g.requests"
+        :queued="g.queued"
+        :empty="t('Ничего не найдено')"
+      />
+    </template>
+    <RequestSection
+      v-else
+      :title="t(MODE_TITLE[mode])"
+      :requests="shown"
+      :queued="queued"
+      :empty="t('Ничего не найдено')"
+    />
 
     <template #fab>
       <router-link :to="{ name: 'pwa-request-new' }" class="requests__fab" :title="t('Новая заявка')">
@@ -49,7 +66,9 @@ import { shownError } from '@/shared/errors'
 import { isoDateTime } from '@/shared/format'
 import { cachedRows, loadCached } from '@/shared/offline/cache'
 import { outbox, outboxAsRequest, queuedRequests, withQueuedEdit } from '@/shared/offline/outbox'
-import { FINAL_STATUSES, seenByMe, waitsForMe } from '@/shared/requests/rights'
+import type { QueuedRequest } from '@/shared/offline/outbox'
+import { RequestStatus } from '@/shared/constants/systemDicts'
+import { canAccept, canWork, FINAL_STATUSES, seenByMe, waitsForMe } from '@/shared/requests/rights'
 import { isRequestList, loadOffline } from '@/shared/requests/useRequestCard'
 import { currentUser } from '@/shared/user'
 import PwaPage from '../components/PwaPage.vue'
@@ -59,7 +78,7 @@ import RequestSection from '../components/RequestSection.vue'
 
 /**
  * Список заявок мобильной части (Ф-ЗАЯ-06): «Мои», «На исполнение», «Все» и под ними «Открытые» или закрытые заявки,
- * созданные за неделю.
+ * созданные за неделю. «Все» открытые — группами, как были на вкладке «Рейс» (groups).
  * Отбор и прокрутка запоминаются в памяти приложения (requestsListState). Заявки из очереди на телефоне показываются
  * первыми в открытых «Моих» и «Всех». Без связи — сохранённый список, а если этот список ещё не открывали — заявки из
  * других сохранённых списков.
@@ -124,6 +143,66 @@ const queued = computed(() => {
 
 // исправления, которые ждут отправки, видны сразу
 const shown = computed(() => requests.value.map(withQueuedEdit))
+
+/** Группа списка «Все» открытые. */
+interface Group {
+  key: string
+  title: string
+  requests: RepairRequest[]
+  queued: QueuedRequest[]
+}
+
+const OPEN_WORK: number[] = [
+  RequestStatus.NEW,
+  RequestStatus.ASSIGNED,
+  RequestStatus.IN_PROGRESS,
+  RequestStatus.DEFERRED,
+]
+
+/**
+ * «Все» открытые — группами, как были на вкладке «Рейс»: «Ждут вашей приёмки», «Ваши открытые заявки», «На
+ * исполнение», «Ждут приёмки автора», остальное — «Остальные открытые». Заявка — в первой подходящей группе; пустые
+ * группы не показываются. Не «Все» открытые — null: один список.
+ */
+const groups = computed<Group[] | null>(() => {
+  const u = currentUser.value
+  if (!u || scope.value !== 'all' || mode.value !== 'open') return null
+  const rest = [...shown.value]
+  const take = (test: (r: RepairRequest) => boolean) => {
+    const res = rest.filter(test)
+    res.forEach((r) => rest.splice(rest.indexOf(r), 1))
+    return res
+  }
+  const list: Group[] = [
+    {
+      key: 'accept',
+      title: 'Ждут вашей приёмки',
+      requests: take((r) => r.requestStatusType === RequestStatus.DONE && canAccept(u, r)),
+      queued: [],
+    },
+    {
+      key: 'mine',
+      title: 'Ваши открытые заявки',
+      requests: take((r) => r.createdByUsr.id === u.id && r.requestStatusType !== RequestStatus.DONE),
+      queued: queued.value,
+    },
+    {
+      key: 'todo',
+      title: 'На исполнение',
+      requests: take((r) => OPEN_WORK.includes(r.requestStatusType) && (r.executorUsr?.id === u.id || canWork(u, r))),
+      queued: [],
+    },
+    {
+      key: 'waiting',
+      title: 'Ждут приёмки автора',
+      requests: take((r) => r.requestStatusType === RequestStatus.DONE && r.executorUsr?.id === u.id),
+      queued: [],
+    },
+  ]
+  list.push({ key: 'rest', title: 'Остальные открытые', requests: rest, queued: [] })
+  const filled = list.filter((g) => g.requests.length > 0 || g.queued.length > 0)
+  return filled.length > 0 ? filled : [{ key: 'empty', title: MODE_TITLE.open, requests: [], queued: [] }]
+})
 
 // общее ожидание страницы: спиннер на месте содержимого — на всю цепочку загрузок
 const busy = provideBusy()

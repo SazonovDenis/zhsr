@@ -1,19 +1,15 @@
 <template>
   <CbList
-    :model-value="model"
-    single
-    placeholder="Выберите ответственного…"
+    :model-value="listModel"
+    placeholder="Выберите ответственных…"
     :values="choices"
     :source="candidatesLoad"
     :disabled="disabled"
-    @update:model-value="model = $event as ResponsibleChoice"
+    @update:model-value="onPick($event as ChoiceId[])"
   >
-    <!-- и в списке, и в поле — «Список ФИО»: ФИО слева, справа должность, под ней — где сотрудник -->
+    <!-- в списке — «Список ФИО»: ФИО слева, справа должность, под ней — где сотрудник -->
     <template #option="{ item }">
       <UserOption v-bind="rowOf(item)" />
-    </template>
-    <template #value="{ item }">
-      <UserOption v-bind="rowOf(item)" compact />
     </template>
   </CbList>
 </template>
@@ -22,7 +18,7 @@
 import { computed, shallowRef, watch } from 'vue'
 
 import type { UserRef } from '@/api/requests'
-import type { ChoiceItem } from '@/shared/components/choice/choice'
+import type { ChoiceId, ChoiceItem } from '@/shared/components/choice/choice'
 import { displayOf } from '@/shared/components/choice/choice'
 import CbList from '@/shared/components/choice/CbList.vue'
 import UserOption from '@/shared/components/UserOption.vue'
@@ -32,21 +28,22 @@ import type { ResponsibleCandidate, ResponsibleChoice } from './responsible'
 import { fetchResponsibles, NOT_ASSIGNED, responsibleDuty, responsiblePlace, responsibleWho } from './responsible'
 
 /**
- * Выбор ответственного за вагон: сотрудники депо станции station, бригада рейса trip и бригады рейсов поезда вагонов
- * wagons, первым — «Ответственный не назначен». У сотрудника подписано, кто он: должность и рейс поезда или «депо
- * станции». v-model — ResponsibleChoice: null — ещё не выбран. Кандидаты грузятся при создании и при смене станции,
- * рейса или вагонов; ошибка загрузки — в самом списке. current — выбранный сотрудник из данных: его имя видно до
- * загрузки. Строка списка и поля — UserOption («Список ФИО»).
+ * Выбор ответственных за вагон галочками: сотрудники депо станции station, бригада рейса trip и бригады рейсов поезда
+ * вагонов wagons, первым — «Ответственный не назначен». У сотрудника подписано, кто он: должность и рейс поезда или
+ * «депо станции». v-model — ResponsibleChoice: null — ещё не выбраны. «Не назначен» снимает отмеченных сотрудников,
+ * отметка сотрудника снимает «Не назначен». Кандидаты грузятся при создании и при смене станции, рейса или вагонов;
+ * ошибка загрузки — в самом списке. current — назначенные сейчас: их имена видны до загрузки. Строка списка —
+ * UserOption («Список ФИО»).
  */
 const props = withDefaults(
   defineProps<{
     station: number | null
     trip?: number | null
     wagons?: string[]
-    current?: UserRef | null
+    current?: UserRef[]
     disabled?: boolean
   }>(),
-  { trip: null, wagons: () => [], current: null, disabled: false },
+  { trip: null, wagons: () => [], current: () => [], disabled: false },
 )
 
 const model = defineModel<ResponsibleChoice>({ default: null })
@@ -63,8 +60,25 @@ watch(
   { immediate: true },
 )
 
+/** Модель списка: «не назначен» — один вариант NOT_ASSIGNED, иначе id сотрудников. */
+const listModel = computed<ChoiceId[]>(() => {
+  const m = model.value
+  if (m === NOT_ASSIGNED) return [NOT_ASSIGNED]
+  return m ?? []
+})
+
+/** Отметка в списке: «не назначен» и сотрудники друг друга исключают; ничего не отмечено — не выбрано. */
+function onPick(ids: ChoiceId[]) {
+  const before = listModel.value
+  if (ids.includes(NOT_ASSIGNED) && !before.includes(NOT_ASSIGNED)) {
+    model.value = NOT_ASSIGNED
+    return
+  }
+  const usrs = ids.filter((id): id is number => typeof id === 'number')
+  model.value = usrs.length > 0 ? usrs : null
+}
+
 const choices = computed<ChoiceItem[]>(() => {
-  const current = props.current
   const items: ChoiceItem[] = candidates.value.map((c) => {
     const role = responsibleWho(c)
     return {
@@ -73,8 +87,10 @@ const choices = computed<ChoiceItem[]>(() => {
       data: { name: c.name, me: isMe(c), duty: responsibleDuty(c), place: responsiblePlace(c) },
     }
   })
-  if (current && !candidates.value.some((u) => u.id === current.id)) {
-    items.unshift({ id: current.id, text: userName(current), data: { name: current.name, me: isMe(current) } })
+  for (const u of [...props.current].reverse()) {
+    if (!candidates.value.some((c) => c.id === u.id)) {
+      items.unshift({ id: u.id, text: userName(u), data: { name: u.name, me: isMe(u) } })
+    }
   }
   return [{ id: NOT_ASSIGNED, text: 'Ответственный не назначен' }, ...items]
 })

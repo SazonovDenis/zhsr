@@ -1,5 +1,6 @@
 import { computed, ref, watch } from 'vue'
 
+import { useDialogEdit } from '@/shared/components/dialog/dialogEdit'
 import type { Loadable } from '@/shared/loadable'
 import type { ChoiceId, ChoiceItem, ChoiceModel } from './choice'
 import { effectiveOf, isDisabled, modelIds, modelOf } from './choice'
@@ -35,6 +36,8 @@ export interface ButtonChoiceEmit {
  * Общая для CbButton и CbSegment — они отличаются только видом.
  */
 export function useButtonChoice(props: ButtonChoiceProps, emit: ButtonChoiceEmit) {
+  // выбор пользователя в диалоге убирает ошибку диалога
+  const dialogEdit = useDialogEdit()
   // контрол создан или сменился источник вариантов — источник, который грузит контрол (справочник), начинает загрузку
   watch(
     () => props.source,
@@ -106,6 +109,7 @@ export function useButtonChoice(props: ButtonChoiceProps, emit: ButtonChoiceEmit
   }
 
   function emitChange() {
+    dialogEdit()
     emit('update:modelValue', modelOf(selected.value, !!props.single))
     emit(
       'change',

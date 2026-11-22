@@ -1,6 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
+    height="lg"
     :title="request ? 'Исправление заявки' : 'Новая заявка'"
     :ok-text="request ? 'Сохранить' : 'Отправить'"
     width="46rem"

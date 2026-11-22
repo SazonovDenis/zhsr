@@ -69,6 +69,23 @@ public class RouteService {
     }
 
     /**
+     * Удалить маршрут (DELETE /routes/{id}): администратор или планировщик вагонов. Остановки удаляются каскадом;
+     * по маршруту есть рейсы - удалить не даст внешний ключ (сообщение - FkMessages).
+     */
+    @Transactional
+    public void delete(long id) throws Exception {
+        checkEditor();
+        if (db.loadRec("route", id) == null) {
+            throw ApiException.notFound("Маршрут не найден");
+        }
+        try {
+            db.deleteRec("route", id);
+        } catch (Exception e) {
+            throw DbErrors.translate(e);
+        }
+    }
+
+    /**
      * Создать маршрут без остановок (Ф-МАР-01): остановки вводятся в редакторе. Вид перевозки - пассажирская.
      *
      * @throws ApiException 400 - не заполнены номер поезда, сообщение, вид или дата начала

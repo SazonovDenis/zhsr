@@ -4,6 +4,7 @@ import kz.kis.kiscore.model.DbRec;
 import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUserService;
+import kz.zhsr.app.constants.TrainWagonKind;
 import kz.zhsr.app.constants.TripStatus;
 import kz.zhsr.app.dto.ref.TripRef;
 import kz.zhsr.app.dto.wagon.ResponsibleCandidate;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -80,27 +82,29 @@ public class ResponsibleService {
     }
 
     /**
-     * Проверить выбранного ответственного: он среди тех, кого можно назначить.
+     * Проверить выбранных ответственных: все среди тех, кого можно назначить.
      *
-     * @param usr ответственный; null - не назначен, проверять нечего
+     * @param usrs ответственные; пусто или null - не назначены, проверять нечего
      * @throws ApiException 400 - сотрудника нельзя назначить
      */
-    public void check(Long usr, Long station, Long trip) throws Exception {
-        check(usr, station, trip, List.of());
+    public void check(List<Long> usrs, Long station, Long trip) throws Exception {
+        check(usrs, station, trip, List.of());
     }
 
     /**
-     * Проверить выбранного ответственного за вагоны передачи: он среди тех, кого можно назначить.
+     * Проверить выбранных ответственных за вагоны передачи: все среди тех, кого можно назначить.
      *
-     * @param usr    ответственный; null - не назначен, проверять нечего
+     * @param usrs   ответственные; пусто или null - не назначены, проверять нечего
      * @param wagons номера вагонов
      * @throws ApiException 400 - сотрудника нельзя назначить
      */
-    public void check(Long usr, Long station, Long trip, List<String> wagons) throws Exception {
-        if (usr == null) {
+    public void check(List<Long> usrs, Long station, Long trip, List<String> wagons) throws Exception {
+        if (usrs == null || usrs.isEmpty()) {
             return;
         }
-        if (candidates(station, trip, wagons).stream().noneMatch(u -> u.getId() == usr)) {
+        Set<Long> allowed = new HashSet<>();
+        candidates(station, trip, wagons).forEach(u -> allowed.add(u.getId()));
+        if (!allowed.containsAll(usrs)) {
             throw ApiException.badRequest("Этого сотрудника нельзя назначить ответственным за вагон");
         }
     }
@@ -113,7 +117,8 @@ public class ResponsibleService {
             return List.of();
         }
         List<Long> res = new ArrayList<>();
-        for (DbRec train : db.loadSql(WagonSql.currentTrainsOf(), Map.of("numbers", numbers))) {
+        for (DbRec train : db.loadSql(WagonSql.currentTrainsOf(), Map.of("numbers", numbers,
+                "fact", TrainWagonKind.FACT))) {
             List<DbRec> trips = db.loadList("trip", Map.of("train", train.getLong("train"), "trip_status_type",
                     List.of(TripStatus.PLANNED, TripStatus.IN_PROGRESS, TripStatus.DONE)));
             trips.stream().filter(t -> t.getLong("trip_status_type") == TripStatus.IN_PROGRESS)

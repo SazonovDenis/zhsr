@@ -86,7 +86,7 @@ export const RoleType = {
   MASTER: 5,
   /** Приёмщик */
   RECEIVER: 6,
-  /** Клининг - учётная запись подрядчика */
+  /** Клининг - может быть учётной записью для подрядчика */
   CLEANING: 7,
   /** Руководитель */
   MANAGER: 8,
@@ -96,12 +96,12 @@ export const RoleType = {
   INSTRUCTOR: 10,
   /** Инструктор-нормировщик (нарядный стол) */
   SCHEDULER: 11,
-  /** Планировщик вагонов - нет в zholserik; вагоны, маршруты, рейсы, состав, ЛНП и ПЭМ (tz.actors.md) */
+  /** Планировщик вагонов - вагоны, маршруты, рейсы, состав, ЛНП и ПЭМ (tz.actors.md) */
   WAGON_PLANNER: 12,
+  /** Планировщик проводников - проводники рейса (tz.actors.md) */
+  CREW_PLANNER: 14,
   /** Эксплуатационщик */
   OPERATOR: 13,
-  /** Планировщик проводников - нет в zholserik; проводники рейса (tz.actors.md) */
-  CREW_PLANNER: 14,
   /** Медик */
   MEDIC: 15,
 } as const
@@ -188,6 +188,13 @@ export const WorkType = {
 
 /** Записи системных справочников фронта по имени справочника DictManager: id, text (на русском) и ссылки. */
 export const SYSTEM_DICT_RECORDS = {
+  // category_type
+  ConductorCategory: [
+    { id: 1, text: 'Стажёр' },
+    { id: 2, text: 'Проводник 2 разряда' },
+    { id: 3, text: 'Проводник 3 разряда' },
+    { id: 4, text: 'Старший проводник' },
+  ],
   // crew_duty_type
   CrewDuty: [
     { id: 1, text: 'Проводник' },
@@ -226,8 +233,8 @@ export const SYSTEM_DICT_RECORDS = {
     { id: 10, text: 'Инструктор поездных бригад', service: 4 },
     { id: 11, text: 'Инструктор-нормировщик (нарядный стол)', service: 4 },
     { id: 12, text: 'Планировщик вагонов', service: null },
-    { id: 13, text: 'Эксплуатационщик', service: 5 },
     { id: 14, text: 'Планировщик проводников', service: null },
+    { id: 13, text: 'Эксплуатационщик', service: 5 },
     { id: 15, text: 'Медик', service: 4 },
   ],
   // service

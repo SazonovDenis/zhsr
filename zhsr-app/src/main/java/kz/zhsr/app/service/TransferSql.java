@@ -17,7 +17,7 @@ final class TransferSql {
                    wagon_info.location_type,
                    coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard, wagon_info.trip) as place,
                    wagon_info.trip, wagon_info.dbeg_location, wagon_info.wagon_status_type,
-                   wagon_info.dbeg_status, wagon_info.responsible_usr, wagon_info.dbeg_responsible,
+                   wagon_info.dbeg_status, wagon_info.wagon_responsible,
                    wagon_info.run_km,
                    (select transfer_act.number
                     from transfer_act_wagon
@@ -144,10 +144,9 @@ final class TransferSql {
     static String actWagons() {
         return """
                 select transfer_act_wagon.transfer_act, wagon.number, transfer_act_wagon.with_property,
-                       wagon_responsible.usr
+                       transfer_act_wagon.wagon_responsible
                 from transfer_act_wagon
                 join wagon on wagon.id = transfer_act_wagon.wagon
-                left join wagon_responsible on wagon_responsible.id = transfer_act_wagon.wagon_responsible
                 where transfer_act_wagon.transfer_act = any(:acts)
                 order by transfer_act_wagon.transfer_act, transfer_act_wagon.seq
                 """;

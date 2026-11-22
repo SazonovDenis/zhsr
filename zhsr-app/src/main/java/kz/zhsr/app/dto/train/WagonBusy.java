@@ -15,9 +15,9 @@ import java.time.OffsetDateTime;
 public class WagonBusy {
     private String number;
     private TrainRef train;
-    /** с какого времени вагон в поезде: факт или план прицепки */
+    /** с какого времени вагон в поезде: по факту или в ожидаемом составе */
     private OffsetDateTime dbeg;
-    /** до какого времени: факт или план отцепки; null - без конца */
+    /** до какого времени; null - без конца */
     private OffsetDateTime dend;
     /** рейс поезда в это время; null - поезд не в рейсе */
     private TripRef trip;

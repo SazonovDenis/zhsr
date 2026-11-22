@@ -1,11 +1,14 @@
 const pad = (n: number) => String(n).padStart(2, '0')
 
-/** Дата и время для показа: «28.10 21:00»; год показывается, только если он не текущий. Пусто — прочерк. */
+/**
+ * Дата и время для показа: «28.10 21:00»; год показывается, только если он не текущий. Пусто — прочерк. Между датой и
+ * временем — неразрывный пробел: дата не отделяется от времени переносом строки.
+ */
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—'
   const d = new Date(iso)
   const year = d.getFullYear() !== new Date().getFullYear() ? `.${d.getFullYear()}` : ''
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}${year} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}${year}\u00a0${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 /**

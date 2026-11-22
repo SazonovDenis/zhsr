@@ -25,7 +25,7 @@ TS = os.path.join(ROOT, 'zhsr-web', 'src', 'shared', 'constants', 'systemDicts.t
 # таблица -> (класс констант, заголовок, справочник фронта DictManager или None)
 SYSTEM_DICTS = {
     'act_status_type': ('ActStatus', 'Статус акта', None),
-    'category_type': ('ConductorCategory', 'Категория проводника', None),
+    'category_type': ('ConductorCategory', 'Категория проводника', 'ConductorCategory'),
     'crew_duty_type': ('CrewDuty', 'Должность члена бригады на рейсе', 'CrewDuty'),
     'location_type': ('LocationType', 'Вид расположения вагона', 'LocationKind'),
     'request_status_type': ('RequestStatus', 'Статус заявки на ремонт', 'RequestStatus'),

@@ -9,20 +9,23 @@
       :periods="PERIODS"
     />
 
+    <!-- у пользователя есть рейс: «Мои» — проведённые им, «Мой рейс» — по его рейсу -->
+    <CbSegment v-if="userTrip" v-model="show" single required :values="SHOW" class="checks__show" />
+
     <!-- что видно: подпись группы, как «Открытые» в заявках, и число строк -->
     <div class="zs-group-head">
       <span>{{ t(scopeTitle) }}</span>
-      <span class="checks__count q-py-none q-px-sm">{{ rows.length }}</span>
+      <span class="checks__count q-py-none q-px-sm">{{ shown.length }}</span>
     </div>
 
-    <LoadSpinner v-if="busy.active.value && rows.length === 0" />
+    <LoadSpinner v-if="busy.active.value && shown.length === 0" />
     <ErrorBox v-else-if="error" :error="error" :retry="load" class="checks__error q-py-sm q-px-md" />
-    <div v-else-if="rows.length === 0 && !busy.active.value" class="checks__empty">
+    <div v-else-if="shown.length === 0 && !busy.active.value" class="checks__empty">
       {{ t('Чек-листов и описей нет') }}
     </div>
 
-    <div v-if="rows.length > 0" class="checks__list">
-      <router-link v-for="r in rows" :key="r.key" :to="r.to" class="checks__row q-px-md">
+    <div v-if="shown.length > 0" class="checks__list">
+      <router-link v-for="r in shown" :key="r.key" :to="r.to" class="checks__row q-px-md">
         <!-- название и справа — вид: чек-лист или опись -->
         <div class="checks__title-row">
           <span class="checks__title">{{ r.title }}</span>
@@ -66,6 +69,8 @@ import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
 import { anyCheckReason, equipReason } from '@/shared/checks/rights'
 import { textOf } from '@/shared/checks/texts'
+import CbSegment from '@/shared/components/choice/CbSegment.vue'
+import type { ChoiceItem } from '@/shared/components/choice/choice'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -81,7 +86,8 @@ import PwaPage from '../components/PwaPage.vue'
 
 /**
  * Вкладка «Описи» на телефоне: кнопка «+» (мастер CheckStartPage: чек-лист Ф-ЧЕК-03 или опись Ф-ЭКП-02) — тем, кто их
- * проводит; над списком — подпись, что именно видно; список не по вагонам — с периодом (по умолчанию месяц). Список
+ * проводит; у пользователя с рейсом — переключатель «Мои» (проведённые им) / «Мой рейс» (по его рейсу); над списком —
+ * подпись, что именно видно; список не по вагонам — с периодом (по умолчанию месяц). Список
  * проведённых чек-листов и описей, новые первыми (Ф-ЧЕК-04, Ф-ЭКП-03; видимость — как на
  * сервере). Нажатие на строку открывает просмотр.
  */
@@ -110,7 +116,19 @@ const SCOPE_TITLE: Record<Scope, string> = {
   trip: 'Вагонов вашего рейса и проведённые вами',
   own: 'Проведённые вами за период',
 }
-const scopeTitle = computed(() => SCOPE_TITLE[scope.value])
+/** Рейс пользователя: есть — переключатель «Мои» / «Мой рейс». */
+const userTrip = computed(() => currentUser.value?.trip ?? null)
+const SHOW: ChoiceItem[] = [
+  { id: 'mine', text: 'Мои' },
+  { id: 'trip', text: 'Мой рейс' },
+]
+// по умолчанию — «Мой рейс»: всё, что видно по рейсу, вместе с проведёнными самим
+const show = ref<string>('trip')
+
+const scopeTitle = computed(() => {
+  if (!userTrip.value) return SCOPE_TITLE[scope.value]
+  return show.value === 'mine' ? 'Проведённые вами' : 'По вашему рейсу'
+})
 
 /** Список не ограничен вагонами: нужен период. */
 const byPeriod = computed(() => scope.value === 'all' || scope.value === 'own')
@@ -138,6 +156,8 @@ interface Row {
   /** проверенный сотрудник — у чек-листа сотрудника; иначе null, объект — subject */
   checkedUsr: UserRef | null
   author: UserRef
+  /** рейс проверки или описи; null — вне рейса */
+  trip: number | null
   violations: number
 }
 
@@ -167,6 +187,7 @@ const rows = computed<Row[]>(() =>
       checkedUsr: r.wagon ? null : r.checkedUsr,
       at: r.completedDt,
       author: r.createdByUsr,
+      trip: r.trip?.id ?? null,
       violations: r.violationCount,
     })),
     ...equips.value.map((r) => ({
@@ -179,10 +200,19 @@ const rows = computed<Row[]>(() =>
       checkedUsr: null,
       at: r.completedDt,
       author: r.createdByUsr,
+      trip: r.trip?.id ?? null,
       violations: r.violationCount,
     })),
   ].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)),
 )
+
+/** Показанные строки: «Мои» — проведённые пользователем, «Мой рейс» — по его рейсу; без рейса — все. */
+const shown = computed<Row[]>(() => {
+  const trip = userTrip.value
+  if (!trip) return rows.value
+  if (show.value === 'mine') return rows.value.filter((r) => r.author.id === currentUser.value?.id)
+  return rows.value.filter((r) => r.trip === trip.id)
+})
 
 // проверки, описи и справочник типов вагонов — параллельно, в счёт ожидания страницы
 async function load() {
@@ -225,6 +255,11 @@ watch([from, to], () => void load())
   box-shadow: 0 0.3rem 0.8rem rgba(0, 0, 0, 0.3);
   color: #fff;
   text-decoration: none;
+}
+
+// переключатель — по ширине кнопок, как выбор периода
+.checks__show {
+  align-self: flex-start;
 }
 
 // выбор периода — по ширине кнопок: колонка страницы растягивала его рамку на всю ширину, справа оставалось пусто

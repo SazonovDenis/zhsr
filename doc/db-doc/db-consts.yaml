@@ -9,18 +9,43 @@ classes:
       - {name: REGULAR, value: '1', description: 'Регулярный маршрут: поезд по расписанию.'}
       - {name: ONE_TIME, value: '2', description: 'Разовый маршрут: поезд без расписания.'}
 
+  kz.zhsr.app.constants.TrainWagonKind:
+    file: zhsr-app/src/main/java/kz/zhsr/app/constants/TrainWagonKind.java
+    constants:
+      - {name: PLAN, value: '1', description: 'План: у журнала - запланированная прицепка или отцепка; у участия - ожидаемый состав поезда.'}
+      - {name: FACT, value: '2', description: 'Факт: у журнала - прицепка или отцепка, которая состоялась; у участия - история состава поезда.'}
+
+  kz.zhsr.app.constants.TrainWagonPlanStatus:
+    file: zhsr-app/src/main/java/kz/zhsr/app/constants/TrainWagonPlanStatus.java
+    constants:
+      - {name: WAITING, value: '1', description: 'Ожидает: факт по плану ещё не отмечен; план входит в ожидаемый состав поезда.'}
+      - {name: DONE, value: '2', description: 'Отработан: отмечен факт по плану, совпали время и место с планом или нет.'}
+      - {name: CANCELLED, value: '3', description: 'Отменён: план не состоялся.'}
+
   kz.zhsr.app.constants.TrainWagonChangeType:
     file: zhsr-app/src/main/java/kz/zhsr/app/constants/TrainWagonChangeType.java
     constants:
       - {name: ATTACH, value: '1', description: 'Прицепка: вагон входит в поезд - на станции или в пути.'}
       - {name: DETACH, value: '2', description: 'Отцепка: вагон выходит из поезда - на станции или в пути.'}
 
-  kz.zhsr.app.constants.TrainWagonChangeStatus:
-    file: zhsr-app/src/main/java/kz/zhsr/app/constants/TrainWagonChangeStatus.java
+  kz.zhsr.app.constants.WagonResponsibleKind:
+    file: zhsr-app/src/main/java/kz/zhsr/app/constants/WagonResponsibleKind.java
     constants:
-      - {name: PLANNED, value: '1', description: 'План: изменение запланировано, журналы вагона не менялись.'}
-      - {name: DONE, value: '2', description: 'Выполнено: факт отмечен.'}
-      - {name: CANCELLED, value: '3', description: 'Отменено: план изменения отменён, изменение не состоялось, журналы вагона не менялись.'}
+      - {name: PLAN, value: '1', description: 'План: запланированный период и состав ответственных; журнал фактов не меняет.'}
+      - {name: FACT, value: '2', description: 'Факт: период и состав ответственных, которые были на деле.'}
+
+  kz.zhsr.app.constants.WagonResponsiblePlanStatus:
+    file: zhsr-app/src/main/java/kz/zhsr/app/constants/WagonResponsiblePlanStatus.java
+    constants:
+      - {name: WAITING, value: '1', description: 'Ожидает: факт по плану ещё не отмечен.'}
+      - {name: DONE, value: '2', description: 'Отработан: отмечен факт по плану, совпали даты с планом или нет.'}
+      - {name: CANCELLED, value: '3', description: 'Отменён: план не состоялся.'}
+
+  kz.zhsr.app.constants.WagonResponsibleTripPoint:
+    file: zhsr-app/src/main/java/kz/zhsr/app/constants/WagonResponsibleTripPoint.java
+    constants:
+      - {name: DEPARTURE, value: '1', description: 'Отправление: план ответственных на рейс, его отрабатывает отметка отправления.'}
+      - {name: ARRIVAL, value: '2', description: 'Прибытие: план ответственных после рейса, его отрабатывает отметка прибытия.'}
 
   kz.zhsr.app.constants.CheckObject:
     file: zhsr-app/src/main/java/kz/zhsr/app/constants/CheckObject.java

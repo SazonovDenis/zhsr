@@ -1,212 +1,148 @@
 <template>
   <FormDialog
     v-model:show="show"
+    height="xl"
     title="Прицепить вагоны"
     ok-text="Прицепить"
     width="70rem"
-    hint="Фактом прицепляется вагон, который стоит на станции прицепки (на станции, в её депо или парке отстоя); другие вагоны — только планом."
+    hint="Фактом прицепляется вагон, который стоит на станции прицепки (на станции, в её депо или парке отстоя; в пути — на самой станции остановки); другие вагоны — только планом. Вагоны встают подряд с выбранной позиции, вагоны с неё сдвигаются назад. Прицепка в рейсе вводит вагон в рейс."
+    :running="running"
     :error="error"
     @ok="save"
   >
-    <FormSection columns="max-content max-content max-content">
-      <FormField label="Прицепка">
-        <CbSegment v-model="mode" single required :values="modes" />
-      </FormField>
-      <!-- план в рейсе — на остановке маршрута; план вне рейса — станция и время -->
-      <FormField v-if="mode === 'plan' && stops.length > 0" label="Остановка">
-        <CbList v-model="stopIndex" single no-search :values="stopChoices" style="width: 18rem" />
-      </FormField>
-      <template v-else-if="mode === 'plan'">
-        <FormField label="Станция">
-          <CbList
-            v-model="planStation"
-            single
-            placeholder="Станция"
-            :values="dictChoices('Station')"
-            :source="dictSource('Station')"
-            style="width: 14rem"
-          />
-        </FormField>
-        <FormField label="Плановое время">
-          <DatePicker v-model="planTime" with-time date-text="Плановое время" />
-        </FormField>
-      </template>
-      <template v-else>
-        <!-- у поезда без вагонов или с вагонами на разных станциях станцию прицепки выбирает пользователь -->
-        <FormField v-if="!factStop && station === null" label="Станция">
-          <CbList
-            v-model="planStation"
-            single
-            placeholder="Станция"
-            :values="dictChoices('Station')"
-            :source="dictSource('Station')"
-            style="width: 14rem"
-          />
-        </FormField>
-        <FormField label="Время прицепки">
-          <DatePicker v-model="factTime" with-time date-text="Время прицепки" />
-        </FormField>
-      </template>
-    </FormSection>
-
-    <FilterBar>
-      <TextInput v-model="filter.number" placeholder="Номер вагона" width="8.8rem" />
-      <!-- поиск по номеру отменяет фильтры: находит вагон на любой станции -->
-      <span v-if="searching" class="attach-wagons__note">{{ t('При поиске по номеру фильтры не применяются.') }}</span>
-      <template v-else>
-        <CbList
-          v-model="filter.station"
-          single
-          placeholder="Станция"
-          :values="dictChoices('Station')"
-          :source="dictSource('Station')"
-          style="width: 14rem"
-        />
-        <CbButton
-          v-model="filter.locationKinds"
-          label="Расположение"
-          :values="dictChoices('LocationKind')"
-          :max-button-count="4"
-        />
-        <CbButton
-          v-model="filter.states"
-          label="Состояние"
-          :values="dictChoices('WagonState')"
-          :hidden="[WagonStatus.OUT_OF_SERVICE]"
-          :max-button-count="5"
-        />
-      </template>
-      <template #right>{{ t('Отмечено: {n}', { n: picked.size }) }}</template>
-    </FilterBar>
-
-    <DataTable
-      :columns="columns"
-      :rows="rows"
-      :error="loadError"
-      :retry="load"
-      row-key="id"
-      :sort="sort"
-      :loading="busy.active.value"
-      empty="Нет вагонов по выбранному фильтру"
-      class="attach-wagons__table"
-      @sort="sort = $event"
-      @row-click="toggle($event as WagonRow)"
+    <ChangeWhereFields
+      ref="fields"
+      :card="card"
+      :groups="groups"
+      :station="station"
+      :fact-allowed="factAllowed"
+      attach
+      :at="at"
+      :trip="trip"
     />
+
+    <!-- фильтр и список вагонов — с небольшим отступом, меньше промежутка тела диалога -->
+    <div class="attach-wagons__list">
+      <FilterBar class="attach-wagons__filter">
+        <TextInput v-model="filter.number" placeholder="Номер вагона" width="8.8rem" />
+        <!-- поиск по номеру отменяет фильтры: находит вагон на любой станции -->
+        <span v-if="searching" class="attach-wagons__note">{{
+          t('При поиске по номеру фильтры не применяются.')
+        }}</span>
+        <template v-else>
+          <CbButton
+            v-model="filter.locationKinds"
+            label="Расположение"
+            :values="dictChoices('LocationKind')"
+            :max-button-count="4"
+          />
+        </template>
+        <template #right>{{ t('Отмечено: {n}', { n: picked.size }) }}</template>
+      </FilterBar>
+
+      <DataTable
+        :columns="columns"
+        :rows="rows"
+        :error="loadError"
+        :retry="load"
+        row-key="id"
+        :sort="sort"
+        :loading="busy.active.value"
+        empty="Нет вагонов по выбранному фильтру"
+        class="attach-wagons__table"
+        @sort="sort = $event"
+        @row-click="toggle($event as WagonRow)"
+      />
+    </div>
   </FormDialog>
 </template>
 
 <script setup lang="ts">
-import { date } from 'quasar'
-import { computed, provide, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, provide, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
 
-import type { WagonBusy } from '@/api/trains'
+import type { TrainCard, WagonBusy } from '@/api/trains'
 import { fetchWagonBusy } from '@/api/trains'
 import type { WagonFilter, WagonRow } from '@/api/wagons'
 import { fetchWagons, wagonQuery } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
-import type { ChoiceItem } from '@/shared/components/choice/choice'
 import CbButton from '@/shared/components/choice/CbButton.vue'
-import CbList from '@/shared/components/choice/CbList.vue'
-import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import FormDialog from '@/shared/components/dialog/FormDialog.vue'
 import FilterBar from '@/shared/components/FilterBar.vue'
-import FormField from '@/shared/components/form/FormField.vue'
-import FormSection from '@/shared/components/form/FormSection.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
-import DatePicker from '@/shared/components/period/DatePicker.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { TableSort } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
 import { LocationType, WagonStatus } from '@/shared/constants/systemDicts'
-import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
+import { dictChoices } from '@/shared/dict/dictChoices'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { formError, shownError } from '@/shared/errors'
-import { formatDateTime, isoDateTime } from '@/shared/format'
+import { formatDateTime } from '@/shared/format'
 import { placeStation, wagonTransferPlace } from '@/shared/transferPlace'
 import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import CellWagonLocation from '../wagons/cells/CellWagonLocation.vue'
 import CellWagonLocationAt from '../wagons/cells/CellWagonLocationAt.vue'
 import CellWagonState from '../wagons/cells/CellWagonState.vue'
-import CellWagonStateAt from '../wagons/cells/CellWagonStateAt.vue'
 import CellWagonType from '../wagons/cells/CellWagonType.vue'
-import CellTripWagonPick from '../trips/cells/CellTripWagonPick.vue'
-import type { WagonFit } from '../trips/wagonPick'
-import { WAGON_PICK } from '../trips/wagonPick'
-import type { AttachChoice, AttachStop } from './attach'
+import type { AttachFit } from './attachPick'
+import { ATTACH_PICK } from './attachPick'
+import CellAttachPick from './cells/CellAttachPick.vue'
+import CellAttachStateAt from './cells/CellAttachStateAt.vue'
+import type { AttachChoice, StopGroup } from './attach'
+import ChangeWhereFields from './ChangeWhereFields.vue'
 
 /**
- * Диалог «Прицепить вагоны» (Ф-ПОЕ-02, Ф-РЕЙ-02): прицепка фактом или планом и список вагонов как основной
- * (GET /wagons), по умолчанию — вагоны станции прицепки. Кроме текущих расположения и состояния — они же на момент at.
- * Вагон, занятый в поезде на это время, не выбирается: под номером — в каком поезде и рейсе он занят и с какого по какое
- * время. Фактом выбирается только вагон на станции прицепки (на станции, в её депо или парке отстоя); другие вагоны —
- * только планом. Поиск по номеру находит вагон на любой станции. Открывается через openDialog, результат —
- * AttachChoice.
+ * Диалог «Прицепить вагоны» (Ф-ПОЕ-02, Ф-РЕЙ-02) — один и тот же из состава поезда и из формирования рейса: как, где и
+ * на какую позицию — по тому, где поезд и вагоны (ChangeWhereFields), и список вагонов как основной (GET /wagons):
+ * вагоны станции прицепки (станция выбирается одна — в полях окна), все состояния, кроме «Отставлен». Кроме текущих расположения и состояния — они же на момент прицепки. Вагон,
+ * занятый в другом поезде на это время по факту или по плану, не выбирается: вместо отметки — замок, в колонке
+ * «Состояние на момент» — в каком поезде и рейсе он занят и с какого по какое время. Фактом выбирается только вагон на станции прицепки; другие вагоны — только планом.
+ * Поиск по номеру находит вагон на любой станции. Открывается через openDialog, результат — поезд после прицепки.
  *
- * @prop trainId   поезд
- * @prop station   станция прицепки фактом и станция фильтра — id справочника Station; null — не задана
- * @prop at        момент для расположения, состояния и занятости вагонов, ISO
- * @prop stops     остановки рейса для плана: станция отправления и остановки в пути; пусто — прицепка вне рейса
- * @prop factStop  остановка рейса для факта (станция отправления); null — вне рейса
+ * @prop card        поезд: состав для выбора позиции
+ * @prop groups      рейсы поезда с остановками (loadStopGroups)
+ * @prop station     станция вагонов поезда — id справочника Station; null — не задана
+ * @prop at          плановое время по умолчанию и момент для расположения вагонов, ISO
  * @prop factAllowed прицепка фактом возможна
+ * @prop trip        рейс, остановки которого предлагаются для плана первыми; null — вне рейса
+ * @prop submit      прицепить по выбору окна: поезд после прицепки; ошибку окно показывает у себя и не закрывается
  */
 const props = withDefaults(
   defineProps<{
-    trainId: number
+    card: TrainCard
+    groups: StopGroup[]
     station: number | null
     at: string
-    stops?: AttachStop[]
-    factStop?: AttachStop | null
     factAllowed?: boolean
+    trip?: number | null
+    submit: (choice: AttachChoice) => Promise<TrainCard>
   }>(),
-  { stops: () => [], factStop: null, factAllowed: true },
+  { factAllowed: true, trip: null },
 )
 
 const show = defineModel<boolean>('show', { default: false })
 // ожидание диалога: спиннер на таблице — на всю цепочку загрузок
 const busy = provideBusy()
-const emit = defineEmits<{ done: [choice: AttachChoice] }>()
+const emit = defineEmits<{ done: [card: TrainCard] }>()
 
-const modes = computed<ChoiceItem[]>(() => [
-  { id: 'fact', text: 'Фактом', disabled: !props.factAllowed },
-  { id: 'plan', text: 'Планом' },
-])
-const mode = ref<string>(props.factAllowed ? 'fact' : 'plan')
-const factTime = ref(date.formatDate(new Date(), 'YYYY-MM-DDTHH:mm'))
-const planTime = ref<string | null>(date.formatDate(props.at, 'YYYY-MM-DDTHH:mm'))
-const planStation = ref<number | null>(props.station)
-const stopIndex = ref<number | null>(props.stops.length > 0 ? 0 : null)
-
-const stopChoices = computed<ChoiceItem[]>(() =>
-  props.stops.map((s, i) => ({
-    id: i,
-    text: `${dictManager.getValue('Station', s.station)} • ${formatDateTime(s.time)}`,
-  })),
-)
-
-/** Станция прицепки сейчас: факт — станция поезда, план — станция остановки или выбранная. */
-const targetStation = computed<number | null>(() => {
-  if (mode.value === 'fact') return props.factStop?.station ?? props.station ?? planStation.value
-  if (props.stops.length > 0) return stopIndex.value === null ? null : (props.stops[stopIndex.value]?.station ?? null)
-  return planStation.value
-})
-
+const fields = useTemplateRef<InstanceType<typeof ChangeWhereFields>>('fields')
+const mode = computed(() => fields.value?.state.mode ?? 'fact')
+/** Станция прицепки: факт — станция поезда или остановки в пути, план — станция остановки или выбранная. */
+const targetStation = computed<number | null>(() => fields.value?.targetStation ?? props.station)
 /** Момент прицепки: от него считается занятость вагонов. */
-const moment = computed<string>(() => {
-  if (mode.value === 'fact') return isoDateTime(new Date(factTime.value))
-  if (props.stops.length > 0 && stopIndex.value !== null) return props.stops[stopIndex.value]?.time ?? props.at
-  return planTime.value ? isoDateTime(new Date(planTime.value)) : props.at
-})
+const moment = computed<string>(() => fields.value?.moment ?? props.at)
 
+// станция — станция прицепки из полей окна (выбор станции один); состояние — все, кроме «Отставлен»
 const filter = reactive<WagonFilter>({
   number: '',
   station: props.station,
   trip: null,
   locationKinds: [],
-  states: [],
+  states: [WagonStatus.IN_IDLE, WagonStatus.IN_TRIP, WagonStatus.IN_REPAIR, WagonStatus.RESERVE],
   at: props.at,
 })
+watch(targetStation, (station) => (filter.station = station))
 const searching = computed(() => filter.number.trim() !== '')
 const sort = ref<TableSort | null>(null)
 
@@ -214,16 +150,17 @@ const rows = shallowRef<WagonRow[]>([])
 const busyOf = shallowRef(new Map<string, WagonBusy>())
 const loadError = ref<ShownError | null>(null)
 const error = ref<ShownError | null>(null)
+const running = ref(false)
 // отмеченные вагоны — по номеру: отметка сохраняется при смене фильтра
 const picked = ref(new Set<string>())
 
 const columns = defineColumns<WagonRow>([
-  { field: 'number', title: 'Номер', width: '13rem', cell: CellTripWagonPick, sortable: true },
+  { field: 'number', title: 'Номер', width: '13rem', cell: CellAttachPick, sortable: true },
   { field: 'wagonType', title: 'Тип', width: 'minmax(min-content, 0.67fr)', cell: CellWagonType },
   { field: 'locationType', title: 'Расположение', cell: CellWagonLocation, sortable: true, sortField: 'dbegLocation' },
   { field: 'wagonStatusType', title: 'Состояние', cell: CellWagonState, sortable: true, sortField: 'dbegStatus' },
   { field: 'locationAt', title: 'Расположение на момент', cell: CellWagonLocationAt },
-  { field: 'wagonStatusTypeAt', title: 'Состояние на момент', cell: CellWagonStateAt },
+  { field: 'wagonStatusTypeAt', title: 'Состояние на момент', cell: CellAttachStateAt },
 ])
 
 /** Занятость словами: «поезд Тулпар-1, рейс 002 … от 12.11, с 12.11 08:00 по 14.11 21:00». */
@@ -234,23 +171,26 @@ function busyText(b: WagonBusy): string {
 }
 
 /**
- * Подходит ли вагон: занят в поезде — нельзя; факт — только вагон на станции прицепки, не в рейсе; план — вагон не на
+ * Подходит ли вагон: занят в поезде — нельзя (замок вместо отметки, занятость — в колонке «Состояние на момент»); факт — только вагон на станции прицепки, не в рейсе; план — вагон не на
  * станции к моменту прицепки — с предупреждением.
  */
-function fit(w: WagonRow): WagonFit {
+function fit(w: WagonRow): AttachFit {
   const b = busyOf.value.get(w.number)
-  if (b) return { block: b.train.id === props.trainId ? t('Уже в поезде') : busyText(b), warn: '' }
+  if (b) {
+    const busy = b.train.id === props.card.id ? t('Уже в поезде') : busyText(b)
+    return { block: busy, warn: '', busy }
+  }
   const station = targetStation.value
   if (mode.value === 'fact') {
     const place = wagonTransferPlace(w.locationType, w.place)
     const at = place ? placeStation(place) : null
     if (w.locationType === LocationType.TRIP || at === null || at !== station)
-      return { block: t('Не на станции прицепки: только планом'), warn: '' }
-    return { block: '', warn: '' }
+      return { block: t('Не на станции прицепки: только планом'), warn: '', busy: '' }
+    return { block: '', warn: '', busy: '' }
   }
   const at = w.locationAt ? wagonTransferPlace(w.locationAt.locationType, w.locationAt.place) : null
   const atStation = at ? placeStation(at) : null
-  return { block: '', warn: atStation === station ? '' : t('Не на станции прицепки к этому времени') }
+  return { block: '', warn: atStation === station ? '' : t('Не на станции прицепки к этому времени'), busy: '' }
 }
 
 function toggle(w: WagonRow) {
@@ -259,9 +199,11 @@ function toggle(w: WagonRow) {
   if (next.has(w.number)) next.delete(w.number)
   else next.add(w.number)
   picked.value = next
+  // отметка вагона — ввод: убирает ошибку диалога
+  error.value = null
 }
 
-provide(WAGON_PICK, { isPicked: (w) => picked.value.has(w.number), toggle, fit })
+provide(ATTACH_PICK, { isPicked: (w) => picked.value.has(w.number), toggle, fit })
 
 async function load() {
   loadError.value = null
@@ -305,38 +247,49 @@ async function init() {
 }
 void init()
 
-function save() {
+async function save() {
   if (picked.value.size === 0) {
     error.value = formError(t('Отметьте вагоны'))
     return
   }
-  const fact = mode.value === 'fact'
-  const stop = fact ? props.factStop : props.stops.length > 0 ? props.stops[stopIndex.value ?? 0] : null
-  if (!fact && !stop && (!planStation.value || !planTime.value)) {
-    error.value = formError(t('Укажите станцию и плановое время'))
+  const choice = fields.value!.build()
+  if (typeof choice === 'string') {
+    error.value = formError(choice)
     return
   }
-  if (fact && !stop && (props.station ?? planStation.value) === null) {
-    error.value = formError(t('Укажите станцию прицепки'))
-    return
+  error.value = null
+  running.value = true
+  try {
+    emit('done', await props.submit({ ...choice, numbers: [...picked.value] }))
+  } catch (e) {
+    error.value = shownError(e)
+  } finally {
+    running.value = false
   }
-  emit('done', {
-    numbers: [...picked.value],
-    fact,
-    time: fact ? isoDateTime(new Date(factTime.value)) : stop ? null : isoDateTime(new Date(planTime.value!)),
-    station: stop ? null : fact ? (props.station ?? planStation.value) : planStation.value,
-    routeStation: stop?.routeStation ?? null,
-  })
 }
 </script>
 
 <style scoped lang="scss">
+// фильтр и список вагонов — одним блоком на свободную высоту окна, между ними — небольшой отступ
+.attach-wagons__list {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.attach-wagons__filter {
+  margin-bottom: 0.4rem;
+}
+
 .attach-wagons__note {
   color: $zs-text-muted;
   font-size: 0.8rem;
 }
 
+// таблица занимает свободную высоту окна
 .attach-wagons__table {
-  height: 26rem;
+  flex: 1 1 0;
+  min-height: 0;
 }
 </style>

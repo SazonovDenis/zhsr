@@ -2,7 +2,7 @@ import { Notify } from 'quasar'
 import { useRouter } from 'vue-router'
 
 import type { TripCrew, TripRow } from '@/api/trips'
-import { assignTripResponsible, cancelArrival, cancelDeparture, fetchTripCrew } from '@/api/trips'
+import { cancelArrival, cancelDeparture } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import type { RowAction } from '@/shared/components/table/rowMenu'
@@ -11,14 +11,15 @@ import { dictManager } from '@/shared/dict/DictManager'
 import { notifyError } from '@/shared/errors'
 import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
 import { markEditable, useNow } from '@/shared/trips/tripTimes'
-import { pickResponsible } from '../wagons/responsibleAssign'
 import TripCancelDialog from './TripCancelDialog.vue'
 import TripMarkDialog from './TripMarkDialog.vue'
 import TripNewDialog from './TripNewDialog.vue'
+import TripResponsiblesDialog from './TripResponsiblesDialog.vue'
 
 /** Тексты действий с рейсом по порядку кнопок. */
 export const TRIP_ACTION_LABELS = [
   'Формирование',
+  'Ответственные за вагоны',
   'Редактировать',
   'Отметить отправление',
   'Отметить прибытие',
@@ -26,12 +27,14 @@ export const TRIP_ACTION_LABELS = [
   'Исправить прибытие',
   'Отменить отправление',
   'Отменить прибытие',
-  'Ответственный за вагоны',
   'Отцепка',
   'Прицепка',
   'Отметить прицепку',
   'Отменить рейс',
 ]
+
+/** Действия-переходы в другое окно, а не диалог: в панели — мягкими ссылками (SoftLink). */
+export const NAV_ACTIONS = ['Формирование', 'Отцепка', 'Прицепка', 'Отметить прицепку']
 
 const FIX_REASON = 'Исправить можно в течение 10 минут после отметки'
 const CANCEL_REASON = 'Отменить можно в течение 10 минут после отметки'
@@ -81,6 +84,12 @@ export function useTripActions(changed: () => void) {
     const status = (...allowed: number[]) => statusReason(trip, ...allowed)
     return [
       { label: 'Формирование', reason: '', run: () => openForm(trip) },
+      // ответственные за вагоны поезда (Ф-РЕЙ-08) — диалог: план и факт; смотреть могут все, менять — по правам
+      {
+        label: 'Ответственные за вагоны',
+        reason: status(TripStatus.PLANNED, TripStatus.IN_PROGRESS, TripStatus.DONE),
+        run: () => void responsibles(trip),
+      },
       {
         label: 'Редактировать',
         reason: why(isPlanner, PLANNER_REASON, status(TripStatus.PLANNED)),
@@ -115,12 +124,6 @@ export function useTripActions(changed: () => void) {
         label: 'Отменить прибытие',
         reason: why(canMark, MARK_REASON, status(TripStatus.DONE) || (fixArrival ? '' : t(CANCEL_REASON))),
         run: () => void cancelMark(trip, false),
-      },
-      // после прибытия ЛНП назначает ответственного за вагоны поезда (Ф-РЕЙ-04)
-      {
-        label: 'Ответственный за вагоны',
-        reason: why(canMark, MARK_REASON, status(TripStatus.DONE)),
-        run: () => void assignResponsible(trip),
       },
       {
         label: 'Отцепка',
@@ -158,6 +161,11 @@ export function useTripActions(changed: () => void) {
     const saved = await openDialog<TripRow>(TripNewDialog, {
       trip: { id: trip.id, route: trip.route, plannedDt: trip.plannedDt, train: trip.train?.id ?? null },
     })
+    if (saved) changed()
+  }
+
+  async function responsibles(trip: TripRow) {
+    const saved = await openDialog<boolean>(TripResponsiblesDialog, { tripId: trip.id })
     if (saved) changed()
   }
 
@@ -199,29 +207,6 @@ export function useTripActions(changed: () => void) {
       position: 'bottom',
     })
     void loadCurrentUser(true)
-    changed()
-  }
-
-  // ответственный за вагоны прибывшего рейса — во всплывающем окне, как исполнитель заявки; текущий — из формирования
-  async function assignResponsible(trip: TripRow) {
-    try {
-      const crew = await fetchTripCrew(trip.id)
-      // окно и сохраняет: ошибка назначения — в окне
-      const result = await pickResponsible({
-        station: null,
-        trip: trip.id,
-        current: crew.trip.responsibleUsr,
-        reassign: crew.trip.responsibleAssigned,
-        save: async (usr) => {
-          await assignTripResponsible(trip.id, usr)
-        },
-      })
-      if (!result) return
-    } catch (e) {
-      notifyError(e)
-      return
-    }
-    Notify.create({ message: t('Ответственный назначен'), type: 'positive', position: 'bottom' })
     changed()
   }
 

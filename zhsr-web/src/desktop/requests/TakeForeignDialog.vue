@@ -1,5 +1,5 @@
 <template>
-  <DialogFrame v-model:show="show" :title="t('Заявка назначена другому')" width="30rem" :actions="actions">
+  <DialogFrame v-model:show="show" height="sm" :title="t('Заявка назначена другому')" width="30rem" :actions="actions">
     <div>{{ t('Исполнитель заявки — {name}. Взять её в работу вместо него?', { name }) }}</div>
   </DialogFrame>
 </template>

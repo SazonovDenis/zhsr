@@ -6,6 +6,7 @@ import kz.kis.kiscore.model.DbRec;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.constants.TripStatus;
 import kz.zhsr.app.service.ApiException;
+import kz.zhsr.app.service.TripLayerSql;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -180,12 +181,15 @@ public class CurrentUserService {
     }
 
     /**
-     * Рейс из строки запроса. Вагоны проводника - из действующих строк бригады: строка - дежурство при вагоне.
+     * Рейс из строки запроса. Вагоны сотрудника - за которые он отвечает на рейс в журнале ответственных.
      */
     private CurrentUser.Trip trip(long usrId, DbRec trip) throws Exception {
         List<Long> wagons = new ArrayList<>();
         List<String> numbers = new ArrayList<>();
-        for (DbRec r : db.loadSql(CurrentUserSql.tripWagons(), Map.of("usr", usrId, "trip", trip.getLong("id")))) {
+        Map<String, Object> params = TripLayerSql.params();
+        params.put("usr", usrId);
+        params.put("trip", trip.getLong("id"));
+        for (DbRec r : db.loadSql(CurrentUserSql.tripWagons(), params)) {
             if (!wagons.contains(r.getLong("wagon"))) {
                 wagons.add(r.getLong("wagon"));
                 numbers.add(r.getString("number"));

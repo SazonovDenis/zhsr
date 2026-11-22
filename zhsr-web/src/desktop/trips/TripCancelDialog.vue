@@ -1,6 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
+    height="sm"
     title="Отмена рейса"
     ok-text="Отменить рейс"
     :running="running"

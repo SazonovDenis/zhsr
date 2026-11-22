@@ -44,6 +44,10 @@ final class ListSql {
                 access.allTripWagons() ? "wagon.id in " + TRIP_WAGONS : null,
                 access.wagons().isEmpty() ? null : "wagon.id = any(:visWagons)",
                 access);
+        if (filter.numbers() != null && !filter.numbers().isEmpty()) {
+            // список Db передаёт массивом чисел (BIGINT): номера приводятся к строкам
+            where.add("wagon.number = any(cast(:numbers as varchar[]))", "numbers", filter.numbers());
+        }
         if (filter.number() != null && !filter.number().isBlank()) {
             where.add("strpos(wagon.number, :number) > 0", "number", filter.number().trim());
         }
@@ -65,7 +69,7 @@ final class ListSql {
                        wagon_info.location_type,
                        coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard, wagon_info.trip) as place,
                        wagon_info.trip, wagon_info.dbeg_location, wagon_info.wagon_status_type,
-                       wagon_info.dbeg_status, wagon_info.responsible_usr, wagon_info.dbeg_responsible,
+                       wagon_info.dbeg_status, wagon_info.wagon_responsible,
                        wagon_info.run_km, wagon.maker, wagon.build_year, wagon.dbeg, wagon.dend
                 from wagon
                 join wagon_info on wagon_info.wagon = wagon.id
@@ -73,38 +77,36 @@ final class ListSql {
     }
 
     /**
-     * Вагоны поезда рейса: вагоны, которые не отцеплены до отправления рейса. Параметр visTrip.
+     * Вагоны поезда рейса: до отправления - в ожидаемом составе, после - по факту; не отцеплены до отправления рейса.
+     * Параметр visTrip.
      */
-    private static final String TRIP_WAGONS = """
-            (select train_wagon.wagon from train_wagon
-             join trip on trip.train = train_wagon.train
-             where trip.id = :visTrip
-               and (train_wagon.dend is null or train_wagon.dend >= coalesce(trip.departed_dt, trip.planned_dt)))""";
+    private static final String TRIP_WAGONS = TripWagonSql.wagonsOf("visTrip");
 
     /**
      * Вагоны поездов рейсов в статусе «план» и «выполняется» - второй проход списка вагонов: от рейсов (их немного,
-     * индекс ix_trip_active), а не от вагонов. Вагон поезда рейса - не отцеплен до отправления рейса. Параметры
-     * planned, inProgress - состояния рейса.
+     * индекс ix_trip_active), а не от вагонов. Вагон поезда рейса - {@link TripWagonSql#WHERE}. Параметры planned,
+     * inProgress - состояния рейса.
      */
     static String activeTripWagons() {
         return """
-                select train_wagon.wagon, trip.id, trip.trip_status_type
+                select distinct train_wagon.wagon, trip.id, trip.trip_status_type, trip.planned_dt
                 from trip
                 join train_wagon on train_wagon.train = trip.train
                 where trip.trip_status_type in (:planned, :inProgress)
-                  and (train_wagon.dend is null or train_wagon.dend >= coalesce(trip.departed_dt, trip.planned_dt))
+                  and %s
                 order by trip.planned_dt
-                """;
+                """.formatted(TripWagonSql.WHERE);
     }
 
     /**
-     * Поезд каждого вагона сейчас: участие по факту без отцепки - второй проход списка вагонов.
+     * Поезд каждого вагона сейчас: открытая запись участия по факту - второй проход списка вагонов. Параметр fact -
+     * слой «факт» участия.
      */
     static String currentTrains() {
         return """
                 select train_wagon.wagon, train_wagon.train
                 from train_wagon
-                where train_wagon.dbeg is not null and train_wagon.dend is null
+                where train_wagon.kind = :fact and train_wagon.dend is null
                 """;
     }
 

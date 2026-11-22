@@ -9,7 +9,7 @@
 
     <nav class="desktop-menu__list q-py-none q-px-sm">
       <DesktopMenuItem
-        v-for="item in menu.items"
+        v-for="item in visibleItems"
         :key="item.id"
         :item="item"
         :active="isActive(item)"
@@ -103,7 +103,7 @@ import { t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { isMenuAutoCollapsed } from '@/shared/screen'
-import { loadCurrentUser } from '@/shared/user'
+import { hasRole, loadCurrentUser } from '@/shared/user'
 import { MENU_COLLAPSED_WIDTH, MENU_WIDTH, menuState } from './menuState'
 import DesktopMenuItem from './DesktopMenuItem.vue'
 import DesktopUserMenu from './DesktopUserMenu.vue'
@@ -127,6 +127,10 @@ const route = useRoute()
 const collapsed = computed(() => menuState.userCollapsed ?? (isMenuAutoCollapsed() || menuState.panelNeedsSpace))
 const adminOpen = computed(() => menuState.openGroup === menu.admin.id)
 const user = shallowRef<CurrentUser | null>(null)
+// пункты с ролями видны только этим ролям
+const visibleItems = computed(() =>
+  menu.items.filter((item) => !item.roles || item.roles.some((r) => hasRole(user.value, r))),
+)
 
 // счётчики пунктов меню из текущего состояния (fetchCurrentState); загружаются при показе меню, после
 // восстановления связи и по событию шины state-refresh — его отправляет тот, кто изменил данные, влияющие на счётчики

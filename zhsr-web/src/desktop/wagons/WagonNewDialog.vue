@@ -1,6 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
+    height="xl"
     title="Ввод вагона"
     ok-text="Ввести вагон"
     :running="running"

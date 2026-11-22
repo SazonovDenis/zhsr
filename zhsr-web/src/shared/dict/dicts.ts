@@ -36,6 +36,8 @@ export const dictDefs = {
   RouteKind: { translate: 'i18n', system: true },
   TransportType: { translate: 'i18n', system: true },
   CrewDuty: { translate: 'i18n', system: true },
+  // категория проводника
+  ConductorCategory: { translate: 'i18n', system: true },
   WorkType: { translate: 'i18n', system: true },
   // роли сотрудников; service — служба роли (id справочника Service), может не быть
   Role: { translate: 'i18n', system: true },

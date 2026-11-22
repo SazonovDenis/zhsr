@@ -1,17 +1,22 @@
 <template>
   <FormDialog
     v-model:show="show"
-    title="Добавить вагоны"
-    ok-text="Добавить"
+    height="xl"
+    :title="title"
+    :ok-text="okText"
     width="70rem"
-    hint="Вагоны в депо и парке отстоя перед отправлением нужно передать на станцию."
+    :hint="wagons ? '' : 'Вагоны в депо и парке отстоя перед отправлением нужно передать на станцию.'"
     :error="error"
     @ok="save"
   >
     <FilterBar>
       <TextInput v-model="filter.number" placeholder="Номер вагона" width="8.8rem" />
       <!-- поиск по номеру отменяет фильтры: находит вагон на любой станции -->
-      <span v-if="searching" class="trip-wagons__note">{{ t('При поиске по номеру фильтры не применяются.') }}</span>
+      <!-- внешний список: только поиск по номеру среди его вагонов -->
+      <template v-if="wagons" />
+      <span v-else-if="searching" class="trip-wagons__note">{{
+        t('При поиске по номеру фильтры не применяются.')
+      }}</span>
       <template v-else>
         <CbList
           v-model="filter.station"
@@ -92,11 +97,36 @@ import { WAGON_PICK } from './wagonPick'
  * к отправлению не на станции отправления, — с предупреждением, выбрать можно. Поиск по номеру находит вагон на
  * любой станции. Открывается через openDialog, результат — номера отмеченных вагонов.
  *
+ * Внешний список (wagons): окно работает только с этими вагонами — без запроса, фильтров и колонок «на момент
+ * отправки», поиск по номеру — среди них; выбрать можно любой, отметку можно снять со всех; picked — отмеченные при
+ * открытии. Так выбирают вагоны ответственного (Ф-РЕЙ-08).
+ *
  * @prop tripId           рейс
  * @prop departureStation станция отправления — id справочника Station
  * @prop plannedDt        плановое отправление, ISO: момент для расположения и состояния
+ * @prop wagons           внешний список вагонов; null — вагоны с сервера по фильтру
+ * @prop picked           номера вагонов, отмеченных при открытии
  */
-const props = defineProps<{ tripId: number; departureStation: number; plannedDt: string }>()
+const props = withDefaults(
+  defineProps<{
+    tripId?: number | null
+    departureStation?: number | null
+    plannedDt?: string | null
+    wagons?: WagonRow[] | null
+    picked?: string[]
+    title?: string
+    okText?: string
+  }>(),
+  {
+    tripId: null,
+    departureStation: null,
+    plannedDt: null,
+    wagons: null,
+    picked: () => [],
+    title: 'Добавить вагоны',
+    okText: 'Добавить',
+  },
+)
 
 const show = defineModel<boolean>('show', { default: false })
 // ожидание диалога: спиннер на таблице — на всю цепочку загрузок
@@ -118,9 +148,9 @@ const rows = shallowRef<WagonRow[]>([])
 const loadError = ref<ShownError | null>(null)
 const error = ref<ShownError | null>(null)
 // отмеченные вагоны — по номеру: отметка сохраняется при смене фильтра
-const picked = ref(new Set<string>())
+const picked = ref(new Set<string>(props.picked))
 
-const columns = defineColumns<WagonRow>([
+const allColumns = defineColumns<WagonRow>([
   { field: 'number', title: 'Номер', width: '11rem', cell: CellTripWagonPick, sortable: true },
   { field: 'wagonType', title: 'Тип', width: 'minmax(min-content, 0.67fr)', cell: CellWagonType },
   { field: 'locationType', title: 'Расположение', cell: CellWagonLocation, sortable: true, sortField: 'dbegLocation' },
@@ -128,9 +158,14 @@ const columns = defineColumns<WagonRow>([
   { field: 'locationAt', title: 'Расположение на момент отправки', cell: CellWagonLocationAt },
   { field: 'wagonStatusTypeAt', title: 'Состояние на момент отправки', cell: CellWagonStateAt },
 ])
+// внешний список — без колонок «на момент отправки»
+const columns = computed(() =>
+  props.wagons ? allColumns.filter((c) => c.field !== 'locationAt' && c.field !== 'wagonStatusTypeAt') : allColumns,
+)
 
 /** Подходит ли вагон: в другом рейсе или уже в составе — нельзя; не на станции отправления к отправлению — можно. */
 function fit(w: WagonRow): WagonFit {
+  if (props.wagons) return { block: '', warn: '' }
   const own = w.trips.find((tr) => tr.trip.id === props.tripId)
   if (own) return { block: t('Уже в составе рейса'), warn: '' }
   const other = w.trips[0]
@@ -153,6 +188,12 @@ provide(WAGON_PICK, { isPicked: (w) => picked.value.has(w.number), toggle, fit }
 
 async function load() {
   loadError.value = null
+  const external = props.wagons
+  if (external) {
+    const number = filter.number.trim()
+    rows.value = external.filter((w) => w.number.includes(number))
+    return
+  }
   try {
     rows.value = await busy.run(fetchWagons(wagonQuery(filter), sort.value))
   } catch (e) {
@@ -176,7 +217,7 @@ async function init() {
 void init()
 
 function save() {
-  if (picked.value.size === 0) {
+  if (picked.value.size === 0 && !props.wagons) {
     error.value = formError(t('Отметьте вагоны'))
     return
   }
@@ -190,7 +231,9 @@ function save() {
   font-size: 0.8rem;
 }
 
+// таблица занимает свободную высоту окна
 .trip-wagons__table {
-  height: 28rem;
+  flex: 1 1 0;
+  min-height: 0;
 }
 </style>
