@@ -1,5 +1,7 @@
 import type { RouteRecordRaw } from 'vue-router'
 
+import { requireAnalytics } from '@/shared/analytics/rights'
+
 declare module 'vue-router' {
   interface RouteMeta {
     /** часть приложения: мобильная (PWA) или десктопная; по ней выполняется переход при смене режима устройства */
@@ -11,7 +13,7 @@ declare module 'vue-router' {
      * на него, а не на главную части
      */
     pair?: string
-    /** мобильная часть: страница с нижней панелью вкладок («Рейс», «Заявки», «Профиль») */
+    /** мобильная часть: страница с нижней панелью вкладок («Рейс», «Заявки», «Профиль» и другие) */
     tabs?: boolean
     /** мобильная часть: заголовок окна в шапке, на русском; нет — название системы */
     title?: string
@@ -127,6 +129,21 @@ const routes: RouteRecordRaw[] = [
         component: () => pwa().then((m) => m.PwaEquipFillPage),
       },
       {
+        path: 'analytics',
+        name: 'pwa-analytics',
+        meta: { tabs: true, pair: 'analytics', title: 'Аналитика' },
+        beforeEnter: requireAnalytics,
+        component: () => pwa().then((m) => m.PwaAnalyticsPage),
+      },
+      {
+        path: 'analytics/:id',
+        name: 'pwa-analytics-chart',
+        meta: { pair: 'analytics', title: 'Аналитика' },
+        beforeEnter: requireAnalytics,
+        props: true,
+        component: () => pwa().then((m) => m.PwaAnalyticsChartPage),
+      },
+      {
         path: 'profile',
         name: 'pwa-profile',
         meta: { tabs: true, title: 'Профиль' },
@@ -226,6 +243,19 @@ const routes: RouteRecordRaw[] = [
         component: () => desktop().then((m) => m.CheckFillPage),
       },
       { path: 'equip', name: 'equip', component: () => desktop().then((m) => m.EquipListsPage) },
+      {
+        path: 'analytics',
+        name: 'analytics',
+        meta: { pair: 'pwa-analytics' },
+        component: () => desktop().then((m) => m.AnalyticsPage),
+      },
+      {
+        path: 'analytics/:id',
+        name: 'analytics-chart',
+        meta: { hideMenu: true, pair: 'pwa-analytics' },
+        props: true,
+        component: () => desktop().then((m) => m.AnalyticsChartPage),
+      },
       {
         path: 'equip/new',
         name: 'equip-new',

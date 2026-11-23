@@ -23,13 +23,15 @@ import { useRoute } from 'vue-router'
 
 import { fetchCurrentState } from '@/api/state'
 import { t } from '@/boot/i18n'
+import { canSeeAnalytics } from '@/shared/analytics/rights'
 import { bus } from '@/shared/bus'
 import type { IconName } from '@/shared/icons/icons'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { loadCached } from '@/shared/offline/cache'
 
 /**
- * Нижняя панель вкладок мобильной части: «Профиль», «Рейс», «Заявки» (число — заявки, ожидающие обработки), «Проверки».
+ * Нижняя панель вкладок мобильной части: «Профиль», «Аналитика» (кому доступна — canSeeAnalytics), «Рейс», «Заявки»
+ * (число — заявки, ожидающие обработки), «Проверки».
  */
 const route = useRoute()
 
@@ -46,6 +48,7 @@ async function loadState() {
 const tabs = computed<{ name: string; label: string; icon?: string; svg?: IconName; badge?: number }[]>(() => [
   // профиль — первым
   { name: 'pwa-profile', label: 'Профиль', svg: 'user' },
+  ...(canSeeAnalytics() ? [{ name: 'pwa-analytics', label: 'Аналитика', svg: 'analytics' as const }] : []),
   { name: 'pwa-home', label: 'Рейс', icon: 'today' },
   { name: 'pwa-requests', label: 'Заявки', svg: 'requests', badge: requests.value },
   { name: 'pwa-checks', label: 'Проверки', svg: 'checks' },

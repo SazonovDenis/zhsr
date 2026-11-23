@@ -129,7 +129,7 @@ import type { HistoryDialog } from '@/shared/components/dialog/dialogHistory'
 import { dialogHistory } from '@/shared/components/dialog/dialogHistory'
 import { useDialogEdit } from '@/shared/components/dialog/dialogEdit'
 import { SCALE0_MAX_PX, screenScale, screenScaleMin } from '@/shared/screen'
-import type { QuickDate } from './quickDates'
+import type { DatePreset, QuickDate } from './quickDates'
 import DateCalendar from './DateCalendar.vue'
 import { DATE_FORMAT, joinIso, splitIso } from './dateValue'
 import { QUICK_DATE_LABELS, quickDateValue } from './quickDates'
@@ -167,6 +167,8 @@ const props = withDefaults(
     applyImmediately?: boolean
     okButtonText?: string
     quick?: QuickDate[]
+    /** свой список готовых дат в окне вместо quick; кнопки в рамке остаются из quick */
+    presets?: DatePreset[]
     /** сколько быстрых вариантов стоит кнопками в рамке */
     shortCount?: number
   }>(),
@@ -179,6 +181,7 @@ const props = withDefaults(
     applyImmediately: false,
     okButtonText: '',
     quick: () => [],
+    presets: () => [],
     shortCount: 2,
   },
 )
@@ -236,7 +239,11 @@ const okButtonShown = computed(() => !props.applyImmediately && !quickPanelAppli
 
 // --- быстрые варианты ---
 
-const quickOptions = computed(() => props.quick.map((code) => ({ label: t(QUICK_DATE_LABELS[code]), value: code })))
+const quickOptions = computed<DatePreset[]>(() =>
+  props.presets.length > 0
+    ? props.presets
+    : props.quick.map((code) => ({ label: t(QUICK_DATE_LABELS[code]), value: code })),
+)
 
 /** Быстрый вариант, которому отвечает дата DD.MM.YYYY; не отвечает ни одному — null. */
 function codeOf(day: string | null): QuickDate | null {
@@ -272,7 +279,12 @@ const shortOptions = computed(() =>
   shortCodes.value.map((code) => ({ label: t(QUICK_DATE_LABELS[code]), value: code })),
 )
 
-const innerCode = computed(() => codeOf(split(inner.value)[0]))
+const innerCode = computed<string | null>(() => {
+  const day = split(inner.value)[0]
+  if (props.presets.length === 0) return codeOf(day)
+  const iso = joinIso(day, null, false)
+  return props.presets.find((p) => p.value === iso)?.value ?? null
+})
 
 // --- значение в рамке ---
 
@@ -533,8 +545,10 @@ function onPopupHide() {
 
 onBeforeUnmount(() => dialogHistory.forget(historyEntry))
 
-function onQuickUpdate(code: QuickDate) {
-  inner.value = join(date.formatDate(quickDateValue(code), DATE_FORMAT), split(inner.value)[1])
+function onQuickUpdate(code: string) {
+  const day =
+    props.presets.length > 0 ? splitIso(code)[0] : date.formatDate(quickDateValue(code as QuickDate), DATE_FORMAT)
+  inner.value = join(day, split(inner.value)[1])
   if (quickPanelApplies.value) apply()
 }
 

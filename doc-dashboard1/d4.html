@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Жолсерік · 4. Люди</title>
+<link rel="stylesheet" href="common.css">
+</head>
+<body class="viz-root">
+<div class="wrap">
+  <header class="top">
+    <div class="ttl">
+      <div class="kicker">Дашборд 4 · ракурс «люди»</div>
+      <h1>Люди: кто замечает неисправности, кто с кем ездит, кто закрывает заявки формально</h1>
+      <p>Диаграммы связывают заявки с людьми через журнал ответственных, бригады рейсов и исполнителей заявок.
+        Цель - не рейтинг сотрудников, а поиск привычек, которые не видны в сумме заявок.</p>
+    </div>
+    <nav class="dash"></nav>
+  </header>
+  <div class="filters">
+    <label class="theme">Оформление
+      <select id="fTheme"><option value="">Как в системе</option><option value="light">Светлое</option><option value="dark">Тёмное</option></select>
+    </label>
+  </div>
+  <div class="stack" id="grid"></div>
+</div>
+<script src="geo.js"></script>
+<script src="common.js"></script>
+<script src="data.js"></script>
+<script>
+'use strict';
+setupPage('d4.html');
+const YEAR0 = TODAY - 364 * DAY;
+const tripsDone = D.TRIPS.filter(t => t.wagons.length && t.arr <= NOW && t.dep >= YEAR0);
+
+/* ---------- 4.1. Эстафета ответственности ---------- */
+function c41(el) {
+  const st = new Map();
+  const get = id => { if (!st.has(id)) st.set(id, { u: D.UBY[id], trips: new Set(), wt: 0, own: 0, found: 0 }); return st.get(id); };
+  const condOf = new Map();
+  for (const t of tripsDone) t.wagons.forEach((wid, i) => {
+    const c = t.cond[i]; if (!c) return;
+    const x = get(c); x.trips.add(t.id); x.wt++;
+    condOf.set(t.id + ':' + wid, c);
+  });
+  for (const q of D.REQS) {
+    if (q.trip && q.role === 'CONDUCTOR' && q.src === 'manual' && condOf.get(q.trip + ':' + q.wagon) === q.author) get(q.author).own++;
+    if (q.found) { const c = condOf.get(q.found + ':' + q.wagon); if (c) get(c).found++; }
+  }
+  const data = [...st.values()].filter(x => x.wt >= 30).map(x => Object.assign(x, { ox: x.own / x.wt * 10, oy: x.found / x.wt * 10 }));
+  const W = 900, H = 460, L = 60, Rr = 30, T = 20, B = 44;
+  const xmax = niceMax(Math.max(...data.map(d => d.ox)) * 1.05), ymax = niceMax(Math.max(...data.map(d => d.oy)) * 1.05);
+  const x = lin(0, xmax, L, W - Rr), y = lin(0, ymax, H - B, T);
+  const mx = median(data.map(d => d.ox)), my = median(data.map(d => d.oy));
+  let s = yGrid(L, W - Rr, y, niceTicks(0, ymax, 5), v => fmt(v, 1)) + xTicks(H - B, x, niceTicks(0, xmax, 8), v => fmt(v, 1));
+  s += `<rect x="${L}" y="${T}" width="${P(x(mx) - L)}" height="${P(y(my) - T)}" fill="var(--critical)" opacity="0.06"/>`;
+  s += `<line x1="${P(x(mx))}" x2="${P(x(mx))}" y1="${T}" y2="${H - B}" stroke="var(--critical)" stroke-dasharray="6 4"/>` +
+    `<line x1="${L}" x2="${W - Rr}" y1="${P(y(my))}" y2="${P(y(my))}" stroke="var(--critical)" stroke-dasharray="6 4"/>`;
+  const q = [['замечает сам, после него находят мало', W - Rr - 6, H - B - 8, 'end'], ['молчит, а после него находят', L + 6, T + 14, 'start'],
+    ['замечает сам, но после него тоже находят', W - Rr - 6, T + 14, 'end'], ['мало заявок вообще: чистые вагоны или слабый осмотр', L + 6, H - B - 8, 'start']];
+  q.forEach(([t, xx, yy, a]) => s += `<text x="${xx}" y="${yy}" text-anchor="${a}" font-size="11" class="muted">${t}</text>`);
+  s += `<text x="${(L + W - Rr) / 2}" y="${H - 6}" text-anchor="middle" font-size="11" class="muted">свои заявки проводника в пути на 10 вагоно-рейсов →</text>`;
+  s += `<text x="${L}" y="${T - 6}" font-size="11" class="muted">неисправности, найденные на его вагоне за сутки после прибытия, на 10 вагоно-рейсов ↑</text>`;
+  const rmax = Math.max(...data.map(d => d.wt));
+  const qx = quantile(data.map(d => d.ox), 0.25), qy = quantile(data.map(d => d.oy), 0.9);
+  const bad = data.filter(d => d.ox < qx && d.oy > qy).sort((a, b) => b.oy - a.oy);
+  for (const d of [...data].sort((a, b) => b.wt - a.wt)) {
+    const isBad = bad.includes(d);
+    s += `<circle cx="${P(x(d.ox))}" cy="${P(y(d.oy))}" r="${P(3 + 7 * Math.sqrt(d.wt / rmax))}" fill="${isBad ? 'var(--critical)' : 'var(--s1)'}" fill-opacity="${isBad ? 0.85 : 0.45}" stroke="var(--surface-1)" stroke-width="1.2"` +
+      tipAttr(`<b>${esc(d.u.name)}</b>, проводник, депо ${esc(D.DEP[d.u.depot].name)}<br>Вагоно-рейсов: ${d.wt}<br>Свои заявки: ${d.own} (${fmt(d.ox, 2)} на 10)<br>Найдено после прибытия: ${d.found} (${fmt(d.oy, 2)} на 10)`) + '/>';
+    if (isBad && bad.indexOf(d) < 4) s += `<text x="${P(x(d.ox) + 11)}" y="${P(y(d.oy) + 4)}" font-size="11" class="strong halo">${esc(d.u.name)}</text>`;
+  }
+  el.innerHTML = legend([{ name: 'проводник; размер - вагоно-рейсы', color: 'var(--s1)', kind: 'dot' }, { name: 'молчит, а после него находят', color: 'var(--critical)', kind: 'dot' },
+    { name: 'медианы', color: 'var(--critical)', kind: 'line' }]) + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`;
+  return {
+    find: `${bad.length} ${plural(bad.length, 'проводник', 'проводника', 'проводников')} почти не пишут заявок в пути, но после их рейса приёмщик за сутки находит на их вагонах в ${fmt(mean(bad.map(d => d.oy)) / my, 1)} раза больше неисправностей, чем у медианного проводника. ` +
+      'Сумма заявок по проводнику этого не покажет: у молчащего проводника заявок мало, и он выглядит образцовым.',
+    side: '<div><h3>Как считается</h3><p>Ответственный за вагон на рейс берётся из журнала ответственных. «Найдено после прибытия» - заявка на этот вагон от другого сотрудника в первые сутки после прибытия рейса.</p></div>',
+    table: table(['Проводник', 'Депо', 'Вагоно-рейсов', 'Свои заявки', 'Найдено после', 'Свои на 10', 'Найдено на 10'],
+      [...data].sort((a, b) => b.oy - a.oy).map(d => [esc(d.u.name), esc(D.DEP[d.u.depot].name), d.wt, d.own, d.found, fmt(d.ox, 2), fmt(d.oy, 2)]), [2, 3, 4, 5, 6])
+  };
+}
+
+/* ---------- 4.2. Кто с кем ездит ---------- */
+const st42 = { depot: 8 };
+function c42(el) {
+  el.innerHTML = '';
+  const lnps = D.CREW[st42.depot].lnp, conds = D.CREW[st42.depot].cond;
+  const M = new Map();
+  for (const t of tripsDone) { if (!lnps.some(l => l.id === t.lnp)) continue; for (const c of t.cond) if (c) { const k = t.lnp + ':' + c; M.set(k, (M.get(k) || 0) + 1); } }
+  const m = (l, c) => M.get(l.id + ':' + c.id) || 0;
+  // Порядок столбцов: проводник ставится к ЛНП, с которым ездит чаще всего
+  const main = c => { let best = 0, bi = 0; lnps.forEach((l, i) => { if (m(l, c) > best) { best = m(l, c); bi = i; } }); return [bi, best]; };
+  const cs = conds.filter(c => lnps.some(l => m(l, c))).sort((a, b) => main(a)[0] - main(b)[0] || main(b)[1] - main(a)[1]);
+  const W = 900, L = 120, T = 16, cw = Math.min(14, (W - L - 20) / cs.length), ch = 18;
+  const max = Math.max(...[...M.values()]);
+  let s = '';
+  lnps.forEach((l, i) => {
+    s += `<text x="${L - 8}" y="${T + i * ch + 13}" text-anchor="end" font-size="11">${esc(l.name)}</text>`;
+    cs.forEach((c, j) => {
+      const v = m(l, c);
+      s += `<rect x="${P(L + j * cw)}" y="${T + i * ch}" width="${P(cw - 1.5)}" height="${ch - 2}" rx="2" fill="${v ? step(BLUE, v, max * 1.0001) : 'var(--surface-2)'}"` +
+        tipAttr(`ЛНП <b>${esc(l.name)}</b><br>Проводник <b>${esc(c.name)}</b><br>Совместных рейсов: ${v}`) + '/>';
+    });
+  });
+  const H = T + lnps.length * ch + 24;
+  s += `<text x="${L}" y="${H - 6}" font-size="11" class="muted">столбцы - ${cs.length} проводников депо, упорядочены по ЛНП, с которым ездят чаще всего</text>`;
+  const stab = cs.map(c => { const tot = sum(lnps.map(l => m(l, c))); return tot ? main(c)[1] / tot : 0; });
+  el.insertAdjacentHTML('beforeend', legend([{ ramp: BLUE, from: 'реже', to: 'чаще' }]) + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`);
+  toggles(el, D.DEPOTS.filter(d => D.CREW[d.id].lnp.length).map(d => ({ v: String(d.id), name: d.name })), String(st42.depot), v => { st42.depot = +v; cards[1].redraw(); });
+  // Устойчивость бригад по всем депо и заявки, возвращённые на доработку, на рейс
+  const rows = D.DEPOTS.filter(d => D.CREW[d.id].lnp.length).map(d => {
+    const L2 = D.CREW[d.id].lnp, C2 = D.CREW[d.id].cond, MM = new Map();
+    for (const t of tripsDone) if (L2.some(l => l.id === t.lnp)) for (const c of t.cond) if (c) MM.set(t.lnp + ':' + c, (MM.get(t.lnp + ':' + c) || 0) + 1);
+    const st = C2.map(c => { const v = L2.map(l => MM.get(l.id + ':' + c.id) || 0), tot = sum(v); return tot ? Math.max(...v) / tot : null; }).filter(v => v != null);
+    return [d, mean(st)];
+  });
+  return {
+    find: `В депо Нурлы Жол матрица почти диагональная: у каждого ЛНП своя постоянная бригада из семи проводников. В Астане и Алматы цвет размазан - бригаду собирают из свободных людей на каждый рейс. ` +
+      `Устойчивость бригады (доля рейсов проводника с «его» ЛНП): ${rows.map(([d, v]) => esc(d.name) + ' ' + pct(v)).join(', ')}. Постоянная бригада - основа для разбора ошибок и обучения стажёров.`,
+    side: `<div><h3>Устойчивость в этом депо</h3><div class="big">${pct(mean(stab))}<small> рейсов с «своим» ЛНП</small></div></div>`,
+    table: table(['ЛНП'].concat(['Проводник', 'Совместных рейсов']), [...M.entries()].filter(([k]) => lnps.some(l => k.startsWith(l.id + ':')))
+      .sort((a, b) => b[1] - a[1]).map(([k, v]) => { const [l, c] = k.split(':').map(Number); return [esc(D.UBY[l].name), esc(D.UBY[c].name), v]; }), [2])
+  };
+}
+
+/* ---------- 4.3. Нагрузка по месяцам ---------- */
+const st43 = { depot: 1 };
+const NORM = 168;
+function c43(el) {
+  el.innerHTML = '';
+  const months = []; for (let m = 11; m >= 0; m--) { const d = new Date(TODAY); months.push(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - m, 1)); }
+  const mi = t => months.findIndex((m, i) => t >= m && (i === 11 || t < months[i + 1]));
+  const H0 = new Map();
+  const add = (u, t, h) => { if (!u) return; const i = mi(t); if (i < 0) return; if (!H0.has(u)) H0.set(u, new Array(12).fill(0)); H0.get(u)[i] += h; };
+  for (const t of D.TRIPS) if (t.wagons.length && t.dep <= NOW) {
+    const r = D.RBY[t.route];
+    t.cond.forEach(c => add(c, t.dep, r.hours[0]));
+    add(t.lnp, t.dep, r.hours[1]);
+  }
+  const users = [...D.CREW[st43.depot].cond, ...D.CREW[st43.depot].lnp].filter(u => H0.has(u.id))
+    .map(u => ({ u, h: H0.get(u.id), tot: sum(H0.get(u.id).slice(0, 11)) })).sort((a, b) => b.tot - a.tot);
+  const W = 900, L = 160, cw = 44, ch = 9, T = 30;
+  const col = h => {
+    const d = (h - NORM) / NORM;
+    if (Math.abs(d) < 0.08) return 'var(--mid)';
+    if (d > 0) return d > 0.35 ? 'var(--r700)' : d > 0.2 ? 'var(--r500)' : 'var(--r300)';
+    return d < -0.5 ? 'var(--b500)' : d < -0.25 ? 'var(--b300)' : 'var(--b100)';
+  };
+  let s = months.map((m, i) => `<text x="${L + i * cw + cw / 2}" y="${T - 8}" text-anchor="middle" font-size="11" class="muted">${MONTHS[monthOf(m)]}</text>`).join('');
+  const tmax = Math.max(...users.map(x => x.tot));
+  users.forEach((x, k) => {
+    const y = T + k * ch;
+    if (k % 4 === 0 || x.u.pref > 1) s += `<text x="${L - 8}" y="${y + 8}" text-anchor="end" font-size="9" class="${x.u.pref > 1 ? 'strong' : 'muted'}">${esc(x.u.name)}${x.u.role === 'LNP' ? ' (ЛНП)' : ''}</text>`;
+    x.h.forEach((h, i) => s += `<rect x="${L + i * cw}" y="${y}" width="${cw - 2}" height="${ch - 1}" fill="${col(h)}"` +
+      tipAttr(`<b>${esc(x.u.name)}</b>${x.u.role === 'LNP' ? ' (ЛНП)' : ''}<br>${MONTHS_FULL[monthOf(months[i])]}: ${fmt(h)} ч при норме ${NORM} ч` + (i === 11 ? '<br><span class="k">месяц не закончен</span>' : '')) + '/>');
+    const bw = x.tot / tmax * 150;
+    s += `<rect x="${L + 12 * cw + 12}" y="${y}" width="${P(bw)}" height="${ch - 1}" fill="${x.u.pref > 1 ? 'var(--text-primary)' : 'var(--neutral-band)'}"/>`;
+  });
+  s += `<text x="${L + 12 * cw + 12}" y="${T - 8}" font-size="11" class="muted">часов за 11 полных месяцев</text>`;
+  const H = T + users.length * ch + 10;
+  el.insertAdjacentHTML('beforeend', legend([{ ramp: ['var(--b500)', 'var(--b300)', 'var(--b100)', 'var(--mid)', 'var(--r300)', 'var(--r500)', 'var(--r700)'], from: 'недогрузка', to: 'переработка' },
+    { name: `норма ${NORM} ч ± 8%`, color: 'var(--mid)' }, { name: 'полужирное имя - «любимчик» нарядчика', color: 'transparent' }]) + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`);
+  toggles(el, D.DEPOTS.filter(d => D.CREW[d.id].cond.length).map(d => ({ v: String(d.id), name: d.name })), String(st43.depot), v => { st43.depot = +v; cards[2].redraw(); });
+  const over = x => x.h.slice(0, 11).filter(h => h > NORM * 1.08).length / 11;
+  const fav = users.filter(x => x.u.pref > 1), rest = users.filter(x => x.u.pref === 1);
+  return {
+    find: `Одни и те же люди перерабатывают из месяца в месяц: у ${fav.length} сотрудников вверху списка переработка в ${pct(mean(fav.map(over)))} месяцев, у остальных - в ${pct(mean(rest.map(over)))}. ` +
+      'Среднее по депо близко к норме и прячет перекос: нарядчик ставит на рейс проверенных людей, пока остальные недогружены.',
+    table: table(['Сотрудник'].concat(months.map(m => MONTHS[monthOf(m)]), ['Итого']), users.map(x => [esc(x.u.name)].concat(x.h.map(h => fmt(h)), [fmt(x.tot)])), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+  };
+}
+
+/* ---------- 4.4. Путь заявки ---------- */
+function c44(el) {
+  const srcOf = q => q.src === 'check' ? 'Чек-лист' : q.src === 'equip' ? 'Опись' : { CONDUCTOR: 'Проводник', LNP: 'ЛНП', PEM: 'ПЭМ' }[q.role] || 'Приёмщик, мастер';
+  const pathOf2 = q => q.sts.some(s => s.s === 'DEFERRED') ? 'Через «Отложена до ТО»' : q.returns ? 'С возвратом на доработку' : 'Без возврата';
+  const outOf = q => ({ CLOSED: 'Закрыта', REJECTED: 'Отклонена', CANCELLED: 'Отменена' }[q.status] || 'Открыта');
+  const COLS = [['Проводник', 'ЛНП', 'ПЭМ', 'Приёмщик, мастер', 'Чек-лист', 'Опись'], ['Техническая', 'Клининг', 'Экипировка'],
+    ['Без возврата', 'С возвратом на доработку', 'Через «Отложена до ТО»'], ['Закрыта', 'Отклонена', 'Отменена', 'Открыта']];
+  const SRC_C = Object.fromEntries(COLS[0].map((n, i) => [n, SER[i]]));
+  const reqs = D.REQS.filter(q => q.created >= YEAR0);
+  const keyOf = q => [srcOf(q), D.SERVICES[q.svc], pathOf2(q), outOf(q)];
+  const total = reqs.length;
+  const W = 900, H = 520, T = 20, B = 20, nodeW = 12, gap = 12;
+  const colX = [130, 400, 620, 800];
+  const nodes = COLS.map((names, c) => names.map(n => ({ n, c, v: 0, inY: 0, outY: 0 })));
+  const links = new Map();
+  for (const q of reqs) {
+    const k = keyOf(q);
+    k.forEach((n, c) => nodes[c].find(x => x.n === n).v++);
+    for (let c = 0; c < 3; c++) { const id = c + '|' + k[c] + '|' + k[c + 1] + '|' + k[0]; links.set(id, (links.get(id) || 0) + 1); }
+  }
+  const sc = (H - T - B - gap * 5) / total;
+  nodes.forEach(col => { let y = T; col.forEach(nd => { nd.y = y; nd.h = Math.max(1, nd.v * sc); nd.inY = y; nd.outY = y; y += nd.h + gap; }); });
+  let s = '';
+  // Ленты: по столбцам слева направо, внутри узла - по порядку источников
+  const ls = [...links.entries()].map(([id, v]) => { const [c, a, b, src] = id.split('|'); return { c: +c, a, b, src, v }; });
+  ls.sort((p, q) => p.c - q.c || COLS[p.c].indexOf(p.a) - COLS[q.c].indexOf(q.a) || COLS[p.c + 1].indexOf(p.b) - COLS[q.c + 1].indexOf(q.b) || COLS[0].indexOf(p.src) - COLS[0].indexOf(q.src));
+  for (const l of ls) {
+    const na = nodes[l.c].find(x => x.n === l.a), nb = nodes[l.c + 1].find(x => x.n === l.b);
+    const h = l.v * sc, x0 = colX[l.c] + nodeW, x1 = colX[l.c + 1], y0 = na.outY, y1 = nb.inY;
+    na.outY += h; nb.inY += h;
+    const xm = (x0 + x1) / 2;
+    s += `<path d="M${x0},${P(y0)}C${xm},${P(y0)} ${xm},${P(y1)} ${x1},${P(y1)}L${x1},${P(y1 + h)}C${xm},${P(y1 + h)} ${xm},${P(y0 + h)} ${x0},${P(y0 + h)}Z" fill="${SRC_C[l.src]}" opacity="0.42"` +
+      tipAttr(`<b>${esc(l.src)}</b><br>${esc(l.a)} → ${esc(l.b)}<br>Заявок: ${fmt(l.v)}`) + '/>';
+  }
+  nodes.forEach((col, c) => col.forEach(nd => {
+    if (!nd.v) return;
+    s += `<rect x="${colX[c]}" y="${P(nd.y)}" width="${nodeW}" height="${P(nd.h)}" fill="${c === 0 ? SRC_C[nd.n] : 'var(--text-secondary)'}" rx="2"${tipAttr(`<b>${esc(nd.n)}</b><br>${fmt(nd.v)} заявок (${pct(nd.v / total, 1)})`)}/>`;
+    const right = c === 3, tx = right ? colX[c] + nodeW + 6 : c === 0 ? colX[c] - 6 : colX[c] + nodeW + 6;
+    s += `<text x="${tx}" y="${P(nd.y + nd.h / 2 + 4)}" text-anchor="${c === 0 ? 'end' : 'start'}" font-size="11" class="halo"><tspan class="strong">${esc(nd.n)}</tspan> <tspan class="muted">${pct(nd.v / total)}</tspan></text>`;
+  }));
+  ['Кто подал', 'Служба', 'Как шла', 'Чем кончилась'].forEach((t, c) => s += `<text x="${colX[c] + (c === 0 ? nodeW : 0)}" y="10" text-anchor="${c === 0 ? 'end' : 'start'}" font-size="11" class="muted">${t}</text>`);
+  el.innerHTML = legend(COLS[0].map(n => ({ name: n, color: SRC_C[n] }))) + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`;
+  const rate = (src, out) => { const a = reqs.filter(q => srcOf(q) === src); return a.filter(q => outOf(q) === out).length / (a.length || 1); };
+  const defer = reqs.filter(q => pathOf2(q) === 'Через «Отложена до ТО»'), defClosed = defer.filter(q => outOf(q) === 'Закрыта').length / (defer.length || 1);
+  return {
+    find: `Заявки проводников отклоняют в ${fmt(rate('Проводник', 'Отклонена') / (rate('Чек-лист', 'Отклонена') || 1e-9), 0)} раз чаще, чем заявки по чек-листу (${pct(rate('Проводник', 'Отклонена'), 1)} против ${pct(rate('Чек-лист', 'Отклонена'), 1)}): чек-лист сверяет значение с нормативом, а проводник пишет «на глаз». ` +
+      `Из заявок, отложенных до ТО, закрыто только ${pct(defClosed)}: остальные отменены или висят открытыми.`,
+    table: table(['Кто подал', 'Служба', 'Как шла', 'Чем кончилась', 'Заявок'],
+      [...groupBy(reqs, q => keyOf(q).join('|')).entries()].sort((a, b) => b[1].length - a[1].length).map(([k, a]) => k.split('|').map(esc).concat([fmt(a.length)])), [4])
+  };
+}
+
+/* ---------- 4.5. Хребты времени исполнения ---------- */
+function c45(el) {
+  const execT = new Map(), ret = new Map();
+  for (const q of D.REQS) {
+    if (q.svc !== 'T' || !q.executor) continue;
+    const i = q.sts.findIndex(s => s.s === 'IN_PROGRESS'), j = q.sts.findIndex(s => s.s === 'DONE');
+    if (i < 0 || j < 0) continue;
+    if (!execT.has(q.executor)) { execT.set(q.executor, []); ret.set(q.executor, [0, 0]); }
+    execT.get(q.executor).push((q.sts[j].t - q.sts[i].t) / MIN);
+    ret.get(q.executor)[0]++; if (q.returns) ret.get(q.executor)[1]++;
+  }
+  const lo = Math.log(1), hi = Math.log(4 * 1440), nb = 80;
+  const rows = [...execT.entries()].filter(([, a]) => a.length >= 60).map(([id, a]) => {
+    const dens = new Array(nb).fill(0);
+    for (const v of a) { const lv = Math.log(Math.max(1, v)); for (let k = 0; k < nb; k++) { const c = lo + (k + 0.5) * (hi - lo) / nb; dens[k] += Math.exp(-((lv - c) ** 2) / (2 * 0.18 ** 2)); } }
+    const m = Math.max(...dens);
+    return { u: D.UBY[id], a, dens: dens.map(d => d / m), fast: a.filter(v => v < 15).length / a.length, ret: ret.get(id)[1] / ret.get(id)[0] };
+  }).sort((a, b) => a.fast - b.fast);
+  const W = 900, L = 190, Rr = 120, rowH = 22, peak = 54, T = peak + 6;
+  const x = v => L + (Math.log(v) - lo) / (hi - lo) * (W - L - Rr);
+  const H = T + rows.length * rowH + 40;
+  let s = '';
+  [[5, '5 мин'], [15, '15 мин'], [60, '1 ч'], [240, '4 ч'], [1440, '1 сут'], [4 * 1440, '4 сут']].forEach(([v, t]) =>
+    s += `<line x1="${P(x(v))}" x2="${P(x(v))}" y1="10" y2="${H - 34}" stroke="var(--grid)"/><text x="${P(x(v))}" y="${H - 20}" text-anchor="middle" font-size="11" class="muted">${t}</text>`);
+  s += `<rect x="${L}" y="10" width="${P(x(15) - L)}" height="${H - 44}" fill="var(--critical)" opacity="0.05"/><text x="${L + 4}" y="22" font-size="10" class="muted">быстрее 15 мин</text>`;
+  rows.forEach((r, k) => {
+    const base = T + k * rowH;
+    const pts = r.dens.map((d, i) => [L + (i + 0.5) / nb * (W - L - Rr), base - d * peak]);
+    const bad = r.fast > 0.3;
+    s += `<path d="${smooth(pts)}L${P(pts[pts.length - 1][0])},${base}L${P(pts[0][0])},${base}Z" fill="${bad ? 'var(--critical)' : 'var(--b300)'}" fill-opacity="${bad ? 0.75 : 0.55}" stroke="var(--surface-1)" stroke-width="1.5"` +
+      tipAttr(`<b>${esc(r.u.name)}</b>, депо ${esc(D.DEP[r.u.depot].name)}<br>Выполнено: ${r.a.length}<br>Медиана исполнения: ${dur(median(r.a) / 60)}<br>Быстрее 15 мин: ${pct(r.fast)}<br>Возвращено на доработку: ${pct(r.ret)}`) + '/>';
+    s += `<text x="${L - 8}" y="${base - 3}" text-anchor="end" font-size="11" class="${bad ? 'strong' : ''}">${esc(r.u.name)} · ${esc(D.DEP[r.u.depot].name)}</text>` +
+      `<text x="${W - Rr + 10}" y="${base - 3}" font-size="11" class="${bad ? 'strong' : 'muted'}">возвратов ${pct(r.ret)}</text>`;
+  });
+  el.innerHTML = legend([{ name: 'распределение времени «в работе → выполнена»', color: 'var(--b300)' }, { name: 'исполнитель с пиком быстрее 15 минут', color: 'var(--critical)' }]) + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`;
+  const bad = rows.filter(r => r.fast > 0.3), good = rows.filter(r => r.fast <= 0.3);
+  return {
+    find: `У ${bad.length} исполнителей распределение двугорбое: второй горб - «выполнено» через 2-10 минут после «взял в работу». За такое время неисправность не устранить; ` +
+      `у этих исполнителей ${pct(mean(bad.map(r => r.ret)))} заявок возвращают на доработку против ${pct(mean(good.map(r => r.ret)))} у остальных. Медиана времени исполнения такой горб не покажет - она выглядит даже лучше.`,
+    side: '<div><h3>Как читать</h3><p>Шкала времени логарифмическая: равные шаги - 5 минут, 15 минут, час, четыре часа, сутки. Высота хребта - доля заявок с таким временем исполнения.</p></div>',
+    table: table(['Исполнитель', 'Депо', 'Выполнено', 'Медиана', 'Быстрее 15 мин', 'Возвратов'],
+      rows.slice().reverse().map(r => [esc(r.u.name), esc(D.DEP[r.u.depot].name), r.a.length, dur(median(r.a) / 60), pct(r.fast), pct(r.ret)]), [2, 3, 4, 5])
+  };
+}
+
+const cards = [
+  { num: '4.1', render: c41, title: 'Проводники, которые молчат: после их рейса неисправности находит приёмщик',
+    form: 'Пузырьковая диаграмма с квадрантами: свои заявки против найденного после передачи вагона',
+    goal: 'Сравнить, сколько неисправностей проводник заявляет сам и сколько находят на его вагоне после рейса.',
+    problem: 'Мало заявок от проводника считается хорошим знаком, хотя часто означает, что он не осматривает вагон.',
+    source: 'wagon_responsible, wagon_responsible_usr (ответственный на рейс), trip (arrived_dt), repair_request (created_by_usr, wagon, created_dt)' },
+  { num: '4.2', render: c42, title: 'В одних депо бригады постоянные, в других - собраны случайно',
+    form: 'Матрица совместных рейсов «ЛНП × проводник», упорядоченная по постоянным парам',
+    goal: 'Показать, ездят ли ЛНП с постоянными проводниками.',
+    problem: 'Случайные бригады не накапливают слаженности; стажёры попадают к разным наставникам.',
+    source: 'trip_crew (crew_duty_type: LNP, CONDUCTOR), usr_depot' },
+  { num: '4.3', render: c43, title: 'Перерабатывают одни и те же люди, месяц за месяцем',
+    form: 'Тепловая лента: строка - сотрудник, столбец - месяц, цвет - отклонение часов от нормы',
+    goal: 'Видеть распределение рабочих часов по людям и месяцам относительно нормы.',
+    problem: 'Среднее по депо в норме, а отдельные сотрудники систематически перерабатывают.',
+    source: 'trip_crew, trip (departed_dt), route (conductor_hours, lnp_hours)' },
+  { num: '4.4', render: c44, title: 'Заявки «на глаз» отклоняют чаще, а отложенные до ТО редко доживают до закрытия',
+    form: 'Диаграмма Санкея: кто подал → служба → ход заявки → итог',
+    goal: 'Проследить путь заявки от источника до итога и найти потери на пути.',
+    problem: 'Неясно, какие источники дают лишние заявки и куда пропадают отложенные.',
+    source: 'repair_request (created_by_usr, роль), check_list_value.repair_request, equip_list.repair_request, repair_request_status' },
+  { num: '4.5', render: c45, title: 'Пик «выполнено за пять минут» выдаёт формальное закрытие',
+    form: 'Хребтовая диаграмма (ridgeline): распределение времени исполнения по исполнителям на логарифмической шкале',
+    goal: 'Сравнить форму распределения времени исполнения у исполнителей технической службы.',
+    problem: 'Медиана и среднее скрывают два разных способа работать: устранять неисправность и сразу отмечать «выполнено».',
+    source: 'repair_request_status (IN_PROGRESS → DONE), repair_request_executor' }
+];
+renderCards(document.getElementById('grid'), cards);
+</script>
+</body>
+</html>

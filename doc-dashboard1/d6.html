@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Жолсерік · 6. Дозор</title>
+<link rel="stylesheet" href="common.css">
+</head>
+<body class="viz-root">
+<div class="wrap">
+  <header class="top">
+    <div class="ttl">
+      <div class="kicker">Дашборд 6 · постоянное наблюдение</div>
+      <h1>Дозор: проблемы, которые возвращаются каждую неделю</h1>
+      <p>Диаграммы дашборда следят за повторяющимися проблемами: просела ли реакция служб, кто подаёт лишние заявки,
+        кто завышает критичность, сколько вагонов стоят «ничьими» после прибытия, планируют ли прицепки, давно ли
+        проверяли вагон. Каждая диаграмма отделяет настоящий сигнал от случайного шума.</p>
+    </div>
+    <nav class="dash"></nav>
+  </header>
+  <div class="filters">
+    <label class="theme">Оформление
+      <select id="fTheme"><option value="">Как в системе</option><option value="light">Светлое</option><option value="dark">Тёмное</option></select>
+    </label>
+  </div>
+  <div class="stack" id="grid"></div>
+</div>
+<script src="geo.js"></script>
+<script src="common.js"></script>
+<script src="data.js"></script>
+<script>
+'use strict';
+setupPage('d6.html');
+const YEAR0 = TODAY - 364 * DAY;
+const WEEK0 = TODAY - wday(TODAY) * DAY - 51 * 7 * DAY;
+const weekIdx = t => Math.floor((t - WEEK0) / (7 * DAY));
+const DEPOT_TGL = [{ v: '0', name: 'Все депо' }].concat(D.DEPOTS.map(d => ({ v: String(d.id), name: d.name })));
+
+/* ---------- 6.1. Контрольная карта реакции ---------- */
+const st61 = { depot: 0 };
+function xmr(depot) {
+  const weeks = Array.from({ length: 52 }, () => []);
+  for (const q of D.REQS) {
+    if (q.svc !== 'T' || q.sev < 3 || (depot && q.depot !== depot)) continue;
+    const w = weekIdx(q.created); if (w < 0 || w > 51) continue;
+    const ip = q.sts.find(s => s.s === 'IN_PROGRESS'); if (!ip) continue;
+    weeks[w].push((ip.t - q.created) / HOUR);
+  }
+  const v = weeks.map(a => a.length >= 5 ? median(a) : null);
+  const base = v.slice(0, 26).filter(x => x != null), cl = mean(base);
+  const mr = []; for (let i = 1; i < 26; i++) if (v[i] != null && v[i - 1] != null) mr.push(Math.abs(v[i] - v[i - 1]));
+  const ucl = cl + 2.66 * mean(mr), lcl = Math.max(0, cl - 2.66 * mean(mr));
+  // Сигналы: выход за границы; восемь недель подряд выше центральной линии
+  const sig = v.map(() => false);
+  v.forEach((x, i) => { if (x != null && (x > ucl || x < lcl)) sig[i] = true; });
+  for (let i = 7; i < 52; i++) if (v.slice(i - 7, i + 1).every(x => x != null && x > cl)) for (let k = i - 7; k <= i; k++) sig[k] = sig[k] || 'run';
+  return { weeks, v, cl, ucl, lcl, sig };
+}
+function c61(el) {
+  el.innerHTML = '';
+  const { weeks, v, cl, ucl, lcl, sig } = xmr(st61.depot);
+  const W = 900, H = 360, L = 60, Rr = 110, T = 16, B = 34;
+  const ymax = niceMax(Math.max(ucl, ...v.filter(x => x != null)) * 1.1), x = lin(0, 51, L, W - Rr), y = lin(0, ymax, H - B, T);
+  let s = yGrid(L, W - Rr, y, niceTicks(0, ymax, 5), t => fmt(t, 1) + ' ч');
+  s += `<rect x="${L}" y="${P(y(ucl))}" width="${W - Rr - L}" height="${P(y(lcl) - y(ucl))}" fill="var(--s3)" opacity="0.08"/>`;
+  [[ucl, 'верхняя граница'], [cl, 'среднее за базовые 26 недель'], [lcl, 'нижняя граница']].forEach(([val, t], i) =>
+    s += `<line x1="${L}" x2="${W - Rr}" y1="${P(y(val))}" y2="${P(y(val))}" stroke="${i === 1 ? 'var(--text-secondary)' : 'var(--s3)'}" stroke-width="${i === 1 ? 1.5 : 1}"${i === 1 ? '' : ' stroke-dasharray="5 4"'}/>` +
+      `<text x="${W - Rr + 6}" y="${P(y(val)) + 4}" font-size="10" class="muted">${t} · ${fmt(val, 1)} ч</text>`);
+  s += `<line x1="${P(x(25.5))}" x2="${P(x(25.5))}" y1="${T}" y2="${H - B}" stroke="var(--axis)"/><text x="${P(x(25.5)) + 4}" y="${T + 10}" font-size="10" class="muted">→ наблюдение</text>`;
+  s += `<path d="${pathOf(v.map((val, i) => val == null ? null : [x(i), y(val)]).filter(Boolean))}" fill="none" stroke="var(--neutral)" stroke-width="1.5"/>`;
+  v.forEach((val, i) => {
+    if (val == null) return;
+    s += `<circle cx="${P(x(i))}" cy="${P(y(val))}" r="${sig[i] ? 5 : 3.2}" fill="${sig[i] === true ? 'var(--critical)' : sig[i] ? 'var(--warning)' : 'var(--s1)'}" stroke="var(--surface-1)" stroke-width="1.5"` +
+      tipAttr(`<b>Неделя с ${dd(WEEK0 + i * 7 * DAY)}</b><br>Медиана реакции: ${dur(val)}<br>Заявок высокой и критической важности: ${weeks[i].length}` +
+        (sig[i] === true ? '<br><b>выход за границу</b>' : sig[i] ? '<br><b>восемь недель подряд выше среднего</b>' : '')) + '/>';
+  });
+  for (let i = 0; i < 52; i += 8) s += `<text x="${P(x(i))}" y="${H - 12}" text-anchor="middle" font-size="11" class="muted">${dd(WEEK0 + i * 7 * DAY)}</text>`;
+  el.insertAdjacentHTML('beforeend', legend([{ name: 'неделя в границах', color: 'var(--s1)', kind: 'dot' }, { name: 'выход за границу', color: 'var(--critical)', kind: 'dot' },
+    { name: 'восемь недель подряд выше среднего', color: 'var(--warning)', kind: 'dot' }]) + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`);
+  toggles(el, DEPOT_TGL, String(st61.depot), val => { st61.depot = +val; cards[0].redraw(); });
+  const outOf = r => r.v.map((val, i) => r.sig[i] === true && i >= 26 && val > r.ucl ? i : -1).filter(i => i >= 0);
+  const out = outOf({ v, sig, ucl });
+  const flagged = D.DEPOTS.map(d => ({ d, out: outOf(xmr(d.id)) })).filter(x => x.out.length);
+  const name = st61.depot ? 'депо ' + D.DEP[st61.depot].name : 'всех депо вместе';
+  return {
+    find: (out.length ? `У ${esc(name)} в периоде наблюдения ${out.length} ${plural(out.length, 'неделя вышла', 'недели вышли', 'недель вышли')} за верхнюю границу: реакция просела по причине, а не случайно. `
+      : `У ${esc(name)} реакция держится в границах: колебания - шум, разбирать их не нужно. `) +
+      (flagged.length ? `Выход за границу есть у депо ${flagged.map(x => esc(x.d.name) + ' (последний - неделя с ' + dd(WEEK0 + x.out[x.out.length - 1] * 7 * DAY) + ')').join(', ')}. ` : '') +
+      'Карта отвечает на вопрос, который задают каждую неделю: «стало хуже или это шум?»',
+    side: '<div><h3>Как считается</h3><p>Точка - медиана времени от подачи заявки высокой и критической важности до «взял в работу» за неделю. Границы - среднее ± 2,66 средних скачка между соседними неделями за базовый период (карта Шухарта XmR).</p></div>',
+    table: table(['Неделя с', 'Заявок', 'Медиана реакции', 'Сигнал'], v.map((val, i) => [dd(WEEK0 + i * 7 * DAY), weeks[i].length, val == null ? '-' : dur(val), sig[i] === true ? 'выход за границу' : sig[i] ? 'серия' : '']), [1])
+  };
+}
+
+/* ---------- 6.2. Воронка отклонённых заявок по авторам ---------- */
+function c62(el) {
+  const by = groupBy(D.REQS.filter(q => q.src === 'manual' && q.created >= YEAR0 && ['CONDUCTOR', 'LNP', 'PEM'].includes(q.role) && !q.open), q => q.author);
+  const pts = [...by.entries()].map(([id, a]) => ({ u: D.UBY[id], n: a.length, k: a.filter(q => q.status === 'REJECTED').length })).filter(p => p.n >= 8);
+  const pbar = sum(pts.map(p => p.k)) / sum(pts.map(p => p.n));
+  const W = 900, H = 400, L = 60, Rr = 30, T = 16, B = 40;
+  const nmax = Math.max(...pts.map(p => p.n)), x = logs(8, nmax * 1.1, L, W - Rr);
+  const ymax = niceMax(Math.max(...pts.map(p => p.k / p.n)) * 1.1), y = lin(0, ymax, H - B, T);
+  let s = yGrid(L, W - Rr, y, niceTicks(0, ymax, 5), v => pct(v));
+  [8, 15, 30, 60, 120, 250].filter(n => n <= nmax * 1.1).forEach(n => s += `<line x1="${P(x(n))}" x2="${P(x(n))}" y1="${T}" y2="${H - B}" stroke="var(--grid)"/><text x="${P(x(n))}" y="${H - B + 15}" text-anchor="middle" font-size="11" class="muted">${n}</text>`);
+  s += `<text x="${(L + W - Rr) / 2}" y="${H - 4}" text-anchor="middle" font-size="11" class="muted">заявок автора за год (логарифмическая шкала) →</text>`;
+  s += `<text x="${L}" y="${T - 4}" font-size="11" class="muted">доля отклонённых как необоснованные ↑</text>`;
+  const band = z => { const up = [], dn = []; for (let n = 8; n <= nmax * 1.1; n *= 1.08) { const sd = Math.sqrt(pbar * (1 - pbar) / n); up.push([x(n), y(Math.min(ymax, pbar + z * sd))]); dn.push([x(n), y(Math.max(0, pbar - z * sd))]); } return up.concat(dn.reverse()); };
+  s += `<path d="${pathOf(band(3))}Z" fill="var(--s1)" opacity="0.08"/><path d="${pathOf(band(2))}Z" fill="var(--s1)" opacity="0.10"/>`;
+  s += `<line x1="${L}" x2="${W - Rr}" y1="${P(y(pbar))}" y2="${P(y(pbar))}" stroke="var(--text-secondary)" stroke-width="1.5"/><text x="${W - Rr - 4}" y="${P(y(pbar)) - 6}" text-anchor="end" font-size="10" class="muted">в среднем ${pct(pbar, 1)}</text>`;
+  const outs = [];
+  for (const p of pts) {
+    const r = p.k / p.n, sd = Math.sqrt(pbar * (1 - pbar) / p.n), out = r > pbar + 3 * sd;
+    if (out) outs.push(p);
+    s += `<circle cx="${P(x(p.n))}" cy="${P(y(r))}" r="${out ? 5 : 3.2}" fill="${out ? 'var(--critical)' : 'var(--s1)'}" fill-opacity="${out ? 0.9 : 0.5}" stroke="var(--surface-1)" stroke-width="1"` +
+      tipAttr(`<b>${esc(p.u.name)}</b>, ${p.u.role === 'LNP' ? 'ЛНП' : p.u.role === 'PEM' ? 'ПЭМ' : 'проводник'}, депо ${esc(D.DEP[p.u.depot].name)}<br>Заявок: ${p.n}<br>Отклонено: ${p.k} (${pct(r, 1)})` + (out ? '<br><b>выше воронки</b>' : '')) + '/>';
+  }
+  outs.sort((a, b) => b.k / b.n - a.k / a.n).slice(0, 6).forEach(p => s += `<text x="${P(x(p.n) + 8)}" y="${P(y(p.k / p.n) + 4)}" font-size="11" class="strong halo">${esc(p.u.name)}</text>`);
+  el.innerHTML = legend([{ name: 'автор заявок', color: 'var(--s1)', kind: 'dot' }, { name: 'выше воронки: отклоняют не случайно', color: 'var(--critical)', kind: 'dot' }, { name: 'воронка: 2 и 3 стандартных отклонения', color: 'var(--b200)' }]) + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`;
+  const smallHigh = pts.filter(p => p.n < 20 && p.k / p.n > pbar * 2 && !outs.includes(p)).length;
+  return {
+    find: `${outs.length} ${plural(outs.length, 'автор', 'автора', 'авторов')} выше воронки: их заявки отклоняют не случайно, этим людям нужен инструктаж по подаче заявок. ` +
+      `Ещё ${smallHigh} ${plural(smallHigh, 'автор', 'автора', 'авторов')} с малым числом заявок выглядят хуже среднего в обычном рейтинге, но остаются внутри воронки: две отклонённые заявки из десяти - шум.`,
+    side: '<div><h3>Почему воронка</h3><p>У автора с десятью заявками доля отклонённых скачет сильнее, чем у автора с сотней. Воронка сужается с ростом числа заявок, и рейтинг не наказывает новичков за случайность.</p></div>',
+    table: table(['Автор', 'Роль', 'Заявок', 'Отклонено', 'Доля', 'Выше воронки'],
+      [...pts].sort((a, b) => b.k / b.n - a.k / a.n).map(p => [esc(p.u.name), p.u.role === 'LNP' ? 'ЛНП' : p.u.role === 'PEM' ? 'ПЭМ' : 'проводник', p.n, p.k, pct(p.k / p.n, 1), outs.includes(p) ? 'да' : '']), [2, 3, 4])
+  };
+}
+
+/* ---------- 6.3. Завышение критичности ---------- */
+function c63(el) {
+  const reqs = D.REQS.filter(q => q.src === 'manual' && q.created >= YEAR0 && q.trip);
+  const roles = [['CONDUCTOR', 'Проводник'], ['LNP', 'ЛНП'], ['PEM', 'ПЭМ']];
+  const W = 900, H = 400, T = 40, B = 40;
+  // Левая панель: наклонные линии «по умолчанию → как подали» для доли высокой и критической важности
+  const lx0 = 120, lx1 = 360, ymax = 0.6, y = lin(0, ymax, H - B, T);
+  let s = yGrid(lx0, lx1, y, [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6], v => pct(v));
+  s += `<text x="${lx0}" y="${T - 22}" font-size="12" class="ttl">Доля высокой и критической важности</text>` +
+    `<text x="${lx0}" y="${H - B + 18}" text-anchor="middle" font-size="11" class="muted">по типу неисправности</text><text x="${lx1}" y="${H - B + 18}" text-anchor="middle" font-size="11" class="muted">как подал автор</text>`;
+  roles.forEach(([code, name], i) => {
+    const a = reqs.filter(q => q.role === code); if (!a.length) return;
+    const d0 = a.filter(q => q.sevDefault >= 3).length / a.length, d1 = a.filter(q => q.sev >= 3).length / a.length;
+    s += `<line x1="${lx0}" x2="${lx1}" y1="${P(y(d0))}" y2="${P(y(d1))}" stroke="${SER[i]}" stroke-width="2.4"/>` +
+      `<circle cx="${lx0}" cy="${P(y(d0))}" r="4.5" fill="${SER[i]}"/><circle cx="${lx1}" cy="${P(y(d1))}" r="4.5" fill="${SER[i]}"${tipAttr(`<b>${name}</b><br>По типу неисправности: ${pct(d0, 1)}<br>Как подали: ${pct(d1, 1)}<br>Заявок: ${a.length}`)}/>` +
+      `<text x="${lx1 + 8}" y="${P(y(d1)) + 4}" font-size="11" class="strong">${name} ${pct(d1)}</text>`;
+  });
+  // Правая панель: авторы с наибольшей долей завышения и скорость реакции
+  const by = groupBy(reqs.filter(q => q.role === 'CONDUCTOR'), q => q.author);
+  const top = [...by.entries()].map(([id, a]) => ({ u: D.UBY[id], n: a.length, up: a.filter(q => q.sev > q.sevDefault).length })).filter(p => p.n >= 10)
+    .sort((a, b) => b.up / b.n - a.up / a.n).slice(0, 10);
+  const rx0 = 600, rx1 = W - 30, xr = lin(0, niceMax(Math.max(...top.map(p => p.up / p.n)) * 1.1), rx0, rx1);
+  s += `<text x="${rx0 - 170}" y="${T - 22}" font-size="12" class="ttl">Проводники, которые чаще завышают</text>`;
+  top.forEach((p, i) => {
+    const Y = T + 6 + i * 30, r = p.up / p.n;
+    s += `<text x="${rx0 - 8}" y="${Y + 4}" text-anchor="end" font-size="11">${esc(p.u.name)}</text>` +
+      `<line x1="${rx0}" x2="${P(xr(r))}" y1="${Y}" y2="${Y}" stroke="var(--axis)" stroke-width="2"/>` +
+      `<circle cx="${P(xr(r))}" cy="${Y}" r="5" fill="${r > 0.2 ? 'var(--critical)' : 'var(--s1)'}"${tipAttr(`<b>${esc(p.u.name)}</b><br>Заявок: ${p.n}<br>Завышена важность: ${p.up} (${pct(r)})`)}/>` +
+      `<text x="${P(xr(r) + 9)}" y="${Y + 4}" font-size="10" class="muted">${pct(r)} из ${p.n}</text>`;
+  });
+  el.innerHTML = legend(roles.map(([, n], i) => ({ name: n, color: SER[i], kind: 'line' })).concat([{ name: 'завышает в каждой пятой заявке и чаще', color: 'var(--critical)', kind: 'dot' }])) + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`;
+  const react = a => median(a.map(q => { const ip = q.sts.find(x => x.s === 'IN_PROGRESS'); return ip ? (ip.t - q.created) / HOUR : null; }).filter(v => v != null));
+  const infl = reqs.filter(q => q.sev > q.sevDefault), honest = reqs.filter(q => q.sev === q.sevDefault && q.sevDefault <= 2);
+  return {
+    find: `Завышенная важность ускоряет реакцию: медиана ${dur(react(infl))} против ${dur(react(honest))} у таких же заявок с честной важностью. Поэтому привычка закрепляется. ` +
+      `Небольшая группа проводников завышает каждую пятую заявку и чаще; служба привыкает не верить пометке «высокая», и настоящая критическая неисправность ждёт в общей очереди.`,
+    side: '<div><h3>Как считается</h3><p>Важность по умолчанию берётся из типа неисправности (fault_type.severity_type); важность заявки - из repair_request.severity_type, которую выбрал автор.</p></div>',
+    table: table(['Проводник', 'Заявок', 'Завышено', 'Доля'], top.map(p => [esc(p.u.name), p.n, p.up, pct(p.up / p.n)]), [1, 2, 3])
+  };
+}
+
+/* ---------- 6.4. «Ничьи» вагоны после прибытия: цикл по дням недели ---------- */
+const st64 = { depot: 0 };
+function c64(el) {
+  el.innerHTML = '';
+  const nW = 26, w0 = TODAY - wday(TODAY) * DAY - (nW - 1) * 7 * DAY;
+  const cell = Array.from({ length: 7 }, () => Array.from({ length: nW }, () => []));
+  for (const t of D.TRIPS) {
+    if (!t.hand || t.arr < w0 || (st64.depot && t.arrDepot !== st64.depot)) continue;
+    const wi = Math.floor((t.arr - w0) / (7 * DAY)); if (wi < 0 || wi >= nW) continue;
+    t.hand.forEach(h => cell[wday(t.arr)][wi].push(h));
+  }
+  const val = a => a.length ? mean(a) : null;
+  const W = 900, H = 330, L = 50, T = 20, B = 40, pw = (W - L - 10) / 7;
+  const all = cell.flat().map(val).filter(v => v != null), ymax = niceMax(Math.max(...all) * 1.05), y = lin(0, ymax, H - B, T);
+  let s = yGrid(L, W - 10, y, niceTicks(0, ymax, 4), v => fmt(v, 1) + ' ч');
+  const means = [];
+  for (let d = 0; d < 7; d++) {
+    const x0 = L + d * pw + 8, x = lin(0, nW - 1, x0, x0 + pw - 16);
+    const vs = cell[d].map(val), m = mean(vs.filter(v => v != null));
+    means.push(m);
+    s += `<line x1="${P(x0)}" x2="${P(x0 + pw - 16)}" y1="${P(y(m))}" y2="${P(y(m))}" stroke="${d >= 5 ? 'var(--critical)' : 'var(--text-primary)'}" stroke-width="2.4"/>`;
+    s += `<path d="${pathOf(vs.map((v, i) => v == null ? null : [x(i), y(v)]).filter(Boolean))}" fill="none" stroke="var(--b400)" stroke-width="1.4"/>`;
+    vs.forEach((v, i) => { if (v != null) s += `<circle class="hit" cx="${P(x(i))}" cy="${P(y(v))}" r="5"${tipAttr(`<b>${WD[d]}, неделя с ${dd(w0 + i * 7 * DAY)}</b><br>Вагоны без ответственного сотрудника станции: в среднем ${fmt(v, 1)} ч<br>Вагонов: ${cell[d][i].length}`)}/>`; });
+    s += `<text x="${P(x0 + (pw - 16) / 2)}" y="${H - B + 18}" text-anchor="middle" font-size="12" class="${d >= 5 ? 'strong' : ''}">${WD[d]}</text>` +
+      `<text x="${P(x0 + (pw - 16) / 2)}" y="${H - B + 32}" text-anchor="middle" font-size="10" class="muted">${fmt(m, 1)} ч</text>`;
+  }
+  el.insertAdjacentHTML('beforeend', legend([{ name: 'неделя за неделей, полгода', color: 'var(--b400)', kind: 'line' }, { name: 'среднее дня недели', color: 'var(--text-primary)', kind: 'line' }, { name: 'выходные', color: 'var(--critical)', kind: 'line' }]) + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`);
+  toggles(el, DEPOT_TGL, String(st64.depot), v => { st64.depot = +v; cards[3].redraw(); });
+  const wk = mean(means.slice(0, 5)), we = mean(means.slice(5));
+  const planShare = mean(D.TRIPS.filter(t => t.hand).flatMap(t => t.hand.map(h => h === 0 ? 1 : 0)));
+  return {
+    find: `После прибытия вагон в среднем ${fmt(wk, 1)} ч в будни и ${fmt(we, 1)} ч в выходные числится за уехавшей бригадой, пока станция его не примет. Выходные дают такой разрыв неделя за неделей - это расписание смен, а не случайность. ` +
+      `План ответственных после рейса задан только у ${pct(planShare)} вагонов; заявки на «ничей» вагон видит бригада, которой уже нет в поезде.`,
+    side: '<div><h3>Как читать</h3><p>Семь мини-графиков - семь дней недели. Внутри дня линия идёт по неделям за полгода; толстая черта - среднее этого дня. Разные высоты черт - недельный ритм, скачки линии внутри дня - отдельные недели.</p></div>',
+    table: table(['День недели', 'Среднее, ч'], WD.map((d, i) => [d, fmt(means[i], 1)]), [1])
+  };
+}
+
+/* ---------- 6.5. Дисциплина прицепок: план против факта ---------- */
+const st65 = { depot: 0 };
+function c65(el) {
+  el.innerHTML = '';
+  const K = [['ontime', 'по плану вовремя', 'var(--s1)', 1], ['late', 'по плану с опозданием больше часа', 'var(--s4)', -1], ['unplanned', 'без плана', 'var(--s2)', -1], ['cancelled', 'план отменён', 'var(--s5)', -1]];
+  const weeks = Array.from({ length: 52 }, () => ({ ontime: 0, late: 0, unplanned: 0, cancelled: 0 }));
+  for (const c of D.COUPLINGS) { if (st65.depot && c.depot !== st65.depot) continue; const w = weekIdx(c.t); if (w >= 0 && w < 52) weeks[w][c.kind]++; }
+  const up = weeks.map(w => w.ontime), dn = weeks.map(w => w.late + w.unplanned + w.cancelled);
+  const m = niceMax(Math.max(...up, ...dn), 3);
+  const W = 900, H = 360, L = 50, Rr = 20, T = 20, B = 30, mid = (H - B + T) / 2;
+  const y = lin(-m, m, H - B, T), x = lin(0, 52, L, W - Rr), bw = (W - Rr - L) / 52 - 2;
+  let s = niceTicks(0, m, 3).flatMap(v => v ? [v, -v] : [0]).map(v => `<line x1="${L}" x2="${W - Rr}" y1="${P(y(v))}" y2="${P(y(v))}" stroke="var(--grid)"/><text x="${L - 6}" y="${P(y(v)) + 4}" text-anchor="end" font-size="11" class="muted">${fmt(Math.abs(v))}</text>`).join('');
+  s += `<text x="${L + 4}" y="${T + 10}" font-size="11" class="muted">↑ прицепки и отцепки по плану, вовремя</text><text x="${L + 4}" y="${H - B - 4}" font-size="11" class="muted">↓ с опозданием, без плана, отменённые планы</text>`;
+  weeks.forEach((w, i) => {
+    const X = x(i) + 1;
+    const tipH = `<b>Неделя с ${dd(WEEK0 + i * 7 * DAY)}</b><br>` + K.map(([k, n]) => `${n}: ${w[k]}`).join('<br>');
+    s += `<rect x="${P(X)}" y="${P(y(w.ontime))}" width="${P(bw)}" height="${P(y(0) - y(w.ontime))}" fill="var(--s1)"${tipAttr(tipH)}/>`;
+    let acc = 0;
+    for (const [k, , c] of K.slice(1)) { if (!w[k]) continue; s += `<rect x="${P(X)}" y="${P(y(-acc))}" width="${P(bw)}" height="${P(y(-acc - w[k]) - y(-acc))}" fill="${c}"${tipAttr(tipH)}/>`; acc += w[k]; }
+  });
+  s += `<line x1="${L}" x2="${W - Rr}" y1="${P(y(0))}" y2="${P(y(0))}" stroke="var(--text-primary)"/>`;
+  for (let i = 0; i < 52; i += 8) s += `<text x="${P(x(i))}" y="${H - 10}" font-size="11" class="muted">${dd(WEEK0 + i * 7 * DAY)}</text>`;
+  el.insertAdjacentHTML('beforeend', legend(K.map(([, n, c]) => ({ name: n, color: c }))) + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`);
+  toggles(el, DEPOT_TGL, String(st65.depot), v => { st65.depot = +v; cards[4].redraw(); });
+  const rows = D.DEPOTS.map(d => { const a = D.COUPLINGS.filter(c => c.depot === d.id); return [d, a.filter(c => c.kind === 'ontime').length / (a.length || 1), a.filter(c => c.kind === 'unplanned').length / (a.length || 1), a.length]; });
+  const worst = [...rows].sort((a, b) => b[2] - a[2])[0];
+  return {
+    find: `Поезда депо ${esc(worst[0].name)} меняют состав без плана в ${pct(worst[2])} случаев: планировщик вагонов узнаёт о замене вагона по факту, а ЛНП - на перроне. ` +
+      `Нижняя половина диаграммы - цена непланирования: вагон не передан на станцию заранее, план ответственных не построен, отправление ждёт.`,
+    table: table(['Депо поезда', 'Изменений состава', 'По плану вовремя', 'Без плана'], rows.map(([d, a, b, n]) => [esc(d.name), fmt(n), pct(a), pct(b)]), [1, 2, 3])
+  };
+}
+
+/* ---------- 6.6. Слепые пятна проверок ---------- */
+const st66 = { kind: 'check' };
+function c66(el) {
+  el.innerHTML = '';
+  const src = st66.kind === 'check' ? D.CHECKS : D.EQUIPS;
+  const last = new Map(); for (const c of src) if (c.t <= NOW && (!last.has(c.wagon) || c.t > last.get(c.wagon))) last.set(c.wagon, c.t);
+  const lastTrip = new Map(); for (const w of D.WAGONS) { const id = w.trips[w.trips.length - 1]; if (id) lastTrip.set(w.id, D.TRIPS[id - 1].dep); }
+  const BANDS = [{ name: 'до 7 суток', max: 7, c: 'var(--b200)' }, { name: '8-30 суток', max: 30, c: 'var(--b400)' }, { name: '31-90 суток', max: 90, c: 'var(--o400)' },
+    { name: 'больше 90 суток', max: 1e9, c: 'var(--o600)' }, { name: 'не проверяли ни разу', max: null, c: 'var(--critical)' }];
+  const W = 900, cs = 13, per = 30;
+  let y = 10, s = '';
+  const blind = [];
+  for (const d of D.DEPOTS) {
+    const ws = D.WAGONS.filter(w => w.depot === d.id && !(w.excludedFrom && w.excludedFrom < NOW)).map(w => {
+      const t = last.get(w.id), days = t ? (NOW - t) / DAY : null;
+      return { w, days, band: days == null ? BANDS[4] : BANDS.find(b => b.max != null && days <= b.max) };
+    }).sort((a, b) => (b.days == null ? 1e9 : b.days) - (a.days == null ? 1e9 : a.days));
+    s += `<text x="0" y="${y + 11}" font-size="12" class="strong">${esc(d.name)}</text><text x="0" y="${y + 25}" font-size="10" class="muted">${ws.length} ваг.</text>`;
+    ws.forEach((x, i) => {
+      const cx = 120 + (i % per) * (cs + 3), cy = y + Math.floor(i / per) * (cs + 3);
+      const rode = lastTrip.get(x.w.id), riskTrip = rode && (x.days == null || x.days > 30) && rode > NOW - 14 * DAY;
+      if (riskTrip) blind.push(x);
+      s += `<rect x="${cx}" y="${cy}" width="${cs}" height="${cs}" rx="3" fill="${x.band.c}"${riskTrip ? ' stroke="var(--text-primary)" stroke-width="2"' : ''}` +
+        tipAttr(`<b>Вагон ${esc(x.w.number)}</b> · ${esc(x.w.typeName)}<br>${st66.kind === 'check' ? 'Последний чек-лист приёмки' : 'Последняя опись'}: ${x.days == null ? 'не было' : fmt(x.days) + ' сут назад'}` +
+          (rode ? `<br>Последний рейс: ${dd(rode)}` : '') + (riskTrip ? '<br><b>ходит в рейсы без свежей проверки</b>' : '')) + '/>';
+    });
+    y += Math.ceil(ws.length / per) * (cs + 3) + 16;
+  }
+  el.insertAdjacentHTML('beforeend', legend(BANDS.map(b => ({ name: b.name, color: b.c })).concat([{ name: 'обводка - был в рейсе за 14 суток без проверки дольше 30 суток', color: 'transparent; border:0.15rem solid var(--text-primary)' }])) +
+    `<svg viewBox="0 0 ${W} ${y}">${s}</svg>`);
+  toggles(el, [{ v: 'check', name: 'Чек-лист приёмки' }, { v: 'equip', name: 'Опись экипировки' }], st66.kind, v => { st66.kind = v; cards[5].redraw(); });
+  const never = D.WAGONS.filter(w => !last.has(w.id) && !(w.excludedFrom && w.excludedFrom < NOW)).length;
+  return {
+    find: `${blind.length} ${plural(blind.length, 'вагон ходит', 'вагона ходят', 'вагонов ходят')} в рейсы, хотя ${st66.kind === 'check' ? 'чек-лист приёмки' : 'опись'} не составляли больше месяца; ${never} ${plural(never, 'вагон', 'вагона', 'вагонов')} не ${st66.kind === 'check' ? 'проверяли' : 'описывали'} ни разу. ` +
+      'Проверки достаются одним и тем же вагонам: подменные вагоны из резерва попадают в рейс без приёмки. Карта показывает, кого проверить сегодня.',
+    side: '<div><h3>Как читать</h3><p>Квадрат - вагон, группы - депо приписки; внутри группы вагоны идут от давно не проверенных к недавно проверенным.</p></div>',
+    table: table(['Вагон', 'Депо', 'Тип вагона', 'Суток с последней проверки'], blind.map(x => [esc(x.w.number), esc(D.DEP[x.w.depot].name), esc(x.w.typeName), x.days == null ? 'не было' : fmt(x.days)]), [3])
+  };
+}
+
+const cards = [
+  { num: '6.1', render: c61, title: 'Реакция на важные неисправности: шум или сигнал - карта Шухарта отвечает каждую неделю',
+    form: 'Контрольная карта XmR: недельная медиана времени реакции с границами нормальных колебаний',
+    goal: 'Отличать настоящее ухудшение реакции служб от случайных колебаний.',
+    problem: 'Руководитель разбирает каждую «плохую» неделю, хотя половина из них - шум, и пропускает медленное ухудшение.',
+    source: 'repair_request (created_dt, severity_type), repair_request_status (IN_PROGRESS)' },
+  { num: '6.2', render: c62, title: 'Лишние заявки подают несколько человек, а не новички с малой выборкой',
+    form: 'Воронковый график: доля отклонённых заявок против числа заявок автора',
+    goal: 'Найти авторов, чьи заявки отклоняют чаще, чем объясняет случайность.',
+    problem: 'Рейтинг по доле отклонённых наказывает авторов с малым числом заявок и не выделяет тех, кому нужен инструктаж.',
+    source: 'repair_request (created_by_usr), repair_request_info (REJECTED), usr_role' },
+  { num: '6.3', render: c63, title: 'Завышенная важность ускоряет реакцию - и поэтому приживается',
+    form: 'Наклонные линии «важность по типу → важность в заявке» и точечный рейтинг авторов',
+    goal: 'Видеть, кто и насколько завышает важность заявок.',
+    problem: 'Служба перестаёт доверять пометке «высокая», и настоящая критическая неисправность ждёт в общей очереди.',
+    source: 'repair_request.severity_type, fault_type.severity_type, repair_request_status' },
+  { num: '6.4', render: c64, title: 'В выходные вагон часами стоит «ничьим» после прибытия',
+    form: 'Цикловой график: дни недели, внутри каждого - путь по неделям за полгода',
+    goal: 'Измерить, сколько вагон числится за уехавшей бригадой после прибытия, и найти повторяющийся ритм.',
+    problem: 'Без ответственного на станции заявки на вагон некому принять, имущество некому сохранить.',
+    source: 'wagon_responsible (план после рейса, факт), trip.arrived_dt, transfer_act' },
+  { num: '6.5', render: c65, title: 'Состав меняют без плана: планировщик узнаёт о замене по факту',
+    form: 'Расходящиеся столбцы по неделям: вверху - по плану вовремя, внизу - опоздания, без плана, отмены',
+    goal: 'Следить за долей прицепок и отцепок, выполненных по плану.',
+    problem: 'Внеплановая замена вагона ломает передачу на станцию, план ответственных и норму проводников.',
+    source: 'train_wagon_change (kind, plan_status, plan, dt)' },
+  { num: '6.6', render: c66, title: 'Вагоны, которые давно никто не проверял, всё равно ходят в рейсы',
+    form: 'Мозаика из квадратов (waffle): вагон - квадрат, цвет - сколько суток назад проверяли',
+    goal: 'Каждый день видеть вагоны без свежего чек-листа приёмки или описи.',
+    problem: 'Проверки достаются одним и тем же вагонам; подменные вагоны уходят в рейс без приёмки.',
+    source: 'check_list (wagon, completed_dt), equip_list (wagon, completed_dt), wagon_info' }
+];
+renderCards(document.getElementById('grid'), cards);
+</script>
+</body>
+</html>

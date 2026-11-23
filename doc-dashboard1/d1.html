@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Жолсерік · 1. Ритмы</title>
+<link rel="stylesheet" href="common.css">
+</head>
+<body class="viz-root">
+<div class="wrap">
+  <header class="top">
+    <div class="ttl">
+      <div class="kicker">Дашборд 1 · ракурс «время»</div>
+      <h1>Ритмы: когда возникают неисправности и где теряется время</h1>
+      <p>Диаграммы раскладывают одни и те же заявки и рейсы по календарю, часам суток, километрам маршрута и
+        статусам. Сезон, час и участок пути объясняют поток заявок лучше, чем сумма за месяц. Демонстрационные данные; срез на 22.11.2026.</p>
+    </div>
+    <nav class="dash"></nav>
+  </header>
+  <div class="filters">
+    <label class="theme">Оформление
+      <select id="fTheme"><option value="">Как в системе</option><option value="light">Светлое</option><option value="dark">Тёмное</option></select>
+    </label>
+  </div>
+  <div class="stack" id="grid"></div>
+</div>
+<script src="geo.js"></script>
+<script src="common.js"></script>
+<script src="data.js"></script>
+<script>
+'use strict';
+setupPage('d1.html');
+const SVC_ORDER = ['T', 'C', 'E'];
+const SVC_COLOR = { T: 'var(--s1)', C: 'var(--s2)', E: 'var(--s3)' };
+
+/* ---------- 1.1. Календарь года ---------- */
+const st11 = { svc: '', norm: 'rate' };
+function c11(el) {
+  el.innerHTML = '';
+  const reqs = D.REQS.filter(q => !st11.svc || q.svc === st11.svc);
+  const day0 = TODAY - 364 * DAY;
+  const first = day0 - wday(day0) * DAY;
+  const nW = Math.ceil((TODAY + DAY - first) / DAY / 7);
+  const cnt = new Map(), wt = new Map();
+  for (const q of reqs) if (q.created >= day0) { const d = Math.floor(q.created / DAY) * DAY; cnt.set(d, (cnt.get(d) || 0) + 1); }
+  for (const t of D.TRIPS) if (t.dep >= day0 && t.wagons.length && t.dep <= NOW) { const d = Math.floor(t.dep / DAY) * DAY; wt.set(d, (wt.get(d) || 0) + t.wagons.length); }
+  const val = d => { const c = cnt.get(d) || 0; return st11.norm === 'rate' ? (wt.get(d) ? c / wt.get(d) * 100 : 0) : c; };
+  const days = [];
+  for (let d = day0; d <= TODAY; d += DAY) days.push({ d, v: val(d), c: cnt.get(d) || 0, w: wt.get(d) || 0 });
+  const vals = days.map(x => x.v).filter(v => v > 0);
+  const qs = [1, 2, 3, 4, 5, 6].map(i => quantile(vals, i / 7));
+  const color = v => v <= 0 ? 'var(--surface-2)' : BLUE[qs.filter(q => v > q).length];
+  const cs = 15, gap = 2, x0 = 34, y0 = 70, W = x0 + nW * (cs + gap) + 150;
+  const weekly = Array.from({ length: nW }, () => ({ c: 0, w: 0 }));
+  const byWd = Array.from({ length: 7 }, () => []);
+  let s = '';
+  for (const x of days) {
+    const wi = Math.floor((x.d - first) / DAY / 7), di = wday(x.d);
+    weekly[wi].c += x.c; weekly[wi].w += x.w; byWd[di].push(x.v);
+    const hol = D.HOLIDAYS.some(([a, b]) => x.d >= a && x.d < b);
+    const cold = x.d >= D.COLD[0] && x.d < D.COLD[1];
+    s += `<rect x="${x0 + wi * (cs + gap)}" y="${y0 + di * (cs + gap)}" width="${cs}" height="${cs}" rx="3" fill="${color(x.v)}"` +
+      (hol ? ' stroke="var(--s2)" stroke-width="2"' : cold ? ' stroke="var(--text-primary)" stroke-width="1.5"' : '') +
+      tipAttr(`<b>${ddy(x.d)}, ${WD[di]}</b><br>Заявок: ${fmt(x.c)}<br>Вагоно-рейсов: ${fmt(x.w)}<br>На 100 вагоно-рейсов: ${fmt(x.w ? x.c / x.w * 100 : 0, 1)}` +
+        (hol ? '<br><span class="k">Праздничные дни</span>' : '') + (cold ? '<br><span class="k">Холодная волна</span>' : '')) + '/>';
+  }
+  // Подписи месяцев
+  let lastM = -1;
+  for (let wi = 0; wi < nW; wi++) {
+    const d = first + wi * 7 * DAY + 3 * DAY, m = monthOf(d);
+    if (m !== lastM) { s += `<text x="${x0 + wi * (cs + gap)}" y="${y0 - 6}" font-size="11" class="muted">${MONTHS[m]}</text>`; lastM = m; }
+  }
+  WD.forEach((w, i) => { if (i % 2 === 0 || i === 6) s += `<text x="${x0 - 6}" y="${y0 + i * (cs + gap) + 11}" font-size="10" text-anchor="end" class="muted">${w}</text>`; });
+  // Сверху - недельные значения
+  const wv = weekly.map(x => st11.norm === 'rate' ? (x.w ? x.c / x.w * 100 : 0) : x.c);
+  const wmax = Math.max(...wv);
+  wv.forEach((v, wi) => {
+    const h = v / wmax * 36;
+    s += `<rect x="${x0 + wi * (cs + gap) + 2}" y="${y0 - 16 - h}" width="${cs - 4}" height="${P(h)}" rx="2" fill="var(--neutral-band)"` +
+      tipAttr(`<b>Неделя с ${dd(first + wi * 7 * DAY)}</b><br>${st11.norm === 'rate' ? 'На 100 вагоно-рейсов: ' + fmt(v, 1) : 'Заявок: ' + fmt(v)}`) + '/>';
+  });
+  // Справа - средний профиль дня недели
+  const wdAvg = byWd.map(a => mean(a)), wdMax = Math.max(...wdAvg);
+  const xr = x0 + nW * (cs + gap) + 16;
+  s += `<text x="${xr}" y="${y0 - 6}" font-size="11" class="muted">в среднем</text>`;
+  wdAvg.forEach((v, i) => {
+    const w = v / wdMax * 90;
+    s += `<rect x="${xr}" y="${y0 + i * (cs + gap) + 2}" width="${P(w)}" height="${cs - 4}" rx="2" fill="var(--b400)"` + tipAttr(`<b>${WD[i]}</b><br>В среднем: ${fmt(v, 1)}`) + '/>' +
+      `<text x="${xr + w + 5}" y="${y0 + i * (cs + gap) + 11}" font-size="10" class="muted">${fmt(v, st11.norm === 'rate' ? 1 : 0)}</text>`;
+  });
+  const H = y0 + 7 * (cs + gap) + 10;
+  const lg = legend([{ ramp: BLUE, from: 'меньше', to: 'больше' }, { name: 'праздничные дни', color: 'transparent; border:0.15rem solid var(--s2)' },
+    { name: 'холодная волна', color: 'transparent; border:0.1rem solid var(--text-primary)' }]);
+  el.insertAdjacentHTML('beforeend', lg + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`);
+  toggles(el, [{ v: 'rate', name: 'На 100 вагоно-рейсов' }, { v: 'abs', name: 'Всего заявок' }], st11.norm, v => { st11.norm = v; cards[0].redraw(); });
+  const box = el.querySelector('.ctl');
+  box.insertAdjacentHTML('beforeend', '<span style="width:1rem"></span>' + [['', 'Все службы'], ['T', 'Техническая'], ['C', 'Клининг'], ['E', 'Экипировка']]
+    .map(([v, n]) => `<button data-s="${v}" class="${st11.svc === v ? 'on' : ''}">${n}</button>`).join(''));
+  box.querySelectorAll('[data-s]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); st11.svc = b.dataset.s; cards[0].redraw(); }));
+  // Вывод
+  const winter = days.filter(x => [11, 0, 1].includes(monthOf(x.d))), summer = days.filter(x => [5, 6, 7].includes(monthOf(x.d)));
+  const rate = a => sum(a.map(x => x.c)) / (sum(a.map(x => x.w)) || 1) * 100;
+  const hol = days.filter(x => D.HOLIDAYS.some(([a, b]) => x.d >= a && x.d < b)), norm = days.filter(x => !D.HOLIDAYS.some(([a, b]) => x.d >= a && x.d < b));
+  const cold = days.filter(x => x.d >= D.COLD[0] && x.d < D.COLD[1]);
+  return {
+    find: `Холодная волна 12-22 января дала ${fmt(rate(cold) / rate(norm), 1)}× заявок на вагоно-рейс против обычного дня. ` +
+      `В праздники поток растёт в ${fmt(rate(hol) / rate(norm), 1)} раза за счёт клининга: пассажиров больше, а норм уборки те же.`,
+    side: `<div><h3>Зима против лета</h3><div class="big">${fmt(rate(winter) / rate(summer), 2)}×<small> заявок на вагоно-рейс</small></div></div>`,
+    table: table(['Неделя с', 'Заявок', 'Вагоно-рейсов', 'На 100 вагоно-рейсов'],
+      weekly.map((x, i) => [dd(first + i * 7 * DAY), fmt(x.c), fmt(x.w), fmt(x.w ? x.c / x.w * 100 : 0, 1)]), [1, 2, 3])
+  };
+}
+
+/* ---------- 1.2. Часы суток ---------- */
+function c12(el) {
+  const R0 = 34, R1 = 128, size = 300;
+  let s = '', rows = [];
+  const peaks = {};
+  SVC_ORDER.forEach((svc, k) => {
+    const m = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    let n = 0;
+    for (const q of D.REQS) if (q.svc === svc && q.src === 'manual') { m[wday(q.created)][hourOf(q.created)]++; n++; }
+    const max = Math.max(...m.flat()), min = Math.min(...m.flat());
+    const cx = k * size + size / 2, cy = 160;
+    const hourSum = new Array(24).fill(0);
+    m.forEach((row, di) => row.forEach((v, h) => {
+      hourSum[h] += v;
+      const r0 = R0 + di * (R1 - R0) / 7, r1 = R0 + (di + 1) * (R1 - R0) / 7 - 1;
+      const a0 = h / 24 * 2 * Math.PI + 0.012, a1 = (h + 1) / 24 * 2 * Math.PI - 0.012;
+      s += `<path d="${arc(cx, cy, r0, r1, a0, a1)}" fill="${step(BLUE, v - min, (max - min) * 1.0001)}"` +
+        tipAttr(`<b>${D.SERVICES[svc]}</b><br>${WD[di]}, ${String(h).padStart(2, '0')}:00-${String(h + 1).padStart(2, '0')}:00<br>Заявок: ${fmt(v)} (${pct(v / n, 1)})`) + '/>';
+    }));
+    [0, 6, 12, 18].forEach(h => {
+      const [x, y] = polar(cx, cy, R1 + 12, h / 24 * 2 * Math.PI);
+      s += `<text x="${P(x)}" y="${P(y + 4)}" text-anchor="middle" font-size="11" class="muted">${String(h).padStart(2, '0')}</text>`;
+    });
+    const ph = hourSum.indexOf(Math.max(...hourSum));
+    peaks[svc] = ph;
+    const [px, py] = polar(cx, cy, R1 + 4, (ph + 0.5) / 24 * 2 * Math.PI);
+    const [lx, ly] = polar(cx, cy, R1 + 30, (ph + 0.5) / 24 * 2 * Math.PI);
+    s += `<line x1="${P(px)}" y1="${P(py)}" x2="${P(lx)}" y2="${P(ly)}" stroke="var(--text-primary)"/>` +
+      `<text x="${P(lx)}" y="${P(ly + (ly > cy ? 12 : -4))}" text-anchor="middle" font-size="11" class="strong halo">пик ${String(ph).padStart(2, '0')}:00</text>`;
+    s += `<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="12" class="ttl">${D.SERVICES[svc]}</text>` +
+      `<text x="${cx}" y="${cy + 13}" text-anchor="middle" font-size="11" class="muted">${fmt(n)}</text>`;
+    rows.push([D.SERVICES[svc], fmt(n), String(ph).padStart(2, '0') + ':00']);
+  });
+  el.innerHTML = legend([{ ramp: BLUE, from: 'реже', to: 'чаще' }, { name: 'кольца изнутри наружу: понедельник - воскресенье', color: 'transparent' }]) +
+    `<svg viewBox="0 0 ${size * 3} 330">${s}</svg>`;
+  return {
+    find: `Техническая служба получает больше всего заявок ночью, около ${String(peaks.T).padStart(2, '0')}:00: проводник замечает холод и свет, когда пассажиры спят. ` +
+      `Клининг и экипировку заявляют вскоре после отправления, при посадке. Ночные заявки ждут исполнителя до утра, поэтому их время реакции завышено «по расписанию», а не по вине службы.`,
+    table: table(['Служба', 'Заявок, поданных людьми', 'Пиковый час'], rows, [1])
+  };
+}
+
+/* ---------- 1.3. Диаграмма Марея ---------- */
+const st13 = { route: 1 };
+function c13(el) {
+  el.innerHTML = '';
+  const r = D.RBY[st13.route];
+  const t1 = TODAY + 8 * HOUR, t0 = t1 - 7 * DAY;
+  const W = 900, H = 430, L = 120, Rr = 20, T = 14, B = 30;
+  const x = lin(t0, t1, L, W - Rr), y = lin(0, r.total, T, H - B);
+  let s = '';
+  // Ночь
+  for (let d = t0 - DAY; d < t1; d += DAY) {
+    const a = Math.max(t0, Math.floor(d / DAY) * DAY + 22 * HOUR), b = Math.min(t1, Math.floor(d / DAY) * DAY + 30 * HOUR);
+    if (b > a) s += `<rect x="${P(x(a))}" y="${T}" width="${P(x(b) - x(a))}" height="${H - B - T}" fill="var(--night)"/>`;
+  }
+  // Участки
+  for (const [a, b] of r.dead) s += `<rect x="${L}" y="${P(y(a))}" width="${W - Rr - L}" height="${P(y(b) - y(a))}" fill="var(--s7)" opacity="0.08"/>` +
+    `<text x="${W - Rr - 4}" y="${P(y(a)) + 12}" text-anchor="end" font-size="10" class="muted">нет связи</text>`;
+  for (const [a, b] of r.dust) s += `<rect x="${L}" y="${P(y(a))}" width="${W - Rr - L}" height="${P(y(b) - y(a))}" fill="var(--s4)" opacity="0.10"/>` +
+    `<text x="${W - Rr - 4}" y="${P(y(a)) + 12}" text-anchor="end" font-size="10" class="muted">пыльный участок</text>`;
+  // Станции с остановкой
+  const seen = new Set();
+  for (const stp of r.stops) {
+    if (seen.has(stp.km)) continue; seen.add(stp.km);
+    s += `<line x1="${L}" x2="${W - Rr}" y1="${P(y(stp.km))}" y2="${P(y(stp.km))}" stroke="var(--grid)"/>` +
+      `<text x="${L - 8}" y="${P(y(stp.km)) + 4}" text-anchor="end" font-size="11">${esc(stp.name)}</text>`;
+  }
+  for (let d = Math.ceil(t0 / DAY) * DAY; d <= t1; d += DAY) s += `<line x1="${P(x(d))}" x2="${P(x(d))}" y1="${T}" y2="${H - B}" stroke="var(--grid)"/>` +
+    `<text x="${P(x(d))}" y="${H - B + 16}" text-anchor="middle" font-size="11" class="muted">${dd(d)}</text>`;
+  const trips = D.TRIPS.filter(t => t.route === r.id && t.arr > t0 && t.dep < t1 && t.status !== 'CANCELLED' && t.wagons.length);
+  const delayColor = m => m <= 15 ? 'var(--neutral)' : m <= 60 ? 'var(--o300)' : m <= 120 ? 'var(--o500)' : 'var(--o700)';
+  const reqByTrip = groupBy(D.REQS.filter(q => q.trip && q.km != null && q.src === 'manual'), q => q.trip);
+  let dots = '', rows = [];
+  for (const t of trips) {
+    const sched = r.T.map((m, i) => [t.plan + (t.dir ? r.durMin - m : m) * MIN, r.K[i]]).sort((a, b) => a[0] - b[0]);
+    s += `<path d="${pathOf(sched.map(([tt, k]) => [x(clamp(tt, t0, t1)), y(k)]))}" fill="none" stroke="var(--axis)" stroke-width="1"/>`;
+    const delay = (t.arr - (t.plan + r.durMin * MIN)) / MIN;
+    const fact = r.T.map((m, i) => [t.dep + (t.dir ? (r.durMin - m) : m) / r.durMin * (Math.min(t.arr, NOW + 1e12) - t.dep), r.K[i]])
+      .sort((a, b) => a[0] - b[0]).filter(p => p[0] <= NOW);
+    const tipT = `<b>Рейс ${esc(r.num)} от ${dd(t.plan)} ${hhmm(t.plan)}</b><br>${t.dir ? 'обратно' : 'туда'}<br>Опоздание прибытия: ${fmt(Math.max(0, delay))} мин<br>Вагонов: ${t.wagons.length}<br>Заявок в пути: ${(reqByTrip.get(t.id) || []).length}`;
+    s += `<path d="${pathOf(fact.filter(p => p[0] >= t0 && p[0] <= t1).map(([tt, k]) => [x(tt), y(k)]))}" fill="none" stroke="${delayColor(delay)}" stroke-width="2.4" stroke-linecap="round"/>`;
+    s += `<path d="${pathOf(fact.filter(p => p[0] >= t0 && p[0] <= t1).map(([tt, k]) => [x(tt), y(k)]))}" fill="none" stroke="transparent" stroke-width="10"${tipAttr(tipT)}/>`;
+    for (const q of reqByTrip.get(t.id) || []) {
+      if (q.created < t0 || q.created > t1) continue;
+      dots += `<circle cx="${P(x(q.created))}" cy="${P(y(q.km))}" r="3.6" fill="${SVC_COLOR[q.svc]}" stroke="var(--surface-1)" stroke-width="1.5"` +
+        tipAttr(`<b>${esc(q.number)}</b> · ${esc(D.SERVICES[q.svc])}<br>${esc(q.fault.name)}<br>${dd(q.created)} ${hhmm(q.created)}, ${fmt(q.km)} км` +
+          (q.received - q.created > 10 * MIN ? `<br>Поступила через ${dur((q.received - q.created) / HOUR)}` : '')) + '/>';
+    }
+    rows.push([dd(t.plan) + ' ' + hhmm(t.plan), t.dir ? 'обратно' : 'туда', fmt(Math.max(0, delay)), fmt((reqByTrip.get(t.id) || []).length)]);
+  }
+  s += dots;
+  el.insertAdjacentHTML('beforeend', legend([{ name: 'расписание', color: 'var(--axis)', kind: 'line' }, { name: 'опоздание до 15 мин', color: 'var(--neutral)', kind: 'line' },
+    { name: '15-60 мин', color: 'var(--o300)', kind: 'line' }, { name: '1-2 ч', color: 'var(--o500)', kind: 'line' }, { name: 'больше 2 ч', color: 'var(--o700)', kind: 'line' },
+    { name: 'Техническая', color: SVC_COLOR.T, kind: 'dot' }, { name: 'Клининг', color: SVC_COLOR.C, kind: 'dot' }, { name: 'Экипировка', color: SVC_COLOR.E, kind: 'dot' }]) +
+    `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`);
+  toggles(el, [1, 103, 203, 101].map(id => ({ v: String(id), name: D.RBY[id].num + ' ' + D.RBY[id].name })), String(st13.route), v => { st13.route = +v; cards[2].redraw(); });
+  // Вывод по всему году
+  const all = D.REQS.filter(q => q.trip && q.km != null && q.src === 'manual' && D.TRIPS[q.trip - 1].route === r.id);
+  const inDust = all.filter(q => D.inSec(r.dust, q.km)).length, dustKm = sum(r.dust.map(([a, b]) => b - a));
+  const late = all.filter(q => q.received - q.created > 30 * MIN).length;
+  return {
+    find: (r.dust.length ? `На пыльном участке (${fmt(dustKm)} км, ${pct(dustKm / r.total)} пути) за год подано ${pct(inDust / all.length)} заявок маршрута: окна, кондиционер, уборка. ` : '') +
+      (r.dead.length ? `Точки на участке без связи «прилипают» к его концу: телефон отправляет заявку только после выхода из зоны, и ${pct(late / all.length)} заявок маршрута поступают позже чем через 30 минут.` :
+        'Заявки распределены по пути равномерно; пучок точек в начале рейса - замечания при посадке.'),
+    side: '<div><h3>Как читать</h3><p>По горизонтали - время, по вертикали - километры маршрута. Каждая наклонная линия - рейс; чем положе линия, тем медленнее поезд. Точки - заявки в тот момент и в том месте, где поезд был по расписанию с поправкой на опоздание.</p></div>',
+    table: table(['Плановое отправление', 'Направление', 'Опоздание, мин', 'Заявок в пути'], rows, [2, 3])
+  };
+}
+
+/* ---------- 1.4. Очередь заявок по статусам ---------- */
+const ST14 = ['NEW', 'ASSIGNED', 'IN_PROGRESS', 'DONE', 'DEFERRED'];
+const ST14C = { NEW: 'var(--s1)', ASSIGNED: 'var(--s7)', IN_PROGRESS: 'var(--s3)', DONE: 'var(--s4)', DEFERRED: 'var(--s5)' };
+const st14 = { depot: 0 };
+function c14(el) {
+  el.innerHTML = '';
+  const nD = 180, d0 = TODAY - (nD - 1) * DAY;
+  const diff = Object.fromEntries(ST14.map(k => [k, new Float64Array(nD + 2)]));
+  const di = t => Math.floor((t - d0) / DAY);
+  for (const q of D.REQS) {
+    if (st14.depot && q.depot !== st14.depot) continue;
+    const sts = q.sts;
+    for (let i = 0; i < sts.length; i++) {
+      const k = sts[i].s; if (!diff[k]) continue;
+      const a = sts[i].t, b = i + 1 < sts.length ? sts[i + 1].t : Infinity;
+      // Заявка считается в статусе на конец суток
+      const ia = Math.max(0, Math.ceil((a - d0 - DAY + 1) / DAY)), ib = b === Infinity ? nD : Math.min(nD, Math.ceil((b - d0 - DAY + 1) / DAY));
+      if (ib > ia && ia < nD) { diff[k][ia] += 1; diff[k][ib] -= 1; }
+    }
+  }
+  const series = {};
+  for (const k of ST14) { let acc = 0; series[k] = Array.from({ length: nD }, (_, i) => (acc += diff[k][i])); }
+  const tot = Array.from({ length: nD }, (_, i) => sum(ST14.map(k => series[k][i])));
+  const W = 900, H = 320, L = 50, Rr = 130, T = 10, B = 26;
+  const x = lin(0, nD - 1, L, W - Rr), ymax = niceMax(Math.max(...tot)), y = lin(0, ymax, H - B, T);
+  let s = yGrid(L, W - Rr, y, niceTicks(0, ymax, 5));
+  const base = new Array(nD).fill(0);
+  for (const k of ST14) {
+    const top = series[k].map((v, i) => base[i] + v);
+    const pts = top.map((v, i) => [x(i), y(v)]), bot = base.map((v, i) => [x(i), y(v)]).reverse();
+    s += `<path d="${pathOf(pts.concat(bot))}Z" fill="${ST14C[k]}" opacity="0.88" stroke="var(--surface-1)" stroke-width="1"/>`;
+    const last = nD - 1, mid = (base[last] + top[last]) / 2;
+    if (series[k][last] > ymax * 0.03) s += `<text x="${W - Rr + 8}" y="${P(y(mid)) + 4}" font-size="11">${D.STATUS[k]} · ${fmt(series[k][last])}</text>`;
+    top.forEach((v, i) => { base[i] = v; });
+  }
+  for (let i = 0; i < nD; i += 30) s += `<text x="${P(x(i))}" y="${H - 8}" text-anchor="middle" font-size="11" class="muted">${dd(d0 + i * DAY)}</text>`;
+  // Наведение: столбик на сутки
+  const bw = (W - Rr - L) / nD;
+  for (let i = 0; i < nD; i++) s += `<rect class="hit" x="${P(x(i) - bw / 2)}" y="${T}" width="${P(bw)}" height="${H - B - T}"` +
+    tipAttr(`<b>${ddy(d0 + i * DAY)}</b><br>` + ST14.slice().reverse().map(k => `${D.STATUS[k]}: ${fmt(series[k][i])}`).join('<br>') + `<br>Всего открыто: ${fmt(tot[i])}`) + '/>';
+  el.insertAdjacentHTML('beforeend', legend(ST14.map(k => ({ name: D.STATUS[k], color: ST14C[k] }))) + `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`);
+  toggles(el, [{ v: '0', name: 'Все депо' }].concat(D.DEPOTS.map(d => ({ v: String(d.id), name: d.name }))), String(st14.depot), v => { st14.depot = +v; cards[3].redraw(); });
+  const defNow = series.DEFERRED[nD - 1], def0 = series.DEFERRED[0];
+  return {
+    find: `Полоса «Отложена до ТО» растёт почти без спадов: с ${fmt(def0)} до ${fmt(defNow)} заявок за полгода. Отложенные заявки не возвращаются в работу сами, ТО их не «забирает». ` +
+      `Выберите депо Караганды: в последние полтора месяца у него разбухают полосы «Новая» и «В работе». Сравните с траекторией депо на диаграмме 1.5.`,
+    side: `<div><h3>Открыто сейчас</h3><div class="big">${fmt(tot[nD - 1])}<small> заявок</small></div></div>`,
+    table: table(['Дата'].concat(ST14.map(k => D.STATUS[k])), Array.from({ length: nD }, (_, i) => nD - 1 - i).filter(i => i % 7 === 0)
+      .map(i => [dd(d0 + i * DAY)].concat(ST14.map(k => fmt(series[k][i])))), [1, 2, 3, 4, 5])
+  };
+}
+
+/* ---------- 1.5. Траектории депо ---------- */
+function c15(el) {
+  const nW = 26, end = TODAY;
+  const closeT = q => { const l = q.sts[q.sts.length - 1]; return q.open ? Infinity : l.t; };
+  const reqs = D.REQS.map(q => ({ w: D.WBY[q.wagon], a: q.created, b: closeT(q) }));
+  const series = D.DEPOTS.map(d => {
+    const ws = D.WAGONS.filter(w => w.depot === d.id);
+    const pts = [];
+    for (let k = nW - 1; k >= 0; k--) {
+      const te = end - k * 7 * DAY;
+      let ok = 0, n = 0;
+      for (let s = 0; s < 14; s++) {
+        const t = te - s * 12 * HOUR;
+        for (const w of ws) { const st = D.stateAt(w, t); if (st === 'OUT_OF_SERVICE') continue; n++; if (st !== 'IN_REPAIR') ok++; }
+      }
+      let open = 0;
+      for (const q of reqs) if (q.w.depot === d.id && q.a <= te && q.b > te) open++;
+      pts.push({ t: te, share: ok / n, open: open / ws.length * 10 });
+    }
+    return { d, pts };
+  });
+  const xs = series.flatMap(s => s.pts.map(p => p.share)), ys = series.flatMap(s => s.pts.map(p => p.open));
+  const W = 900, H = 420, L = 60, Rr = 120, T = 16, B = 40;
+  const x = lin(Math.floor(Math.min(...xs) * 100 - 1) / 100, Math.ceil(Math.max(...xs) * 100 + 1) / 100, L, W - Rr);
+  const ymax = niceMax(Math.max(...ys) * 1.05), y = lin(0, ymax, H - B, T);
+  let s = yGrid(L, W - Rr, y, niceTicks(0, ymax, 5), v => fmt(v, 1));
+  const xt = niceTicks(x.inv(L), x.inv(W - Rr), 6);
+  s += xTicks(H - B, x, xt, v => pct(v), T);
+  s += `<text x="${(L + W - Rr) / 2}" y="${H - 6}" text-anchor="middle" font-size="11" class="muted">доля рабочего парка депо за неделю →</text>`;
+  s += `<text x="${L}" y="${T - 4}" font-size="11" class="muted">открытых заявок на 10 вагонов ↑</text>`;
+  s += `<text x="${W - Rr - 6}" y="${H - B - 8}" text-anchor="end" font-size="11" class="muted">хорошо</text><text x="${L + 6}" y="${T + 14}" font-size="11" class="muted">плохо</text>`;
+  s += '<defs>' + series.map((sr, i) => `<marker id="ar${i}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="${SER[i]}"/></marker>`).join('') + '</defs>';
+  series.forEach((sr, i) => {
+    const pts = sr.pts.map(p => [x(p.share), y(p.open)]);
+    s += `<g class="trj" data-i="${i}"><path d="${smooth(pts)}" fill="none" stroke="${SER[i]}" stroke-width="2" stroke-opacity="0.9" marker-end="url(#ar${i})"/>`;
+    sr.pts.forEach((p, k) => {
+      s += `<circle cx="${P(pts[k][0])}" cy="${P(pts[k][1])}" r="${k === 0 ? 4 : 2.2}" fill="${k === 0 ? 'var(--surface-1)' : SER[i]}" stroke="${SER[i]}" stroke-width="1.5"` +
+        tipAttr(`<b>${esc(sr.d.name)}</b>, неделя до ${dd(p.t)}<br>Доля рабочего парка: ${pct(p.share, 1)}<br>Открытых заявок на 10 вагонов: ${fmt(p.open, 1)}`) + '/>';
+    });
+    const e = pts[pts.length - 1];
+    s += `<text x="${P(e[0] + 9)}" y="${P(e[1] + 4)}" font-size="12" class="strong halo">${esc(sr.d.name)}</text></g>`;
+  });
+  el.innerHTML = legend(series.map((sr, i) => ({ name: sr.d.name, color: SER[i], kind: 'line' })).concat([{ name: 'полый кружок - начало, стрелка - текущая неделя', color: 'transparent' }])) +
+    `<svg viewBox="0 0 ${W} ${H}">${s}</svg>`;
+  el.querySelectorAll('.trj').forEach(g => {
+    g.addEventListener('mouseenter', () => el.querySelectorAll('.trj').forEach(o => o.classList.toggle('dim', o !== g)));
+    g.addEventListener('mouseleave', () => el.querySelectorAll('.trj').forEach(o => o.classList.remove('dim')));
+  });
+  const k = series.find(s => s.d.id === 4), a = k.pts[nW - 7], b = k.pts[nW - 1];
+  return {
+    find: `Депо Караганды за шесть недель ушло влево вверх: доля рабочего парка ${pct(a.share)} → ${pct(b.share)}, очередь ${fmt(a.open, 1)} → ${fmt(b.open, 1)} заявок на 10 вагонов. ` +
+      `Остальные депо петляют в одном углу. Одна диаграмма связывает два показателя, которые в отчётах живут на разных страницах.`,
+    table: table(['Депо', 'Неделя до', 'Доля рабочего парка', 'Открытых на 10 вагонов'],
+      series.flatMap(sr => sr.pts.filter((_, i) => i % 4 === 1 || i === nW - 1).map(p => [esc(sr.d.name), dd(p.t), pct(p.share, 1), fmt(p.open, 1)])), [2, 3])
+  };
+}
+
+const cards = [
+  { num: '1.1', render: c11, title: 'Холод и праздники, а не дни недели, задают поток заявок',
+    form: 'Календарная тепловая карта с недельными и дневными итогами по краям',
+    goal: 'Видеть сезонность и всплески потока заявок с поправкой на число вагоно-рейсов.',
+    problem: 'Службы планируют людей и материалы по среднему месяцу и не готовятся к пикам: холодной волне, праздникам, лету.',
+    source: 'repair_request.created_dt, service; trip.departed_dt; состав поезда на рейс (train_wagon)' },
+  { num: '1.2', render: c12, title: 'Техника ломается ночью, клининг и экипировка - при посадке',
+    form: 'Радиальные тепловые карты: 24 часа по кругу, дни недели кольцами, по одной на службу',
+    goal: 'Показать, в какие часы и дни служба получает заявки.',
+    problem: 'Смены исполнителей не совпадают с часами потока заявок; время реакции ночью выглядит плохим без вины службы.',
+    source: 'repair_request.created_dt, fault_type.service; только заявки, поданные людьми' },
+  { num: '1.3', render: c13, wide: false, title: 'Заявки рождаются на определённых участках пути, а приходят - после выхода из «тени»',
+    form: 'Диаграмма Марея (график движения поездов) с заявками на линиях рейсов',
+    goal: 'Совместить расписание, фактическое движение, опоздания и место подачи заявок на одной картине за неделю.',
+    problem: 'Неясно, связаны ли неисправности с участком пути и почему заявки из рейса приходят с опозданием.',
+    source: 'trip (planned_dt, departed_dt, arrived_dt), route_station (km, arrival_min, departure_min), repair_request (created_dt, received_dt)' },
+  { num: '1.4', render: c14, title: 'Отложенные до ТО заявки копятся: ТО их не закрывает',
+    form: 'Поток статусов: открытые заявки на конец суток слоями по статусам',
+    goal: 'Найти статус, в котором скапливаются заявки, и момент, когда скопление началось.',
+    problem: 'Узкое место (приёмка, ожидание исполнителя, отложенные) видно только по жалобам.',
+    source: 'repair_request_status (dbeg, dend), repair_request_info' },
+  { num: '1.5', render: c15, title: 'Депо Караганды скатывается в угол «мало вагонов, много заявок»',
+    form: 'Связанная диаграмма рассеяния: путь каждого депо по неделям за полгода',
+    goal: 'Видеть, как вместе меняются готовность парка и очередь заявок у каждого депо.',
+    problem: 'Падение готовности парка замечают, когда срываются рейсы; связь с очередью заявок не видна.',
+    source: 'wagon_status (интервалы), wagon.depot, repair_request_status' }
+];
+renderCards(document.getElementById('grid'), cards);
+</script>
+</body>
+</html>

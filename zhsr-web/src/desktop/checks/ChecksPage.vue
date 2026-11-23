@@ -139,6 +139,16 @@ function applyRouteQuery() {
   void router.replace({ name: 'checks' })
 }
 applyRouteQuery()
+
+/** Переход из диаграммы: номер вагона в поиске и период (?query=номер&from=дата&to=дата). */
+function applySearchQuery() {
+  const { query, from, to } = route.query
+  if (typeof query !== 'string' || typeof from !== 'string' || typeof to !== 'string') return
+  Object.assign(filter, { query, from, to })
+  void router.replace({ name: 'checks' })
+}
+applySearchQuery()
+watch(() => route.query.query, applySearchQuery)
 watch(() => route.query.wagon, applyRouteQuery)
 watch(wagonFilter, (w) => (filter.wagon = w?.id ?? null), { immediate: true })
 

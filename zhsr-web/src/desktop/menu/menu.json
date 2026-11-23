@@ -56,7 +56,8 @@
     {
       "id": "analytics",
       "label": "Аналитика",
-      "icon": "analytics"
+      "icon": "analytics",
+      "route": "analytics"
     }
   ],
   "admin": {
