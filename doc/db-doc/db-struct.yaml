@@ -572,6 +572,15 @@ tables:
       dbeg: {type: timestamptz, required: true}
       dend: {type: timestamptz}
 
+  usr_geo_location:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      usr: {type: bigint, required: true, references: usr}
+      dt: {type: timestamptz, required: true}
+      x: {type: 'numeric(9,6)', required: true}
+      y: {type: 'numeric(9,6)', required: true}
+
   usr_role:
     primary_key: [id]
     columns:
@@ -606,6 +615,15 @@ tables:
       wagon_status: {type: bigint, references: wagon_status}
       wagon_responsible: {type: bigint, references: wagon_responsible}
       closed_wagon_responsible: {type: bigint, references: wagon_responsible}
+
+  wagon_geo_location:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      wagon: {type: bigint, required: true, references: wagon}
+      dt: {type: timestamptz, required: true}
+      x: {type: 'numeric(9,6)', required: true}
+      y: {type: 'numeric(9,6)', required: true}
 
   wagon_info:
     primary_key: [wagon]

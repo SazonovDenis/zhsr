@@ -1,7 +1,7 @@
 <template>
   <div class="analytics-grid">
     <div
-      v-for="chart in CHARTS"
+      v-for="chart in visibleCharts()"
       :key="chart.id"
       role="button"
       tabindex="0"
@@ -19,7 +19,7 @@
 
 <script setup lang="ts">
 import { t } from '@/boot/i18n'
-import { CHARTS } from './charts'
+import { visibleCharts } from './charts'
 
 /**
  * Сетка диаграмм дашборда «Аналитика», общая для десктопа и телефона. В ячейке — заголовок и тело диаграммы без ФИО;

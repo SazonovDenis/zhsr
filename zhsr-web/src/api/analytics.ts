@@ -1,5 +1,6 @@
 import { http } from './http'
 import type { UserRef, WagonRef } from './requests'
+import type { TrainRef } from './trains'
 
 /** API раздела «Аналитика»: данные диаграмм. */
 
@@ -49,7 +50,7 @@ export async function fetchUncheckedWagons(at: string): Promise<UncheckedWagonRo
   return (await http.get<UncheckedWagonRow[]>('/analytics/unchecked-wagons', { params: { at } })).data
 }
 
-/** День диаграммы «Заявки и неисправности». */
+/** День диаграммы «Количество и сроки исполнения заявок». */
 export interface RequestsDay {
   /** дата: 2026-11-23 */
   day: string
@@ -59,7 +60,7 @@ export interface RequestsDay {
   trips: number
 }
 
-/** Неделя диаграммы «Заявки и неисправности»: сроки исполнения заявок, поданных за неделю. */
+/** Неделя диаграммы «Количество и сроки исполнения заявок»: сроки исполнения заявок, поданных за неделю. */
 export interface RequestsWeek {
   /** понедельник недели: 2026-11-23 */
   week: string
@@ -71,7 +72,7 @@ export interface RequestsWeek {
   median: number | null
 }
 
-/** Диаграмма «Заявки и неисправности»: заявки по дням и сроки исполнения по неделям. */
+/** Диаграмма «Количество и сроки исполнения заявок»: заявки по дням и сроки исполнения по неделям. */
 export interface RequestsChart {
   /** дни без пропусков: с понедельника по сегодня */
   days: RequestsDay[]
@@ -98,4 +99,88 @@ export interface ExecutionRow {
 /** Исполнители технической службы и время исполнения заявок за год. */
 export async function fetchExecution(): Promise<ExecutionRow[]> {
   return (await http.get<ExecutionRow[]>('/analytics/execution')).data
+}
+
+/** Выполненные заявки одной службы, неисправности и депо исполнителя: диаграмма «Заявки». */
+export interface WorkTimeRow {
+  /** служба — id справочника Service */
+  service: number
+  /** неисправность — id справочника FaultType */
+  faultType: number
+  /** текущее депо исполнителя — id справочника Depot; null — исполнителя или депо нет */
+  depot: number | null
+  /** число выполненных заявок */
+  requests: number
+  /** минуты от взятия в работу до первого выполнения, сумма по заявкам */
+  minutes: number
+}
+
+/** Выполненные заявки, поданные за период [from, to). */
+export async function fetchWorkTime(from: string, to: string): Promise<WorkTimeRow[]> {
+  return (await http.get<WorkTimeRow[]>('/analytics/work-time', { params: { from, to } })).data
+}
+
+/** Маршрут на карте. */
+export interface GeoRoute {
+  id: number
+  trainNumber: string
+  name: string
+  /** точки линии по порядку: долгота, широта, километр от начала линии */
+  points: [number, number, number][]
+}
+
+/** Рейс на карте. */
+export interface GeoTrip {
+  id: number
+  /** маршрут — id из GeoChart.routes */
+  route: number
+  train: TrainRef
+  plannedDt: string
+  departedDt: string
+  /** null — рейс в пути */
+  arrivedDt: string | null
+  /**
+   * ход поезда по порядку: минуты от начала периода, километр линии маршрута, отклонение от расписания в минутах
+   * (больше нуля — отставание); пусто — координат нет
+   */
+  track: [number, number, number][]
+}
+
+/** Положения на карте вне рейсов: общее вагона и проводника. */
+export interface GeoPlaces {
+  /**
+   * точки по времени вне рейсов и последняя точка каждого рейса: минуты от начала периода (меньше нуля — до периода),
+   * долгота, широта; не пуст
+   */
+  points: [number, number, number][]
+  /** рейсы периода: минуты начала и конца; конец null — рейс идёт */
+  trips: [number, number | null][]
+  /** до какой минуты показывается; null — в последней точке бессрочно */
+  until: number | null
+}
+
+/** Положения вагона на карте. */
+export interface GeoWagon extends GeoPlaces {
+  wagon: WagonRef
+}
+
+/** Положения проводника на карте. */
+export interface GeoUsr extends GeoPlaces {
+  usr: UserRef
+}
+
+/** Диаграмма «Текущие рейсы». Время точек — минуты от from. */
+export interface GeoChart {
+  from: string
+  routes: GeoRoute[]
+  trips: GeoTrip[]
+  /** без points — пустой список */
+  wagons: GeoWagon[]
+  /** без points — пустой список */
+  usrs: GeoUsr[]
+}
+
+/** Ход рейсов и положения вагонов и проводников за период [from, to); points — с положениями вагонов и проводников. */
+export async function fetchGeoChart(from: string, to: string, points: boolean): Promise<GeoChart> {
+  return (await http.get<GeoChart>('/analytics/geo', { params: { from, to, points } })).data
 }

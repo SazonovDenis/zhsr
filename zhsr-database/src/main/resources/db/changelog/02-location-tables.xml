@@ -433,4 +433,49 @@
         </createTable>
     </changeSet>
 
+    <!-- положение сотрудника на местности по времени, очищенные данные;
+         x - долгота, y - широта (WGS 84); dt - момент, в который вычислено положение -->
+    <changeSet id="02-location-tables-usr_geo_location" author="zhsr">
+        <createTable tableName="usr_geo_location">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="x" type="numeric(9,6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="y" type="numeric(9,6)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- положение вагона на местности по времени, очищенные данные: вычисляется по положению ответственных за вагон, а у
+         вагона без ответственных - по составу поезда; у вагона вне рейса новых строк нет - он стоит там, где последняя;
+         x - долгота, y - широта (WGS 84); dt - момент, в который вычислено положение -->
+    <changeSet id="02-location-tables-wagon_geo_location" author="zhsr">
+        <createTable tableName="wagon_geo_location">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="wagon" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="x" type="numeric(9,6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="y" type="numeric(9,6)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
 </databaseChangeLog>

@@ -16,7 +16,9 @@ import kz.zhsr.app.dto.analytics.RequestsChart;
 import kz.zhsr.app.dto.analytics.RequestsDay;
 import kz.zhsr.app.dto.analytics.RequestsWeek;
 import kz.zhsr.app.dto.analytics.UncheckedWagonRow;
+import kz.zhsr.app.dto.analytics.WorkTimeRow;
 import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.service.ApiException;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
@@ -47,7 +49,7 @@ public class AnalyticsService {
     /** Число месяцев диаграммы «переработка»: 11 полных и текущий. */
     private static final int MONTHS = 12;
 
-    /** Период диаграммы «Заявки и неисправности», суток; начало округляется до понедельника. */
+    /** Период диаграммы «Количество и сроки исполнения заявок», суток; начало округляется до понедельника. */
     private static final int REQUEST_DAYS = 365;
 
     private final Db db;
@@ -117,8 +119,8 @@ public class AnalyticsService {
     }
 
     /**
-     * Заявки и неисправности (GET /analytics/requests): заявки и отправленные рейсы по дням за год, сроки исполнения
-     * по неделям подачи. Период - с понедельника недели, в которую попадает день год назад, по сегодня.
+     * Количество и сроки исполнения заявок (GET /analytics/requests): заявки и отправленные рейсы по дням за год,
+     * сроки исполнения по неделям подачи. Период - с понедельника недели, в которую попадает день год назад, по сегодня.
      *
      * @param service служба заявок (ServiceType); null - все службы
      */
@@ -217,6 +219,58 @@ public class AnalyticsService {
                     .anyMatch(s -> s.getLong("request_status_type") == RequestStatus.IN_PROGRESS)) {
                 row.setReturned(row.getReturned() + 1);
             }
+            return;
+        }
+    }
+
+    /**
+     * Время выполнения заявок (GET /analytics/work-time): заявки всех служб, поданные за период [from, to) и
+     * выполненные, по службе, неисправности и депо исполнителя. Время выполнения - от последнего взятия в работу перед
+     * первым выполнением до первого выполнения; заявка, выполненная без взятия в работу, не учитывается. Депо -
+     * текущее депо исполнителя в момент первого выполнения. Пустой список - выполненных заявок нет.
+     *
+     * @throws ApiException 400 - конец периода не позже начала
+     */
+    public List<WorkTimeRow> workTime(OffsetDateTime from, OffsetDateTime to) throws Exception {
+        if (!to.isAfter(from)) {
+            throw ApiException.badRequest("Конец периода должен быть позже начала");
+        }
+        Map<Long, List<DbRec>> requests = UtDb.collectGroupBy_records(db.loadSql(AnalyticsSql.workTime(),
+                Map.of("from", from, "to", to, "inProgress", RequestStatus.IN_PROGRESS,
+                        "done", RequestStatus.DONE)), "repair_request");
+        Map<Long, Long> depots = loadCurrentDepots();
+
+        Map<String, WorkTimeRow> rows = new LinkedHashMap<>();
+        for (List<DbRec> statuses : requests.values()) {
+            addWorkTime(rows, statuses, depots);
+        }
+        return new ArrayList<>(rows.values());
+    }
+
+    /** Добавляет заявку в строку её службы, неисправности и депо; statuses - взятия в работу и выполнения по порядку. */
+    private static void addWorkTime(Map<String, WorkTimeRow> rows, List<DbRec> statuses, Map<Long, Long> depots) {
+        OffsetDateTime start = null;
+        for (DbRec status : statuses) {
+            if (status.getLong("request_status_type") == RequestStatus.IN_PROGRESS) {
+                start = status.getDateTimeTZ("dbeg");
+                continue;
+            }
+            if (start == null) {
+                return;
+            }
+            Long service = status.getLong("service");
+            Long faultType = status.getLong("fault_type");
+            Long executor = status.getLong("executor_usr", null);
+            Long depot = executor == null ? null : depots.get(executor);
+            WorkTimeRow row = rows.computeIfAbsent(service + ":" + faultType + ":" + depot, key -> {
+                WorkTimeRow created = new WorkTimeRow();
+                created.setService(service);
+                created.setFaultType(faultType);
+                created.setDepot(depot);
+                return created;
+            });
+            row.setRequests(row.getRequests() + 1);
+            row.setMinutes(row.getMinutes() + Duration.between(start, status.getDateTimeTZ("dbeg")).toMinutes());
             return;
         }
     }

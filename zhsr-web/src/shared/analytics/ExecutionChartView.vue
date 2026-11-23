@@ -41,7 +41,7 @@
             <span v-for="tick in TICKS" :key="tick" class="ridge__line" :style="{ left: timePos(tick) + '%' }" />
             <svg class="ridge__svg" :viewBox="`0 0 100 ${units}`" preserveAspectRatio="none">
               <path v-for="(row, i) in rows" :key="row.id" class="ridge__path" :d="ridgePath(row, i)">
-                <title v-if="detailed">{{ rowTitle(row) }}</title>
+                <title>{{ rowTitle(row) }}</title>
               </path>
             </svg>
             <span v-if="detailed" class="ridge__fast-label">{{ t('быстрее 15 мин') }}</span>
@@ -53,7 +53,7 @@
               :key="row.id"
               class="ridge__band"
               :style="bandStyle(i)"
-              :title="detailed ? rowTitle(row) : undefined"
+              :title="rowTitle(row)"
             >
               <i
                 class="ridge__bar"
@@ -98,11 +98,12 @@
 import { computed, ref } from 'vue'
 
 import { fetchExecution } from '@/api/analytics'
-import { i18n, t } from '@/boot/i18n'
+import { t } from '@/boot/i18n'
 import { dictManager } from '@/shared/dict/DictManager'
 import ChartView from './ChartView.vue'
 import DepotChoice from './DepotChoice.vue'
 import { ALL_DEPOTS } from './depots'
+import { duration } from './duration'
 import { useChart } from './useChart'
 
 /**
@@ -234,18 +235,8 @@ function ridgePath(row: Row, i: number): string {
   return `M0,${base}L${points.join('L')}L100,${base}Z`
 }
 
-function number(v: number): string {
-  return new Intl.NumberFormat(i18n.global.locale.value, { maximumFractionDigits: 1 }).format(v)
-}
-
 function percent(share: number): string {
   return Math.round(share * 100) + '%'
-}
-
-function duration(minutes: number): string {
-  if (minutes < 60) return t('{m} мин', { m: Math.round(minutes) })
-  if (minutes < 1440) return t('{h} ч', { h: number(minutes / 60) })
-  return t('{n} сут', { n: number(minutes / 1440) })
 }
 
 function rowTitle(row: Row): string {
@@ -279,7 +270,7 @@ void load()
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
-  color: $zs-text-muted;
+  color: $zs-text;
   font-size: 0.8rem;
 }
 

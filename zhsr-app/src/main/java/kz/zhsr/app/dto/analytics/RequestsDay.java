@@ -3,7 +3,7 @@ package kz.zhsr.app.dto.analytics;
 import java.time.LocalDate;
 
 /**
- * День диаграммы «Заявки и неисправности».
+ * День диаграммы «Количество и сроки исполнения заявок».
  *
  * @param day      день
  * @param requests число заявок, поданных за день

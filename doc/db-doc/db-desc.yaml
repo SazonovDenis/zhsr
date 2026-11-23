@@ -27,6 +27,11 @@ diagrams:
     tables: [ wagon_location, wagon_status, wagon_responsible: { hide_references: [ "created_by_usr" ] }, wagon_responsible_usr, wagon_edit: { hide_references: [ "wagon", "created_by_usr" ] }, wagon: { hide_references: [ "depot" ] }, depot: { hide_references: [ "station" ] }, yard: { hide_references: [ "station" ] }, station, trip, location_type, usr ]
     hide_fields: [ "depot", "yard", "station" , "wagon", "trip", "location_type", "usr" ]
 
+  geo_location:
+    title: "Положение вагонов и сотрудников на местности"
+    tables: [ usr_geo_location, wagon_geo_location, usr, wagon: { hide_references: [ "depot" ] } ]
+    hide_fields: [ "usr", "wagon" ]
+
   transfer_act:
     title: "Передача вагонов между депо, станцией и парком отстоя"
     description: "Акт приёма-передачи вагонов между станцией, её депо и парками отстоя"
@@ -778,6 +783,42 @@ tables:
       km:
         title: "Пробег, км"
         description: "Разность километража route_station конца и начала участка"
+
+  usr_geo_location:
+    title: "Положение сотрудника на местности"
+    description: |
+      Очищенные координаты сотрудника по времени.
+    columns:
+      usr:
+        title: "Сотрудник"
+      dt:
+        title: "Момент"
+        description: "Время, в которое вычислено положение"
+      x:
+        title: "Долгота"
+        description: "Градусы, WGS 84"
+      y:
+        title: "Широта"
+        description: "Градусы, WGS 84"
+
+  wagon_geo_location:
+    title: "Положение вагона на местности"
+    description: |
+      Очищенные координаты вагона по времени. Положение вагона вычисляется по положению ответственных за вагон, у вагона
+      без ответственных - по составу поезда. Вагон вне рейса новых строк не получает: вагон стоит там, где его последняя
+      строка.
+    columns:
+      wagon:
+        title: "Вагон"
+      dt:
+        title: "Момент"
+        description: "Время, в которое вычислено положение"
+      x:
+        title: "Долгота"
+        description: "Градусы, WGS 84"
+      y:
+        title: "Широта"
+        description: "Градусы, WGS 84"
 
   trip_crew:
     title: "Бригада рейса"

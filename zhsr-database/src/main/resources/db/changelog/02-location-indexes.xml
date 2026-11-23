@@ -750,4 +750,36 @@
                                  referencedTableName="wagon_responsible" referencedColumnNames="id" onDelete="SET NULL"/>
     </changeSet>
 
+    <!-- usr_geo_location -->
+
+    <changeSet id="02-location-indexes-fk_usr_geo_location_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="usr_geo_location" baseColumnNames="usr" constraintName="fk_usr_geo_location_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <!-- положение на момент и ход за период; не уникальный: сдвиг времени демо-данных одним update на время даёт
+         одинаковые моменты -->
+    <changeSet id="02-location-indexes-ix_usr_geo_location_usr_dt" author="zhsr">
+        <createIndex tableName="usr_geo_location" indexName="ix_usr_geo_location_usr_dt">
+            <column name="usr"/>
+            <column name="dt"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- wagon_geo_location -->
+
+    <changeSet id="02-location-indexes-fk_wagon_geo_location_wagon" author="zhsr">
+        <addForeignKeyConstraint baseTableName="wagon_geo_location" baseColumnNames="wagon" constraintName="fk_wagon_geo_location_wagon"
+                                 referencedTableName="wagon" referencedColumnNames="id"/>
+    </changeSet>
+
+    <!-- положение на момент и ход за период; не уникальный: сдвиг времени демо-данных одним update на время даёт
+         одинаковые моменты -->
+    <changeSet id="02-location-indexes-ix_wagon_geo_location_wagon_dt" author="zhsr">
+        <createIndex tableName="wagon_geo_location" indexName="ix_wagon_geo_location_wagon_dt">
+            <column name="wagon"/>
+            <column name="dt"/>
+        </createIndex>
+    </changeSet>
+
 </databaseChangeLog>

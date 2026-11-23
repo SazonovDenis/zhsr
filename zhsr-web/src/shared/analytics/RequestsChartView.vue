@@ -36,7 +36,7 @@
           :key="'w' + w"
           class="flow__slot"
           :style="{ gridArea: area(2, w) }"
-          :title="detailed ? weekTitle(w) : undefined"
+          :title="weekTitle(w)"
         >
           <i class="flow__bar" :style="{ height: share(week.value, weekMax) }" />
         </span>
@@ -60,7 +60,7 @@
           class="flow__day"
           :class="'flow--c' + color(day.value)"
           :style="{ gridArea: area(4 + (i % 7), Math.floor(i / 7)) }"
-          :title="detailed ? dayTitle(day) : undefined"
+          :title="dayTitle(day)"
         />
 
         <!-- справа — среднее по дням недели -->
@@ -96,7 +96,7 @@
           :key="'t' + week.week"
           class="flow__slot"
           :style="{ gridArea: area(12, w) }"
-          :title="detailed ? termTitle(week) : undefined"
+          :title="termTitle(week)"
         >
           <template v-if="week.median !== null">
             <svg class="flow__dots" viewBox="0 0 1 1" preserveAspectRatio="none">
@@ -122,10 +122,9 @@ import ChartView from './ChartView.vue'
 import { useChart } from './useChart'
 
 /**
- * Диаграмма «Заявки и неисправности»: календарь года (столбец — неделя, строка — день недели, цвет — число заявок),
- * над ним недельные итоги, под ним на тех же неделях — сроки исполнения заявок, поданных за неделю: точка — типичная
- * заявка (без 10% самых быстрых и 10% самых долгих),
- * отметка — медиана.
+ * Диаграмма «Количество и сроки исполнения заявок»: календарь года (столбец — неделя, строка — день недели,
+ * цвет — число заявок), над ним недельные итоги, под ним на тех же неделях — сроки исполнения заявок, поданных
+ * за неделю: точка — типичная заявка (без 10% самых быстрых и 10% самых долгих), отметка — медиана.
  *
  * detailed = false — ячейка дашборда: число заявок всех служб. detailed = true — окно раскрытой диаграммы: выбор
  * показателя и службы, легенды, среднее по дням недели, подсказки. Закономерность с цифрами уходит владельцу событием
@@ -357,7 +356,7 @@ void load()
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
-  color: $zs-text-muted;
+  color: $zs-text;
   font-size: 0.8rem;
   font-weight: 400;
 

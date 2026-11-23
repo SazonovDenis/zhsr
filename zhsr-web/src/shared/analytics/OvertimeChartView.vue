@@ -41,7 +41,7 @@
             :key="i"
             class="overtime__cell"
             :class="'overtime--l' + level(h)"
-            :title="detailed ? cellTitle(row, i, h) : undefined"
+            :title="cellTitle(row, i, h)"
           />
           <span
             v-if="detailed"
@@ -223,7 +223,7 @@ void load()
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  color: $zs-text-muted;
+  color: $zs-text;
   font-size: 0.8rem;
 }
 

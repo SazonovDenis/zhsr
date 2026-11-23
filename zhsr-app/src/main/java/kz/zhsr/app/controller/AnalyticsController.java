@@ -1,10 +1,13 @@
 package kz.zhsr.app.controller;
 
 import kz.zhsr.app.dto.analytics.ExecutionRow;
+import kz.zhsr.app.dto.analytics.GeoChart;
 import kz.zhsr.app.dto.analytics.OvertimeChart;
 import kz.zhsr.app.dto.analytics.RequestsChart;
 import kz.zhsr.app.dto.analytics.UncheckedWagonRow;
+import kz.zhsr.app.dto.analytics.WorkTimeRow;
 import kz.zhsr.app.service.analytics.AnalyticsService;
+import kz.zhsr.app.service.analytics.GeoService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,9 +23,11 @@ import java.util.List;
 public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
+    private final GeoService geoService;
 
-    public AnalyticsController(AnalyticsService analyticsService) {
+    public AnalyticsController(AnalyticsService analyticsService, GeoService geoService) {
         this.analyticsService = analyticsService;
+        this.geoService = geoService;
     }
 
     @GetMapping("/analytics/overtime")
@@ -45,5 +50,20 @@ public class AnalyticsController {
     @GetMapping("/analytics/execution")
     public List<ExecutionRow> execution() throws Exception {
         return analyticsService.execution();
+    }
+
+    @GetMapping("/analytics/work-time")
+    public List<WorkTimeRow> workTime(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to) throws Exception {
+        return analyticsService.workTime(from, to);
+    }
+
+    @GetMapping("/analytics/geo")
+    public GeoChart geo(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to,
+            @RequestParam(defaultValue = "true") boolean points) throws Exception {
+        return geoService.chart(from, to, points);
     }
 }

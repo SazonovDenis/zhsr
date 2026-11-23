@@ -51,7 +51,7 @@
                   :to="linked ? listLocation(cell, line.route) : undefined"
                   class="unchecked__square"
                   :class="['unchecked--b' + cell.band, { 'unchecked__square--rides': cell.rides }]"
-                  :title="detailed ? cellTitle(cell) : undefined"
+                  :title="cellTitle(cell)"
                 />
               </span>
             </template>
@@ -80,7 +80,7 @@ import ChartView from './ChartView.vue'
 import { useChart } from './useChart'
 
 /**
- * Диаграмма «Вагоны в рейсах без проверки»: две линии фигур — по чек-листам вагона и по описям. Фигура — вагон,
+ * Диаграмма «Вагоны без проверки»: две линии фигур — по чек-листам вагона и по описям. Фигура — вагон,
  * цвет — сколько суток назад проверяли, круг — вагон был в рейсе за последние 14 суток, квадрат — не был. Внутри линии — от давно
  * не проверенных к недавно проверенным.
  *
@@ -154,11 +154,20 @@ interface Cell {
   rides: boolean
 }
 
-const view = useChart(fetchRows, (text) => emit('find', text), findText)
+const view = useChart(
+  fetchRows,
+  (text) => emit('find', text),
+  (rows) => {
+    at.value = requestedAt
+    return findText(rows)
+  },
+)
 const { data, load } = view
 
 /** Момент, по состоянию на который показана диаграмма: от него считается давность. */
 const at = ref(new Date())
+// момент последнего запроса: at сменится вместе с данными — до ответа показана прежняя диаграмма
+let requestedAt = at.value
 
 /** Фигуры — ссылки на списки десктопа; на телефоне таких списков нет. */
 const linked = computed(() => props.detailed && !isMobile.value)
@@ -321,9 +330,9 @@ function findText(rows: UncheckedWagonRow[]): string {
 }
 
 async function fetchRows(): Promise<UncheckedWagonRow[]> {
-  at.value = dayMoment(atDay.value)
+  requestedAt = dayMoment(atDay.value)
   const [rows] = await Promise.all([
-    fetchUncheckedWagons(isoDateTime(at.value)),
+    fetchUncheckedWagons(isoDateTime(requestedAt)),
     dictManager.prepareDict('Depot'),
     dictManager.prepareDict('WagonType'),
   ])
@@ -358,7 +367,7 @@ void load()
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
-  color: $zs-text-muted;
+  color: $zs-text;
   font-size: 0.8rem;
 }
 
