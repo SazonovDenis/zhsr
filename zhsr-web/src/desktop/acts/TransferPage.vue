@@ -48,15 +48,6 @@
               </template>
             </CbList>
           </FormField>
-          <FormField label="Вид работ">
-            <CbList
-              v-model="work"
-              single
-              placeholder="Выберите…"
-              :values="dictChoices('WorkType')"
-              :source="dictSource('WorkType')"
-            />
-          </FormField>
           <FormField label="Время акта">
             <DatePicker v-model="time" with-time date-text="Время акта" />
           </FormField>
@@ -114,7 +105,6 @@ import { ActStatus, RoleType } from '@/shared/constants/systemDicts'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { Column } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
-import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
 import { compareText } from '@/shared/format'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
@@ -160,7 +150,6 @@ const str = (v: unknown) => (typeof v === 'string' && v ? v : null)
 const station = ref<number | null>(null)
 const fromCode = ref<string | null>(str(query.from))
 const toCode = ref<string | null>(str(query.to))
-const work = ref<number | null>(null)
 const time = ref<string | null>(date.formatDate(new Date(), 'YYYY-MM-DDTHH:mm'))
 const giver = ref<number | null>(null)
 const wagons = shallowRef<TransferWagon[]>([])
@@ -303,7 +292,6 @@ const emptyText = computed(() => {
 const okHint = computed(() => {
   if (!fromCode.value || !toCode.value) return t('Выберите, откуда и куда передаются вагоны')
   if (!mode.value) return t('Ваша роль не участвует в такой передаче')
-  if (!work.value) return t('Выберите вид работ')
   if (!time.value) return t('Укажите время акта')
   if (immediate.value && !giver.value) return t('Выберите, кто сдал вагоны')
   if (responsible.value === null) return t('Выберите ответственных за вагоны')
@@ -390,7 +378,6 @@ async function save() {
       toStation: to.value.station,
       toDepot: to.value.depot,
       toYard: to.value.yard,
-      workType: work.value!,
       transferredByUsr: giver.value,
       transferredDt: time.value!,
       wagons: selected.value.map((number) => ({

@@ -46,8 +46,6 @@
             <span>{{ transferPlaceText(transferFrom(selected)) }}</span>
             <span>{{ t('Куда') }}</span>
             <span>{{ transferPlaceText(transferTo(selected)) }}</span>
-            <span>{{ t('Вид работ') }}</span>
-            <span>{{ dictManager.getValue('WorkType', selected.workType) }}</span>
             <span>{{ t('Состояние') }}</span>
             <span>{{ statusText(selected.actStatusType) }}</span>
             <span>{{ t('Сдал') }}</span>

@@ -56,14 +56,14 @@ public class TransferService {
      * @param toStation        куда: станция; ровно одно из toStation, toDepot, toYard
      * @param toDepot          куда: депо
      * @param toYard           куда: парк отстоя
-     * @param workType         вид работ (work_type)
+     * @param workType         вид работ (work_type); не вводится, null
      * @param transferredByUsr кто сдал вагоны: для акта, проведённого сразу; null - сам составитель
      * @param transferredDt    время акта, ISO с часовым поясом; null - сейчас
      * @param wagons           вагоны
      * @param responsibleUsrs  ответственные за вагоны акта; пусто - ответственный не назначен
      */
     public record TransferBody(Long fromStation, Long fromDepot, Long fromYard, Long toStation, Long toDepot,
-                               Long toYard, long workType, Long transferredByUsr, OffsetDateTime transferredDt,
+                               Long toYard, Long workType, Long transferredByUsr, OffsetDateTime transferredDt,
                                List<WagonItem> wagons, List<Long> responsibleUsrs) {
 
         TransferPlace from() {

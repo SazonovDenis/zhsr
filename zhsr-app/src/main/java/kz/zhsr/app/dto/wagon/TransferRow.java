@@ -24,7 +24,7 @@ public class TransferRow {
     private Long toYard;
     /** станция акта - станция расположения «откуда» (вычисляемое) */
     private long station;
-    private long workType;
+    private Long workType;
     private long actStatusType;
     private UserRef transferredByUsr;
     private OffsetDateTime transferredDt;

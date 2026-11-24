@@ -30,7 +30,7 @@ export interface Transfer {
   /** станция акта — станция расположения «откуда», id справочника Station */
   station: number
   /** вид работ — id справочника WorkType */
-  workType: number
+  workType: number | null
   /** состояние — константы ActStatus */
   actStatusType: number
   /** кто сдал: фамилия и инициалы */
@@ -64,7 +64,6 @@ export interface TransferDraft {
   toStation: number | null
   toDepot: number | null
   toYard: number | null
-  workType: number
   /** кто сдал вагоны — для акта, проведённого сразу */
   transferredByUsr: number | null
   /** время акта: значение DatePicker, время браузера без пояса */

@@ -48,4 +48,6 @@
 
     <include file="db/changelog/06-depot-name.xml"/>
 
+    <include file="db/changelog/07-transfer-act-work-type.xml"/>
+
 </databaseChangeLog>
