@@ -17,8 +17,11 @@ import java.util.List;
  * @param states        id состояния вагона (wagon_status_type)
  * @param at            момент (например, отправление рейса): дополнительно к текущим - расположение и состояние на
  *                      этот момент по журналам; null - не нужны
+ * @param plan          true и задан at: станция, виды расположения и состояния отбираются, а расположение и
+ *                      состояние на момент считаются по факту и по ожидающему плану (прицепки и отцепки поездов
+ *                      до момента); иначе - только по текущим данным (отбор) и по факту (на момент)
  */
 public record WagonFilter(Long depot, String number, List<Long> ids, Long station, Long trip,
                           List<Long> locationKinds, List<Long> states,
-                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime at) {
+                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime at, Boolean plan) {
 }

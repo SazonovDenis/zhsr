@@ -51,7 +51,8 @@ function defaultPlanTime(at: string): Date {
  * @param factAllowed факт возможен
  * @param attach      прицепка: позиция и выбор станции плана вне рейса; у отцепки — станция вагонов
  * @param at          плановое время по умолчанию, ISO
- * @param trip        рейс, предложенный для плана первым (формирование рейса); null — вне рейса
+ * @param trip        рейс, предложенный для плана первым (формирование рейса); null — вне рейса; у прицепки выбранный
+ *                    рейс поезда в статусе «план» — окно открывается планом, выбор рейса заблокирован
  * @param plan        открыть сразу планом
  * @param initial     исправление плана: его время, рейс, остановка, станция, позиция и основания; wagon — вагон плана: в
  *                    позициях прицепки его нет (он и есть прицепляемый)
@@ -77,6 +78,9 @@ export function useChangeWhere(o: {
   const firstGroup = planGroups.find((g) => g.trip.id === (init ? init.trip : o.trip)) ?? null
   const firstStop = firstGroup?.stops[0] ?? null
 
+  // прицепка из выбранного рейса: сразу планом, рейс не меняется
+  const tripLocked = o.attach && !init && firstGroup !== null
+
   const state = reactive<{
     mode: string
     factStop: number | null
@@ -92,7 +96,7 @@ export function useChangeWhere(o: {
     /** основания, примечания: приказ, причина */
     comment: string
   }>({
-    mode: o.factAllowed && !o.plan ? 'fact' : 'plan',
+    mode: o.factAllowed && !o.plan && !tripLocked ? 'fact' : 'plan',
     factStop: factStops.length > 0 ? 0 : null,
     trip: firstGroup?.trip.id ?? null,
     stop: init?.routeStation ?? firstStop?.routeStation ?? null,
@@ -220,6 +224,7 @@ export function useChangeWhere(o: {
     modes,
     factStopChoices,
     tripChoices,
+    tripLocked,
     stopChoices,
     seqChoices,
     targetStation,

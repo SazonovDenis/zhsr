@@ -168,7 +168,14 @@ const picked = ref(new Set<string>(props.picked))
 const allColumns = defineColumns<WagonRow>([
   { field: 'number', title: 'Номер', width: '11rem', cell: CellTripWagonPick, sortable: true },
   { field: 'wagonType', title: 'Тип', width: 'minmax(min-content, 0.67fr)', cell: CellWagonType },
-  { field: 'locationType', title: 'Расположение', cell: CellWagonLocation, sortable: true, sortField: 'dbegLocation' },
+  {
+    field: 'locationType',
+    title: 'Расположение',
+    width: 'minmax(min-content, 0.8fr)',
+    cell: CellWagonLocation,
+    sortable: true,
+    sortField: 'dbegLocation',
+  },
   { field: 'wagonStatusType', title: 'Состояние', cell: CellWagonState, sortable: true, sortField: 'dbegStatus' },
   { field: 'locationAt', title: 'Расположение на момент отправки', cell: CellWagonLocationAt },
   { field: 'wagonStatusTypeAt', title: 'Состояние на момент отправки', cell: CellWagonStateAt },

@@ -1,4 +1,5 @@
 import { t } from '@/boot/i18n'
+import { noBreak } from '@/shared/format'
 
 /** Время станции маршрута временем суток «чч:мм»: следующие сутки — снова с «00:00». */
 export function formatTime(minutes: number): string {
@@ -9,16 +10,16 @@ export function formatTime(minutes: number): string {
 export function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
-  if (h === 0) return t('{m} м', { m })
-  return m === 0 ? t('{h} ч', { h }) : t('{h} ч {m} м', { h, m })
+  if (h === 0) return noBreak(t('{m} м', { m }))
+  return noBreak(m === 0 ? t('{h} ч', { h }) : t('{h} ч {m} м', { h, m }))
 }
 
 /** Длительность в минутах — словами полностью: «23 ч 34 мин», «34 мин», «3 ч». */
 export function formatHoursMin(minutes: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
-  if (h === 0) return t('{m} мин', { m })
-  return m === 0 ? t('{h} ч', { h }) : t('{h} ч {m} мин', { h, m })
+  if (h === 0) return noBreak(t('{m} мин', { m }))
+  return noBreak(m === 0 ? t('{h} ч', { h }) : t('{h} ч {m} мин', { h, m }))
 }
 
 /** Длительность в минутах — часы и минуты: «0:34», «2:32», «19:05». */

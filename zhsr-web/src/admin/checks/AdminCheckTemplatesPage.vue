@@ -31,7 +31,6 @@
       :error="loadError"
       :retry="load"
       :row-menu="rowMenu"
-      menu-gap
       empty="Шаблонов чек-листов нет"
       @row-dblclick="openItems"
     />

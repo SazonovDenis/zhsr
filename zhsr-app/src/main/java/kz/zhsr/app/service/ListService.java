@@ -72,7 +72,7 @@ public class ListService {
         addWagonTripsAndTransfers(rows);
         addWagonResponsibles(rows);
         if (filter.at() != null) {
-            addWagonStateAt(rows, filter.at());
+            addWagonStateAt(rows, filter.at(), Boolean.TRUE.equals(filter.plan()));
         }
         return rows;
     }
@@ -85,7 +85,7 @@ public class ListService {
      */
     public WagonRow wagonByNumber(String number) throws Exception {
         String value = number == null ? "" : number.trim();
-        WagonFilter filter = new WagonFilter(null, value, null, null, null, null, null, null);
+        WagonFilter filter = new WagonFilter(null, value, null, null, null, null, null, null, null);
         List<WagonRow> rows = wagonRows(filter, new ListSort(null, false), WagonRow.class, false).stream()
                 .filter(w -> w.getNumber().equals(value))
                 .toList();
@@ -104,7 +104,7 @@ public class ListService {
      * Второй проход списка вагонов при фильтре at: расположение и состояние на момент по журналам - дополнительно к
      * текущим.
      */
-    private void addWagonStateAt(List<WagonRow> rows, OffsetDateTime at) throws Exception {
+    private void addWagonStateAt(List<WagonRow> rows, OffsetDateTime at, boolean plan) throws Exception {
         if (rows.isEmpty()) {
             return;
         }
@@ -113,6 +113,25 @@ public class ListService {
             byId.put(row.getId(), row);
         }
         Map<String, Object> params = Map.of("ids", List.copyOf(byId.keySet()), "at", at);
+        if (plan) {
+            Map<String, Object> planParams = new HashMap<>(ListSql.PLAN_AT_PARAMS);
+            planParams.put("ids", List.copyOf(byId.keySet()));
+            planParams.put("at", at);
+            for (DbRec rec : db.loadSql(ListSql.wagonsAtPlan(), planParams)) {
+                WagonRow row = byId.get(rec.getLong("id"));
+                if (rec.getLong("location_type") != null) {
+                    WagonPlace place = new WagonPlace();
+                    place.setLocationType(rec.getLong("location_type"));
+                    place.setPlace(rec.getLong("place"));
+                    Long trip = rec.getLong("trip");
+                    place.setTrip(trip == null ? null : new TripRef(trip));
+                    row.setLocationAt(place);
+                }
+                row.setWagonStatusTypeAt(rec.getLong("wagon_status_type"));
+            }
+            refResolver.resolve(rows);
+            return;
+        }
         for (DbRec rec : db.loadSql(ListSql.locationsAt(), params)) {
             WagonPlace place = new WagonPlace();
             place.setLocationType(rec.getLong("location_type"));

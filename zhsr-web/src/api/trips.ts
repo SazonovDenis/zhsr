@@ -257,7 +257,9 @@ export interface ConductorCandidate extends UserRef {
   senior: boolean
   /** уже в бригаде этого рейса */
   assigned: boolean
-  /** рейс, из которого проводник освободится к отправлению; null — свободен */
+  /** занят в другом рейсе, пересекающемся по времени с этим: назначить его нельзя */
+  busy: boolean
+  /** другой рейс проводника: пересекающийся с этим (busy), иначе тот, после которого он освободится; null — рейсов нет */
   busyTrip: TripRef | null
   /** когда этот рейс прибудет */
   busyUntil: string | null

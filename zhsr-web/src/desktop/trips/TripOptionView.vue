@@ -3,7 +3,7 @@
     <span class="trip-option__code zs-mono">{{ trip.trainNumber }}</span>
     <div class="trip-option__main">
       <div class="trip-option__label">
-        {{ trip.name }} • {{ t('рейс от {date}', { date: formatDateTime(trip.plannedDt) }) }}
+        {{ trip.name }} • {{ formatDateTime(trip.plannedDt) }}
       </div>
       <div class="trip-option__sub">{{ sub }}</div>
     </div>

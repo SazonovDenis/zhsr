@@ -17,7 +17,9 @@ public class ConductorCandidate extends UserRef {
     private boolean senior;
     /** уже в бригаде этого рейса */
     private boolean assigned;
-    /** рейс, из которого проводник освободится к отправлению; null - свободен */
+    /** занят в другом рейсе, пересекающемся по времени с этим: назначить его нельзя */
+    private boolean busy;
+    /** другой рейс проводника: пересекающийся с этим (busy), иначе тот, после которого он освободится; null - рейсов нет */
     private TripRef busyTrip;
     /** когда этот рейс прибудет */
     private OffsetDateTime busyUntil;

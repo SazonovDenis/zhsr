@@ -10,11 +10,11 @@
   >
     <!-- строка «сейчас»: как запись, время идёт само, выделена только жирным -->
     <template v-if="!change">
-      <span class="journal-item__time journal-item__now">{{ formatDateTime(new Date(nowMinute).toISOString()) }}</span>
+      <span class="journal-item__time journal-item__now">{{ wrap(formatDateTime(new Date(nowMinute).toISOString())) }}</span>
       <span class="journal-item__now">{{ t('Текущее состояние') }}</span>
     </template>
     <template v-else>
-      <span class="journal-item__time">{{ hideTime ? '' : formatDateTime(change.dt) }}</span>
+      <span class="journal-item__time">{{ hideTime ? '' : wrap(formatDateTime(change.dt)) }}</span>
       <span class="journal-item__main">
         <span class="journal-item__what">
           <ChangeTitle :change="change" />
@@ -78,12 +78,17 @@ const emit = defineEmits<{ select: []; menu: [e: MouseEvent]; trip: [id: number]
 
 const plan = computed(() => !!props.change && isWaiting(props.change))
 const deviation = computed(() => (props.change ? deviationText(props.change) : ''))
+
+/** Время в колонке «Время» переносится: между датой и временем обычный пробел вместо неразрывного. */
+function wrap(text: string): string {
+  return text.replace('\u00a0', ' ')
+}
 </script>
 
 <style scoped lang="scss">
 .journal-item {
   display: grid;
-  grid-template-columns: 5.6rem minmax(0, 1fr) auto;
+  grid-template-columns: 2.8rem minmax(0, 1fr) auto;
   gap: 0.6rem;
   align-items: start;
   border-top: 0.0625rem solid $zs-border-row;
@@ -103,7 +108,6 @@ const deviation = computed(() => (props.change ? deviationText(props.change) : '
 
 .journal-item__time {
   color: $zs-text-muted;
-  white-space: nowrap;
 }
 
 .journal-item__now {

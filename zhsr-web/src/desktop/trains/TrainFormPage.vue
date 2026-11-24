@@ -72,6 +72,8 @@
           :mark="selectedMark"
           class="train-form__view"
           @detach="(w, fact, plan, at) => void actions.detach(w, fact, plan, at)"
+          @select="onSelect"
+          @pick-trip="pickTrip"
         />
       </div>
     </div>
@@ -320,7 +322,7 @@ async function rename() {
 .train-form {
   display: grid;
   flex: 1;
-  grid-template-columns: 22.4rem minmax(0, 1fr);
+  grid-template-columns: 16.8rem minmax(0, 1fr);
   gap: 1rem;
   min-height: 0;
 }

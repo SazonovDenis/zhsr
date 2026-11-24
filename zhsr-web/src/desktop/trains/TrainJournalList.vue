@@ -336,7 +336,7 @@ watch([side, pastMode, period], scrollToNow)
 .train-journal__cols {
   display: grid;
   flex: none;
-  grid-template-columns: 5.6rem minmax(0, 1fr) 1.2rem;
+  grid-template-columns: 2.8rem minmax(0, 1fr) 1.2rem;
   gap: 0.6rem;
   border-left: 0.2rem solid transparent;
   background: $zs-table-head-bg;

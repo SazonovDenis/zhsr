@@ -7,7 +7,14 @@
       </FormField>
       <!-- рейсы поезда в статусе «план» — богатым видом, как фильтр «Рейс» списка вагонов; пусто — вне рейса -->
       <FormField v-if="w.state.mode === 'plan'" label="В рейсе">
-        <CbList v-model="w.state.trip" single placeholder="вне рейса" :values="w.tripChoices" style="width: 36rem">
+        <CbList
+          v-model="w.state.trip"
+          single
+          placeholder="вне рейса"
+          :values="w.tripChoices"
+          :disabled="w.tripLocked"
+          style="width: 36rem"
+        >
           <template #option="{ item }">
             <TripOptionView v-if="item.data" :trip="tripOptionOf(item)" class="trip-option--list" />
             <CbOption v-else :item="item" />

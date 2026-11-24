@@ -95,6 +95,8 @@ export interface WagonFilter {
   depot?: number | null
   /** момент, например отправление рейса, ISO с поясом: дополнительно расположение и состояние на него */
   at?: string | null
+  /** true при заданном at: станция, виды и состояния отбираются, а «на момент» считается с учётом ожидающего плана поездов */
+  plan?: boolean
 }
 
 /**
@@ -103,7 +105,7 @@ export interface WagonFilter {
  */
 export function wagonQuery(filter: WagonFilter): WagonFilter {
   if (!filter.number.trim()) return filter
-  return { number: filter.number, station: null, trip: null, locationKinds: [], states: [], at: filter.at ?? null }
+  return { number: filter.number, station: null, trip: null, locationKinds: [], states: [], at: filter.at ?? null, plan: filter.plan ?? false }
 }
 
 /** Новый вагон: паспорт (wagon), депо приписки, начальное расположение и состояние. */

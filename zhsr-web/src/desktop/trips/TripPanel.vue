@@ -108,6 +108,7 @@ import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { formatDateTime } from '@/shared/format'
+import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
 import SidePanel from '../frame/SidePanel.vue'
 import CrewPickDialog from './CrewPickDialog.vue'
@@ -259,7 +260,7 @@ async function editCrew() {
   if (!c) return
   const saved = await openDialog<boolean>(CrewPickDialog, {
     tripId: c.trip.id,
-    tripName: `${c.trip.trainNumber} • ${c.trip.name}`,
+    tripName: tripRefDatedText(c.trip),
     station: c.trip.departureStation ? dictManager.getValue('Station', c.trip.departureStation) : '',
     crew: c.crew,
   })

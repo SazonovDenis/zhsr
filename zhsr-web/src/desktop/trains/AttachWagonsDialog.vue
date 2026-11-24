@@ -224,7 +224,7 @@ async function load() {
   loadError.value = null
   try {
     await busy.run(async () => {
-      const list = await fetchWagons(wagonQuery({ ...filter, at: moment.value }), sort.value)
+      const list = await fetchWagons(wagonQuery({ ...filter, at: moment.value, plan: mode.value === 'plan' }), sort.value)
       const busyList = await fetchWagonBusy(
         list.map((w) => w.id),
         moment.value,
@@ -238,7 +238,7 @@ async function load() {
   }
 }
 
-watch([filter, sort, moment], load, { deep: true })
+watch([filter, sort, moment, mode], load, { deep: true })
 
 // отмеченный вагон, который при смене вида или времени перестал подходить, снимается
 watch([mode, moment, busyOf], () => {

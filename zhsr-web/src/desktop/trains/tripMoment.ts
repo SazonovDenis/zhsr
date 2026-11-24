@@ -5,7 +5,7 @@ import type { TrainWagon } from '@/api/trains'
 /** Рейс поезда, выбранный на экране поезда: состав показывается на его отправление. */
 export interface TripMoment {
   id: number
-  /** рейс словами: «002 • Алматы — Астана • рейс от 22.11 10:00» */
+  /** рейс словами: «002 • Алматы — Астана • 22.11 10:00» */
   text: string
   /** номер поезда маршрута: «655/656» */
   number: string
@@ -27,3 +27,13 @@ export interface TripTransfer {
 }
 
 export const TRIP_TRANSFER: InjectionKey<TripTransfer> = Symbol('tripTransfer')
+
+/** Действия над планами вагона в ячейке «По плану» состава — как в журнале (provide/inject). */
+export interface MomentPlans {
+  /** выбрать запись плана журнала */
+  select: (id: number) => void
+  /** выбрать рейс поезда */
+  pickTrip: (id: number) => void
+}
+
+export const MOMENT_PLANS: InjectionKey<MomentPlans> = Symbol('momentPlans')

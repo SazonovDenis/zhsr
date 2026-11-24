@@ -7,7 +7,7 @@
     @click="emit('select')"
     @keydown.enter.prevent="emit('select')"
   >
-    <span class="journal-mark__time">{{ formatDateTime(mark.dt) }}</span>
+    <span class="journal-mark__time">{{ formatDateTime(mark.dt).replace('\u00a0', ' ') }}</span>
     <span class="journal-mark__text">
       {{
         t(mark.kind === 'departure' ? 'Отправление рейса {trip}' : 'Прибытие рейса {trip}', {
@@ -36,7 +36,7 @@ const emit = defineEmits<{ select: [] }>()
 // колонки — как у записи журнала (TrainJournalItem)
 .journal-mark {
   display: grid;
-  grid-template-columns: 5.6rem minmax(0, 1fr) auto;
+  grid-template-columns: 2.8rem minmax(0, 1fr) auto;
   gap: 0.6rem;
   align-items: start;
   border-top: 0.0625rem dashed $zs-border-row;
@@ -52,10 +52,6 @@ const emit = defineEmits<{ select: [] }>()
     border-left-color: $zs-row-selected-bar;
     background: $zs-row-selected-bg;
   }
-}
-
-.journal-mark__time {
-  white-space: nowrap;
 }
 
 .journal-mark__text {

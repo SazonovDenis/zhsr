@@ -86,6 +86,7 @@ import { computed } from 'vue'
 import type { RoutePoint } from '@/api/routes'
 import { t } from '@/boot/i18n'
 import { dictManager } from '@/shared/dict/DictManager'
+import { noBreak } from '@/shared/format'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
 import { formatDuration as formatWords, formatHm, runOf, stopOf } from './duration'
 
@@ -174,8 +175,8 @@ function formatHourMin(min: number): string {
   if (!min) return ''
   const h = Math.floor(min / 60)
   const m = min % 60
-  if (h === 0) return t('{m} мин', { m })
-  return m === 0 ? t('{h} ч', { h }) : t('{h} ч {m} мин', { h, m })
+  if (h === 0) return noBreak(t('{m} мин', { m }))
+  return noBreak(m === 0 ? t('{h} ч', { h }) : t('{h} ч {m} мин', { h, m }))
 }
 </script>
 

@@ -39,7 +39,6 @@ import {
   compositionAt,
   currentComposition,
   expectedAt,
-  isAttach,
   isFact,
   isWaiting,
   journalOf,
@@ -48,16 +47,19 @@ import {
 import { TrainWagonKind } from '@/shared/constants/TrainWagonChange'
 import { currentUser, hasRole } from '@/shared/user'
 import { wagonsColumns } from '../wagons/wagonsColumns'
+import CellMomentPlans from './cells/CellMomentPlans.vue'
 import CellTripAway from './cells/CellTripAway.vue'
 import type { TripMoment } from './tripMoment'
-import { TRIP_TRANSFER } from './tripMoment'
+import { MOMENT_PLANS, TRIP_TRANSFER } from './tripMoment'
 
 /** Строка состава на момент: вагон поезда с полями колонок списка вагонов. */
 interface MomentRow extends TrainWagon {
   key: number
   seq: number
-  /** ожидающие планы вагона после момента словами */
-  plans: string
+  /** ожидающие планы вагона после момента */
+  plans: TrainChange[]
+  /** id выбранной записи журнала: её план в ячейке выделен */
+  selectedPlan: number | null
 }
 
 /**
@@ -89,7 +91,12 @@ const props = withDefaults(
   }>(),
   { trip: null, mark: null },
 )
-const emit = defineEmits<{ detach: [wagon: TrainWagon, factAllowed: boolean, plan: boolean, at: string | null] }>()
+const emit = defineEmits<{
+  detach: [wagon: TrainWagon, factAllowed: boolean, plan: boolean, at: string | null]
+  select: [id: number]
+  'pick-trip': [id: number]
+}>()
+provide(MOMENT_PLANS, { select: (id) => emit('select', id), pickTrip: (id) => emit('pick-trip', id) })
 
 const change = computed<TrainChange | null>(() => props.card.changes.find((c) => c.id === props.changeId) ?? null)
 /** Показан состав на момент отметки рейса: отметка выбрана, запись журнала — нет. */
@@ -150,12 +157,9 @@ const plansAfter = computed<TrainChange[]>(() => {
   return plans.slice(plans.findIndex((c) => c.id === props.changeId) + 1)
 })
 
-/** Ожидающие планы вагона после момента словами. */
-function plansOf(wagon: number): string {
-  return plansAfter.value
-    .filter((c) => c.wagon.id === wagon)
-    .map((c) => t(isAttach(c) ? 'прицепка {time}' : 'отцепка {time}', { time: formatDateTime(c.dt) }))
-    .join(', ')
+/** Ожидающие планы вагона после момента. */
+function plansOf(wagon: number): TrainChange[] {
+  return plansAfter.value.filter((c) => c.wagon.id === wagon)
 }
 
 const rows = computed<MomentRow[]>(() =>
@@ -163,7 +167,8 @@ const rows = computed<MomentRow[]>(() =>
     ...m.wagon,
     key: m.wagon.wagon,
     seq: m.state.seq,
-    plans: props.future ? plansOf(m.wagon.wagon) : '',
+    plans: props.future ? plansOf(m.wagon.wagon) : [],
+    selectedPlan: props.changeId,
   })),
 )
 
@@ -195,7 +200,7 @@ const wagonColumns = (wagonsColumns as unknown as Column<MomentRow>[])
 const withAway = computed(() => atTrip.value && !props.trip!.fact && props.trip!.departureStation !== null)
 
 const columns = computed(() => [
-  ...defineColumns<MomentRow>([{ field: 'seq', title: '№', width: '3rem' }]),
+  ...defineColumns<MomentRow>([{ field: 'seq', title: '№', width: '2rem' }]),
   ...wagonColumns,
   ...(withAway.value
     ? defineColumns<MomentRow>([
@@ -203,7 +208,7 @@ const columns = computed(() => [
       ])
     : []),
   ...(props.future
-    ? defineColumns<MomentRow>([{ field: 'plans', title: 'По плану', width: 'minmax(6rem, 0.8fr)' }])
+    ? defineColumns<MomentRow>([{ field: 'plans', title: 'По плану', width: 'minmax(12rem, 1.4fr)', cell: CellMomentPlans }])
     : []),
 ])
 

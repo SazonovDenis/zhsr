@@ -47,6 +47,11 @@ export function formatHours(hours: number | null): string {
   return new Intl.NumberFormat(i18n.global.locale.value, { maximumFractionDigits: 2 }).format(hours)
 }
 
+/** Пробелы неразрывные: длительность «4 час 37 мин» не рвётся переносом строки. */
+export function noBreak(text: string): string {
+  return text.replace(/ /g, '\u00a0')
+}
+
 /** Дробные часы — часы и минуты: 2.5 → «2:30». */
 export function formatHoursMinutes(hours: number): string {
   const minutes = Math.round(hours * 60)

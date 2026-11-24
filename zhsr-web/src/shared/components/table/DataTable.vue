@@ -156,8 +156,6 @@ const props = withDefaults(
     retry?: (() => void) | null
     /** меню строки: пункты по порядку; null — меню нет */
     rowMenu?: RowMenuItem<Row>[] | null
-    /** у последней колонки справа отступ под три точки меню строки: точки не закрывают значение */
-    menuGap?: boolean
     /** выбор строки снимают повторный щелчок по ней и Escape */
     deselect?: boolean
     /** строки с отметками: пробел на выделенной строке — то же, что щелчок по ней (row-click); щелчок по самой отметке выделяет строку */
@@ -171,7 +169,6 @@ const props = withDefaults(
     error: null,
     retry: null,
     rowMenu: null,
-    menuGap: false,
     deselect: false,
     spacePick: false,
   },
@@ -218,7 +215,7 @@ function alignClass(col: Column<Row>): string {
 }
 
 function paddingClass(col: Column<Row>): string {
-  if (props.menuGap && col === props.columns.at(-1)) return 'q-pl-md data-table--menu-gap'
+  if (props.rowMenu && col === props.columns.at(-1)) return 'q-pl-md data-table--menu-gap'
   return col.dense ? 'q-pl-md q-pr-xs' : 'q-px-md'
 }
 
@@ -475,7 +472,7 @@ watch(selected, async (key) => {
 
 .data-table__menu-btn {
   position: absolute;
-  top: 50%;
+  top: 0.3rem;
   right: 0.3rem;
   display: flex;
   align-items: center;
@@ -488,7 +485,6 @@ watch(selected, async (key) => {
   color: $zs-text-muted;
   opacity: 0.4;
   cursor: pointer;
-  transform: translateY(-50%);
 
   &:hover,
   &:focus-visible {
@@ -498,7 +494,7 @@ watch(selected, async (key) => {
   }
 }
 
-// место под три точки: ширина кнопки меню и её отступ от края
+// у последней колонки таблицы с меню строки — место под три точки: ширина кнопки меню и её отступ от края
 .data-table--menu-gap {
   padding-right: 2.2rem;
 }

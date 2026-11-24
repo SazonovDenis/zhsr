@@ -88,6 +88,7 @@ import { tripRefText } from '@/shared/trips/tripRefText'
 import { isMe, userName } from '@/shared/user'
 import { staffColumns } from '../staff/staffColumns'
 import CellCrewPick from './cells/CellCrewPick.vue'
+import CellCrewPlan from './cells/CellCrewPlan.vue'
 import { CREW_PICK } from './crewPick'
 
 /**
@@ -180,6 +181,7 @@ void busy.run(async () => {
 })
 
 function toggle(id: number) {
+  if (candidates.value.find((c) => c.id === id)?.busy) return
   selected.value = selected.value.includes(id) ? selected.value.filter((x) => x !== id) : [...selected.value, id]
 }
 
@@ -191,11 +193,22 @@ const conductorRows = computed(() => {
 })
 
 // колонки списка сотрудников без сортировки: первая — ФИО с отметкой выбора
-const conductorColumns = staffColumns().map((col) =>
-  col.field === 'fullName' ? { ...col, sortable: false, cell: CellCrewPick } : { ...col, sortable: false },
-)
+// «Назначен»: рейс этого диалога — надпись «Назначен в этот рейс»
+const conductorColumns = staffColumns().map((col) => {
+  if (col.field === 'fullName') return { ...col, sortable: false, cell: CellCrewPick }
+  if (col.field === 'station') return { ...col, sortable: false, width: 'minmax(15rem, 1.7fr)' }
+  if (col.field === 'planTrip')
+    return { ...col, sortable: false, title: 'Занятость', width: 'minmax(21rem, 2.5fr)', cell: CellCrewPlan }
+  return { ...col, sortable: false }
+})
 
 provide(CREW_PICK, {
+  tripId: props.tripId,
+  isBusy: (id) => candidates.value.find((c) => c.id === id)?.busy ?? false,
+  busy: (id) => {
+    const c = candidates.value.find((x) => x.id === id)
+    return c?.busyUntil ? { trip: c.busyTrip, until: c.busyUntil } : null
+  },
   isPicked: (id) => selected.value.includes(id),
   toggle,
   reason: () => conductorReason.value,

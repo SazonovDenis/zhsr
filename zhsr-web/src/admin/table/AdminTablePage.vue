@@ -38,7 +38,6 @@
           :retry="def ? list.load : () => open(table)"
           empty="Записей нет"
           :row-menu="rowMenu"
-          menu-gap
           @sort="list.query.sort = $event"
           @row-dblclick="edit"
         />

@@ -32,7 +32,6 @@
       :error="loadError"
       :retry="init"
       :row-menu="rowMenu"
-      menu-gap
       empty="В шаблоне нет пунктов"
       @row-dblclick="(r: ItemRow) => void edit(r.item, r.section)"
     />

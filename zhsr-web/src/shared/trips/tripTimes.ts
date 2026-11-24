@@ -1,6 +1,7 @@
 import { onBeforeUnmount, ref } from 'vue'
 
 import { t } from '@/boot/i18n'
+import { noBreak } from '@/shared/format'
 
 /** Плановое прибытие: плановое отправление плюс время в пути, мин. ISO. */
 export function plannedArrival(plannedDt: string, duration: number): string {
@@ -12,7 +13,9 @@ export function delayText(planned: string, actual: string): string {
   const minutes = Math.round((Date.parse(actual) - Date.parse(planned)) / 60_000)
   if (minutes === 0) return t('по плану')
   const abs = Math.abs(minutes)
-  const span = abs >= 60 ? t('{h} ч {m} мин', { h: Math.floor(abs / 60), m: abs % 60 }) : t('{m} мин', { m: abs })
+  const span = noBreak(
+    abs >= 60 ? t('{h} ч {m} мин', { h: Math.floor(abs / 60), m: abs % 60 }) : t('{m} мин', { m: abs }),
+  )
   return minutes > 0 ? t('опоздание {span}', { span }) : t('раньше на {span}', { span })
 }
 

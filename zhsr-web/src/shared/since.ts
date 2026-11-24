@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 
 import { t } from '@/boot/i18n'
-import { formatDateTime } from '@/shared/format'
+import { formatDateTime, noBreak } from '@/shared/format'
 
 /** Текущее время, мс; обновляется раз в минуту — для подписей «сколько уже длится» во всех ячейках сразу. */
 export const nowMinute = ref(Date.now())
@@ -16,11 +16,11 @@ export function spanText(ms: number): string {
   const days = Math.floor(minutes / 1440)
   const hours = Math.floor((minutes % 1440) / 60)
   const rest = minutes % 60
-  if (days >= 10 || (days > 0 && hours === 0)) return t('{d} дн', { d: days })
-  if (days > 0) return t('{d} дн {h} час', { d: days, h: hours })
-  if (hours > 0 && rest === 0) return t('{h} час', { h: hours })
-  if (hours > 0) return t('{h} час {m} мин', { h: hours, m: rest })
-  return t('{m} мин', { m: minutes })
+  if (days >= 10 || (days > 0 && hours === 0)) return noBreak(t('{d} дн', { d: days }))
+  if (days > 0) return noBreak(t('{d} дн {h} час', { d: days, h: hours }))
+  if (hours > 0 && rest === 0) return noBreak(t('{h} час', { h: hours }))
+  if (hours > 0) return noBreak(t('{h} час {m} мин', { h: hours, m: rest }))
+  return noBreak(t('{m} мин', { m: minutes }))
 }
 
 /** С какого времени и сколько уже длится: «с 25.10 01:05, 8 час 25 мин». now — текущее время, мс. */

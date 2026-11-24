@@ -257,8 +257,9 @@ public class TripService {
     }
 
     /**
-     * Проводники для набора в бригаду: станции отправления и уже назначенные. Занятые в пересекающемся по времени
-     * рейсе не показываются; у того, кто до отправления ещё в другом рейсе, - этот рейс и когда освободится.
+     * Проводники для набора в бригаду: станции отправления и уже назначенные. Занятый в пересекающемся по времени
+     * рейсе - в списке с пометкой busy, этим рейсом и временем его прибытия; назначить его не даст requireFree. У
+     * остальных - рейс, после которого они освободятся к отправлению, и время его прибытия.
      */
     public List<ConductorCandidate> conductorCandidates(long id) throws Exception {
         requireVisible(id);
@@ -284,18 +285,22 @@ public class TripService {
             long usr = c.getId();
             boolean assigned = crew.getCrew().stream().anyMatch(m -> m.getUsr().getId() == usr);
             List<DbRec> busy = others.getOrDefault(usr, List.of());
-            if (!assigned && busy.stream().anyMatch(o -> overlaps(o, start, end))) {
-                continue;
-            }
-            // рейс, который закончится последним из тех, что идут до отправления
+            // пересекающийся рейс, а если его нет - рейс, который закончится последним из тех, что идут до отправления
             DbRec before = null;
+            boolean overlap = false;
             for (DbRec o : busy) {
                 OffsetDateTime until = o.getDateTimeTZ("arrival");
-                if (!until.isAfter(start) && (before == null || until.isAfter(before.getDateTimeTZ("arrival")))) {
+                boolean cross = overlaps(o, start, end);
+                if (cross && !overlap) {
+                    overlap = true;
+                    before = o;
+                } else if (cross == overlap && (cross || !until.isAfter(start))
+                        && (before == null || until.isAfter(before.getDateTimeTZ("arrival")))) {
                     before = o;
                 }
             }
             c.setAssigned(assigned);
+            c.setBusy(!assigned && overlap);
             if (before != null) {
                 c.setBusyTrip(new TripRef(before.getLong("trip")));
                 c.setBusyUntil(before.getDateTimeTZ("arrival"));

@@ -1,6 +1,11 @@
 package kz.zhsr.app.service;
 
+import kz.zhsr.app.constants.LocationType;
+import kz.zhsr.app.constants.TrainWagonChangeType;
+import kz.zhsr.app.constants.TrainWagonKind;
+import kz.zhsr.app.constants.TrainWagonPlanStatus;
 import kz.zhsr.app.constants.TripStatus;
+import kz.zhsr.app.constants.WagonStatus;
 import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.dto.route.RouteFilter;
 import kz.zhsr.app.dto.trip.TripFilter;
@@ -51,8 +56,22 @@ final class ListSql {
         if (filter.number() != null && !filter.number().isBlank()) {
             where.add("strpos(wagon.number, :number) > 0", "number", filter.number().trim());
         }
+        boolean plan = Boolean.TRUE.equals(filter.plan()) && filter.at() != null;
+        String with = "";
+        if (plan) {
+            PLAN_AT_PARAMS.forEach(where::param);
+            where.param("at", filter.at());
+            with = "with " + WAGON_AT_PLAN + "\n";
+        }
+        String place = plan ? "wagon_at" : "wagon_info";
         if (filter.station() != null) {
-            where.add("""
+            where.add(plan ? """
+                    ((wagon_at.location_type = :stationType and wagon_at.place = :station)
+                     or (wagon_at.location_type = :depotType
+                         and wagon_at.place in (select depot.id from depot where depot.station = :station))
+                     or (wagon_at.location_type = :yardType
+                         and wagon_at.place in (select yard.id from yard where yard.station = :station)))"""
+                    : """
                     (wagon_info.station = :station
                      or wagon_info.depot in (select depot.id from depot where depot.station = :station)
                      or wagon_info.yard in (select yard.id from yard where yard.station = :station))""",
@@ -61,10 +80,10 @@ final class ListSql {
         if (filter.trip() != null) {
             where.add("wagon_info.trip = :trip", "trip", filter.trip());
         }
-        where.any("wagon_info.location_type", "locationKinds", filter.locationKinds());
-        where.any("wagon_info.wagon_status_type", "states", filter.states());
+        where.any(place + ".location_type", "locationKinds", filter.locationKinds());
+        where.any(place + ".wagon_status_type", "states", filter.states());
 
-        return where.query("""
+        return where.query(with + """
                 select wagon.id, wagon.number, wagon.wagon_type, wagon.model_type, wagon.depot,
                        wagon_info.location_type,
                        coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard, wagon_info.trip) as place,
@@ -73,7 +92,7 @@ final class ListSql {
                        wagon_info.run_km, wagon.initial_run_km, wagon.maker, wagon.build_year, wagon.dbeg, wagon.dend
                 from wagon
                 join wagon_info on wagon_info.wagon = wagon.id
-                """, sort.orderBy(WAGON_SORT, "wagon.number") + (limit == null ? "" : "\nlimit " + limit));
+                """ + (plan ? "join wagon_at on wagon_at.id = wagon.id\n" : ""), sort.orderBy(WAGON_SORT, "wagon.number") + (limit == null ? "" : "\nlimit " + limit));
     }
 
     /**
@@ -102,6 +121,60 @@ final class ListSql {
                 from train_wagon
                 where train_wagon.kind = :fact and train_wagon.dend is null
                 """;
+    }
+
+    /** Параметры {@link #WAGON_AT_PLAN} (кроме at и ids). */
+    static final Map<String, Object> PLAN_AT_PARAMS = Map.of(
+            "planKind", TrainWagonKind.PLAN,
+            "waiting", TrainWagonPlanStatus.WAITING,
+            "attach", TrainWagonChangeType.ATTACH,
+            "detach", TrainWagonChangeType.DETACH,
+            "stationType", LocationType.STATION,
+            "depotType", LocationType.DEPOT,
+            "yardType", LocationType.YARD,
+            "tripType", LocationType.TRIP,
+            "idle", WagonStatus.IN_IDLE,
+            "inTrip", WagonStatus.IN_TRIP);
+
+    /**
+     * Расположение и состояние каждого вагона на момент at с учётом плана (CTE wagon_at): запись журнала факта,
+     * действующая в момент, а если до момента есть ожидающая плановая отцепка или прицепка - её последний результат:
+     * отцепка - вагон на станции отцепки в простое, прицепка - вагон в рейсе в поезде. Исполненный план уже в
+     * журнале факта. Параметры at, {@link #PLAN_AT_PARAMS}.
+     */
+    private static final String WAGON_AT_PLAN = """
+            plan_last as (
+                select distinct on (train_wagon_change.wagon) train_wagon_change.wagon, train_wagon_change.change_type,
+                       train_wagon_change.station, train_wagon_change.trip
+                from train_wagon_change
+                where train_wagon_change.kind = :planKind and train_wagon_change.plan_status = :waiting
+                  and train_wagon_change.dt <= :at
+                order by train_wagon_change.wagon, train_wagon_change.dt desc, train_wagon_change.id desc),
+            wagon_at as (
+                select wagon.id,
+                       case plan_last.change_type when :detach then cast(:stationType as bigint)
+                            when :attach then cast(:tripType as bigint) else wagon_location.location_type end
+                            as location_type,
+                       case plan_last.change_type when :detach then plan_last.station
+                            when :attach then plan_last.trip
+                            else coalesce(wagon_location.station, wagon_location.depot, wagon_location.yard,
+                                          wagon_location.trip) end as place,
+                       case plan_last.change_type when :detach then null when :attach then plan_last.trip
+                            else wagon_location.trip end as trip,
+                       case plan_last.change_type when :detach then cast(:idle as bigint)
+                            when :attach then cast(:inTrip as bigint) else wagon_status.wagon_status_type end
+                            as wagon_status_type
+                from wagon
+                left join plan_last on plan_last.wagon = wagon.id
+                left join wagon_location on wagon_location.wagon = wagon.id
+                     and tstzrange(wagon_location.dbeg, wagon_location.dend) @> :at
+                left join wagon_status on wagon_status.wagon = wagon.id
+                     and tstzrange(wagon_status.dbeg, wagon_status.dend) @> :at)
+            """;
+
+    /** Расположение и состояние на момент с учётом плана - второй проход списка вагонов. Параметры ids, at, PLAN_AT_PARAMS. */
+    static String wagonsAtPlan() {
+        return "with " + WAGON_AT_PLAN + "select id, location_type, place, trip, wagon_status_type from wagon_at where id = any(:ids)";
     }
 
     /**
