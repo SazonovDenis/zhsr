@@ -147,7 +147,7 @@ async function submit() {
     await rememberLogin(username.value.trim())
     // локальная БД сверяется с сервером до загрузки страниц
     await loadCurrentUser(true)
-    await router.push({ name: 'home' })
+    await router.push({ name: 'trips' })
   } catch (e) {
     // нужно сменить пароль: переход на страницу смены пароля уже выполнен (onPasswordChangeRequired)
     if (isPasswordChangeRequired(e)) return

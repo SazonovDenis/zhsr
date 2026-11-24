@@ -1,24 +1,6 @@
 {
   "items": [
     {
-      "id": "wagons",
-      "label": "Вагоны",
-      "icon": "wagons",
-      "route": "wagons"
-    },
-    {
-      "id": "trains",
-      "label": "Поезда",
-      "sub": true,
-      "route": "trains"
-    },
-    {
-      "id": "acts",
-      "label": "Передача",
-      "route": "acts",
-      "sub": true
-    },
-    {
       "id": "trips",
       "label": "Рейсы",
       "icon": "trips",
@@ -49,6 +31,24 @@
       "route": "equip"
     },
     {
+      "id": "wagons",
+      "label": "Вагоны",
+      "icon": "wagons",
+      "route": "wagons"
+    },
+    {
+      "id": "trains",
+      "label": "Поезда",
+      "sub": true,
+      "route": "trains"
+    },
+    {
+      "id": "acts",
+      "label": "Передача",
+      "route": "acts",
+      "sub": true
+    },
+    {
       "id": "warranty",
       "label": "Гарантийные талоны",
       "icon": "warranty"
@@ -69,7 +69,11 @@
         "id": "staff",
         "label": "Сотрудники",
         "route": "staff",
-        "roles": [1, 12, 14]
+        "roles": [
+          1,
+          12,
+          14
+        ]
       },
       {
         "id": "admin-group-routes",
