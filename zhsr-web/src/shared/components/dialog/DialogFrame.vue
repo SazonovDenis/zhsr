@@ -12,7 +12,7 @@
       ref="cardEl"
       class="dialog-frame"
       :class="{ 'dialog-frame--maximized': isMaximized }"
-      :style="isMaximized ? undefined : { width, height: dialogHeight(height) }"
+      :style="isMaximized ? undefined : { width, minHeight: dialogHeight(minHeight) }"
       @keydown.stop="onKeydown"
     >
       <DialogHeader :title="title" @close="close" />
@@ -73,8 +73,9 @@ import DialogHeader from './DialogHeader.vue'
  *   zs-focusable внутри диалога. При открытии фокус встаёт на первый такой элемент — первый контрол формы. Класс
  *   zs-focusable ставят сами контролы: TextInput, DatePicker, CbList, CbSegment, CbButton, кнопки действий.
  * - На телефоне диалог развёрнут на весь экран, а кнопка «назад» закрывает его (см. dialogHistory).
- * - Высота постоянная (height, DialogHeight): от высоты экрана в пределах min и max, содержимое её не меняет — лишнее
- *   прокручивается в теле.
+ * - Наименьшая высота — minHeight (DialogHeight): от высоты экрана в пределах min и max. Содержимому нужно больше —
+ *   диалог растёт до высоты окна; тело прокручивается, только когда не помещается и тогда. Список со своей прокруткой
+ *   (flex: 1 1 0) диалог не растит: занимает свободное место.
  * - Ошибка (error) — полосой во всю ширину над кнопками, с крестиком (событие errorClose): тело уступает ей высоту.
  * - Предупреждения (слот warnings) — такой же полосой над ошибкой, на фоне предупреждения, без крестика; длинный
  *   список прокручивается.
@@ -93,8 +94,8 @@ const props = withDefaults(
     maximized?: boolean | null
     /** ширина диалога, если он не развёрнут */
     width?: string
-    /** постоянная высота диалога, если он не развёрнут: готовая (DialogHeight) или своя — значение CSS */
-    height?: DialogHeightValue
+    /** наименьшая высота диалога, если он не развёрнут: готовая (DialogHeight) или своя — значение CSS */
+    minHeight?: DialogHeightValue
     actions?: DialogAction[]
     /** текст слева от кнопок, например почему основное действие недоступно */
     actionsStateText?: string
@@ -110,7 +111,7 @@ const props = withDefaults(
     title: '',
     maximized: null,
     width: '32rem',
-    height: 'md',
+    minHeight: 'md',
     actions: () => [],
     actionsStateText: '',
     actionRunning: null,
@@ -250,6 +251,7 @@ function onAction(action: DialogAction) {
   display: flex;
   flex-direction: column;
   max-width: 100%;
+  max-height: calc(100vh - 3rem);
   border-radius: 0.3rem;
   background: #fff;
   box-shadow: 0 1.5rem 3.8rem rgba(0, 0, 0, 0.2);
@@ -257,13 +259,15 @@ function onAction(action: DialogAction) {
   &--maximized {
     width: 100%;
     height: 100%;
+    max-height: none;
     border-radius: 0;
   }
 }
 
 .dialog-frame__body {
   display: flex;
-  flex: 1;
+  // высота — по содержимому, свободное место — телу; не помещается в окно — тело сжимается и прокручивается
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 1rem;
   min-height: 0;

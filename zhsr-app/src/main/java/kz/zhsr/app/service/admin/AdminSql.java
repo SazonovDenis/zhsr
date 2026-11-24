@@ -45,6 +45,16 @@ final class AdminSql {
     }
 
     /**
+     * Все строки, найденные поиском: id и поля таблицы.
+     *
+     * @param orderBy поле сортировки - колонка таблицы из её описания
+     */
+    static SqlQuery all(AdminTable table, String search, String orderBy) {
+        Map<String, Object> params = new HashMap<>();
+        return new SqlQuery(select(table) + searchWhere(table, search, params) + "order by " + orderBy, params);
+    }
+
+    /**
      * Сортировка по полю-ссылке: текст записи, на которую ссылается поле.
      */
     static String refSort(AdminTable table, AdminColumn column) {

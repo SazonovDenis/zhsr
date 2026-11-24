@@ -1,6 +1,7 @@
 package kz.zhsr.app.controller;
 
 import kz.zhsr.app.dto.route.StageLines;
+import kz.zhsr.app.dto.route.StationPoint;
 import kz.zhsr.app.service.StageService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -23,6 +24,11 @@ public class StageController {
     @GetMapping("/stages/lines")
     public StageLines lines(@RequestParam(required = false) List<Long> stations) throws Exception {
         return stageService.lines(stations);
+    }
+
+    @GetMapping("/stages/stations")
+    public List<StationPoint> stations() throws Exception {
+        return stageService.stations();
     }
 
 }

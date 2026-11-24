@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    height="xl"
+    min-height="xl"
     title="Прицепить вагоны"
     ok-text="Прицепить"
     width="70rem"
@@ -24,7 +24,14 @@
     <!-- фильтр и список вагонов — с небольшим отступом, меньше промежутка тела диалога -->
     <div class="attach-wagons__list">
       <FilterBar class="attach-wagons__filter">
-        <TextInput v-model="filter.number" placeholder="Номер вагона" width="8.8rem" />
+        <TextInput
+          ref="searchField"
+          v-model="filter.number"
+          placeholder="Номер вагона"
+          width="8.8rem"
+          @keydown.down.prevent="dataTable?.focus()"
+          @keydown.esc="searchEsc($event, filter.number, () => (filter.number = ''))"
+        />
         <!-- поиск по номеру отменяет фильтры: находит вагон на любой станции -->
         <span v-if="searching" class="attach-wagons__note">{{
           t('При поиске по номеру фильтры не применяются.')
@@ -41,6 +48,8 @@
       </FilterBar>
 
       <DataTable
+        ref="dataTable"
+        space-pick
         :columns="columns"
         :rows="rows"
         :error="loadError"
@@ -50,6 +59,7 @@
         :loading="busy.active.value"
         empty="Нет вагонов по выбранному фильтру"
         class="attach-wagons__table"
+        @keydown.esc="searchEsc($event, filter.number, () => (filter.number = ''))"
         @sort="sort = $event"
         @row-click="toggle($event as WagonRow)"
       />
@@ -71,6 +81,8 @@ import FormDialog from '@/shared/components/dialog/FormDialog.vue'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
+import { useSearchFocus } from '@/shared/composables/searchFocus'
+import { searchEsc } from '@/shared/composables/searchEsc'
 import type { TableSort } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
 import { LocationType, WagonStatus } from '@/shared/constants/systemDicts'
@@ -121,6 +133,9 @@ const props = withDefaults(
   { factAllowed: true, trip: null },
 )
 
+const dataTable = useTemplateRef<{ focus: () => void }>('dataTable')
+const searchField = useTemplateRef<InstanceType<typeof TextInput>>('searchField')
+useSearchFocus(searchField)
 const show = defineModel<boolean>('show', { default: false })
 // ожидание диалога: спиннер на таблице — на всю цепочку загрузок
 const busy = provideBusy()

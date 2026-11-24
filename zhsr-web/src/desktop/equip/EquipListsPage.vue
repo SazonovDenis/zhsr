@@ -17,7 +17,14 @@
     </template>
 
     <FilterBar>
-      <TextInput v-model="filter.query" placeholder="Номер вагона" width="12rem" />
+      <TextInput
+        ref="searchField"
+        v-model="filter.query"
+        placeholder="Номер вагона"
+        width="12rem"
+        @keydown.down.prevent="dataTable?.focus()"
+        @keydown.esc="searchEsc($event, filter.query, () => (filter.query = ''))"
+      />
       <span v-if="wagonFilter" class="list-wagon q-py-xs q-pl-sm q-pr-xs">
         {{ t('Вагон № {number}', { number: wagonFilter.number }) }}
         <button
@@ -42,6 +49,7 @@
     </FilterBar>
 
     <DataTable
+      ref="dataTable"
       v-model:selected="selectedId"
       :columns="columns"
       :rows="rows"
@@ -61,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { EquipListFilter, EquipListRow, EquipTemplate } from '@/api/equip'
@@ -76,6 +84,8 @@ import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
+import { useSearchFocus } from '@/shared/composables/searchFocus'
+import { searchEsc, usePageSearchEsc } from '@/shared/composables/searchEsc'
 import type { TableSort } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
@@ -94,6 +104,9 @@ import { useKeptSelection } from '../frame/keptSelection'
  * проверок. Справа — карточка описи. «Новая опись» — составление описи (Ф-ЭКП-02).
  */
 
+const dataTable = useTemplateRef<{ focus: () => void }>('dataTable')
+const searchField = useTemplateRef<InstanceType<typeof TextInput>>('searchField')
+useSearchFocus(searchField)
 const router = useRouter()
 const route = useRoute()
 const busy = provideBusy()
@@ -101,6 +114,11 @@ const filter = reactive<EquipListFilter>({ template: null, wagon: null, query: '
 const rows = shallowRef<EquipListRow[]>([])
 // выбранная строка остаётся при возврате на страницу
 const selectedId = useKeptSelection(route.query.id ? Number(route.query.id) : null)
+usePageSearchEsc(
+  () => filter.query,
+  () => (filter.query = ''),
+  selectedId,
+)
 const panel = useSidePanel(selectedId)
 // сортировка по колонке; null — сначала новые
 const sort = ref<TableSort | null>(null)

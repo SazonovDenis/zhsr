@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    :height="plan ? 'md' : 'sm'"
+    :min-height="plan ? 'md' : 'sm'"
     :title="title"
     ok-text="Сохранить"
     :width="plan ? '60rem' : '36rem'"

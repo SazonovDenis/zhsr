@@ -47,8 +47,7 @@ public class DictService {
             }),
             "WagonModel", new Def("model_type", r -> rec(r, "text", r.getString("text"))),
             "Depot", new Def("depot", r -> {
-                Map<String, Object> res = rec(r, "text", multiText(r.getString("name_ru"), r.getString("name_kk"),
-                        r.getString("name_en")));
+                Map<String, Object> res = rec(r, "text", multiText(r.getString("name"), null, null));
                 res.put("station", r.getLong("station"));
                 return res;
             }),

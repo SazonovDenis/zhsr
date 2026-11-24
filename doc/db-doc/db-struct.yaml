@@ -148,9 +148,7 @@ tables:
     columns:
       id: {type: bigint, required: true}
       code: {type: varchar(20)}
-      name_ru: {type: varchar(255), required: true}
-      name_kk: {type: varchar(255)}
-      name_en: {type: varchar(255)}
+      name: {type: varchar(255), required: true}
       station: {type: bigint, references: station}
 
   dict_version:
@@ -427,7 +425,14 @@ tables:
       id: {type: bigint, required: true}
       code: {type: varchar(20), required: true}
       name: {type: varchar(255), required: true}
-      stage_point: {type: bigint, references: stage_point}
+
+  station_point:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      station: {type: bigint, required: true, references: station}
+      x: {type: 'numeric(9,6)', required: true}
+      y: {type: 'numeric(9,6)', required: true}
 
   train:
     primary_key: [id]

@@ -21,6 +21,7 @@
 
     <DataTable
       v-model:selected="selectedId"
+      deselect
       :columns="columns"
       :rows="rows"
       row-key="id"
@@ -30,6 +31,7 @@
       :error="loadError"
       :retry="load"
       :row-menu="rowMenu"
+      menu-gap
       empty="Шаблонов чек-листов нет"
       @row-dblclick="openItems"
     />
@@ -47,6 +49,7 @@ import DesktopFrame from '@/desktop/frame/DesktopFrame.vue'
 import { moveSortOrder } from '@/api/admin'
 import { provideBusy } from '@/shared/busy'
 import { CHECK_OBJECTS, checkObjectText } from '@/shared/checks/labels'
+import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { Column, RowMenuItem } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
@@ -100,6 +103,7 @@ void load()
 const rowMenu: RowMenuItem<CheckTemplate>[] = [
   { label: 'Пункты', run: (row) => openItems(row) },
   { label: 'Изменить', run: (row) => void edit(row) },
+  { label: 'Удалить', run: (row) => void remove(row) },
   { label: 'Создать шаблон', separator: true, run: () => void edit(null) },
 ]
 
@@ -123,5 +127,11 @@ async function edit(tpl: CheckTemplate | null) {
   if (result === undefined) return
   await load()
   selectedId.value = result === 'deleted' ? null : result.id
+}
+
+async function remove(row: CheckTemplate) {
+  if (!(await confirmDelete('Удаление записи', 'Удалить запись «{name}»?', { name: row.textRu }, () => deleteCheckTemplate(row.id)))) return
+  await load()
+  selectedId.value = null
 }
 </script>

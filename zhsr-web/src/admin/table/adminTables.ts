@@ -50,8 +50,48 @@ export function forgetAdminOptions(ref: string): void {
   options.delete(ref)
 }
 
+/** Постоянная ширина колонок: таблица — поле — ширина; остальные колонки — по умолчанию DataTable. */
+const COLUMN_WIDTH: Record<string, Record<string, string>> = {
+  station: { code: '11rem' },
+}
+
+function widthOf(table: string, field: string): { width?: string } {
+  const width = COLUMN_WIDTH[table]?.[field]
+  return width ? { width } : {}
+}
+
+/**
+ * Колонки перегонов: станции — одной колонкой «Перегон» (сортировка — по первой станции), расстояние — узкой, единица — в
+ * значении.
+ */
+function stageColumns(): Column<AdminRow>[] {
+  return defineColumns<AdminRow>([
+    {
+      field: 'from_station_text',
+      title: 'Перегон',
+      sortable: true,
+      sortField: 'from_station',
+      format: (_, row) => stageName(row),
+    },
+    {
+      field: 'km',
+      title: 'Расстояние',
+      width: '10rem',
+      align: 'right',
+      sortable: true,
+      format: (value) => t('{km} км', { km: value }),
+    },
+  ])
+}
+
+/** Название перегона: станции через длинное тире. */
+export function stageName(row: AdminRow): string {
+  return [row.from_station_text, row.to_station_text].filter((v) => typeof v === 'string').join(' — ')
+}
+
 /** Колонки DataTable по полям таблицы: ссылка показывается текстом записи, «да/нет» — словом. */
 export function adminColumns(table: AdminTable): Column<AdminRow>[] {
+  if (table.name === 'stage') return stageColumns()
   return defineColumns<AdminRow>(
     sortFields(table.name, table.columns, (col) => col.name)
       .filter((col) => col.listed)
@@ -63,6 +103,7 @@ export function adminColumns(table: AdminTable): Column<AdminRow>[] {
           : {
               field: col.type === 'REF' ? `${col.name}_text` : col.name,
               title: col.title,
+              ...widthOf(table.name, col.name),
               sortable: true,
               sortField: col.name,
               align: col.type === 'INT' || col.type === 'DECIMAL' ? 'right' : 'left',

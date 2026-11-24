@@ -81,7 +81,7 @@ diagrams:
   stage:
     title: "Железные дороги: станции и перегоны"
     description: "Граф: станции - вершины, перегоны - рёбра."
-    tables: [ station, stage, stage_point, route_station, route ]
+    tables: [ station, station_point, stage, stage_point, route_station, route ]
     hide_fields: [ "route" ]
 
   usr:
@@ -232,12 +232,8 @@ tables:
       code:
         title: "Код депо"
         description: "Уникален в компании; пусто - не задан"
-      name_ru:
-        title: "Название на русском"
-      name_kk:
-        title: "Название на казахском"
-      name_en:
-        title: "Название на английском"
+      name:
+        title: "Название"
       station:
         title: "Расположение депо"
         description: "Задаёт территориальную привязку"
@@ -506,9 +502,21 @@ tables:
         description: "Код ЕСР; если в OpenStreetMap его нет - 'OSM' и id точки станции в OpenStreetMap"
       name:
         title: "Название"
-      stage_point:
-        title: "Точка станции на карте"
-        description: "Одна из крайних точек перегонов станции; концы остальных её перегонов совпадают с ней по координатам. Пусто - у станции нет перегонов"
+
+  station_point:
+    title: "Точка станции на карте"
+    description: |
+      Координаты станции. У станции не больше одной точки; точка удаляется вместе со станцией. Концы линий перегонов
+      станции на карте рисуются в этой точке. Перегон без линии (stage_point) рисуется прямой между точками станций.
+    columns:
+      station:
+        title: "Станция"
+      x:
+        title: "Долгота"
+        description: "Градусы, WGS 84"
+      y:
+        title: "Широта"
+        description: "Градусы, WGS 84"
 
   stage:
     title: "Перегон"
@@ -1272,11 +1280,11 @@ tables:
       check_dict:
         title: "Справочник ответов"
       text_ru:
-        title: "Название на русском"
+        title: "Текст на русском"
       text_kk:
-        title: "Название на казахском"
+        title: "Текст на казахском"
       text_en:
-        title: "Название на английском"
+        title: "Текст на английском"
       sort_order:
         title: "Порядок в списке"
       disabled:

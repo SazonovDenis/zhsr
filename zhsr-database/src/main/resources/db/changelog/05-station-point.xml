@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
+        objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
+
+    <!-- точка станции на карте: x - долгота, y - широта (WGS 84); у станции не больше одной точки -->
+    <changeSet id="05-station-point-station_point" author="zhsr">
+        <createTable tableName="station_point">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="station" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="x" type="numeric(9,6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="y" type="numeric(9,6)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="05-station-point-uq_station_point_station" author="zhsr">
+        <addUniqueConstraint tableName="station_point" columnNames="station" constraintName="uq_station_point_station"/>
+    </changeSet>
+
+    <!-- точка удаляется вместе со станцией -->
+    <changeSet id="05-station-point-fk_station_point_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="station_point" baseColumnNames="station" constraintName="fk_station_point_station"
+                                 referencedTableName="station" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <!-- прежние точки станций: station.stage_point -->
+    <changeSet id="05-station-point-data" author="zhsr">
+        <sql>
+            insert into station_point (station, x, y)
+            select station.id, stage_point.x, stage_point.y
+            from station
+                join stage_point on stage_point.id = station.stage_point
+            order by station.id
+        </sql>
+    </changeSet>
+
+    <changeSet id="05-station-point-drop-station-stage_point" author="zhsr">
+        <dropForeignKeyConstraint baseTableName="station" constraintName="fk_station_stage_point"/>
+        <dropColumn tableName="station" columnName="stage_point"/>
+    </changeSet>
+
+</databaseChangeLog>

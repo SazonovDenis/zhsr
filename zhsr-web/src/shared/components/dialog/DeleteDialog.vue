@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    height="sm"
+    min-height="sm"
     :title="title"
     ok-text="Удалить"
     :running="running"

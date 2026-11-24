@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    height="sm"
+    min-height="sm"
     :title="t('Отмена акта № {n}', { n: number })"
     ok-text="Отменить акт"
     :running="running"

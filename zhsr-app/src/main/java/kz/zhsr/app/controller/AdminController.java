@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -50,6 +51,12 @@ public class AdminController {
     @GetMapping("/tables/{table}/rows")
     public AdminPage<Map<String, Object>> rows(@PathVariable String table, AdminQuery query) throws Exception {
         return adminService.page(table, query);
+    }
+
+    @GetMapping("/tables/{table}/all")
+    public List<Map<String, Object>> all(@PathVariable String table,
+                                         @RequestParam(required = false) String search) throws Exception {
+        return adminService.all(table, search);
     }
 
     @GetMapping("/tables/{table}/rows/{id}")

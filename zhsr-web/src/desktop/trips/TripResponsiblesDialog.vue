@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    height="xl"
+    min-height="xl"
     title="Ответственные за вагоны"
     ok-text="Сохранить"
     width="80rem"

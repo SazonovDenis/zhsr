@@ -22,6 +22,7 @@
 
     <DataTable
       v-model:selected="selectedId"
+      deselect
       :columns="columns"
       :rows="rows"
       row-key="id"
@@ -31,6 +32,7 @@
       :error="loadError"
       :retry="init"
       :row-menu="rowMenu"
+      menu-gap
       empty="В шаблоне нет позиций"
       @row-dblclick="(r: ItemRow) => void edit(r.item, r.section)"
     />
@@ -53,6 +55,7 @@ import { useSidePanel } from '@/desktop/frame/useSidePanel'
 import { moveSortOrder } from '@/api/admin'
 import { provideBusy } from '@/shared/busy'
 import { treeRows } from '@/shared/checks/tree'
+import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { Column, RowMenuItem } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
@@ -146,6 +149,7 @@ void init()
 
 const rowMenu: RowMenuItem<ItemRow>[] = [
   { label: 'Изменить', run: (row) => void edit(row.item, row.section) },
+  { label: 'Удалить', run: (row) => void remove(row) },
   { label: 'Добавить позицию в раздел', visible: (row) => row.section, run: (row) => void edit(null, false, row.id) },
   { label: 'Добавить раздел', separator: true, run: () => void edit(null, true) },
   { label: 'Добавить позицию', run: () => void edit(null, false) },
@@ -218,5 +222,15 @@ async function edit(item: EquipItem | null, section: boolean, parent: number | n
     loadError.value = shownError(e)
   }
   selectedId.value = result === 'deleted' ? null : result.id
+}
+
+async function remove(row: ItemRow) {
+  if (!(await confirmDelete('Удаление записи', 'Удалить запись «{name}»?', { name: row.item.textRu }, () => deleteEquipItem(row.id)))) return
+  try {
+    await loadItems()
+  } catch (e) {
+    loadError.value = shownError(e)
+  }
+  selectedId.value = null
 }
 </script>

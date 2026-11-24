@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    height="min(clamp(14rem, 30vh, 19rem), calc(100vh - 3rem))"
+    min-height="min(clamp(14rem, 30vh, 19rem), calc(100vh - 3rem))"
     :title="depot ? 'Перемещение сотрудника' : 'Смена категории'"
     :ok-text="depot ? 'Переместить' : 'Сменить'"
     width="40rem"

@@ -1,21 +1,22 @@
 # Станции, перегоны и линии перегонов из OpenStreetMap
 
-Инструкция для Claude: как заново собрать `db-data/default/01-station.tsv`, `02-stage.tsv`, `03-stage_point.tsv`.
+Инструкция для Claude: как заново собрать `db-data/default/01-station.tsv`, `02-station_point.tsv`, `02-stage.tsv`,
+`03-stage_point.tsv`.
 Первая сборка - 2026-11-02, данные OSM на 2026-11-01.
 
 ## Что получается
 
-- `01-station.tsv` - станции: `id`, `code`, `name`, `stage_point`, `description` (не загружается).
+- `01-station.tsv` - станции: `id`, `code`, `name`, `description` (не загружается).
   - `code`: код ЕСР (тег `esr:user`); если его нет - `OSM<id точки OSM>`. Код уникален (`uq_station_code`).
   - `name`: тег `name:ru`, иначе `name`; поправки - `NAME_FIX` и `NAME_PREFIX` в `build_graph.py`.
-  - `stage_point`: точка станции - id первой точки первого её перегона, где она `from_station`, или последней, где
-    она `to_station`; концы остальных её перегонов совпадают с этой точкой по координатам.
   - `description`: id точки OSM, склеенные дубли, `uic_ref`, пометка «вне Казахстана, транзит».
+- `02-station_point.tsv` - точка станции на карте: `id`, `station`, `x` (долгота), `y` (широта).
 - `02-stage.tsv` - перегоны: ребро между соседними станциями, `from_station < to_station`, `km` - по линии пути.
 - `03-stage_point.tsv` - линия перегона для карты: `id`, `stage`, `seq`, `x` (долгота), `y` (широта). Точки идут от
   `from_station` к `to_station`; первая точка - координаты `from_station`, последняя - `to_station`.
 
-В `build/osm/out` файлы - без номера порядка загрузки: `station.tsv`, `stage.tsv`, `stage_point.tsv`.
+В `build/osm/out` файлы - без номера порядка загрузки: `station.tsv`, `station_point.tsv`, `stage.tsv`,
+`stage_point.tsv`.
 
 id станций и перегонов при каждой сборке выдаются заново (станции - по алфавиту имени). БД пересоздаётся с нуля,
 поэтому это допустимо, но всё, что ссылается на id станций в других tsv, надо перепривязать: демо-данные

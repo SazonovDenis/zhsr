@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    height="xl"
+    min-height="xl"
     :title="wagon ? 'Исправить данные вагона' : 'Ввод вагона'"
     :ok-text="wagon ? 'Сохранить' : 'Ввести вагон'"
     :running="running"

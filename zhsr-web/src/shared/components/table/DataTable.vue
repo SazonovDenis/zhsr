@@ -1,5 +1,5 @@
 <template>
-  <div ref="scrollEl" class="data-table">
+  <div ref="scrollEl" class="data-table" tabindex="0" @keydown="onKeydown">
     <div class="data-table__inner">
       <!-- шапка: в том же контейнере прокрутки, что и строки, поэтому колонки не съезжают из-за полосы прокрутки -->
       <div class="data-table__head data-table__grid" :style="gridStyle" role="row">
@@ -7,18 +7,11 @@
           v-for="col in columns"
           :key="col.field"
           class="data-table__head-cell q-py-sm"
-          :class="[
-            alignClass(col),
-            col.dense ? 'q-pl-md q-pr-xs' : 'q-px-md',
-            { 'data-table__head-cell--sortable': col.sortable },
-          ]"
+          :class="[alignClass(col), paddingClass(col), { 'data-table__head-cell--sortable': col.sortable }]"
           role="columnheader"
           :aria-sort="ariaSort(col)"
-          :tabindex="col.sortable ? 0 : undefined"
           :title="col.sortable ? t('Сортировать') : undefined"
           @click="onHeaderClick(col)"
-          @keydown.enter.prevent="onHeaderClick(col)"
-          @keydown.space.prevent="onHeaderClick(col)"
         >
           <component :is="col.header" v-if="col.header" :column="col" />
           <template v-else>{{ headerText(col) }}</template>
@@ -46,7 +39,8 @@
             class="data-table__row"
             :class="{ 'data-table__row--selected': isSelected(item), 'data-table__row--struck': struck?.(item) }"
             role="row"
-            @click="onRowClick(item)"
+            @click.capture="spacePick && (selected = keyOf(item))"
+            @click="onRowClick($event, item)"
             @dblclick="emit('row-dblclick', item)"
             @contextmenu="onContextMenu($event, item)"
           >
@@ -56,7 +50,7 @@
                   v-for="col in columns"
                   :key="col.field"
                   class="data-table__cell q-py-sm"
-                  :class="[alignClass(col), col.dense ? 'q-pl-md q-pr-xs' : 'q-px-md', col.cellClass]"
+                  :class="[alignClass(col), paddingClass(col), col.cellClass]"
                   role="cell"
                 >
                   <component :is="col.cell ?? CellText" :row="item" :value="item[col.field]" :column="col" />
@@ -91,7 +85,7 @@
           v-for="col in columns"
           :key="col.field"
           class="data-table__foot-cell q-py-sm"
-          :class="[alignClass(col), col.dense ? 'q-pl-md q-pr-xs' : 'q-px-md']"
+          :class="[alignClass(col), paddingClass(col)]"
         >
           <template v-if="typeof col.footer === 'string'">{{ col.footer }}</template>
           <component :is="col.footer" v-else-if="col.footer" :rows="rows" :column="col" />
@@ -115,7 +109,7 @@
 
 <script setup lang="ts" generic="Row extends object">
 import type { QVirtualScroll } from 'quasar'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import { t } from '@/boot/i18n'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
@@ -131,11 +125,12 @@ import type { Column, RowKey, RowMenuItem, TableSort } from './types'
  * - Раскладка на CSS grid: ширина колонки — дорожка grid, поэтому ширина в символах ('10ch') соблюдается точно.
  * - Ячейка — компонент из column.cell, по умолчанию CellText. Строку целиком можно заменить слотом row.
  * - Шапка и подвал по колонкам закреплены сверху и снизу при прокрутке, строки рендерятся виртуально.
- * - Сортировка — только по колонкам с sortable. Таблица сама не сортирует: клик по заголовку (или Enter на нём)
+ * - Сортировка — только по колонкам с sortable. Таблица сама не сортирует: клик по заголовку
  *   отправляет событие sort с полным запросом, а владелец загружает данные заново. Клики по одной колонке идут по
  *   кругу: по возрастанию → по убыванию → без сортировки (null, порядок сервера). Клик по другой колонке —
  *   сортировка по ней по возрастанию.
  * - Выбранная строка (v-model:selected) подсвечивается, а при смене выбора прокручивается в видимую область.
+ * - Таблица получает фокус (щелчок, Tab, focus()); стрелки вверх и вниз переводят выбор на соседнюю строку.
  * - Строка может быть зачёркнута (struck): значения перечёркнуты, например у отключённой записи.
  * - Подвал: строка по колонкам (column.footer) и свободный слот footer под таблицей.
  * - Меню строки (rowMenu): в конце строки — полупрозрачные три точки, по ним и по правой кнопке мыши открывается меню
@@ -149,8 +144,6 @@ const props = withDefaults(
     /** поле строки с ключом или функция, вычисляющая ключ */
     // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- ложное срабатывание на generic компонента
     rowKey: (keyof Row & string) | ((row: Row) => RowKey)
-    /** ключ выбранной строки */
-    selected?: RowKey | null
     /** строка показывается зачёркнутой: например, отключённая запись; null — зачёркнутых строк нет */
     struck?: ((row: Row) => boolean) | null
     sort?: TableSort | null
@@ -163,9 +156,14 @@ const props = withDefaults(
     retry?: (() => void) | null
     /** меню строки: пункты по порядку; null — меню нет */
     rowMenu?: RowMenuItem<Row>[] | null
+    /** у последней колонки справа отступ под три точки меню строки: точки не закрывают значение */
+    menuGap?: boolean
+    /** выбор строки снимают повторный щелчок по ней и Escape */
+    deselect?: boolean
+    /** строки с отметками: пробел на выделенной строке — то же, что щелчок по ней (row-click); щелчок по самой отметке выделяет строку */
+    spacePick?: boolean
   }>(),
   {
-    selected: null,
     struck: null,
     sort: null,
     loading: false,
@@ -173,11 +171,16 @@ const props = withDefaults(
     error: null,
     retry: null,
     rowMenu: null,
+    menuGap: false,
+    deselect: false,
+    spacePick: false,
   },
 )
 
+/** ключ выбранной строки; владелец выбор не ведёт — его ведёт сама таблица */
+const selected = defineModel<RowKey | null>('selected', { default: null })
+
 const emit = defineEmits<{
-  'update:selected': [key: RowKey | null]
   'row-click': [row: Row]
   'row-dblclick': [row: Row]
   sort: [sort: TableSort | null]
@@ -207,11 +210,16 @@ function keyOf(row: Row): RowKey {
 }
 
 function isSelected(row: Row): boolean {
-  return props.selected !== null && keyOf(row) === props.selected
+  return selected.value !== null && keyOf(row) === selected.value
 }
 
 function alignClass(col: Column<Row>): string {
   return `data-table--align-${col.align ?? 'left'}`
+}
+
+function paddingClass(col: Column<Row>): string {
+  if (props.menuGap && col === props.columns.at(-1)) return 'q-pl-md data-table--menu-gap'
+  return col.dense ? 'q-pl-md q-pr-xs' : 'q-px-md'
 }
 
 function headerText(col: Column<Row>): string {
@@ -267,7 +275,7 @@ function hasMenu(row: Row): boolean {
 }
 
 function openMenu(row: Row, x: number, y: number, alignRight = false) {
-  emit('update:selected', keyOf(row))
+  selected.value = keyOf(row)
   void rowMenuEl.value?.show(menuItems(row), x, y, alignRight)
 }
 
@@ -284,32 +292,102 @@ function onContextMenu(e: MouseEvent, row: Row) {
   openMenu(row, e.clientX, e.clientY)
 }
 
-function onRowClick(row: Row) {
-  emit('update:selected', keyOf(row))
+function onRowClick(e: MouseEvent, row: Row) {
+  // второй щелчок двойного (detail 2) выбор не снимает: двойной щелчок — действие с этой строкой
+  const off = props.deselect && isSelected(row) && e.detail <= 1
+  selected.value = off ? null : keyOf(row)
   emit('row-click', row)
 }
+
+function onKeydown(e: KeyboardEvent) {
+  if (props.spacePick && e.key === ' ' && e.target === scrollEl.value) onSpace(e)
+  else onArrow(e)
+}
+
+// фокус на самой таблице: у кнопок и отметок в ячейках пробел — свой
+function onSpace(e: KeyboardEvent) {
+  // таблица пробелом не прокручивается
+  e.preventDefault()
+  const row = props.rows.find(isSelected)
+  if (row && !e.repeat) emit('row-click', row)
+}
+
+// стрелки — по строкам; выбора нет — первая строка (вниз) или последняя (вверх)
+function onArrow(e: KeyboardEvent) {
+  if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+  // поле ввода в ячейке: стрелки — его; у отметки (checkbox) стрелки — по строкам
+  if ((e.target as HTMLElement).closest('input:not([type=checkbox]), textarea, select, [contenteditable]')) return
+  // страница списком не прокручивается: прокрутка идёт за выбором
+  e.preventDefault()
+  const down = e.key === 'ArrowDown'
+  const last = props.rows.length - 1
+  const at = props.rows.findIndex(isSelected)
+  const next = at < 0 ? (down ? 0 : last) : Math.max(0, Math.min(last, at + (down ? 1 : -1)))
+  // фокус — с отметки в ячейке на таблицу: пробел относится к выделенной строке
+  scrollEl.value?.focus({ preventScroll: true })
+  void selectRow(next)
+}
+
+async function selectRow(index: number) {
+  const row = props.rows[index]
+  if (!row) return
+  selected.value = keyOf(row)
+  await nextTick()
+  const box = scrollEl.value
+  const el = box?.querySelector<HTMLElement>('.data-table__row--selected')
+  // строки нет в DOM — прокручивает виртуальный список
+  if (!box || !el) {
+    virtualScroll.value?.scrollTo(index, 'center')
+    return
+  }
+  const head = box.querySelector('.data-table__head')?.getBoundingClientRect()
+  const rect = el.getBoundingClientRect()
+  const top = head ? head.bottom : box.getBoundingClientRect().top
+  const bottom = box.getBoundingClientRect().top + box.clientHeight
+  if (rect.top < top) box.scrollTop -= top - rect.top
+  else if (rect.bottom > bottom) box.scrollTop += rect.bottom - bottom
+}
+
+/** Поставить фокус в таблицу; ничего не выбрано — выбирается первая строка. */
+function focus() {
+  scrollEl.value?.focus()
+  if (!props.rows.some(isSelected)) void selectRow(0)
+}
+
+defineExpose({ focus })
+
+// на document — раньше обработчиков Escape страницы (window: «назад», правая панель): пока строка выбрана, Escape только
+// снимает выбор
+function onEscape(e: KeyboardEvent) {
+  if (e.key !== 'Escape' || !props.deselect || selected.value === null || e.defaultPrevented) return
+  // открыто меню или диалог — Escape их
+  if (document.querySelector('.q-dialog, .q-menu, .row-menu')) return
+  e.preventDefault()
+  selected.value = null
+}
+
+document.addEventListener('keydown', onEscape)
+onBeforeUnmount(() => document.removeEventListener('keydown', onEscape))
 
 // список перечитан, а выбранной строки в нём нет (её убрал фильтр, её удалили) — выбор снимается: правая панель не
 // показывает запись, которой нет в списке
 watch(
   () => props.rows,
   (rows) => {
-    const key = props.selected
-    if (key !== null && !rows.some((row) => keyOf(row) === key)) emit('update:selected', null)
+    const key = selected.value
+    if (key !== null && !rows.some((row) => keyOf(row) === key)) selected.value = null
   },
 )
 
 // выбранная строка могла оказаться за пределами видимой области (выбор пришёл снаружи) — прокручиваем к ней
-watch(
-  () => props.selected,
-  async (key) => {
-    if (key === null) return
-    const index = props.rows.findIndex((row) => keyOf(row) === key)
-    if (index < 0) return
-    await nextTick()
-    virtualScroll.value?.scrollTo(index)
-  },
-)
+watch(selected, async (key) => {
+  if (key === null) return
+  const index = props.rows.findIndex((row) => keyOf(row) === key)
+  if (index < 0) return
+  await nextTick()
+  virtualScroll.value?.scrollTo(index)
+})
 </script>
 
 <style scoped lang="scss">
@@ -322,6 +400,10 @@ watch(
   border-radius: 0.3rem;
   background: #fff;
   font-size: 0.8rem;
+}
+
+.data-table:focus {
+  outline: none;
 }
 
 .data-table__inner {
@@ -414,6 +496,11 @@ watch(
     opacity: 1;
     outline: none;
   }
+}
+
+// место под три точки: ширина кнопки меню и её отступ от края
+.data-table--menu-gap {
+  padding-right: 2.2rem;
 }
 
 .data-table__cell {

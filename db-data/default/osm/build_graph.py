@@ -1,7 +1,7 @@
 """Станции, перегоны и точки перегонов Казахстана из OpenStreetMap (выгрузки Overpass).
 
 argv: rail.json (пути и станции в прямоугольнике вокруг Казахстана), kz.json (станции внутри Казахстана),
-каталог для station.tsv, stage.tsv, stage_point.tsv. Подробно - README.md рядом.
+каталог для station.tsv, station_point.tsv, stage.tsv, stage_point.tsv. Подробно - README.md рядом.
 
 - Станция: node railway=station, кроме метро и LRT. Дубли (один код ЕСР или одно имя ближе DUP_KM) склеиваются.
 - Разрывы путей в OSM (концы соседних путей не в одной точке) склеиваются, если ближе GAP_KM.
@@ -423,7 +423,6 @@ def simplify(pts, eps):
 order = sorted(keep, key=lambda g: (sname(g), g))
 sid = {g: i + 1 for i, g in enumerate(order)}
 npts = 0
-station_point = {}
 ordered = sorted(rows.items(), key=lambda kv: tuple(sorted((sid[kv[0][0]], sid[kv[0][1]]))))
 with open(f'{out}/stage.tsv', 'w', encoding='utf-8') as f, \
         open(f'{out}/stage_point.tsv', 'w', encoding='utf-8') as fp:
@@ -436,16 +435,14 @@ with open(f'{out}/stage.tsv', 'w', encoding='utf-8') as f, \
             pts.reverse()
         f.write(f"{i}\t{sid[a]}\t{sid[b]}\t{max(1, round(km))}\t{sname(a)} - {sname(b)}\n")
         line = simplify(pts, SIMPLIFY_KM)
-        # точка станции - первая точка первого её перегона (from_station) или последняя (to_station)
-        station_point.setdefault(a, npts + 1)
-        station_point.setdefault(b, npts + len(line))
         for seq, (x, y) in enumerate(line, 1):
             npts += 1
             fp.write(f"{npts}\t{i}\t{seq}\t{x:.6f}\t{y:.6f}\n")
 
-# station.tsv - после точек: stage_point станции - id её точки в stage_point.tsv
-with open(f'{out}/station.tsv', 'w', encoding='utf-8') as f:
-    f.write('id\tcode\tname\tstage_point\tdescription\n')
+with open(f'{out}/station.tsv', 'w', encoding='utf-8') as f, \
+        open(f'{out}/station_point.tsv', 'w', encoding='utf-8') as fp:
+    f.write('id\tcode\tname\tdescription\n')
+    fp.write('id\tstation\tx\ty\n')
     for g in order:
         t = st[g]['tags']
         merged = sorted(s for s in st if root(s) == g and s != g)
@@ -456,7 +453,8 @@ with open(f'{out}/station.tsv', 'w', encoding='utf-8') as f:
             desc.append(f"uic_ref {t['uic_ref']}")
         if g in transit:
             desc.append('вне Казахстана, транзит')
-        f.write(f"{sid[g]}\t{t.get('esr:user') or f'OSM{g}'}\t{sname(g)}\t{station_point.get(g, '')}\t{'; '.join(desc)}\n")
+        f.write(f"{sid[g]}\t{t.get('esr:user') or f'OSM{g}'}\t{sname(g)}\t{'; '.join(desc)}\n")
+        fp.write(f"{sid[g]}\t{sid[g]}\t{pt[g][0]:.6f}\t{pt[g][1]:.6f}\n")
 
 relabel()
 sizes = defaultdict(int)

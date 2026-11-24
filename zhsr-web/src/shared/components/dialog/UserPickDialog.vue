@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    height="lg"
+    min-height="lg"
     :title="title"
     :ok-text="okText"
     :extra-actions="extraActions"
@@ -22,7 +22,7 @@
         :values="groupItems"
         class="user-pick__groups"
       />
-      <div class="user-pick" @pointerdown="saveError = null">
+      <div class="user-pick" @pointerdown="saveError = null" @keydown="onArrow">
         <!-- multiple: подсвечено может быть несколько, нажатие подсвечивает или снимает; двойной клик не применяет -->
         <button
           v-for="o in options"
@@ -60,6 +60,7 @@ import type { DialogAction } from '@/shared/components/dialog/types'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import type { UserPlacePart } from '@/shared/components/UserOption.vue'
 import UserOption from '@/shared/components/UserOption.vue'
+import { arrowTarget } from '@/shared/composables/listArrows'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { currentUser, isMe } from '@/shared/user'
@@ -154,6 +155,13 @@ function pick(id: number | null) {
     pickedMany.value = pickedMany.value.includes(id)
       ? pickedMany.value.filter((u) => u !== id)
       : [...pickedMany.value, id]
+}
+
+/** Стрелки вверх и вниз — выбор соседнего варианта; multiple — только фокус, отмечает пробел. */
+function onArrow(e: KeyboardEvent) {
+  const el = arrowTarget(e, '.user-pick__item', props.multiple ? '.user-pick__item:focus' : '.user-pick__item--on')
+  el?.focus()
+  if (!props.multiple) el?.click()
 }
 
 const group = ref<string | null>(props.groups[0]?.id ?? null)

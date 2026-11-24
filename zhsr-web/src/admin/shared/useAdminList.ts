@@ -7,7 +7,7 @@ import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 
 /** Строк на странице списка администрирования. */
-export const ADMIN_PAGE_SIZE = 50
+export const ADMIN_PAGE_SIZE = 1000
 
 /** Пауза после ввода в поиск перед запросом, мс. */
 const SEARCH_DELAY = 300

@@ -19,7 +19,14 @@
     <FilterBar>
       <RouteSelect v-model="filter.route" placeholder="Маршрут" compact style="width: 17.7rem" />
       <!-- номер вагона: рейсы, в составе которых вагон; остальные фильтры не отменяет -->
-      <TextInput v-model="filter.wagon" placeholder="Номер вагона" width="8.8rem" />
+      <TextInput
+        ref="searchField"
+        v-model="filter.wagon"
+        placeholder="Номер вагона"
+        width="8.8rem"
+        @keydown.down.prevent="dataTable?.focus()"
+        @keydown.esc="searchEsc($event, filter.wagon, () => (filter.wagon = ''))"
+      />
       <CbList
         v-model="filter.station"
         single
@@ -46,6 +53,7 @@
     </FilterBar>
 
     <DataTable
+      ref="dataTable"
       v-model:selected="selectedId"
       :columns="tripsColumns"
       :rows="rows"
@@ -67,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { TripRow, TripFilter } from '@/api/trips'
@@ -81,6 +89,8 @@ import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
 import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import type { RowMenuItem, TableSort } from '@/shared/components/table/types'
 import DataTable from '@/shared/components/table/DataTable.vue'
+import { useSearchFocus } from '@/shared/composables/searchFocus'
+import { searchEsc, usePageSearchEsc } from '@/shared/composables/searchEsc'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { openDialog } from '@/shared/components/dialog/openDialog'
@@ -106,6 +116,9 @@ import { useKeptSelection } from '../frame/keptSelection'
 // по умолчанию — план и выполняется, неделя вперёд
 const router = useRouter()
 const route = useRoute()
+const dataTable = useTemplateRef<{ focus: () => void }>('dataTable')
+const searchField = useTemplateRef<InstanceType<typeof TextInput>>('searchField')
+useSearchFocus(searchField)
 const filter = reactive<TripFilter & { wagon: string }>({
   route: null,
   station: null,
@@ -180,6 +193,11 @@ const rows = shallowRef<TripRow[]>([])
 const busy = provideBusy()
 // выбранная строка остаётся при возврате на страницу
 const selectedId = useKeptSelection()
+usePageSearchEsc(
+  () => filter.wagon,
+  () => (filter.wagon = ''),
+  selectedId,
+)
 // правая панель: рядом со списком на широком окне, поверх него — на узком
 const panel = useSidePanel(selectedId)
 const sort = ref<TableSort | null>(null)

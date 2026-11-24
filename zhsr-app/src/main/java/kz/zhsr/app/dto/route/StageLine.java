@@ -10,7 +10,9 @@ import java.util.List;
  * @param stage       перегон (stage)
  * @param fromStation станция перегона, от которой идёт линия (по ходу пути)
  * @param toStation   станция перегона, к которой идёт линия
- * @param points      точки линии по порядку от fromStation к toStation; первая и последняя - сами станции
+ * @param points      точки линии по порядку от fromStation к toStation; первая и последняя - сами станции. Точек у
+ *                    перегона нет - прямая между станциями; точки станции тоже нет - часть прямой между ближайшими
+ *                    станциями пути с точками; таких станций с обеих сторон нет - пусто
  */
 public record StageLine(int index, long stage, long fromStation, long toStation, List<MapPoint> points) {
     public StageLine {

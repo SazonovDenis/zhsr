@@ -17,7 +17,14 @@
     </template>
 
     <FilterBar>
-      <TextInput v-model="filter.number" placeholder="Номер вагона" width="8.8rem" />
+      <TextInput
+        ref="searchField"
+        v-model="filter.number"
+        placeholder="Номер вагона"
+        width="8.8rem"
+        @keydown.down.prevent="dataTable?.focus()"
+        @keydown.esc="searchEsc($event, filter.number, () => (filter.number = ''))"
+      />
       <!-- поиск по номеру отменяет фильтры: они скрыты и не применяются, но не очищаются -->
       <span v-if="searching" class="wagons__search-note">{{ t('При поиске по номеру фильтры не применяются.') }}</span>
       <template v-else>
@@ -59,6 +66,7 @@
     </FilterBar>
 
     <DataTable
+      ref="dataTable"
       v-model:selected="selectedId"
       :columns="columns"
       :rows="rows"
@@ -80,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { TripOption } from '@/api/trips'
@@ -92,6 +100,8 @@ import CbButton from '@/shared/components/choice/CbButton.vue'
 import CbList from '@/shared/components/choice/CbList.vue'
 import type { RowMenuItem, TableSort } from '@/shared/components/table/types'
 import DataTable from '@/shared/components/table/DataTable.vue'
+import { useSearchFocus } from '@/shared/composables/searchFocus'
+import { searchEsc, usePageSearchEsc } from '@/shared/composables/searchEsc'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { TripStatus, WagonStatus } from '@/shared/constants/systemDicts'
@@ -116,6 +126,9 @@ import { useKeptSelection } from '../frame/keptSelection'
 
 /** Список вагонов: фильтры и таблица. */
 
+const dataTable = useTemplateRef<{ focus: () => void }>('dataTable')
+const searchField = useTemplateRef<InstanceType<typeof TextInput>>('searchField')
+useSearchFocus(searchField)
 // «Номер» и «Тип» — постоянной ширины, не тянутся; общие колонки (wagonsColumns) других таблиц не меняются
 const COLUMN_WIDTH: Record<string, string> = { number: '10ch', wagonType: '10rem' }
 const columns = wagonsColumns.map((c) => {
@@ -193,6 +206,11 @@ const rows = shallowRef<WagonRow[]>([])
 const busy = provideBusy()
 // выбранная строка остаётся при возврате на страницу
 const selectedId = useKeptSelection()
+usePageSearchEsc(
+  () => filter.number,
+  () => (filter.number = ''),
+  selectedId,
+)
 // правая панель: рядом со списком на широком окне, поверх него — на узком
 const panel = useSidePanel(selectedId)
 const sort = ref<TableSort | null>(null)

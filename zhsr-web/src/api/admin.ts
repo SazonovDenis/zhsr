@@ -69,6 +69,15 @@ export async function fetchAdminRows(table: string, query: AdminQuery): Promise<
   return (await http.get<AdminPage<AdminRow>>(`/admin/tables/${table}/rows`, { params: params(query) })).data
 }
 
+/** Все строки, найденные поиском, — тем же, что у страницы строк. */
+export async function fetchAdminAll(table: string, search: string): Promise<AdminRow[]> {
+  return (await http.get<AdminRow[]>(`/admin/tables/${table}/all`, { params: { search } })).data
+}
+
+export async function fetchAdminRow(table: string, id: number): Promise<AdminRow> {
+  return (await http.get<AdminRow>(`/admin/tables/${table}/rows/${id}`)).data
+}
+
 /** Новая запись: values — поля по имени колонки. */
 export async function createAdminRow(table: string, values: Record<string, unknown>): Promise<AdminRow> {
   return (await http.post<AdminRow>(`/admin/tables/${table}/rows`, values)).data

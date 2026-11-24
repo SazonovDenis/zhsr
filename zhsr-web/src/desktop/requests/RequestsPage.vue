@@ -8,7 +8,14 @@
     </template>
 
     <FilterBar>
-      <TextInput v-model="filter.query" placeholder="Номер, вагон, неисправность" width="15rem" />
+      <TextInput
+        ref="searchField"
+        v-model="filter.query"
+        placeholder="Номер, вагон, неисправность"
+        width="15rem"
+        @keydown.down.prevent="dataTable?.focus()"
+        @keydown.esc="searchEsc($event, filter.query, () => (filter.query = ''))"
+      />
       <!-- поиск отменяет список и фильтры, кроме периода: они скрыты и не применяются, но не очищаются -->
       <span v-if="searching" class="requests__search-note">
         {{ t('При поиске список и фильтры, кроме периода, не применяются.') }}
@@ -43,6 +50,7 @@
     </FilterBar>
 
     <DataTable
+      ref="dataTable"
       v-model:selected="selectedId"
       :columns="requestsColumns"
       :rows="rows"
@@ -63,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { RepairRequest, RequestAction, RequestCounts } from '@/api/requests'
@@ -80,6 +88,8 @@ import TextInput from '@/shared/components/form/TextInput.vue'
 import { wagonRequestsPeriod } from '@/shared/requests/requestView'
 import PeriodPicker from '@/shared/components/period/PeriodPicker.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
+import { useSearchFocus } from '@/shared/composables/searchFocus'
+import { searchEsc, usePageSearchEsc } from '@/shared/composables/searchEsc'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import type { RowMenuItem, TableSort } from '@/shared/components/table/types'
@@ -107,6 +117,9 @@ import { useKeptSelection } from '../frame/keptSelection'
  * службе, поиск по номеру, вагону и неисправности. Справа — карточка выбранной заявки с действиями.
  */
 
+const dataTable = useTemplateRef<{ focus: () => void }>('dataTable')
+const searchField = useTemplateRef<InstanceType<typeof TextInput>>('searchField')
+useSearchFocus(searchField)
 const router = useRouter()
 const route = useRoute()
 
@@ -176,6 +189,11 @@ const counts = shallowRef<RequestCounts>({ requestStatusType: {}, severityType: 
 const busy = provideBusy()
 // выбранная строка остаётся при возврате на страницу
 const selectedId = useKeptSelection()
+usePageSearchEsc(
+  () => filter.query,
+  () => (filter.query = ''),
+  selectedId,
+)
 // правая панель: рядом со списком на широком окне, поверх него — на узком
 const panel = useSidePanel(selectedId)
 const sort = ref<TableSort | null>(null)

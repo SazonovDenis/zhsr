@@ -21,6 +21,7 @@
 
     <DataTable
       v-model:selected="selectedId"
+      deselect
       :columns="columns"
       :rows="rows"
       row-key="id"
@@ -30,6 +31,7 @@
       :error="loadError"
       :retry="load"
       :row-menu="rowMenu"
+      menu-gap
       empty="Шаблонов описей нет"
       @row-dblclick="openItems"
     />
@@ -46,6 +48,7 @@ import { t } from '@/boot/i18n'
 import DesktopFrame from '@/desktop/frame/DesktopFrame.vue'
 import { moveSortOrder } from '@/api/admin'
 import { provideBusy } from '@/shared/busy'
+import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { Column, RowMenuItem } from '@/shared/components/table/types'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -107,6 +110,7 @@ void load()
 const rowMenu: RowMenuItem<EquipTemplate>[] = [
   { label: 'Пункты', run: (row) => openItems(row) },
   { label: 'Изменить', run: (row) => void edit(row) },
+  { label: 'Удалить', run: (row) => void remove(row) },
   { label: 'Создать шаблон', separator: true, run: () => void edit(null) },
 ]
 
@@ -136,5 +140,11 @@ async function edit(tpl: EquipTemplate | null) {
   if (result === undefined) return
   await load()
   selectedId.value = result === 'deleted' ? null : result.id
+}
+
+async function remove(row: EquipTemplate) {
+  if (!(await confirmDelete('Удаление записи', 'Удалить запись «{name}»?', { name: row.textRu }, () => deleteEquipTemplate(row.id)))) return
+  await load()
+  selectedId.value = null
 }
 </script>

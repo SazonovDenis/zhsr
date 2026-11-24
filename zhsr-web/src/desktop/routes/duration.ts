@@ -1,8 +1,8 @@
 import { t } from '@/boot/i18n'
 
-/** Время станции маршрута «чч:мм»: часы от полуночи дня отправления, следующие сутки — больше 24 («26:55»). */
+/** Время станции маршрута временем суток «чч:мм»: следующие сутки — снова с «00:00». */
 export function formatTime(minutes: number): string {
-  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+  return `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
 
 /** Длительность в минутах — словами: «3 ч 42 м», «42 м», «3 ч». */

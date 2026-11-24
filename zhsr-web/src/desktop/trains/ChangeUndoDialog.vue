@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    height="sm"
+    min-height="sm"
     :title="t(title, { n: number })"
     :ok-text="marked ? 'Отменить отметку' : attach ? 'Удалить прицепку' : 'Удалить отцепку'"
     :running="running"

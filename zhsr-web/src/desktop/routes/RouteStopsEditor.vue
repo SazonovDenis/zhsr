@@ -53,13 +53,11 @@
           index > 0 ? elapsedText(stop) : ''
         }}</span>
 
-        <!-- у конечной станции — только прибытие; часы — от полуночи дня отправления, следующие сутки — больше 24:
-             «26:55» -->
+        <!-- у конечной станции — только прибытие; время показывается временем суток: 26:55 — «02:55» -->
         <span v-if="readonly" class="stops-editor__text">{{ index > 0 ? timeText(stop.arrivalMin) : '' }}</span>
         <TimeInput
           v-else-if="index > 0 && stop.arrivalMin !== null"
           :model-value="stop.arrivalMin"
-          over-day
           :nullable="false"
           @update:model-value="setTime(index, 'arrivalMin', $event)"
         />
@@ -83,7 +81,6 @@
         <TimeInput
           v-else-if="index < stops.length - 1 && stop.departureMin !== null"
           :model-value="stop.departureMin"
-          over-day
           :nullable="false"
           @update:model-value="setTime(index, 'departureMin', $event)"
         />
@@ -145,7 +142,7 @@ import TimeInput from '@/shared/components/form/TimeInput.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { compareText } from '@/shared/format'
 import { useLoad } from '@/shared/loadable'
-import { formatDuration, formatTime, stopOf } from './duration'
+import { formatDuration, formatTime, leaveOf, stopOf } from './duration'
 
 /**
  * Редактор «Остановки по порядку». Правит список остановок в памяти (v-model); сохраняет маршрут владелец.
@@ -155,8 +152,7 @@ import { formatDuration, formatTime, stopOf } from './duration'
  *   расстояние от предыдущей остановки.
  * - Время остановки — минуты от полуночи дня отправления с начальной станции (1440 и больше — следующие сутки).
  *   У начальной станции вводится отправление, у промежуточных — прибытие, стоянка и отправление, у конечной —
- *   прибытие. Время вводится и показывается как «чч:мм», часы — от полуночи дня отправления: следующие сутки — часы
- *   больше 24 («26:55»).
+ *   прибытие. Время вводится и показывается временем суток «чч:мм»: следующие сутки — снова с «00:00». Введено время раньше отправления с предыдущей остановки — это время следующих суток.
  * - Времена связаны: прибытие сдвигает отправление (стоянка прежняя), стоянка — отправление, отправление — прибытие
  *   (стоянка прежняя); следующие остановки сдвигаются на ту же разницу. «В пути» — время в пути от отправления с
  *   начальной станции; у конечной станции расстояние и время в пути — итог маршрута, жирным.
@@ -313,9 +309,29 @@ function shifted(index: number, changed: RouteStop, delta: number): RouteStop[] 
   )
 }
 
-function setTime(index: number, field: TimeField, time: number | null) {
+/** Когда поезд уходит с ближайшей предыдущей остановки, у которой есть время; нет такой — null. */
+function previousLeave(index: number): number | null {
+  for (let i = index - 1; i >= 0; i--) {
+    const leave = leaveOf(stops.value[i]!)
+    if (leave != null) return leave
+  }
+  return null
+}
+
+const DAY_MIN = 24 * 60
+
+/** Введённое время, раньше которого (min) быть нельзя, — время следующих суток: после 23:57 «00:18» — это 1458 мин. */
+function notBefore(time: number, min: number): number {
+  return time >= min ? time : time + Math.ceil((min - time) / DAY_MIN) * DAY_MIN
+}
+
+function setTime(index: number, field: TimeField, typed: number | null) {
   const stop = stops.value[index]
-  if (time === null || !stop) return
+  if (typed === null || !stop) return
+  // отправление — не раньше прибытия, которое сдвинется вместе с ним
+  const leave = previousLeave(index)
+  const dwell = field === 'departureMin' ? stopOf(stop) : 0
+  const time = leave === null ? typed : notBefore(typed, leave + dwell)
   // прибытие сдвигает отправление, отправление — прибытие: стоянка прежняя; у начальной станции прибытия нет, у
   // конечной — отправления
   const delta = time - (stop[field] ?? time)

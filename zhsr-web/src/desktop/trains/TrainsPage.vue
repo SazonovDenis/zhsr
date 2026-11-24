@@ -17,12 +17,20 @@
     </template>
 
     <FilterBar>
-      <TextInput v-model="filter.search" placeholder="Поезд или номер вагона" width="14rem" />
+      <TextInput
+        ref="searchField"
+        v-model="filter.search"
+        placeholder="Поезд или номер вагона"
+        width="14rem"
+        @keydown.down.prevent="dataTable?.focus()"
+        @keydown.esc="searchEsc($event, filter.search, () => (filter.search = ''))"
+      />
       <CbButton v-model="filter.states" label="Состояние" :values="states" />
       <template #right>{{ t('{n} поездов', rows.length) }}</template>
     </FilterBar>
 
     <DataTable
+      ref="dataTable"
       v-model:selected="selectedId"
       :columns="trainsColumns"
       :rows="rows"
@@ -48,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { TrainFilter, TrainRow } from '@/api/trains'
@@ -63,6 +71,8 @@ import { openDialog } from '@/shared/components/dialog/openDialog'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
+import { useSearchFocus } from '@/shared/composables/searchFocus'
+import { searchEsc, usePageSearchEsc } from '@/shared/composables/searchEsc'
 import type { RowMenuItem } from '@/shared/components/table/types'
 import { RoleType } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -83,6 +93,9 @@ import { useKeptSelection } from '../frame/keptSelection'
  * планировщик вагонов и администратор (Ф-ПОЕ-01).
  */
 
+const dataTable = useTemplateRef<{ focus: () => void }>('dataTable')
+const searchField = useTemplateRef<InstanceType<typeof TextInput>>('searchField')
+useSearchFocus(searchField)
 const router = useRouter()
 
 const createReason = computed(() => roleReason([RoleType.WAGON_PLANNER], 'Создаёт планировщик вагонов'))
@@ -99,6 +112,11 @@ const rows = shallowRef<TrainRow[]>([])
 const busy = provideBusy()
 // выбранная строка остаётся при возврате на страницу
 const selectedId = useKeptSelection()
+usePageSearchEsc(
+  () => filter.search,
+  () => (filter.search = ''),
+  selectedId,
+)
 const panel = useSidePanel(selectedId)
 const selected = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null)
 

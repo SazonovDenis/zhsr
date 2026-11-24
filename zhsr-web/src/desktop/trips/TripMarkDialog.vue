@@ -4,7 +4,7 @@
     :title="title"
     :ok-text="fix ? 'Сохранить время' : depart ? 'Отметить отправление' : 'Отметить прибытие'"
     :width="fix ? '35rem' : '50rem'"
-    :height="fix ? 'sm' : 'xl'"
+    :min-height="fix ? 'sm' : 'xl'"
     :running="running"
     :error="error"
     @ok="save"

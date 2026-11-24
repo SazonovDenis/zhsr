@@ -44,4 +44,8 @@
 
     <include file="db/changelog/04-check-indexes.xml"/>
 
+    <include file="db/changelog/05-station-point.xml"/>
+
+    <include file="db/changelog/06-depot-name.xml"/>
+
 </databaseChangeLog>

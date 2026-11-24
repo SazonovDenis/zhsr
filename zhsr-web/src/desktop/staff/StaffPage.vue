@@ -17,7 +17,14 @@
     </template>
 
     <FilterBar>
-      <TextInput v-model="filter.search" placeholder="Поиск: ФИО, логин, телефон" width="16rem" />
+      <TextInput
+        ref="searchField"
+        v-model="filter.search"
+        placeholder="Поиск: ФИО, логин, телефон"
+        width="16rem"
+        @keydown.down.prevent="dataTable?.focus()"
+        @keydown.esc="searchEsc($event, filter.search, () => (filter.search = ''))"
+      />
       <CbList
         v-model="filter.station"
         single
@@ -50,7 +57,9 @@
     </FilterBar>
 
     <DataTable
+      ref="dataTable"
       v-model:selected="selectedId"
+      deselect
       :columns="columns"
       :rows="rows"
       :error="loadError"
@@ -68,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
 
 import type { AdminUser } from '@/api/admin'
 import { fetchAdminUser } from '@/api/admin'
@@ -87,6 +96,8 @@ import { openDialog } from '@/shared/components/dialog/openDialog'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
+import { useSearchFocus } from '@/shared/composables/searchFocus'
+import { searchEsc, usePageSearchEsc } from '@/shared/composables/searchEsc'
 import type { RowMenuItem, TableSort } from '@/shared/components/table/types'
 import { RoleType, TripStatus } from '@/shared/constants/systemDicts'
 import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
@@ -111,6 +122,9 @@ import { useKeptSelection } from '../frame/keptSelection'
  * пользователь». Отключённых сотрудников видит только администратор, строки зачёркнуты.
  */
 
+const dataTable = useTemplateRef<{ focus: () => void }>('dataTable')
+const searchField = useTemplateRef<InstanceType<typeof TextInput>>('searchField')
+useSearchFocus(searchField)
 const PLANNER_REASON = 'Сотрудников перемещает планировщик'
 
 // новый пользователь и карточка пользователя — администратору
@@ -147,6 +161,11 @@ const rows = shallowRef<StaffRow[]>([])
 const busy = provideBusy()
 // выбранная строка остаётся при возврате на страницу
 const selectedId = useKeptSelection()
+usePageSearchEsc(
+  () => filter.search,
+  () => (filter.search = ''),
+  selectedId,
+)
 const sort = ref<TableSort | null>(null)
 // ошибка загрузки показывается на месте строк таблицы
 const loadError = ref<ShownError | null>(null)

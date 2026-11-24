@@ -43,6 +43,12 @@ public final class AdminTables {
      */
     public static final String FAVORITE = "favorite";
 
+    /**
+     * Координаты станции: поля формы, а не колонки station, - запись в station_point.
+     */
+    public static final String X = "x";
+    public static final String Y = "y";
+
     private static final Map<String, AdminTable> TABLES = new LinkedHashMap<>();
 
     /**
@@ -52,7 +58,7 @@ public final class AdminTables {
             RoleType.TABLE, "text",
             ConductorCategory.TABLE, "text",
             "station", "name",
-            "depot", "name_ru",
+            "depot", "name",
             "fault_group_type", "name",
             "fault_type", "name",
             "wagon_type", "text",
@@ -79,9 +85,7 @@ public final class AdminTables {
     static {
         add(new AdminTable("depot", "Депо", List.of(
                 text("code", "Код", false, 20),
-                text("name_ru", "Название на русском", true, 255),
-                text("name_kk", "Название на казахском", false, 255),
-                text("name_en", "Название на английском", false, 255),
+                text("name", "Название", true, 255),
                 ref("station", "Станция", false, "station"))));
         add(new AdminTable("yard", "Парки отстоя", List.of(
                 text("code", "Код", true, 20),
@@ -89,7 +93,9 @@ public final class AdminTables {
                 ref("station", "Станция", false, "station"))));
         add(new AdminTable("station", "Станции", List.of(
                 text("code", "Код", true, 20),
-                text("name", "Название", true, 255))));
+                text("name", "Название", true, 255),
+                formOnly(X, "Долгота", DECIMAL, false),
+                formOnly(Y, "Широта", DECIMAL, false))));
         add(new AdminTable("stage", "Перегоны", List.of(
                 // станции перегона - в любом порядке: AdminService ставит станцию с меньшим id в from_station
                 ref("from_station", "Станция 1", true, "station"),
@@ -160,7 +166,8 @@ public final class AdminTables {
      * Поле формы, которого нет в таблице: его пишет и читает AdminService отдельно.
      */
     public static boolean isVirtual(String table, String column) {
-        return table.equals("fault_type") && column.equals(FAVORITE);
+        return table.equals("fault_type") && column.equals(FAVORITE)
+               || table.equals("station") && (column.equals(X) || column.equals(Y));
     }
 
     private static void add(AdminTable table) {

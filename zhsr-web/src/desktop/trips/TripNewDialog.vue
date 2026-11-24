@@ -4,7 +4,7 @@
     :title="trip ? 'Редактирование рейса' : 'Создание рейса'"
     :ok-text="trip ? 'Сохранить' : 'Создать рейс'"
     width="40rem"
-    :height="trip ? 'auto' : 'md'"
+    :min-height="trip ? 'auto' : 'md'"
     :hint="
       trip
         ? ''

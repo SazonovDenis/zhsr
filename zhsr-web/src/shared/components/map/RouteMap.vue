@@ -440,7 +440,7 @@ function updateExpandButton() {
 
 onMounted(() => {
   if (!mapEl.value) return
-  const m = createMap(mapEl.value, { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM })
+  const m = createMap(mapEl.value, { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, doubleClickZoom: false })
   leaflet = m
   // без значка и ссылки Leaflet: на маленькой карте подпись занимает много места; ссылка на OSM обязательна
   m.attributionControl.setPrefix(false)

@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    height="xl"
+    min-height="xl"
     title="Поездная бригада"
     ok-text="Сохранить"
     width="80rem"
@@ -50,6 +50,7 @@
       <div v-if="conductorReason" class="zs-sub">{{ conductorReason }}</div>
       <!-- таблица, как в списке сотрудников; клик по строке отмечает или снимает -->
       <DataTable
+        space-pick
         :columns="conductorColumns"
         :rows="conductorRows"
         row-key="id"

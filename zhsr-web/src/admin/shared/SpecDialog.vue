@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    height="lg"
+    min-height="lg"
     :title="title"
     :ok-text="okText"
     :width="width"

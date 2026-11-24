@@ -16,7 +16,7 @@ public record AdminQuery(String search, Integer page, Integer size, String sort,
     }
 
     public static final int DEFAULT_SIZE = 50;
-    public static final int MAX_SIZE = 500;
+    public static final int MAX_SIZE = 1000;
 
     public int pageOrZero() {
         return page == null || page < 0 ? 0 : page;

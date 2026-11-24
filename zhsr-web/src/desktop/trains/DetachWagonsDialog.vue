@@ -1,7 +1,7 @@
 <template>
   <FormDialog
     v-model:show="show"
-    height="xl"
+    min-height="xl"
     title="Отцепить вагоны"
     ok-text="Отцепить"
     width="70rem"
@@ -27,6 +27,7 @@
       </FilterBar>
 
       <DataTable
+        space-pick
         :columns="columns"
         :rows="rows"
         :error="loadError"

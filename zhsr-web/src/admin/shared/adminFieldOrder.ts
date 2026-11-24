@@ -5,13 +5,11 @@
  * называет таблица: колонки БД у общего редактора, поля AdminUser у сотрудников.
  */
 export const ADMIN_FIELD_ORDER: Record<string, string[]> = {
-  // названия на всех языках — рядом
-  depot: ['name_ru', 'name_kk', 'name_en', 'code'],
   // сотрудники: свои поля, правило их не знает
   usr: ['fullName', 'login', 'phone', 'roles', 'depot', 'categoryType', 'disabled', 'password'],
 }
 
-const NAME_FIELDS = ['name', 'name_ru', 'text', 'text_ru']
+const NAME_FIELDS = ['name', 'text', 'text_ru']
 const CODE_FIELD = 'code'
 
 /** Место поля в таблице: чем меньше, тем раньше. У полей вне записи и вне правила место одно — порядок сервера. */

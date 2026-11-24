@@ -457,7 +457,7 @@ onMounted(() => {
     zoomControl: !still,
     dragging: !still,
     scrollWheelZoom: !still,
-    doubleClickZoom: !still,
+    doubleClickZoom: false,
     boxZoom: !still,
     touchZoom: !still,
     keyboard: !still,

@@ -1,7 +1,7 @@
 package kz.zhsr.app.dto.route;
 
 /**
- * Станция на карте: точка станции (station.stage_point).
+ * Станция на карте: точка станции (station_point).
  *
  * @param station станция (station)
  * @param point   точка станции на карте

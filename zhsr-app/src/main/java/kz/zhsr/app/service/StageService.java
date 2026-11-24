@@ -21,7 +21,7 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 /**
- * Перегоны на карте: точки станций и линии перегонов (stage, stage_point) для рисунка пути.
+ * Перегоны на карте: точки станций и линии перегонов (stage, stage_point, station_point) для рисунка пути.
  */
 @Service
 public class StageService {
@@ -33,11 +33,23 @@ public class StageService {
     }
 
     /**
+     * Точки всех станций (GET /stages/stations); у станции без точки записи нет.
+     */
+    public List<StationPoint> stations() throws Exception {
+        return db.loadList("station_point", Map.of()).stream()
+                .map(rec -> new StationPoint(rec.getLong("station"), DbRecMapper.toObject(rec, MapPoint.class)))
+                .toList();
+    }
+
+    /**
      * Рисунок пути по станциям (GET /stages/lines): точки станций и линии перегонов между соседними станциями
      * списка. Соседние станции соединены перегоном напрямую - его линия (из нескольких перегонов между ними - самый
      * короткий); иначе - линии перегонов кратчайшего по километражу пути между ними: так рисуются пары остановок,
      * для которых станции следования ещё не построены (маршрут правится в редакторе). Пути нет - линий у пары нет.
      * Линии идут от предыдущей станции к следующей.
+     * <p>
+     * У перегона нет точек - прямая между точками его станций. У станции нет и точки - прямая между ближайшими станциями
+     * пути, у которых точка есть.
      *
      * @param stations станции по порядку (станции маршрута: остановки и станции следования)
      */
@@ -62,23 +74,119 @@ public class StageService {
             path.forEach(stage -> used.add(stage.getLong("id")));
         }
 
+        // все станции рисунка: станции списка и промежуточные станции путей
+        Set<Long> all = new HashSet<>(stations);
+        paths.forEach(path -> path.forEach(stage -> {
+            all.add(stage.getLong("from_station"));
+            all.add(stage.getLong("to_station"));
+        }));
+        Map<Long, MapPoint> stationPoints = stationPoints(all);
         Map<Long, List<MapPoint>> points = stagePoints(used);
+
         List<StageLine> lines = new ArrayList<>();
+        // перегоны подряд, которые рисуются только частью общей прямой
+        List<Leg> gap = new ArrayList<>();
+        MapPoint gapStart = null;
         for (int i = 0; i < paths.size(); i++) {
             long at = stations.get(i);
+            if (paths.get(i).isEmpty() && at != stations.get(i + 1)) {
+                // пути по перегонам нет: через этот разрыв прямая не проводится
+                closeGap(lines, gap, null, null);
+                gapStart = null;
+                continue;
+            }
             for (DbRec stage : paths.get(i)) {
-                long next = other(stage, at);
-                List<MapPoint> line = points.getOrDefault(stage.getLong("id"), List.of());
-                // точки перегона идут от from_station; путь идёт в обратную сторону - линию разворачиваем
-                if (stage.getLong("from_station") != at) {
-                    line = line.reversed();
+                Leg leg = new Leg(i, stage, at, other(stage, at));
+                List<MapPoint> line = line(leg, points, stationPoints);
+                MapPoint from = line.isEmpty() ? stationPoints.get(leg.from()) : line.getFirst();
+                MapPoint to = line.isEmpty() ? stationPoints.get(leg.to()) : line.getLast();
+                if (from != null) {
+                    closeGap(lines, gap, gapStart, from);
+                    gapStart = from;
                 }
-                lines.add(new StageLine(i, stage.getLong("id"), at, next, line));
-                at = next;
+                if (line.isEmpty()) {
+                    gap.add(leg);
+                } else {
+                    lines.add(leg.line(line));
+                }
+                if (to != null) {
+                    closeGap(lines, gap, gapStart, to);
+                    gapStart = to;
+                }
+                at = leg.to();
             }
         }
+        closeGap(lines, gap, null, null);
 
-        return new StageLines(stationPoints(new HashSet<>(stations)), lines);
+        // кружки - только станции списка
+        List<StationPoint> res = new HashSet<>(stations).stream()
+                .filter(stationPoints::containsKey)
+                .map(station -> new StationPoint(station, stationPoints.get(station)))
+                .toList();
+        return new StageLines(res, lines);
+    }
+
+    /**
+     * Перегон на пути.
+     *
+     * @param index номер пары соседних станций списка
+     * @param from  станция перегона, от которой идёт путь
+     * @param to    станция перегона, к которой идёт путь
+     */
+    private record Leg(int index, DbRec stage, long from, long to) {
+        StageLine line(List<MapPoint> points) {
+            return new StageLine(index, stage.getLong("id"), from, to, points);
+        }
+    }
+
+    /**
+     * Линия перегона по ходу пути: точки перегона, концы - в точках станций; точек перегона нет - прямая между точками
+     * станций.
+     *
+     * @return пусто - точек перегона нет, и у одной из станций нет точки
+     */
+    private static List<MapPoint> line(Leg leg, Map<Long, List<MapPoint>> points, Map<Long, MapPoint> stationPoints) {
+        MapPoint from = stationPoints.get(leg.from());
+        MapPoint to = stationPoints.get(leg.to());
+        List<MapPoint> line = points.getOrDefault(leg.stage().getLong("id"), List.of());
+        if (line.size() < 2) {
+            return from == null || to == null ? List.of() : List.of(from, to);
+        }
+        // точки перегона идут от from_station; путь идёт в обратную сторону - линию разворачиваем
+        line = new ArrayList<>(leg.stage().getLong("from_station") == leg.from() ? line : line.reversed());
+        if (from != null) {
+            line.set(0, from);
+        }
+        if (to != null) {
+            line.set(line.size() - 1, to);
+        }
+        return line;
+    }
+
+    /**
+     * Нарисовать перегоны gap одной прямой от start до end: каждому перегону - её часть по километражу. Одного из концов
+     * нет - перегоны без линий.
+     */
+    private static void closeGap(List<StageLine> lines, List<Leg> gap, MapPoint start, MapPoint end) {
+        boolean drawn = start != null && end != null;
+        double total = gap.stream().mapToInt(leg -> leg.stage().getInt("km")).sum();
+        double km = 0;
+        MapPoint last = start;
+        for (Leg leg : gap) {
+            km += leg.stage().getInt("km");
+            MapPoint next = drawn ? between(start, end, km / total) : null;
+            lines.add(leg.line(drawn ? List.of(last, next) : List.of()));
+            last = next;
+        }
+        gap.clear();
+    }
+
+    /** Точка прямой от a до b на части part её длины; part = 1 - сама точка b. */
+    private static MapPoint between(MapPoint a, MapPoint b, double part) {
+        if (part >= 1) {
+            return b;
+        }
+        return new MapPoint(a.getX() + (b.getX() - a.getX()) * part, a.getY() + (b.getY() - a.getY()) * part);
     }
 
     /**
@@ -143,29 +251,14 @@ public class StageService {
     }
 
     /**
-     * Точки станций: station.stage_point; у станции без точки записи нет.
+     * Точки станций (station_point).
+     *
+     * @return по id станции - её точка; у станции без точки записи нет
      */
-    private List<StationPoint> stationPoints(Collection<Long> stations) throws Exception {
-        Map<Long, Long> pointOf = new HashMap<>();
-        for (DbRec station : db.loadList("station", Map.of("id", stations))) {
-            Long point = station.getLong("stage_point");
-            if (point != null) {
-                pointOf.put(station.getLong("id"), point);
-            }
-        }
-        if (pointOf.isEmpty()) {
-            return List.of();
-        }
-        Map<Long, MapPoint> points = new HashMap<>();
-        for (DbRec p : db.loadList("stage_point", Map.of("id", new HashSet<>(pointOf.values())))) {
-            points.put(p.getLong("id"), DbRecMapper.toObject(p, MapPoint.class));
-        }
-        List<StationPoint> res = new ArrayList<>();
-        for (Map.Entry<Long, Long> e : pointOf.entrySet()) {
-            MapPoint point = points.get(e.getValue());
-            if (point != null) {
-                res.add(new StationPoint(e.getKey(), point));
-            }
+    private Map<Long, MapPoint> stationPoints(Collection<Long> stations) throws Exception {
+        Map<Long, MapPoint> res = new HashMap<>();
+        for (DbRec rec : db.loadList("station_point", Map.of("station", stations))) {
+            res.put(rec.getLong("station"), DbRecMapper.toObject(rec, MapPoint.class));
         }
         return res;
     }

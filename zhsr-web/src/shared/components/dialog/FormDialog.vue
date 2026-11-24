@@ -3,7 +3,7 @@
     v-model:show="show"
     :title="t(title)"
     :width="width"
-    :height="height"
+    :min-height="minHeight"
     :actions="actions"
     :action-running="running ? 'ok' : null"
     :busy="busy.active.value"
@@ -61,8 +61,8 @@ const props = withDefaults(
     /** текст кнопки «Отмена» на русском, например «Не отменять» у отмены заявки */
     cancelText?: string
     width?: string
-    /** постоянная высота: готовая (DialogHeight) или своя — значение CSS */
-    height?: DialogHeightValue
+    /** наименьшая высота: готовая (DialogHeight) или своя — значение CSS */
+    minHeight?: DialogHeightValue
     running?: boolean
     /** ошибка над кнопками: проверки формы (formError) или запроса (shownError, запрос второй строкой); null — нет */
     error?: ShownError | null
@@ -75,7 +75,7 @@ const props = withDefaults(
     okText: 'Сохранить',
     cancelText: 'Отмена',
     width: '35rem',
-    height: 'md',
+    minHeight: 'md',
     running: false,
     error: null,
     hint: '',

@@ -1,7 +1,7 @@
 <template>
   <DialogFrame
     v-model:show="show"
-    height="sm"
+    min-height="sm"
     :title="t('База данных сервера изменилась')"
     width="30rem"
     :actions="actions"

@@ -1,0 +1,62 @@
+// точки с подписями на картах Leaflet (mapMarks.ts): элементы рисует Leaflet, scoped-стили до них не достают.
+// Стили важнее атрибутов SVG и оформления подсказок, которые ставит Leaflet
+.map-mark {
+  fill: $zs-route-dot;
+  fill-opacity: 1;
+  stroke: #fff;
+  stroke-opacity: 1;
+  stroke-width: 0.1rem;
+}
+
+// подпись — без плашки: текст с белой обводкой, чтобы читался поверх карты
+.leaflet-tooltip.map-label {
+  margin: 0 0 0 0.4rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: $zs-text;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  text-shadow:
+    0 0 0.2em #fff,
+    0 0 0.2em #fff,
+    0 0 0.2em #fff;
+
+  &::before {
+    display: none;
+  }
+}
+
+.leaflet-tooltip.map-label--point {
+  margin-left: 0.7rem;
+  color: $primary;
+  font-weight: 600;
+}
+
+.leaflet-tooltip-left.map-label {
+  margin-left: -0.4rem;
+}
+
+.leaflet-tooltip-left.map-label--point {
+  margin-left: -0.7rem;
+}
+
+.map-point {
+  fill: $primary;
+  fill-opacity: 1;
+  stroke: #fff;
+  stroke-opacity: 1;
+  stroke-width: 0.15rem;
+}
+
+.map-line {
+  fill: none;
+  stroke: $primary;
+  stroke-opacity: 0.85;
+  stroke-width: 0.2rem;
+}
+
+.leaflet-tooltip.map-label--top {
+  z-index: 1;
+}

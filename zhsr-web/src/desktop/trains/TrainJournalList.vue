@@ -35,7 +35,7 @@
         <span role="columnheader">{{ t('Событие') }}</span>
       </div>
 
-      <div ref="scrollEl" class="train-journal__list">
+      <div ref="scrollEl" class="train-journal__list" @keydown="onArrow">
         <!-- настоящее: «Текущее состояние» сверху, под ним планы -->
         <!-- выбран рейс — строки «Текущее состояние» нет: момент по умолчанию — отметка отправления рейса -->
         <JournalItem
@@ -89,6 +89,7 @@ import { t } from '@/boot/i18n'
 import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import type { ChoiceItem } from '@/shared/components/choice/choice'
 import RowMenu from '@/shared/components/table/RowMenu.vue'
+import { arrowTarget } from '@/shared/composables/listArrows'
 import type { JournalMark as Mark } from '@/shared/trains/trainJournal'
 import { nowMinute } from '@/shared/since'
 import { changeActions, journalOf, tripMarksOf, tripMarksOfTrip } from '@/shared/trains/trainJournal'
@@ -140,6 +141,14 @@ function isMarkSelected(m: Mark): boolean {
   if (props.selectedMark !== null) return props.selectedMark === m.key
   return props.selected === null && !props.nowSelected && props.onlyTrip === m.trip.id && m.kind === 'departure'
 }
+
+/** Стрелки вверх и вниз — выбор соседней строки журнала. */
+function onArrow(e: KeyboardEvent) {
+  const el = arrowTarget(e, '.journal-item, .journal-mark', '.journal-item--selected, .journal-mark--selected')
+  el?.focus()
+  el?.click()
+}
+
 const side = defineModel<JournalSide>('side', { required: true })
 const emit = defineEmits<{
   select: [id: number | null]

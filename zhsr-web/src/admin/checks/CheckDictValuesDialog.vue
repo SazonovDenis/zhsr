@@ -1,5 +1,5 @@
 <template>
-  <FormDialog v-model:show="show" height="lg" :title="title" ok-text="Готово" width="40rem" @ok="emit('done', true)">
+  <FormDialog v-model:show="show" min-height="lg" :title="title" ok-text="Готово" width="40rem" @ok="emit('done', true)">
     <div class="dict-values">
       <ErrorBox v-if="loadError" :error="loadError" :retry="load" />
       <template v-else>

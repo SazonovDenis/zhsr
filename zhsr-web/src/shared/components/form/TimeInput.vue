@@ -25,28 +25,28 @@ import { t } from '@/boot/i18n'
  * остальное — по Enter или уходу из поля: «9» — 09:00. Ошибка — поле возвращается к прежнему значению. Escape
  * отменяет ввод.
  *
- * Значение — минуты от полуночи. overDay — часы могут быть больше 23 (следующие сутки, «26:55»), но не больше 99.
+ * Значение — минуты от полуночи. Значение 1440 и больше (следующие сутки) показывается временем суток: 1615 — «02:55».
+ * Введённое время — всегда 0…1439; сутки определяет владелец. Время суток не изменилось — значение прежнее.
  *
- *   <TimeInput v-model="departureMin" over-day :nullable="false" />
+ *   <TimeInput v-model="departureMin" :nullable="false" />
  */
 const props = withDefaults(
   defineProps<{
     /** на русском; переводится при показе */
     placeholder?: string
     width?: string
-    overDay?: boolean
     /** пустое поле очищает время; иначе пустое поле возвращается к прежнему значению */
     nullable?: boolean
   }>(),
-  { placeholder: 'чч:мм', width: '100%', overDay: false, nullable: true },
+  { placeholder: 'чч:мм', width: '100%', nullable: true },
 )
 
 const model = defineModel<number | null>({ default: null })
 
-/** Минуты от полуночи → «чч:мм». */
+/** Минуты от полуночи → время суток «чч:мм». */
 function textOf(minutes: number | null): string {
   if (minutes == null) return ''
-  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+  return `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
 
 // текст поля: пока пользователь печатает, — его текст, иначе — значение
@@ -150,9 +150,9 @@ function applyText(text: string): boolean {
   if (!m) return false
   const hours = Number(m[1])
   const minutes = Number(m[2] ?? 0)
-  if ((!props.overDay && hours > 23) || minutes > 59) return false
+  if (hours > 23 || minutes > 59) return false
   const value = hours * 60 + minutes
-  if (value !== model.value) model.value = value
+  if (model.value == null || value !== model.value % (24 * 60)) model.value = value
   return true
 }
 

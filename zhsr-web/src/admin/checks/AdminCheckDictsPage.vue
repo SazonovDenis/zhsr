@@ -21,6 +21,7 @@
 
     <DataTable
       v-model:selected="selectedId"
+      deselect
       :columns="columns"
       :rows="rows"
       row-key="id"
@@ -30,6 +31,7 @@
       :error="loadError"
       :retry="load"
       :row-menu="rowMenu"
+      menu-gap
       empty="Шаблонов ответов нет"
       @row-dblclick="edit"
     />
@@ -46,6 +48,7 @@ import DesktopFrame from '@/desktop/frame/DesktopFrame.vue'
 import { moveSortOrder } from '@/api/admin'
 import { provideBusy } from '@/shared/busy'
 import { openDialog } from '@/shared/components/dialog/openDialog'
+import { confirmDelete } from '@/shared/components/dialog/confirmDelete'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import type { RowMenuItem } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
@@ -94,6 +97,7 @@ void load()
 const rowMenu: RowMenuItem<CheckDict>[] = [
   { label: 'Варианты ответов', run: (row) => void openValues(row) },
   { label: 'Изменить', run: (row) => void edit(row) },
+  { label: 'Удалить', run: (row) => void remove(row) },
   { label: 'Создать шаблон', separator: true, run: () => void edit(null) },
 ]
 
@@ -113,5 +117,11 @@ async function edit(dict: CheckDict | null) {
 
 async function openValues(dict: CheckDict) {
   await openDialog(CheckDictValuesDialog, { dict })
+}
+
+async function remove(row: CheckDict) {
+  if (!(await confirmDelete('Удаление записи', 'Удалить запись «{name}»?', { name: row.textRu }, () => deleteCheckDict(row.id)))) return
+  await load()
+  selectedId.value = null
 }
 </script>

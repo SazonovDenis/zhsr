@@ -11,6 +11,7 @@ import kz.zhsr.app.dto.admin.AdminOption;
 import kz.zhsr.app.dto.admin.AdminPage;
 import kz.zhsr.app.dto.admin.AdminQuery;
 import kz.zhsr.app.dto.admin.AdminTable;
+import kz.zhsr.app.dto.route.MapPoint;
 import kz.zhsr.app.service.ApiException;
 import kz.zhsr.app.service.DbErrors;
 import kz.zhsr.app.service.SqlQuery;
@@ -27,6 +28,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -73,6 +75,16 @@ public class AdminService {
         return new AdminPage<>(total, withRefTexts(table, db.loadSql(page.sql(), page.params())));
     }
 
+    /**
+     * Все строки, найденные поиском, - тем же, что у страницы ({@link #page}), в порядке страницы по умолчанию.
+     */
+    public List<Map<String, Object>> all(String tableName, String search) throws Exception {
+        requireAdmin();
+        AdminTable table = table(tableName);
+        SqlQuery query = AdminSql.all(table, search, sortColumn(table, null));
+        return withRefTexts(table, db.loadSql(query.sql(), query.params()));
+    }
+
     public Map<String, Object> get(String tableName, long id) throws Exception {
         requireAdmin();
         return row(table(tableName), id);
@@ -89,6 +101,7 @@ public class AdminService {
             values.put(AdminTables.SORT_ORDER, nextSortOrder(table.name()));
         }
         Boolean favorite = favorite(table, values);
+        Optional<MapPoint> point = stationPoint(table, values);
         long id;
         try {
             id = db.insertRec(table.name(), values);
@@ -96,6 +109,7 @@ public class AdminService {
             throw DbErrors.translate(e);
         }
         setFavorite(id, favorite);
+        setStationPoint(table, id, point.orElse(null));
         changed(table);
         return row(table, id);
     }
@@ -112,6 +126,7 @@ public class AdminService {
             values.remove(AdminTables.SORT_ORDER);
         }
         Boolean favorite = favorite(table, values);
+        Optional<MapPoint> point = stationPoint(table, values);
         values.put("id", id);
         try {
             db.updateRec(table.name(), values);
@@ -119,6 +134,7 @@ public class AdminService {
             throw DbErrors.translate(e);
         }
         setFavorite(id, favorite);
+        setStationPoint(table, id, point.orElse(null));
         changed(table);
         return row(table, id);
     }
@@ -204,6 +220,18 @@ public class AdminService {
                 row.put(AdminTables.FAVORITE, favorites.contains(((Number) row.get("id")).longValue()));
             }
         }
+        if (AdminTables.isVirtual(table.name(), AdminTables.X) && !rows.isEmpty()) {
+            Map<Long, DbRec> points = new HashMap<>();
+            for (DbRec point : db.loadList("station_point",
+                    Map.of("station", rows.stream().map(r -> ((Number) r.get("id")).longValue()).toList()))) {
+                points.put(point.getLong("station"), point);
+            }
+            for (Map<String, Object> row : rows) {
+                DbRec point = points.get(((Number) row.get("id")).longValue());
+                row.put(AdminTables.X, point == null ? null : point.get(AdminTables.X));
+                row.put(AdminTables.Y, point == null ? null : point.get(AdminTables.Y));
+            }
+        }
         for (AdminColumn c : table.columns()) {
             if (!AdminTables.REF.equals(c.type())) {
                 continue;
@@ -255,6 +283,58 @@ public class AdminService {
         }
     }
 
+    /**
+     * Убрать из значений координаты станции: их нет в таблице station.
+     *
+     * @return координаты; пусто - не заданы или у таблицы таких полей нет
+     */
+    private static Optional<MapPoint> stationPoint(AdminTable table, Map<String, Object> values) {
+        if (!AdminTables.isVirtual(table.name(), AdminTables.X)) {
+            return Optional.empty();
+        }
+        BigDecimal x = (BigDecimal) values.remove(AdminTables.X);
+        BigDecimal y = (BigDecimal) values.remove(AdminTables.Y);
+        if (x == null && y == null) {
+            return Optional.empty();
+        }
+        if (x == null || y == null) {
+            throw ApiException.badRequest("Заполните и долготу, и широту");
+        }
+        if (x.abs().compareTo(BigDecimal.valueOf(180)) > 0) {
+            throw ApiException.badRequest("Долгота - от -180 до 180");
+        }
+        if (y.abs().compareTo(BigDecimal.valueOf(90)) > 0) {
+            throw ApiException.badRequest("Широта - от -90 до 90");
+        }
+        return Optional.of(new MapPoint(x.doubleValue(), y.doubleValue()));
+    }
+
+    /**
+     * Точка станции на карте (station_point): записать или удалить.
+     *
+     * @param point null - точки у станции нет
+     */
+    private void setStationPoint(AdminTable table, long station, MapPoint point) throws Exception {
+        if (!AdminTables.isVirtual(table.name(), AdminTables.X)) {
+            return;
+        }
+        DbRec rec = db.loadRec("station_point", Map.of("station", station));
+        if (point == null) {
+            if (rec != null) {
+                db.deleteRec("station_point", rec.getLong("id"));
+            }
+            return;
+        }
+        Map<String, Object> values = new HashMap<>(Map.of("station", station,
+                AdminTables.X, BigDecimal.valueOf(point.getX()), AdminTables.Y, BigDecimal.valueOf(point.getY())));
+        if (rec == null) {
+            db.insertRec("station_point", values);
+        } else {
+            values.put("id", rec.getLong("id"));
+            db.updateRec("station_point", values);
+        }
+    }
+
     /** Порядок показа новой записи - последней: на 10 больше наибольшего в таблице. */
     private int nextSortOrder(String tableName) throws Exception {
         int last = db.loadList(tableName, Map.of()).stream()
@@ -299,7 +379,10 @@ public class AdminService {
             if (hasSortOrder(table)) {
                 return AdminTables.SORT_ORDER;
             }
-            AdminColumn first = table.columns().get(0);
+            // иначе - название; его нет (перегоны) - первое поле
+            AdminColumn first = table.columns().stream()
+                    .filter(c -> c.name().equals("name") || c.name().equals("text"))
+                    .findFirst().orElse(table.columns().get(0));
             return AdminTables.REF.equals(first.type()) ? AdminSql.refSort(table, first) : first.name();
         }
         for (AdminColumn c : table.columns()) {
