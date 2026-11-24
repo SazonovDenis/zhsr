@@ -64,12 +64,12 @@ export function responsibleWho(c: ResponsibleCandidate): string {
 
 /**
  * Кого можно назначить ответственным: сотрудники депо станции station, бригада рейса trip и бригады рейсов поезда
- * вагонов wagons; сначала бригада, затем сотрудники депо. Всё пусто — пусто.
+ * вагонов wagons (id); сначала бригада, затем сотрудники депо. Всё пусто — пусто.
  */
 export async function fetchResponsibles(
   station: number | null,
   trip: number | null,
-  wagons: string[] = [],
+  wagons: number[] = [],
 ): Promise<ResponsibleCandidate[]> {
   return (await http.get<ResponsibleCandidate[]>('/wagons/responsibles', { params: { station, trip, wagons } })).data
 }

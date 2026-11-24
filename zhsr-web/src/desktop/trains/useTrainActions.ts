@@ -64,7 +64,7 @@ export function useTrainActions(o: {
       station: card.station,
       at: o.at(),
       trip: o.trip(),
-      submit: (choice: AttachChoice) => attachWagons(card.id, changeBody(choice.numbers, choice)),
+      submit: (choice: AttachChoice) => attachWagons(card.id, changeBody(choice.wagons, choice)),
     })
     if (done) await o.changed(done)
   }
@@ -92,9 +92,9 @@ export function useTrainActions(o: {
       groups,
       at: at ?? o.at(),
       trip: o.trip(),
-      wagon: wagon?.number ?? null,
+      wagon: wagon?.wagon ?? null,
       plan: plan || !factAllowed,
-      submit: (choice: AttachChoice) => detachWagons(card.id, changeBody(choice.numbers, choice)),
+      submit: (choice: AttachChoice) => detachWagons(card.id, changeBody(choice.wagons, choice)),
     })
     if (done) await o.changed(done)
   }

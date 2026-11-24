@@ -151,8 +151,8 @@ const busyOf = shallowRef(new Map<string, WagonBusy>())
 const loadError = ref<ShownError | null>(null)
 const error = ref<ShownError | null>(null)
 const running = ref(false)
-// отмеченные вагоны — по номеру: отметка сохраняется при смене фильтра
-const picked = ref(new Set<string>())
+// отмеченные вагоны — по id: отметка сохраняется при смене фильтра
+const picked = ref(new Set<number>())
 
 const columns = defineColumns<WagonRow>([
   { field: 'number', title: 'Номер', width: '13rem', cell: CellAttachPick, sortable: true },
@@ -196,14 +196,14 @@ function fit(w: WagonRow): AttachFit {
 function toggle(w: WagonRow) {
   if (fit(w).block) return
   const next = new Set(picked.value)
-  if (next.has(w.number)) next.delete(w.number)
-  else next.add(w.number)
+  if (next.has(w.id)) next.delete(w.id)
+  else next.add(w.id)
   picked.value = next
   // отметка вагона — ввод: убирает ошибку диалога
   error.value = null
 }
 
-provide(ATTACH_PICK, { isPicked: (w) => picked.value.has(w.number), toggle, fit })
+provide(ATTACH_PICK, { isPicked: (w) => picked.value.has(w.id), toggle, fit })
 
 async function load() {
   loadError.value = null
@@ -211,7 +211,7 @@ async function load() {
     await busy.run(async () => {
       const list = await fetchWagons(wagonQuery({ ...filter, at: moment.value }), sort.value)
       const busyList = await fetchWagonBusy(
-        list.map((w) => w.number),
+        list.map((w) => w.id),
         moment.value,
       )
       rows.value = list
@@ -228,8 +228,8 @@ watch([filter, sort, moment], load, { deep: true })
 // отмеченный вагон, который при смене вида или времени перестал подходить, снимается
 watch([mode, moment, busyOf], () => {
   picked.value = new Set(
-    [...picked.value].filter((n) => {
-      const row = rows.value.find((w) => w.number === n)
+    [...picked.value].filter((id) => {
+      const row = rows.value.find((w) => w.id === id)
       return !row || !fit(row).block
     }),
   )
@@ -260,7 +260,7 @@ async function save() {
   error.value = null
   running.value = true
   try {
-    emit('done', await props.submit({ ...choice, numbers: [...picked.value] }))
+    emit('done', await props.submit({ ...choice, wagons: [...picked.value] }))
   } catch (e) {
     error.value = shownError(e)
   } finally {

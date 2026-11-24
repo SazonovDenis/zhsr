@@ -44,7 +44,7 @@ public class TransferService {
      * @param number   номер вагона
      * @param withProperty передаётся с имуществом (with_property)
      */
-    public record WagonItem(String number, boolean withProperty) {
+    public record WagonItem(long wagon, boolean withProperty) {
     }
 
     /**
@@ -206,16 +206,14 @@ public class TransferService {
         if (items.isEmpty()) {
             throw ApiException.badRequest("Отметьте вагоны");
         }
-        Map<String, DbRec> available = UtDb.collectGroupBy_record(
-                candidates(from), "number");
+        Map<Long, DbRec> available = UtDb.collectGroupBy_record(candidates(from), "id");
         for (WagonItem item : items) {
-            DbRec w = available.get(item.number());
+            DbRec w = available.get(item.wagon());
             if (w == null) {
-                throw ApiException.conflict("Вагон " + item.number() + " не там, откуда передаётся");
+                throw ApiException.conflict("Вагон не там, откуда передаётся");
             }
-            // getString отдаёт для пустого значения пустую строку, а не null: проверяется само значение
             if (w.get("pending_act") != null) {
-                throw ApiException.conflict("Вагон " + item.number() + " ожидает приёма по акту "
+                throw ApiException.conflict("Вагон " + w.getString("number") + " ожидает приёма по акту "
                         + w.getString("pending_act"));
             }
         }
@@ -226,7 +224,7 @@ public class TransferService {
             throw ApiException.badRequest("Сотрудник не найден");
         }
         responsibleService.check(body.responsibleUsrs(), station, null,
-                items.stream().map(WagonItem::number).toList());
+                items.stream().map(WagonItem::wagon).toList());
 
         Map<String, Object> act = new HashMap<>();
         act.put("number", String.format("P-%05d", db.loadSqlRec(TransferSql.nextActId(), Map.of()).getLong("next_id")));
@@ -249,7 +247,7 @@ public class TransferService {
             id = db.insertRec("transfer_act", act);
             int seq = 1;
             for (WagonItem item : items) {
-                long wagon = db.loadRec("wagon", Map.of("number", item.number())).getLong("id");
+                long wagon = item.wagon();
                 WagonJournal.Responsibles responsibles = wagonJournal.assign(wagon, time, body.responsibleUsrs());
                 Map<String, Object> row = new HashMap<>();
                 row.put("transfer_act", id);
@@ -282,10 +280,8 @@ public class TransferService {
         OffsetDateTime now = OffsetDateTime.now();
         if (body != null) {
             List<DbRec> actWagons = db.loadList("transfer_act_wagon", Map.of("transfer_act", id));
-            List<String> numbers = db.loadList("wagon", Map.of("id",
-                    actWagons.stream().map(r -> r.getLong("wagon")).toList())).stream()
-                    .map(r -> r.getString("number")).toList();
-            responsibleService.check(body.responsibleUsrs(), stationOf(from(act)), null, numbers);
+            responsibleService.check(body.responsibleUsrs(), stationOf(from(act)), null,
+                    actWagons.stream().map(r -> r.getLong("wagon")).toList());
             OffsetDateTime time = act.getDateTimeTZ("transferred_dt");
             for (DbRec row : actWagons) {
                 WagonJournal.Responsibles responsibles = wagonJournal.reassign(row.getLong("wagon"), time,
@@ -334,8 +330,8 @@ public class TransferService {
 
     /** Записи факта ответственных, открытая и закрытая актом по вагону (строка transfer_act_wagon). */
     static WagonJournal.Responsibles responsibles(DbRec row) {
-        return new WagonJournal.Responsibles(row.getLong("wagon_responsible", null),
-                row.getLong("closed_wagon_responsible", null));
+        return new WagonJournal.Responsibles(row.getLong("wagon_responsible"),
+                row.getLong("closed_wagon_responsible"));
     }
 
     /** Перевести вагоны акта в расположение «куда»; запись журнала, открытая приёмом, - в строке вагона акта. */
@@ -400,7 +396,7 @@ public class TransferService {
         if (rec == null) {
             throw ApiException.badRequest("Депо или парк отстоя не найдены");
         }
-        Long station = rec.getLong("station", null);
+        Long station = rec.getLong("station");
         if (station == null) {
             throw ApiException.badRequest("У депо или парка отстоя не задана станция");
         }
@@ -408,13 +404,13 @@ public class TransferService {
     }
 
     private static TransferPlace from(DbRec act) {
-        return new TransferPlace(act.getLong("from_station", null), act.getLong("from_depot", null),
-                act.getLong("from_yard", null));
+        return new TransferPlace(act.getLong("from_station"), act.getLong("from_depot"),
+                act.getLong("from_yard"));
     }
 
     private static TransferPlace to(DbRec act) {
-        return new TransferPlace(act.getLong("to_station", null), act.getLong("to_depot", null),
-                act.getLong("to_yard", null));
+        return new TransferPlace(act.getLong("to_station"), act.getLong("to_depot"),
+                act.getLong("to_yard"));
     }
 
     private DbRec requirePendingForMe(long id, CurrentUser me) throws Exception {

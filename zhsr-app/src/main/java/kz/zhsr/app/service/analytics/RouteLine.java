@@ -1,6 +1,7 @@
 package kz.zhsr.app.service.analytics;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtCnv;
 import kz.zhsr.app.dto.route.MapPoint;
 import kz.zhsr.app.dto.route.StageLine;
 import kz.zhsr.app.dto.route.StageLines;
@@ -56,8 +57,8 @@ final class RouteLine {
     }
 
     private static double minute(DbRec station, String field, String other) {
-        Long value = station.getLong(field, null);
-        return value != null ? value : station.getLong(other);
+        Long value = station.getLong(field);
+        return value != null ? value : UtCnv.toLong(station.get(other));
     }
 
     private void add(double x, double y) {

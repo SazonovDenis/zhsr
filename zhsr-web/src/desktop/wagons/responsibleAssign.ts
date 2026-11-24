@@ -15,7 +15,7 @@ import { fetchResponsibles, responsibleDuty, responsiblePlace } from '@/shared/w
 export async function pickResponsibles(opts: {
   station: number | null
   trip?: number | null
-  wagons?: string[]
+  wagons?: number[]
   current: UserRef[]
   save: (usrs: number[]) => Promise<void>
 }): Promise<{ usrs: number[] } | undefined> {

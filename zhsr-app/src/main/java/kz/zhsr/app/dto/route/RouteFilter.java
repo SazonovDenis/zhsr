@@ -7,7 +7,7 @@ import java.util.List;
  *
  * @param depot  id депо: маршрут идёт через станцию этого депо
  * @param kinds  вид маршрута (константы RouteKind)
- * @param states состояния маршрута: active, closed
+ * @param states состояния маршрута: константы ActiveState
  */
-public record RouteFilter(Long depot, List<Integer> kinds, List<String> states) {
+public record RouteFilter(Long depot, List<Integer> kinds, List<Integer> states) {
 }

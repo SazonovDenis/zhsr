@@ -67,12 +67,12 @@ public class ActCancelService {
             throw ApiException.conflict("Акт уже отменён");
         }
         if (!canCancelTransfer(me, act.getLong("act_status_type"), act.getLong("transferred_by_usr"),
-                act.getLong("received_by_usr", null))) {
+                act.getLong("received_by_usr"))) {
             throw ApiException.forbidden("Акт отменяет тот, кто сдал или принял вагоны, или администратор");
         }
         long cancellation = cancellation(me, body);
         for (DbRec row : db.loadList("transfer_act_wagon", Map.of("transfer_act", id))) {
-            Long location = row.getLong("wagon_location", null);
+            Long location = row.getLong("wagon_location");
             WagonJournal.Responsibles responsibles = TransferService.responsibles(row);
             Map<String, Object> values = new HashMap<>();
             values.put("id", row.getLong("id"));

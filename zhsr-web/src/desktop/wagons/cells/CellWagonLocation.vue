@@ -1,6 +1,7 @@
 <template>
   <!-- в рейсе — сам рейс; иначе вид и место: «Депо: Вагонное депо Астана» -->
   <div v-if="row.locationType === LocationType.TRIP">{{ wagonPlace(row) }}</div>
+  <div v-else-if="row.locationType === null">—</div>
   <div v-else>{{ dictManager.getValue('LocationKind', row.locationType) }}: {{ wagonPlace(row) }}</div>
   <div class="zs-sub">
     {{ row.responsibleUsrs.length > 1 ? t('ответственные:') : t('ответственный:') }}

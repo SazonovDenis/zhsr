@@ -39,7 +39,7 @@ const props = withDefaults(
   defineProps<{
     station: number | null
     trip?: number | null
-    wagons?: string[]
+    wagons?: number[]
     current?: UserRef[]
     disabled?: boolean
   }>(),

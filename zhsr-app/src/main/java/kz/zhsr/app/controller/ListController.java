@@ -12,7 +12,7 @@ import kz.zhsr.app.dto.wagon.WagonOption;
 import kz.zhsr.app.dto.wagon.WagonRow;
 import kz.zhsr.app.service.ListService;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -36,8 +36,8 @@ public class ListController {
         return listService.wagons(filter, sort);
     }
 
-    @GetMapping("/wagons/by-number/{number}")
-    public WagonRow wagonByNumber(@PathVariable String number) throws Exception {
+    @GetMapping("/wagons/by-number")
+    public WagonRow wagonByNumber(@RequestParam String number) throws Exception {
         return listService.wagonByNumber(number);
     }
 

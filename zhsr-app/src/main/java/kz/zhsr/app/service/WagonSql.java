@@ -63,7 +63,7 @@ final class WagonSql {
                   and usr.id in (select usr_depot.usr from usr_depot
                                  join depot on depot.id = usr_depot.depot
                                  where usr_depot.dend is null and depot.station = :station)
-                order by usr.full_name, usr.id
+                order by usr.full_name, usr.login
                 """;
     }
 
@@ -79,20 +79,16 @@ final class WagonSql {
                 join usr on usr.id = trip_crew.usr
                 where trip_crew.trip = any(:trips) and not usr.disabled
                   and (trip_crew.dend is null or trip_crew.dend = trip.arrived_dt)
-                order by trip_crew.crew_duty_type desc, usr.full_name, trip_crew.id
+                order by usr.full_name, usr.login, trip.planned_dt
                 """;
     }
 
-    /**
-     * Поезда, в которых вагоны с номерами сейчас по факту. Параметры numbers, fact - слой «факт» участия в поезде.
-     * Список Db передаёт массивом чисел: номера приводятся к строкам.
-     */
+    /** Поезда, в которых вагоны сейчас по факту. Параметры wagons, fact - слой «факт» участия в поезде. */
     static String currentTrainsOf() {
         return """
                 select distinct train_wagon.train
                 from train_wagon
-                join wagon on wagon.id = train_wagon.wagon
-                where wagon.number = any(cast(:numbers as varchar[])) and train_wagon.kind = :fact and train_wagon.dend is null
+                where train_wagon.wagon = any(:wagons) and train_wagon.kind = :fact and train_wagon.dend is null
                 """;
     }
 
@@ -152,7 +148,7 @@ final class WagonSql {
                 join usr on usr.id = wagon_responsible_usr.usr
                 where wagon_responsible.wagon = any(:wagons) and wagon_responsible.kind = :fact
                   and wagon_responsible.dend is null
-                order by usr.full_name, usr.id
+                order by usr.full_name, usr.login
                 """;
     }
 
@@ -173,7 +169,7 @@ final class WagonSql {
                 from wagon_responsible_usr
                 join usr on usr.id = wagon_responsible_usr.usr
                 where wagon_responsible_usr.wagon_responsible = any(:records)
-                order by usr.full_name, usr.id
+                order by usr.full_name, usr.login
                 """;
     }
 

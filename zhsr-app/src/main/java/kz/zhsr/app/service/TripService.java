@@ -203,7 +203,7 @@ public class TripService {
             db.updateRec("trip", values);
             // планы прицепок и отцепок рейса: при том же поезде и маршруте - вслед за плановым отправлением, при смене
             // поезда или маршрута - отменяются
-            Long oldTrain = trip.getLong("train", null);
+            Long oldTrain = trip.getLong("train");
             boolean sameRoute = trip.getLong("route").longValue() == body.route();
             if (oldTrain != null) {
                 if (!oldTrain.equals(body.train()) || !sameRoute) {
@@ -215,7 +215,7 @@ public class TripService {
                     }
                 }
             }
-            if (Objects.equals(trip.getLong("train", null), body.train())) {
+            if (Objects.equals(trip.getLong("train"), body.train())) {
                 tripResponsibleService.retimePlans(load(id));
             } else {
                 tripResponsibleService.cancelPlans(id);
@@ -419,7 +419,7 @@ public class TripService {
     private Set<Long> applyDuty(DbRec trip, long duty, Long user, Set<Long> removed) throws Exception {
         long id = trip.getLong("id");
         DbRec current = db.loadRec("trip_crew", Map.of("trip", id, "crew_duty_type", duty));
-        if (current != null && user != null && current.getLong("usr") == user) {
+        if (current != null && user != null && Objects.equals(current.getLong("usr"), user)) {
             return Set.of();
         }
         Set<Long> changed = new HashSet<>();
@@ -784,7 +784,7 @@ public class TripService {
 
     /** Вагоны поезда рейса: все, кто был в поезде по факту, без повторов. */
     private List<Long> trainWagons(DbRec trip) throws Exception {
-        Long train = trip.getLong("train", null);
+        Long train = trip.getLong("train");
         if (train == null) {
             return List.of();
         }
@@ -832,7 +832,7 @@ public class TripService {
     TripCrew load(long id) throws Exception {
         DbRec tripRec = tripRec(id);
         TripCrew.Trip trip = DbRecMapper.toObject(tripRec, TripCrew.Trip.class);
-        Long train = tripRec.getLong("train", null);
+        Long train = tripRec.getLong("train");
         trip.setTrain(train == null ? null : new TrainRef(train));
         List<DbRec> stopRecs = routeService.stations(List.of(trip.getRoute())).getOrDefault(trip.getRoute(), List.of())
                 .stream().filter(rs -> rs.getBoolean("have_stop")).toList();
@@ -899,7 +899,7 @@ public class TripService {
         LocalDate end = route == null ? null : RouteService.localDate(route, "dend");
         // при правке рейса его прежний маршрут допустим и после окончания действия: маршрут не меняется
         boolean sameRoute = id != null && route != null
-                && db.loadRec("trip", id).getLong("route") == body.route();
+                && Objects.equals(db.loadRec("trip", id).getLong("route"), body.route());
         if (route == null || (!sameRoute && end != null && end.isBefore(LocalDate.now()))) {
             throw ApiException.badRequest("Маршрут не действует");
         }
@@ -922,7 +922,7 @@ public class TripService {
         DbRec duration = db.loadSqlRec(TripSql.routeDuration(), Map.of("route", route));
         OffsetDateTime end = planned.plusMinutes(duration.getInt("duration"));
         for (DbRec other : db.loadSql(TripSql.trainTrips(), Map.of("train", train, "states", ACTIVE))) {
-            if (except != null && other.getLong("id") == except) {
+            if (except != null && Objects.equals(other.getLong("id"), except)) {
                 continue;
             }
             if (other.getDateTimeTZ("beg").isBefore(end) && other.getDateTimeTZ("fin").isAfter(planned)) {
@@ -975,7 +975,7 @@ public class TripService {
      */
     private void requireReadable(long id) throws Exception {
         DbRec trip = tripRec(id);
-        Long train = trip.getLong("train", null);
+        Long train = trip.getLong("train");
         if (train != null && visibility.trainVisible(currentUserService.get(), train)) {
             return;
         }

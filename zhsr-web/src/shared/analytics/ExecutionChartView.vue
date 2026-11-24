@@ -99,6 +99,7 @@ import { computed, ref } from 'vue'
 
 import { fetchExecution } from '@/api/analytics'
 import { t } from '@/boot/i18n'
+import { compareText } from '@/shared/format'
 import { dictManager } from '@/shared/dict/DictManager'
 import ChartView from './ChartView.vue'
 import DepotChoice from './DepotChoice.vue'
@@ -199,7 +200,7 @@ const allRows = computed<Row[]>(() =>
         density: densityOf(r.minutes),
       }
     })
-    .sort((a, b) => a.fast - b.fast || a.id - b.id),
+    .sort((a, b) => a.fast - b.fast || compareText(a.name, b.name)),
 )
 
 const rows = computed(() =>

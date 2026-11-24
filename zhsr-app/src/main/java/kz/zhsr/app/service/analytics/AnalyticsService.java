@@ -1,6 +1,7 @@
 package kz.zhsr.app.service.analytics;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtCnv;
 import kz.kis.kiscore.utils.UtDb;
 import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.DbRecMapper;
@@ -73,7 +74,7 @@ public class AnalyticsService {
             months.add(first.plusMonths(i).atDay(1).atStartOfDay(zone).toOffsetDateTime());
         }
 
-        Map<String, int[]> hours = new LinkedHashMap<>();
+        Map<String, double[]> hours = new LinkedHashMap<>();
         for (DbRec rec : db.loadSql(AnalyticsSql.crewHours(), Map.of("from", months.getFirst(),
                 "lnp", CrewDuty.LNP, "conductor", CrewDuty.CONDUCTOR))) {
             OffsetDateTime departed = rec.getDateTimeTZ("departed_dt");
@@ -84,7 +85,7 @@ public class AnalyticsService {
                 continue;
             }
             String key = rec.getLong("usr") + ":" + rec.getLong("crew_duty_type");
-            hours.computeIfAbsent(key, k -> new int[MONTHS])[index] += rec.getLong("hours").intValue();
+            hours.computeIfAbsent(key, k -> new double[MONTHS])[index] += UtCnv.toDouble(rec.get("hours"));
         }
 
         Map<Long, Long> depots = loadCurrentDepots();
@@ -97,7 +98,7 @@ public class AnalyticsService {
             row.setUsr(new UserRef(usr));
             row.setCrewDutyType(Long.parseLong(parts[1]));
             row.setDepot(depots.get(usr));
-            row.setHours(Arrays.stream(values).boxed().toList());
+            row.setHours(Arrays.stream(values).mapToObj(h -> UtCnv.round(h, 2)).toList());
             rows.add(row);
         });
         refResolver.resolve(rows);
@@ -111,9 +112,10 @@ public class AnalyticsService {
      * @param at по состоянию на момент; null - на текущий момент
      */
     public List<UncheckedWagonRow> uncheckedWagons(OffsetDateTime at) throws Exception {
+        OffsetDateTime time = at == null ? OffsetDateTime.now() : at;
         List<UncheckedWagonRow> rows = DbRecMapper.toList(
                 db.loadSql(AnalyticsSql.lastChecks(), Map.of("fact", TrainWagonKind.FACT,
-                        "at", at == null ? OffsetDateTime.now() : at)), UncheckedWagonRow.class);
+                        "at", time, "day", time.atZoneSameInstant(ZoneId.systemDefault()).toLocalDate())), UncheckedWagonRow.class);
         refResolver.resolve(rows);
         return rows;
     }
@@ -204,7 +206,7 @@ public class AnalyticsService {
                 start = status.getDateTimeTZ("dbeg");
                 continue;
             }
-            Long executor = status.getLong("executor_usr", null);
+            Long executor = status.getLong("executor_usr");
             if (start == null || executor == null) {
                 return;
             }
@@ -260,7 +262,7 @@ public class AnalyticsService {
             }
             Long service = status.getLong("service");
             Long faultType = status.getLong("fault_type");
-            Long executor = status.getLong("executor_usr", null);
+            Long executor = status.getLong("executor_usr");
             Long depot = executor == null ? null : depots.get(executor);
             WorkTimeRow row = rows.computeIfAbsent(service + ":" + faultType + ":" + depot, key -> {
                 WorkTimeRow created = new WorkTimeRow();

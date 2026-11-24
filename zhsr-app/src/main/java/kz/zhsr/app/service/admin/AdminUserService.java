@@ -118,7 +118,6 @@ public class AdminUserService {
         }
         for (AdminUserRow row : rows) {
             List<Long> userRoles = roles.getOrDefault(row.getId(), new ArrayList<>());
-            userRoles.sort(null);
             row.setRoles(userRoles);
         }
         return rows;

@@ -177,14 +177,16 @@ export interface CrewWagon extends TrainWagon {
 
 /** Вагон для прицепки или отцепки в рейсе. */
 export interface CouplingWagon {
+  /** id вагона */
+  wagon: number
   number: string
   /** отцепка: позиция вагона в поезде; прицепка — null */
   seq: number | null
   /** тип вагона — id справочника WagonType */
   wagonType: number
   /** вид расположения — id справочника LocationKind */
-  locationType: number
-  place: number
+  locationType: number | null
+  place: number | null
   /** состояние вагона — id справочника WagonState */
   wagonStatusType: number
   /** занятость вагона в другом поезде; null — вагон свободен */
@@ -419,7 +421,8 @@ export async function coupleWagons(
     routeStation: number
     /** основания, примечания: приказ, причина */
     comment: string
-    wagons: string[]
+    /** вагоны — id */
+    wagons: number[]
     /** фактическое время, ISO */
     time: string
     /** прицепка: позиция первого вагона в поезде, с 1; null — в конец */

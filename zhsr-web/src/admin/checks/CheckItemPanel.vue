@@ -84,6 +84,7 @@ import { numText } from '@/shared/checks/texts'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
+import { compareText } from '@/shared/format'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -105,6 +106,11 @@ const error = ref<ShownError | null>(null)
 
 const dictName = computed(() => props.dicts.find((d) => d.id === props.item?.checkDict)?.textRu ?? '')
 
+// норматив для всех типов вагона — первым, остальные — по типу вагона
+function normType(n: CheckNorm): string {
+  return n.wagonType === null ? '' : dictManager.getValue('WagonType', n.wagonType)
+}
+
 async function load() {
   const item = props.item
   norms.value = []
@@ -120,7 +126,7 @@ async function load() {
       ]),
     )
     if (props.item?.id !== item.id) return
-    norms.value = list
+    norms.value = [...list].sort((a, b) => compareText(normType(a), normType(b)))
     dictValues.value = values
   } catch (e) {
     error.value = shownError(e)
@@ -136,7 +142,10 @@ function normText(n: CheckNorm): string {
     parts.push(t('от {min} до {max}', { min: numText(n.numMin) || '…', max: numText(n.numMax) || '…' }))
   }
   if (n.checkDictValues.length > 0) {
-    const names = n.checkDictValues.map((id) => dictValues.value.find((v) => v.id === id)?.textRu ?? `<<${id}>>`)
+    const order = (id: number) => dictValues.value.findIndex((v) => v.id === id)
+    const names = [...n.checkDictValues]
+      .sort((a, b) => order(a) - order(b))
+      .map((id) => dictValues.value.find((v) => v.id === id)?.textRu ?? `<<${id}>>`)
     parts.push(t('допустимо: {values}', { values: names.join(', ') }))
   }
   return parts.join('; ') || t('без условий')

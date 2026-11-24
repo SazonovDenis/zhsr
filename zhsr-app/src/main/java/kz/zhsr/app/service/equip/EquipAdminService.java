@@ -196,7 +196,7 @@ public class EquipAdminService {
 
     static <T extends EquipItemRow> List<T> sortedItems(List<T> items) {
         List<T> res = new ArrayList<>(items);
-        res.sort(Comparator.comparingInt(EquipItemRow::getSortOrder).thenComparingLong(EquipItemRow::getId));
+        res.sort(Comparator.comparingInt(EquipItemRow::getSortOrder).thenComparing(EquipItemRow::getTextRu));
         return res;
     }
 
@@ -255,7 +255,7 @@ public class EquipAdminService {
             if (p == null || p.getLong("equip_list_template") != template || p.get("unit") != null) {
                 throw ApiException.badRequest("Раздел - пункт без единицы измерения из этого же шаблона");
             }
-            parent = p.getLong("parent_item", null);
+            parent = p.getLong("parent_item");
         }
         Map<String, Object> columns = Columns.of(body);
         AdminTexts.normalize(columns);

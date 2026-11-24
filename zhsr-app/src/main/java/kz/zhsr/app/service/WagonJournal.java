@@ -206,7 +206,7 @@ public class WagonJournal {
         if (closed != null) {
             DbRec last = db.loadSqlRec(WagonSql.lastResponsibleFact(),
                     Map.of("wagon", wagon, "fact", WagonResponsibleKind.FACT));
-            if (last == null || last.getLong("id") != closed) {
+            if (last == null || !Objects.equals(last.getLong("id"), closed)) {
                 throw ApiException.conflict("После этого у вагона меняли ответственных - сначала отмените это");
             }
             Map<String, Object> values = new HashMap<>();
@@ -445,16 +445,15 @@ public class WagonJournal {
      * wagon_info - по ним. После перевода у вагона не должно быть других записей. Вызывается внутри транзакции.
      */
     public void undo(Opened opened) throws Exception {
-        DbRec location = undoRec("wagon_location", opened.location());
+        long wagon = db.loadRec("wagon_location", opened.location()).getLong("wagon");
+        DbRec location = undoLocationRec(opened.location());
         DbRec status = undoRec("wagon_status", opened.status());
-        Map<String, Object> info = locationInfo(location.getDateTimeTZ("dbeg"), location.getLong("location_type"),
-                location.getLong("station", null), location.getLong("depot", null), location.getLong("yard", null),
-                location.getLong("trip", null));
+        Map<String, Object> info = locationInfo(location);
         info.put("dbeg_status", status.getDateTimeTZ("dbeg"));
         info.put("wagon_status_type", status.getLong("wagon_status_type"));
-        db.updateRec("wagon_info", info, Map.of("wagon", location.getLong("wagon")));
+        db.updateRec("wagon_info", info, Map.of("wagon", wagon));
         if (opened.responsibles() != null) {
-            unassign(location.getLong("wagon"), opened.responsibles());
+            unassign(wagon, opened.responsibles());
         }
     }
 
@@ -464,10 +463,21 @@ public class WagonJournal {
      * транзакции.
      */
     public void undoLocation(long opened) throws Exception {
-        DbRec location = undoRec("wagon_location", opened);
-        db.updateRec("wagon_info", locationInfo(location.getDateTimeTZ("dbeg"), location.getLong("location_type"),
-                location.getLong("station", null), location.getLong("depot", null), location.getLong("yard", null),
-                location.getLong("trip", null)), Map.of("wagon", location.getLong("wagon")));
+        long wagon = db.loadRec("wagon_location", opened).getLong("wagon");
+        db.updateRec("wagon_info", locationInfo(undoLocationRec(opened)), Map.of("wagon", wagon));
+    }
+
+    /**
+     * Удалить запись расположения и снова сделать текущей прежнюю. Возвращает прежнюю запись; null - запись была
+     * первой: расположение снова не задано.
+     */
+    private DbRec undoLocationRec(long id) throws Exception {
+        DbRec rec = db.loadRec("wagon_location", id);
+        if (rec.getDateTimeTZ("dend") == null && previous("wagon_location", rec) == null) {
+            db.deleteRec("wagon_location", id);
+            return null;
+        }
+        return undoRec("wagon_location", id);
     }
 
     private void retimeRec(String table, long id, OffsetDateTime time, String infoField) throws Exception {
@@ -514,18 +524,32 @@ public class WagonJournal {
     private long openLocation(long wagon, OffsetDateTime time, long locationType, Long station, Long depot, Long yard,
                               Long trip) throws Exception {
         DbRec location = db.loadRec("wagon_location", current(wagon));
-        if (location == null) {
-            throw ApiException.conflict("У вагона нет текущего расположения");
+        // текущей записи нет - расположение не задано: запись будет первой
+        if (location != null) {
+            if (!time.isAfter(location.getDateTimeTZ("dbeg"))) {
+                throw ApiException.badRequest("Время должно быть позже последнего изменения вагонов");
+            }
+            db.updateRec("wagon_location", Map.of("id", location.getLong("id"), "dend", time));
         }
-        if (!time.isAfter(location.getDateTimeTZ("dbeg"))) {
-            throw ApiException.badRequest("Время должно быть позже последнего изменения вагонов");
-        }
-        db.updateRec("wagon_location", Map.of("id", location.getLong("id"), "dend", time));
         Map<String, Object> values = new HashMap<>(locationValues(locationType, station, depot, yard, trip));
         values.values().removeIf(Objects::isNull);
         values.put("wagon", wagon);
         values.put("dbeg", time);
         return db.insertRec("wagon_location", values);
+    }
+
+    /** Расположение для кэша wagon_info по записи журнала; null - расположение не задано. */
+    private static Map<String, Object> locationInfo(DbRec location) {
+        if (location == null) {
+            Map<String, Object> info = new HashMap<>();
+            for (String field : List.of("location_type", "station", "depot", "yard", "trip", "dbeg_location")) {
+                info.put(field, null);
+            }
+            return info;
+        }
+        return locationInfo(location.getDateTimeTZ("dbeg"), location.getLong("location_type"),
+                location.getLong("station"), location.getLong("depot"), location.getLong("yard"),
+                location.getLong("trip"));
     }
 
     private static Map<String, Object> locationInfo(OffsetDateTime time, long locationType, Long station, Long depot,

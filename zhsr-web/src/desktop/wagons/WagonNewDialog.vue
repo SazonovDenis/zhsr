@@ -2,15 +2,15 @@
   <FormDialog
     v-model:show="show"
     height="xl"
-    title="Ввод вагона"
-    ok-text="Ввести вагон"
+    :title="wagon ? 'Исправить данные вагона' : 'Ввод вагона'"
+    :ok-text="wagon ? 'Сохранить' : 'Ввести вагон'"
     :running="running"
     :error="error"
     @ok="save"
   >
     <FormSection title="Паспорт" columns="repeat(2, minmax(0, 1fr))">
       <FormField label="Номер вагона">
-        <TextInput v-model="draft.number" mono inputmode="numeric" placeholder="5–8 цифр" />
+        <TextInput v-model="draft.number" mono placeholder="5–20 знаков" />
       </FormField>
       <FormField label="Тип вагона">
         <CbList
@@ -51,7 +51,13 @@
       />
     </FormSection>
 
-    <FormSection title="Начальное расположение и состояние" divided columns="repeat(2, minmax(0, 1fr))">
+    <!-- вагон в рейсе: расположение и состояние меняют отметки рейса -->
+    <FormSection
+      v-if="!inTrip"
+      :title="wagon ? 'Расположение и состояние' : 'Начальное расположение и состояние'"
+      divided
+      columns="repeat(2, minmax(0, 1fr))"
+    >
       <FormField label="Расположение" class="wagon-new__kind">
         <CbSegment v-model="draft.locationType" single required :values="locationKinds" :max-button-count="3" />
       </FormField>
@@ -85,7 +91,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 
 import type { WagonRow, WagonDraft } from '@/api/wagons'
-import { createWagon } from '@/api/wagons'
+import { createWagon, updateWagon } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import type { ShownError } from '@/shared/errors'
 import { formError, shownError } from '@/shared/errors'
@@ -103,27 +109,31 @@ import { LocationType, WagonStatus } from '@/shared/constants/systemDicts'
 
 /**
  * Диалог «Ввод вагона» (Ф-ВАГ-01): паспорт с пробегом на момент ввода, депо приписки, начальное расположение и
- * состояние. Открывается через openDialog,
- * результат — созданный вагон.
+ * состояние. С вагоном wagon — «Исправить данные вагона» (Ф-ВАГ-08): те же поля, заполненные данными вагона.
+ * Открывается через openDialog, результат — созданный или исправленный вагон.
  */
+
+const props = withDefaults(defineProps<{ wagon?: WagonRow | null }>(), { wagon: null })
 
 const show = defineModel<boolean>('show', { default: false })
 // ожидание диалога: спиннер в подвале (FormDialog) — на всю цепочку загрузок формы
 provideBusy()
 const emit = defineEmits<{ done: [wagon: WagonRow] }>()
 
+const inTrip = props.wagon?.locationType === LocationType.TRIP
+
 const draft = reactive<WagonDraft>({
-  number: '',
-  wagonType: null,
-  modelType: null,
-  buildYear: '',
-  maker: '',
-  depot: null,
-  locationType: LocationType.DEPOT,
-  place: null,
-  wagonStatusType: null,
-  dbeg: null,
-  initialRunKm: '0',
+  number: props.wagon?.number ?? '',
+  wagonType: props.wagon?.wagonType ?? null,
+  modelType: props.wagon?.modelType ?? null,
+  buildYear: props.wagon?.buildYear?.toString() ?? '',
+  maker: props.wagon?.maker ?? '',
+  depot: props.wagon?.depot ?? null,
+  locationType: (inTrip ? null : props.wagon?.locationType) ?? LocationType.DEPOT,
+  place: (inTrip ? null : props.wagon?.place) ?? null,
+  wagonStatusType: (inTrip ? null : props.wagon?.wagonStatusType) ?? null,
+  dbeg: props.wagon?.dbeg ?? null,
+  initialRunKm: String(props.wagon?.initialRunKm ?? 0),
 })
 
 const running = ref(false)
@@ -153,8 +163,13 @@ const initialStates = computed(() => dictChoices('WagonState').filter((c) => c.i
 // справочники формы контролы загружают сами (dictSource): спиннер и ошибка — в выпадающем списке
 
 function validate(): string {
-  if (!/^\d{5,8}$/.test(draft.number)) return t('Номер вагона — от 5 до 8 цифр')
-  if (!draft.wagonType || !draft.modelType || !draft.depot || !draft.place || !draft.wagonStatusType || !draft.dbeg) {
+  if (!/^[\d/]{5,20}$/.test(draft.number)) return t('Номер вагона — от 5 до 20 знаков: цифры и дробная черта')
+  if (!draft.wagonType || !draft.dbeg) return t('Заполните все поля')
+  if (props.wagon) {
+    // исправление: модель, депо и место могут быть не заданы; заданное место не очищается
+    const placeLost = props.wagon.place !== null && !draft.place
+    if (!inTrip && (placeLost || !draft.wagonStatusType)) return t('Заполните все поля')
+  } else if (!draft.modelType || !draft.depot || !draft.place || !draft.wagonStatusType) {
     return t('Заполните все поля')
   }
   if (!/^\d+$/.test(draft.initialRunKm.trim())) return t('Пробег — целое неотрицательное число, км')
@@ -168,7 +183,7 @@ async function save() {
   if (error.value) return
   running.value = true
   try {
-    emit('done', await createWagon({ ...draft }))
+    emit('done', await (props.wagon ? updateWagon(props.wagon.id, { ...draft }) : createWagon({ ...draft })))
   } catch (e) {
     error.value = shownError(e)
   } finally {

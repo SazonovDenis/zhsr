@@ -43,7 +43,7 @@ public class TrainController {
 
     /** Занятость вагонов в поездах с времени from. */
     @GetMapping("/trains/busy")
-    public List<WagonBusy> busy(@RequestParam List<String> wagons,
+    public List<WagonBusy> busy(@RequestParam List<Long> wagons,
                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
                                 OffsetDateTime from) throws Exception {
         return trainService.busy(wagons, from);

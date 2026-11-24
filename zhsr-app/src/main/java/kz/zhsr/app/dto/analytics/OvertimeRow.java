@@ -19,5 +19,5 @@ public class OvertimeRow {
     /** текущее депо сотрудника (справочник Depot); null - депо нет */
     private Long depot;
     /** часы по месяцам, в порядке OvertimeChart.months */
-    private List<Integer> hours;
+    private List<Double> hours;
 }

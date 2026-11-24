@@ -15,9 +15,9 @@ export interface WagonOption {
   /** тип вагона — id справочника WagonType */
   wagonType: number
   /** вид расположения — id справочника LocationKind (константы LocationType) */
-  locationType: number
+  locationType: number | null
   /** место расположения по виду: id справочника Station, Depot, Yard или id рейса */
-  place: number
+  place: number | null
   /** рейс, в составе которого вагон; null — вагон не в рейсе */
   trip: TripRef | null
 }
@@ -28,8 +28,8 @@ export interface WagonRow extends WagonOption {
   modelType: number | null
   /** депо приписки — id справочника Depot; null — не задано */
   depot: number | null
-  /** с какого времени вагон в этом расположении, ISO с часовым поясом */
-  dbegLocation: string
+  /** с какого времени вагон в этом расположении, ISO с часовым поясом; null — расположение не задано */
+  dbegLocation: string | null
   /** состояние вагона — id справочника WagonState (константы WagonStatus) */
   wagonStatusType: number
   /** с какого времени вагон в этом состоянии, ISO с часовым поясом */
@@ -40,6 +40,8 @@ export interface WagonRow extends WagonOption {
   dbegResponsible: string | null
   /** общий пробег, км: пробег на момент ввода плюс пробеги в рейсах */
   runKm: number
+  /** пробег на момент ввода, км */
+  initialRunKm: number
   /** изготовитель; null — не указан */
   maker: string | null
   /** год постройки; null — не указан */
@@ -79,8 +81,8 @@ export interface WagonPendingTransfer {
 export interface WagonFilter {
   /** поиск по номеру вагона */
   number: string
-  /** номера вагонов целиком: только эти вагоны (например, состав поезда); не задано — без отбора */
-  numbers?: string[]
+  /** id вагонов: только эти вагоны (например, состав поезда); не задано — без отбора */
+  ids?: number[]
   /** станция — id справочника Station */
   station: number | null
   /** рейс — id рейса (api/trips.ts) */
@@ -147,7 +149,7 @@ export async function changeWagonResponsible(id: number, responsibleUsrs: number
 }
 
 export async function fetchWagonByNumber(number: string): Promise<WagonRow> {
-  return (await http.get<WagonRow>(`/wagons/by-number/${encodeURIComponent(number)}`)).data
+  return (await http.get<WagonRow>('/wagons/by-number', { params: { number } })).data
 }
 
 /** Вагоны как варианты выбора: фильтр — как у списка вагонов. */
@@ -157,13 +159,19 @@ export async function fetchWagonOptions(filter: WagonFilter): Promise<WagonOptio
 
 /** Ввести вагон (Ф-ВАГ-01): год постройки и пробег уходят числами; пустой год — не указан. */
 export async function createWagon(draft: WagonDraft): Promise<WagonRow> {
-  const body = {
-    ...draft,
-    buildYear: draft.buildYear.trim() ? Number(draft.buildYear) : null,
-    initialRunKm: Number(draft.initialRunKm),
-  }
-  return (await http.post<WagonRow>('/wagons', body)).data
+  return (await http.post<WagonRow>('/wagons', wagonBody(draft))).data
 }
+
+/** Исправить данные вагона (Ф-ВАГ-08). Пустые расположение и состояние не меняются. */
+export async function updateWagon(id: number, draft: WagonDraft): Promise<WagonRow> {
+  return (await http.put<WagonRow>(`/wagons/${id}`, wagonBody(draft))).data
+}
+
+const wagonBody = (draft: WagonDraft) => ({
+  ...draft,
+  buildYear: draft.buildYear.trim() ? Number(draft.buildYear) : null,
+  initialRunKm: Number(draft.initialRunKm),
+})
 
 /** Рейс в данных. */
 export interface TripRef {
@@ -186,7 +194,7 @@ export interface RequestWagon {
   /** рейс, в составе которого вагон едет сейчас; null — вагон не в рейсе */
   trip: TripRef | null
   /** вид расположения — id справочника LocationKind */
-  locationType: number
+  locationType: number | null
   /** место расположения — id справочника по виду расположения (Station, Depot, Yard); в рейсе — null */
   place: number | null
   /** станция расположения вагона — id справочника Station; null — вагон не на станции */

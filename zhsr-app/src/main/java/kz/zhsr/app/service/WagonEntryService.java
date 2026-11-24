@@ -1,8 +1,11 @@
 package kz.zhsr.app.service;
 
+import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtCnv;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
+import kz.zhsr.app.constants.ActStatus;
 import kz.zhsr.app.constants.LocationType;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.constants.WagonStatus;
@@ -15,18 +18,19 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Ввод вагона в эксплуатацию (Ф-ВАГ-01): паспорт, депо приписки, пробег на момент ввода, начальное расположение и
- * состояние. Вводит администратор.
+ * состояние. Исправление данных вагона (Ф-ВАГ-08): те же поля. Вводит и исправляет администратор.
  */
 @Service
 public class WagonEntryService {
 
     /**
-     * Новый вагон. Поля - по колонкам wagon; place - место начального расположения.
+     * Данные вагона: ввод и исправление. Поля - по колонкам wagon; place - место начального расположения.
      *
-     * @param number          номер: 5-8 цифр, уникален
+     * @param number          номер: 5-20 знаков - цифры и дробная черта, уникален
      * @param wagonType       тип вагона (wagon_type)
      * @param modelType       модель (model_type)
      * @param buildYear       год постройки; null - не указан
@@ -46,11 +50,16 @@ public class WagonEntryService {
     private final Db db;
     private final CurrentUserService currentUserService;
     private final ListService listService;
+    private final WagonJournal wagonJournal;
+    private final WagonRun wagonRun;
 
-    public WagonEntryService(Db db, CurrentUserService currentUserService, ListService listService) {
+    public WagonEntryService(Db db, CurrentUserService currentUserService, ListService listService,
+                             WagonJournal wagonJournal, WagonRun wagonRun) {
         this.db = db;
         this.currentUserService = currentUserService;
         this.listService = listService;
+        this.wagonJournal = wagonJournal;
+        this.wagonRun = wagonRun;
     }
 
     /**
@@ -95,10 +104,7 @@ public class WagonEntryService {
         if (!me.hasRole(RoleType.ADMIN)) {
             throw ApiException.forbidden("Вагон вводит администратор");
         }
-        String number = body.number() == null ? "" : body.number().trim();
-        if (!number.matches("\\d{5,8}")) {
-            throw ApiException.badRequest("Номер вагона - от 5 до 8 цифр");
-        }
+        String number = number(body);
         if (body.wagonType() == null || body.modelType() == null || body.depot() == null || body.dbeg() == null
                 || body.locationType() == null || body.place() == null || body.wagonStatusType() == null) {
             throw ApiException.badRequest("Заполните все поля");
@@ -106,10 +112,7 @@ public class WagonEntryService {
         if (body.wagonStatusType() == WagonStatus.IN_TRIP) {
             throw ApiException.badRequest("Состояние «в пути» вагон получает только в рейсе");
         }
-        int initialRunKm = body.initialRunKm() == null ? 0 : body.initialRunKm();
-        if (initialRunKm < 0) {
-            throw ApiException.badRequest("Пробег - целое неотрицательное число");
-        }
+        int initialRunKm = initialRunKm(body);
         String placeColumn = placeColumn(body.locationType());
         if (db.loadRec(placeColumn, body.place()) == null) {
             throw ApiException.badRequest("Место начального расположения не найдено");
@@ -120,16 +123,7 @@ public class WagonEntryService {
 
         OffsetDateTime now = OffsetDateTime.now();
         try {
-            Map<String, Object> wagon = new HashMap<>();
-            wagon.put("number", number);
-            wagon.put("wagon_type", body.wagonType());
-            wagon.put("model_type", body.modelType());
-            wagon.put("build_year", body.buildYear());
-            wagon.put("maker", body.maker() == null || body.maker().isBlank() ? null : body.maker().trim());
-            wagon.put("dbeg", body.dbeg());
-            wagon.put("depot", body.depot());
-            wagon.put("initial_run_km", initialRunKm);
-            long id = db.insertRec("wagon", wagon);
+            long id = db.insertRec("wagon", values(body, number, initialRunKm));
 
             db.insertRec("wagon_location", Map.of("wagon", id, "dbeg", now, "location_type", body.locationType(),
                     placeColumn, body.place()));
@@ -149,6 +143,114 @@ public class WagonEntryService {
             throw DbErrors.translate(e);
         }
         return listService.wagonByNumber(number);
+    }
+
+    /**
+     * Исправить данные вагона (PUT /wagons/{id}): паспорт - без ограничений; изменённые расположение и состояние -
+     * ручная правка wagon_edit без комментария: новые записи журналов текущим временем, ответственные не меняются.
+     * Модель, депо приписки, расположение и состояние могут быть пусты: пустые расположение и состояние не меняются.
+     *
+     * @return вагон как строка списка вагонов
+     * @throws ApiException 403 - не администратор; 400 - не заполнено или неверно; 409 - номер уже есть, вагон в рейсе
+     *                      или ждёт приёма по акту
+     */
+    @Transactional
+    public WagonRow update(long id, WagonBody body) throws Exception {
+        CurrentUser me = currentUserService.get();
+        if (!me.hasRole(RoleType.ADMIN)) {
+            throw ApiException.forbidden("Данные вагона исправляет администратор");
+        }
+        if (db.loadRec("wagon", id) == null) {
+            throw ApiException.notFound("Вагон не найден");
+        }
+        String number = number(body);
+        if (body.wagonType() == null || body.dbeg() == null) {
+            throw ApiException.badRequest("Заполните все поля");
+        }
+        int initialRunKm = initialRunKm(body);
+        DbRec same = db.loadRec("wagon", Map.of("number", number));
+        if (same != null && same.getLong("id") != id) {
+            throw ApiException.conflict("Вагон № " + number + " уже есть");
+        }
+        try {
+            Map<String, Object> wagon = values(body, number, initialRunKm);
+            wagon.put("id", id);
+            db.updateRec("wagon", wagon);
+        } catch (Exception e) {
+            throw DbErrors.translate(e);
+        }
+        wagonRun.recalc(id);
+        changeState(id, body, me);
+        return listService.wagonByNumber(number);
+    }
+
+    /** Изменённые при исправлении расположение и состояние - в журналы, одной ручной правкой. */
+    private void changeState(long id, WagonBody body, CurrentUser me) throws Exception {
+        DbRec info = db.loadRec("wagon_info", Map.of("wagon", id));
+        String column = body.locationType() == null || body.place() == null ? null : placeColumn(body.locationType());
+        boolean newLocation = column != null && (!Objects.equals(info.getLong("location_type"),
+                body.locationType()) || !Objects.equals(info.getLong(column), body.place()));
+        boolean newStatus = body.wagonStatusType() != null
+                && !Objects.equals(info.getLong("wagon_status_type"), body.wagonStatusType());
+        if (!newLocation && !newStatus) {
+            return;
+        }
+        if (UtCnv.toLong(info.get("location_type")) == LocationType.TRIP) {
+            throw ApiException.conflict("Вагон в рейсе - меняется отметками рейса и актами отцепки и прицепки");
+        }
+        OffsetDateTime now = OffsetDateTime.now();
+        Map<String, Object> edit = new HashMap<>();
+        edit.put("wagon", id);
+        edit.put("created_by_usr", me.id());
+        edit.put("created_dt", now);
+        if (newLocation) {
+            if (db.loadRec(column, body.place()) == null) {
+                throw ApiException.badRequest("Место расположения не найдено");
+            }
+            if (db.loadSqlRec(WagonSql.pendingTransfer(), Map.of("wagon", id, "pending", ActStatus.PENDING)) != null) {
+                throw ApiException.conflict("Вагон ждёт приёма по акту передачи - сначала примите или отмените акт");
+            }
+            edit.put("wagon_location", wagonJournal.moveLocation(id, now, body.locationType(),
+                    "station".equals(column) ? body.place() : null, "depot".equals(column) ? body.place() : null,
+                    "yard".equals(column) ? body.place() : null));
+        }
+        if (newStatus) {
+            if (body.wagonStatusType() == WagonStatus.IN_TRIP) {
+                throw ApiException.badRequest("Состояние «в пути» вагон получает только в рейсе");
+            }
+            edit.put("wagon_status", wagonJournal.moveStatus(id, now, body.wagonStatusType()));
+        }
+        db.insertRec("wagon_edit", edit);
+    }
+
+    private static String number(WagonBody body) {
+        String number = body.number() == null ? "" : body.number().trim();
+        if (!number.matches("[\\d/]{5,20}")) {
+            throw ApiException.badRequest("Номер вагона - от 5 до 20 знаков: цифры и дробная черта");
+        }
+        return number;
+    }
+
+    private static int initialRunKm(WagonBody body) {
+        int initialRunKm = body.initialRunKm() == null ? 0 : body.initialRunKm();
+        if (initialRunKm < 0) {
+            throw ApiException.badRequest("Пробег - целое неотрицательное число");
+        }
+        return initialRunKm;
+    }
+
+    /** Поля вагона из тела запроса. */
+    private static Map<String, Object> values(WagonBody body, String number, int initialRunKm) {
+        Map<String, Object> wagon = new HashMap<>();
+        wagon.put("number", number);
+        wagon.put("wagon_type", body.wagonType());
+        wagon.put("model_type", body.modelType());
+        wagon.put("build_year", body.buildYear());
+        wagon.put("maker", body.maker() == null || body.maker().isBlank() ? null : body.maker().trim());
+        wagon.put("dbeg", body.dbeg());
+        wagon.put("depot", body.depot());
+        wagon.put("initial_run_km", initialRunKm);
+        return wagon;
     }
 
     /** Колонка места по виду расположения: станция, депо или парк отстоя; «в рейсе» вагон не вводится. */

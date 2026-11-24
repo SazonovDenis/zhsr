@@ -22,7 +22,16 @@ import type {
   LeafletMouseEvent,
   Map as LeafletMap,
 } from 'leaflet'
-import { circleMarker, latLngBounds, layerGroup, map as createMap, polyline, tileLayer } from 'leaflet'
+import {
+  circleMarker,
+  Control,
+  DomEvent,
+  latLngBounds,
+  layerGroup,
+  map as createMap,
+  polyline,
+  tileLayer,
+} from 'leaflet'
 import { nextTick, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 
 import type { RoutePoint } from '@/api/routes'
@@ -44,8 +53,9 @@ import { useLoad } from '@/shared/loadable'
  * passingZoom (мельче они сливаются в сплошную линию). Выбранная станция видна всегда.
  *
  * Размер карты задаёт владелец (ширина и высота корня компонента); высота — не меньше 10em. Маршрут вписывается в
- * карту при первом рисунке и при смене showPassing (развернули или свернули станции следования); смена станций
- * (правка в редакторе) и размера масштаб и место карты не меняют.
+ * карту (станция одна — видно 100 км вокруг неё) при первом рисунке, когда добавлена остановка или сменились границы
+ * маршрута, и при смене showPassing (развернули или свернули станции следования); смена размера масштаб и место карты
+ * не меняет.
  *
  * Перегоны и точки станций компонент грузит сам (GET /stages/lines) — это независимая загрузка: спиннер и ошибка —
  * на месте карты, в ожидание фрейма она не входит.
@@ -53,7 +63,8 @@ import { useLoad } from '@/shared/loadable'
  * События:
  * - station — щелчок по станции: станция, её точка маршрута и её номер в points, точка станции на карте;
  * - stage — щелчок по линии перегона: перегон, точки маршрута, между которыми он лежит, и ближайшая к месту щелчка
- *   точка линии.
+ *   точка линии;
+ * - expand — щелчок по кнопке «развернуть» (expandable).
  */
 const props = withDefaults(
   defineProps<{
@@ -65,8 +76,10 @@ const props = withDefaults(
     showPassing?: boolean
     /** масштаб карты (уровень Leaflet), с которого видны станции следования, когда showPassing выключен */
     passingZoom?: number
+    /** кнопка «развернуть» в левом нижнем углу: владелец по событию expand меняет showPassing и размер карты */
+    expandable?: boolean
   }>(),
-  { selected: null, showPassing: true, passingZoom: 8 },
+  { selected: null, showPassing: true, passingZoom: 8, expandable: false },
 )
 
 /** Щелчок по станции. */
@@ -98,6 +111,7 @@ export interface RouteMapStageClick {
 const emit = defineEmits<{
   station: [click: RouteMapStationClick]
   stage: [click: RouteMapStageClick]
+  expand: []
 }>()
 
 // Оформление — как у схемы маршрута (RouteStops), кроме линии пути и станции следования (размер, цвет кольца):
@@ -108,6 +122,8 @@ const emit = defineEmits<{
 // вся республика — пока рисовать нечего
 const DEFAULT_CENTER: LatLngExpression = [48.0, 67.0]
 const DEFAULT_ZOOM = 5
+// сколько видно вокруг единственной станции, метров
+const SINGLE_RADIUS_M = 100_000
 
 const mapEl = shallowRef<HTMLElement | null>(null)
 const data = shallowRef<StageLines | null>(null)
@@ -117,8 +133,10 @@ let drawing: LayerGroup | null = null
 // границы маршрута: карта вписывает их после загрузки и при смене размера
 let routeBounds: LatLngBounds | null = null
 let resizeObserver: ResizeObserver | null = null
-// маршрут уже вписан в карту: дальше масштаб и место карты меняет только пользователь
+// маршрут уже вписан в карту: до смены остановок или границ маршрута масштаб и место карты меняет только пользователь
 let fitted = false
+// остановки на последнем рисунке: появилась новая — маршрут вписывается заново
+let drawnStops = new Set<number>()
 // кружки станций по id станции: при смене выбранной станции меняется только их оформление
 const markers = new Map<number, CircleMarker>()
 // станции следования — их кружки снимаются с карты и возвращаются по масштабу (updatePassing)
@@ -210,6 +228,7 @@ function draw() {
   drawing?.remove()
   markers.clear()
   passing.clear()
+  const oldBounds = routeBounds
   routeBounds = null
   const group = layerGroup().addTo(m)
   drawing = group
@@ -267,13 +286,17 @@ function draw() {
   }
 
   routeBounds = bounds.isValid() ? bounds : null
-  // при первом рисунке маршрут вписывается; правка станций (редактор) масштаб и место карты не меняет
+  const stops = new Set(stations.filter((s) => isStop(s.index)).map((s) => s.station))
+  const added = [...stops].some((s) => !drawnStops.has(s))
+  drawnStops = stops
+  const moved = !!routeBounds && !(oldBounds && routeBounds.equals(oldBounds))
+  if (added || moved) fitted = false
   if (!fitted) fit()
   applySelected()
 }
 
 /**
- * Вписать маршрут в карту; маршрута нет — вся республика. У карты нулевого размера (ещё не разложена страница) масштаб
+ * Вписать маршрут в карту; станция одна — она и окрестности; маршрута нет — вся республика. У карты нулевого размера (ещё не разложена страница) масштаб
  * не считается: Leaflet получил бы NaN и перестал рисовать — карта впишется, когда появится размер (ResizeObserver).
  */
 function fit() {
@@ -282,8 +305,13 @@ function fit() {
   const size = m.getSize()
   if (size.x === 0 || size.y === 0) return
   if (routeBounds) {
-    fitted = true
     const padding = cssPx('--route-fit-padding')
+    // единственная станция: вокруг неё — окрестные города; маршрут впишется, когда станций станет больше
+    if (routeBounds.getNorthEast().equals(routeBounds.getSouthWest())) {
+      m.fitBounds(routeBounds.getCenter().toBounds(SINGLE_RADIUS_M * 2))
+      return
+    }
+    fitted = true
     m.fitBounds(routeBounds, { padding: [padding, padding] })
   } else {
     m.setView(DEFAULT_CENTER, DEFAULT_ZOOM)
@@ -376,6 +404,40 @@ function applySelected() {
   updatePassing()
 }
 
+// кнопка «развернуть» — в стиле кнопок масштаба Leaflet
+let expandButton: HTMLElement | null = null
+
+function addExpandButton(m: LeafletMap) {
+  const button = document.createElement('a')
+  button.href = '#'
+  button.setAttribute('role', 'button')
+  const icon = document.createElement('i')
+  icon.className = 'material-icons route-map__expand-icon'
+  button.append(icon)
+  expandButton = button
+  updateExpandButton()
+
+  const control = new Control({ position: 'bottomleft' })
+  control.onAdd = () => {
+    const bar = document.createElement('div')
+    bar.className = 'leaflet-bar route-map__expand'
+    bar.append(button)
+    DomEvent.disableClickPropagation(bar)
+    DomEvent.on(button, 'click', (e) => {
+      DomEvent.preventDefault(e)
+      emit('expand')
+    })
+    return bar
+  }
+  control.addTo(m)
+}
+
+function updateExpandButton() {
+  if (!expandButton) return
+  expandButton.title = props.showPassing ? t('Свернуть карту') : t('Развернуть карту')
+  expandButton.firstElementChild!.textContent = props.showPassing ? 'close_fullscreen' : 'open_in_full'
+}
+
 onMounted(() => {
   if (!mapEl.value) return
   const m = createMap(mapEl.value, { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM })
@@ -387,6 +449,7 @@ onMounted(() => {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(m)
+  if (props.expandable) addExpandButton(m)
   draw()
   // размер карты сменил владелец (или окно) — Leaflet пересчитывает размер, середина карты остаётся на месте;
   // маршрут ещё не вписан (у карты не было размера) — вписывается
@@ -416,6 +479,7 @@ watch(() => props.passingZoom, updatePassing)
 watch(
   () => props.showPassing,
   async () => {
+    updateExpandButton()
     await nextTick()
     leaflet?.invalidateSize()
     fit()
@@ -466,7 +530,13 @@ void load.run()
 }
 
 // кнопки масштаба Leaflet («+» и «−») — полупрозрачные, чтобы не закрывали карту; под курсором — непрозрачные
-.route-map :deep(.leaflet-control-zoom) {
+.route-map :deep(.route-map__expand-icon) {
+  font-size: 1.1rem;
+  line-height: inherit;
+}
+
+.route-map :deep(.leaflet-control-zoom),
+.route-map :deep(.route-map__expand) {
   opacity: 0.6;
   transition: opacity 0.15s;
 

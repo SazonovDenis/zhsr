@@ -36,6 +36,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -160,8 +161,9 @@ public class EquipService {
                     Map.of("equip_list_value", values.stream().map(EquipListValueRow::getId).toList())),
                     "equip_list_value");
             for (EquipListValueRow v : values) {
-                v.setPhotos(photos.getOrDefault(v.getId(), List.of()).stream().map(r -> r.getLong("id")).sorted()
-                                  .toList());
+                v.setPhotos(photos.getOrDefault(v.getId(), List.of()).stream()
+                                  .sorted(Comparator.comparing((DbRec r) -> r.getDateTimeTZ("created_dt")))
+                                  .map(r -> r.getLong("id")).toList());
             }
         }
         res.setValues(values);
@@ -251,7 +253,7 @@ public class EquipService {
         db.updateRec("equip_list", Map.of("id", id, "completed_dt", now));
 
         Shortage shortage = saveValues(id, tpl, wagon, draft, files, user.id(), now);
-        Long request = own.getLong("repair_request", null);
+        Long request = own.getLong("repair_request");
         if (request != null) {
             if (!shortage.lines().isEmpty()) {
                 requestService.updateSystem(request, shortage.text(tpl), shortage.photos(), author);
@@ -262,7 +264,7 @@ public class EquipService {
                 db.updateRec("equip_list", rec);
             }
         } else if (!shortage.lines().isEmpty() && tpl.getFaultType() != null) {
-            long created = requestService.createSystem(wagonId, own.getLong("trip", null), tpl.getFaultType(),
+            long created = requestService.createSystem(wagonId, own.getLong("trip"), tpl.getFaultType(),
                     shortage.text(tpl), author, now, shortage.photos());
             db.updateRec("equip_list", Map.of("id", id, "repair_request", created));
         }
@@ -467,7 +469,7 @@ public class EquipService {
      */
     private Long wagonTrip(long wagon) throws Exception {
         DbRec info = db.loadRec("wagon_info", Map.of("wagon", wagon));
-        return info != null && info.getLong("location_type") == LocationType.TRIP ? info.getLong("trip", null) : null;
+        return info != null && info.getLong("location_type") == LocationType.TRIP ? info.getLong("trip") : null;
     }
 
     /**
@@ -487,7 +489,7 @@ public class EquipService {
         for (EquipNormRow n : db.loadList("equip_list_item_norm", key, EquipNormRow.class)) {
             norms.computeIfAbsent(n.getEquipListTemplateItem(), k -> new ArrayList<>()).add(n);
         }
-        Long modelType = wagon.getLong("model_type", null);
+        Long modelType = wagon.getLong("model_type");
         DbRec model = modelType == null ? null : db.loadRec("model_type", modelType);
         Map<Long, BigDecimal> previous = previous(wagon.getLong("id"), template, exclude);
         Long wagonType = wagon.getLong("wagon_type");

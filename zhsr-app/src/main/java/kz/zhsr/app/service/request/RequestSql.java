@@ -178,7 +178,7 @@ final class RequestSql {
             where.add("repair_request.created_dt < :toNext", "toNext", filter.to().plusDays(1));
         }
         where.param("tripLocation", LocationType.TRIP);
-        return where.query(SELECT, sort.orderBy(SORT, "repair_request.created_dt desc, repair_request.id desc"));
+        return where.query(SELECT, sort.orderBy(SORT, "repair_request.created_dt desc, repair_request.number desc"));
     }
 
     /**
@@ -198,13 +198,13 @@ final class RequestSql {
 
     /**
      * Наибольший номер заявки с префиксом (код компании и год): номера одной длины, поэтому наибольший по строке -
-     * последний. Параметр: prefix - «KZR-26-%».
+     * последний. Параметр: prefix - «KZR-26-».
      */
     static String maxNumber() {
         return """
                 select max(repair_request.number) as max_number
                 from repair_request
-                where repair_request.number like :prefix
+                where strpos(repair_request.number, :prefix) = 1
                 """;
     }
 

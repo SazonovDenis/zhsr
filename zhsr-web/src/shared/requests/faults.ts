@@ -1,3 +1,4 @@
+import { dictRecords } from '@/shared/dict/dictChoices'
 import type { ChoiceItem } from '@/shared/components/choice/choice'
 import { Severity } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -33,7 +34,7 @@ export interface FaultServiceNode {
 
 /** Неисправности, которые можно выбрать: отключённые не предлагаются. */
 function activeFaults() {
-  return dictManager.getList('FaultType').filter((f) => f.disabled !== true)
+  return dictRecords('FaultType').filter((f) => f.disabled !== true)
 }
 
 /** Поиск начинается с двух букв. */
@@ -44,7 +45,7 @@ export function isFaultSearch(query: string): boolean {
 /** Дерево неисправностей; при поиске — только совпавшие по названию неисправности или группы. */
 export function faultTree(query = ''): FaultServiceNode[] {
   const q = isFaultSearch(query) ? query.trim().toLowerCase() : ''
-  const groups = [...dictManager.getList('FaultGroup')].sort((a, b) => Number(a.sortOrder) - Number(b.sortOrder))
+  const groups = dictRecords('FaultGroup')
   const types = activeFaults()
   return dictManager
     .getList('Service')

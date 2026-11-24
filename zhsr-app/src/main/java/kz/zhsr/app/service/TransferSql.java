@@ -18,7 +18,7 @@ final class TransferSql {
                    coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard, wagon_info.trip) as place,
                    wagon_info.trip, wagon_info.dbeg_location, wagon_info.wagon_status_type,
                    wagon_info.dbeg_status, wagon_info.wagon_responsible,
-                   wagon_info.run_km,
+                   wagon_info.run_km, wagon.initial_run_km,
                    (select transfer_act.number
                     from transfer_act_wagon
                     join transfer_act on transfer_act.id = transfer_act_wagon.transfer_act
@@ -89,7 +89,7 @@ final class TransferSql {
                 join usr_depot on usr_depot.usr = usr.id and usr_depot.dend is null
                 join depot on depot.id = usr_depot.depot
                 where usr_role.role_type = :role and not usr.disabled and depot.station = :station
-                order by usr.full_name, usr.id
+                order by usr.full_name, usr.login
                 """;
     }
 
@@ -116,7 +116,7 @@ final class TransferSql {
                 + (station ? " and coalesce(transfer_act.from_station, depot.station, yard.station) = :station" : "")
                 + (states ? " and transfer_act.act_status_type = any(:states)" : "")
                 + (one ? " and transfer_act.id = :id" : "")
-                + " order by transfer_act.id desc limit 500";
+                + " order by transfer_act.transferred_dt desc, transfer_act.number desc limit 500";
     }
 
     /**
@@ -143,7 +143,7 @@ final class TransferSql {
      */
     static String actWagons() {
         return """
-                select transfer_act_wagon.transfer_act, wagon.number, transfer_act_wagon.with_property,
+                select transfer_act_wagon.transfer_act, transfer_act_wagon.wagon, wagon.number, transfer_act_wagon.with_property,
                        transfer_act_wagon.wagon_responsible
                 from transfer_act_wagon
                 join wagon on wagon.id = transfer_act_wagon.wagon

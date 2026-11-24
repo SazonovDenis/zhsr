@@ -11,10 +11,15 @@ argv: rail.json (пути и станции в прямоугольнике во
 - Станции вне Казахстана берутся только как транзитные: цепочка таких станций между двумя станциями сети не длиннее
   TRANSIT_KM, и без неё путь между ними по сети длиннее в TRANSIT_GAIN раз или его нет (Уральск через Илецк,
   Мактаарал через Узбекистан). Цепочки печатаются - их надо просмотреть.
+- Станции без имени (OSM <id>) и с именем-километром («117 км», «рзд. 142 км») убираются: у промежуточной соседние
+  перегоны склеиваются в один, тупиковая удаляется с перегоном, развилка (три перегона и больше) остаётся с именем
+  «Развилка XXX/YYY» по двум ближайшим соседним станциям.
+- Станции с номером вместо имени («№ 1», «рзд. №33», «19») получают имя «Разъезд A-B» по соседним станциям.
 """
 import heapq
 import json
 import math
+import re
 import sys
 from collections import defaultdict
 
@@ -49,8 +54,9 @@ def dist(a, b):
     return 2 * 6371.0088 * math.asin(math.sqrt(h))
 
 
-# устаревшие или неточные name:ru
-NAME_FIX = {'Чимкент': 'Шымкент', 'Аягуз': 'Аягоз'}
+# устаревшие или неточные name:ru, имена латиницей
+NAME_FIX = {'Чимкент': 'Шымкент', 'Аягуз': 'Аягоз', 'Rzd.jarkij': 'Разъезд Жаркий',
+            'разъезд 87 Алтыкудык': 'Разъезд Алтыкудык'}
 NAME_PREFIX = ('Железнодорожный вокзал ', 'Станция ')
 
 
@@ -218,8 +224,11 @@ def relabel():
                     stack.append(y)
 
 
+made_name = {}  # имена вместо номеров и развилок, см. ниже
+
+
 def sname(g):
-    return name_of(st[g]['tags']) or f'OSM {g}'
+    return made_name.get(g) or name_of(st[g]['tags']) or f'OSM {g}'
 
 
 def kz_dist(a, b, limit):
@@ -271,6 +280,119 @@ for d, a, b, foreign in sorted(cand):
 
 keep = {s for s in kz if any(y in kz for y, _ in g_adj[s])}
 rows = {k: v for k, v in stage.items() if k[0] in keep and k[1] in keep}
+
+# --- станции без имени и с именем-километром: промежуточные склеиваются, тупиковые удаляются, развилки остаются
+KM_NAME = re.compile(r'\d+\s*км$', re.IGNORECASE)
+
+
+def unnamed(g):
+    n = name_of(st[g]['tags']).strip()
+    return not n or bool(KM_NAME.search(n))
+
+
+def contract(rows, keep, drop):
+    """Убрать из rows (перегоны) и keep (станции) станции drop, у которых не больше двух перегонов; вернуть
+    (склеено, удалено тупиков). Снятие станции меняет число перегонов у соседей - повторяется, пока есть что убирать."""
+    joined = dead = 0
+    nb = defaultdict(set)
+    for a, b in rows:
+        nb[a].add(b)
+        nb[b].add(a)
+    queue = sorted(drop & keep)
+    while queue:
+        s = queue.pop()
+        # тупик на единственном перегоне соседа не удаляется: сосед остался бы без перегонов
+        if s not in keep or len(nb[s]) > 2 or len(nb[s]) == 1 and len(nb[next(iter(nb[s]))]) == 1:
+            continue
+        ends = sorted(nb[s])
+        legs = []
+        for e in ends:
+            km, path = rows.pop((min(e, s), max(e, s)))
+            legs.append((km, path if e < s else path[::-1]))  # путь от соседа к s
+            nb[e].discard(s)
+        keep.discard(s)
+        del nb[s]
+        if len(ends) == 2:
+            a, b = ends
+            km = legs[0][0] + legs[1][0]
+            # параллельный перегон между теми же станциями: остаётся короткий
+            if (a, b) not in rows or km < rows[(a, b)][0]:
+                rows[(a, b)] = (km, legs[0][1] + [s] + legs[1][1][::-1])
+            nb[a].add(b)
+            nb[b].add(a)
+            joined += 1
+        else:
+            dead += 1
+        queue += [e for e in ends if e in drop]
+    return joined, dead
+
+
+drop = {g for g in keep if unnamed(g)}
+joined, dead = contract(rows, keep, drop)
+transit &= keep
+print('без имени и километровых', len(drop), 'склеено', joined, 'удалено тупиков', dead)
+
+# --- имена: развилки и станции, у которых вместо имени номер («№ 1», «19», «рзд. №33», «Razezd No 27», «Разъезд»)
+NUMBER_NAME = re.compile(
+    r"^(?:(?:(?:жд\s+)?(?:раз[ъь]езд|рзд\.?|раз\.?|raz'?ezd|обгонный пункт)\s*)?(?:№|no\.?)?\s*\d+(?:\s*-?\s*[а-яa-z])?"
+    r"(?:-темір жол айрығы|\s+остановочный пункт)?|раз[ъь]езд)$", re.IGNORECASE)
+
+
+def make_names(rows, weak, name):
+    """Имена станций weak: развилка (три перегона и больше) - «Развилка A/B» по двум ближайшим станциям с именем;
+    остальные - «Разъезд A-B» по ближайшим станциям с именем по обе стороны (по алфавиту), несколько подряд -
+    с номером от A; у тупика - «Разъезд A». name(g) - прежнее имя."""
+    nb = defaultdict(dict)
+    for (a, b), (km, _) in rows.items():
+        nb[a][b] = km
+        nb[b][a] = km
+    res = {}
+
+    def nearby(g):
+        return [n for _, n in sorted((km, name(x)) for x, km in nb[g].items() if x not in weak)]
+
+    for g in weak:
+        if len(nb[g]) > 2 and len(nearby(g)) > 1:
+            res[g] = 'Развилка ' + '/'.join(nearby(g)[:2])
+
+    def end_name(g):
+        # конец цепочки - развилка: вместо неё ближайшая к ней станция с именем
+        return nearby(g)[0] if g in weak and nearby(g) else name(g)
+
+    seen = set()
+    for s in sorted(g for g in weak if len(nb[g]) <= 2):
+        if s in seen:
+            continue
+        # цепочка станций без имени: от s в обе стороны до станции с именем, развилки или тупика
+        sides, ends = [], []
+        for x in sorted(nb[s]):
+            prev, side = s, []
+            while x in weak and len(nb[x]) <= 2 and x != s:
+                side.append(x)
+                onward = [y for y in nb[x] if y != prev]
+                prev = x
+                if not onward:
+                    x = None
+                    break
+                x = onward[0]
+            sides.append(side)
+            ends.append(end_name(x) if x is not None else None)
+        chain = (sides[0][::-1] if sides else []) + [s] + (sides[1] if len(sides) > 1 else [])
+        seen.update(chain)
+        names = [n for n in ends if n]
+        if len(names) == 2 and names[0] > names[1]:
+            names.reverse()
+            chain.reverse()
+        for k, g in enumerate(chain, 1):
+            if names:
+                res[g] = 'Разъезд ' + '-'.join(names) + (f' {k}' if len(chain) > 1 else '')
+    return res
+
+
+weak = drop & keep | {g for g in keep if NUMBER_NAME.match(name_of(st[g]['tags']).strip())}
+for g, n in sorted(make_names(rows, weak, sname).items(), key=lambda kv: kv[1]):
+    print('  имя:', sname(g), '->', n)
+    made_name[g] = n
 
 
 def simplify(pts, eps):

@@ -142,7 +142,7 @@ public class CurrentUserService {
             DbRec depot = db.loadSqlRec(CurrentUserSql.currentDepot(), byUsr);
             CurrentUser.Trip[] trips = loadTrips(usrId);
             return new CurrentUser(usrId, usr.getString("login"), usr.getString("full_name"), roles,
-                    depot == null ? null : depot.getLong("id"), depot == null ? null : depot.getLong("station", null),
+                    depot == null ? null : depot.getLong("id"), depot == null ? null : depot.getLong("station"),
                     trips[0], usr.getBoolean("change_password"), trips[1]);
         } catch (Exception e) {
             throw new IllegalStateException("Не удалось загрузить сотрудника " + usrId, e);

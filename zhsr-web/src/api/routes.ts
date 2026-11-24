@@ -49,11 +49,11 @@ export interface RouteAttrs {
   dbeg: string
   /** дата завершения, ISO; null — маршрут действует бессрочно */
   dend: string | null
-  /** норма часов проводника; null — не задана */
+  /** норма часов проводника, бывает дробной; null — не задана */
   conductorHours: number | null
-  /** норма часов ЛНП; null — не задана */
+  /** норма часов ЛНП, бывает дробной; null — не задана */
   lnpHours: number | null
-  /** норма часов ПЭМ; null — не задана */
+  /** норма часов ПЭМ, бывает дробной; null — не задана */
   pemHours: number | null
 }
 
@@ -93,13 +93,11 @@ export interface RouteDraft {
   dbeg: string | null
 }
 
-/** Состояние маршрута для фильтра: действует или завершён. */
-export type RouteState = 'active' | 'closed'
-
 export interface RouteFilter {
   /** виды маршрута — id справочника RouteKind */
   kinds: number[]
-  states: RouteState[]
+  /** состояния — константы ActiveState */
+  states: number[]
   /** депо: маршрут идёт через станцию депо; null — без ограничения (сервер может ограничить по роли) */
   depot?: number | null
 }
@@ -151,7 +149,7 @@ export async function saveRoute(route: Route, points: RoutePoint[]): Promise<Rou
 
 /**
  * Станции, на которые можно перейти от остановки from: расстояние от начала маршрута и время в пути от from по
- * умолчанию. Без from — станции, с которых может начинаться маршрут (узловые).
+ * умолчанию. Без from — все станции маршрутной сети.
  */
 export async function fetchNextStations(from: RouteStop | null): Promise<NextStation[]> {
   const params = from ? { station: from.station, km: from.km } : {}
@@ -167,9 +165,22 @@ export async function recalcStops(stops: RouteStop[], changed: number[]): Promis
   return (await http.post<RouteStop[]>('/routes/recalc-stops', { stops, changed })).data
 }
 
-/** Действует ли маршрут сегодня. */
-export function stateOf(route: RouteAttrs): RouteState {
-  return !route.dend || route.dend >= new Date().toISOString().slice(0, 10) ? 'active' : 'closed'
+/** Пара соседних остановок: станции — id справочника Station. */
+export interface RouteLeg {
+  from: number
+  to: number
+}
+
+/** Станция следования между соседними остановками. */
+export interface LegStation {
+  station: number
+  /** расстояние от предыдущей остановки, км */
+  km: number
+}
+
+/** Станции следования кратчайшего пути для каждой пары соседних остановок, в порядке legs. */
+export async function fetchLegs(legs: RouteLeg[]): Promise<LegStation[][]> {
+  return (await http.post<LegStation[][]>('/routes/legs', legs)).data
 }
 
 /** Удалить маршрут: на него ссылаются другие записи — ошибка 409 с причиной. */

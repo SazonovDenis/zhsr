@@ -42,9 +42,10 @@ public final class TripLayerSql {
                 from wagon_responsible
                 join wagon_responsible_usr on wagon_responsible_usr.wagon_responsible = wagon_responsible.id
                 join wagon on wagon.id = wagon_responsible.wagon
+                join usr on usr.id = wagon_responsible_usr.usr
                 join trip on trip.id = :trip
                 where wagon_responsible.wagon = any(:wagons) and %s
-                order by wagon.number, wagon_responsible_usr.usr
+                order by wagon.number, usr.full_name, usr.login
                 """.formatted(WHERE);
     }
 
@@ -58,9 +59,10 @@ public final class TripLayerSql {
                 from wagon_responsible
                 join wagon_responsible_usr on wagon_responsible_usr.wagon_responsible = wagon_responsible.id
                 join wagon on wagon.id = wagon_responsible.wagon
+                join usr on usr.id = wagon_responsible_usr.usr
                 join trip on trip.id = :trip
                 where %s
-                order by wagon.number, wagon_responsible_usr.usr
+                order by wagon.number, usr.full_name, usr.login
                 """.formatted(WHERE);
     }
 

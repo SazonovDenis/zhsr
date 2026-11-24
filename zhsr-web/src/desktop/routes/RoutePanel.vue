@@ -20,9 +20,9 @@
         <span>{{ t('Нормы часов') }}</span>
         <!-- нормы — друг под другом: проводник, ЛНП, ПЭМ -->
         <span class="route-panel__norms">
-          <span>{{ t('проводник: {n} час', { n: route.conductorHours }) }}</span>
-          <span>{{ t('ЛНП: {n} час', { n: route.lnpHours }) }}</span>
-          <span>{{ t('ПЭМ: {n} час', { n: route.pemHours }) }}</span>
+          <span>{{ t('проводник: {n} час', { n: formatHours(route.conductorHours) }) }}</span>
+          <span>{{ t('ЛНП: {n} час', { n: formatHours(route.lnpHours) }) }}</span>
+          <span>{{ t('ПЭМ: {n} час', { n: formatHours(route.pemHours) }) }}</span>
         </span>
       </SidePanelFields>
 
@@ -79,6 +79,7 @@ import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
+import { formatHours } from '@/shared/format'
 import { dictManager } from '@/shared/dict/DictManager'
 import RouteMap from '@/shared/components/map/RouteMap.vue'
 import { RoleType } from '@/shared/constants/systemDicts'

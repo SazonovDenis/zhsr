@@ -33,9 +33,8 @@
 ### Частичное обновление
 
 Скрипты `./build-app`, `./build-app-docker-push` и `./remote-update` принимают ключи `app` (сервер), `database`
-(миграции БД) и `web` (фронт и nginx): тогда скрипты собирают, публикуют и обновляют на сервере только эти части. По
-ключу `database` скрипт `./build-app-docker-push` публикует два образа: миграции `zhsr-database` и демо-данные
-`zhsr-database-demo`. Без ключей скрипты обрабатывают всё приложение.
+(миграции БД) и `web` (фронт и nginx): тогда скрипты собирают, публикуют и обновляют на сервере только эти части. Без
+ключей скрипты обрабатывают всё приложение.
 
 | Что изменилось                                    | Команды                                                                                                  |
 |---------------------------------------------------|----------------------------------------------------------------------------------------------------------|
@@ -43,7 +42,7 @@
 | Фронт (`zhsr-web`)                                | `./build-app web && ./build-app-docker-push web`, затем `./remote-update web`                            |
 | Конфигурация nginx                                | `./build-app web && ./build-app-docker-push web`, затем `./remote-update web`                            |
 | Миграции БД без изменения прежних changeSet       | `./build-app database app && ./build-app-docker-push database app`, затем `./remote-update database app` |
-| Данные `db-data` (справочники, демо-данные, фото) | `./build-app database && ./build-app-docker-push database`, затем `./remote-reset --demo`                |
+| Данные `db-data` (справочники, демо-данные, фото) | `./remote-reset --demo`                                                                                  |
 | Структура БД (прежние changeSet изменены)         | `./build-app && ./build-app-docker-push`, затем `./remote-reset --demo`                                  |
 | Всё сразу или неясно что                          | `./build-app && ./build-app-docker-push`, затем `./remote-update`                                        |
 
@@ -51,7 +50,11 @@
 
 `./remote-reset --demo` - пересоздаёт на сервере БД и хранилище файлов с демо-данными.
 
-- `./remote-reset` пересоздаёт их без демо-данных. Оба скрипта стирают все прежние данные на сервере.
+- `./remote-reset --<каталог>` загружает вместо демо-данных данные `db-data/<каталог>`, например `--kazrail`.
+- `./remote-reset` загружает только `db-data/default`.
+- Скрипт `./remote-reset` копирует данные на сервер по ssh: файлы `*.tsv` и `*.sql` и фото `img/*.jpg`. Docker-образы
+  данных не содержат.
+- `./remote-reset` с любым ключом стирает все прежние данные на сервере.
 
 ## HTTPS
 

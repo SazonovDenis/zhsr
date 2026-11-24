@@ -84,7 +84,7 @@ import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
-import { formatDateTime } from '@/shared/format'
+import { compareText, formatDateTime } from '@/shared/format'
 import { currentUser, loadCurrentUser } from '@/shared/user'
 import PwaPage from '../components/PwaPage.vue'
 
@@ -104,7 +104,13 @@ const language = computed<ChoiceModel>({
 })
 
 const user = computed(() => currentUser.value)
-const roles = computed(() => user.value?.roles.map((r) => dictManager.getValue('Role', r)).join(', ') ?? '')
+const roles = computed(
+  () =>
+    user.value?.roles
+      .map((r) => dictManager.getValue('Role', r))
+      .sort(compareText)
+      .join(', ') ?? '',
+)
 const services = computed(() => user.value?.services.map((s) => dictManager.getValue('Service', s)).join(', ') ?? '')
 
 /** Рейс: «002 • Алматы — Астана, отправление 29.10 06:00». */

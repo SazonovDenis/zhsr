@@ -1,3 +1,4 @@
+import { dictRecords } from '@/shared/dict/dictChoices'
 import type { TransferPlace } from '@/api/transfers'
 import { LocationType } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -35,8 +36,8 @@ export function placeKind(p: TransferPlace): number | null {
   return null
 }
 
-/** Расположение вагона, если вагон стоит на станции, в депо или парке отстоя; в рейсе — null. */
-export function wagonTransferPlace(locationType: number, place: number): TransferPlace | null {
+/** Расположение вагона, если вагон стоит на станции, в депо или парке отстоя; в рейсе или не задано — null. */
+export function wagonTransferPlace(locationType: number | null, place: number | null): TransferPlace | null {
   const res: TransferPlace = { station: null, depot: null, yard: null }
   if (locationType === LocationType.STATION) res.station = place
   else if (locationType === LocationType.DEPOT) res.depot = place
@@ -74,7 +75,7 @@ export function transferPlaceText(p: TransferPlace): string {
 /** Расположения станции: сама станция, её депо и парки отстоя. */
 export function stationPlaceList(station: number): TransferPlace[] {
   const at = (name: 'Depot' | 'Yard') =>
-    dictManager.getList(name).filter((r) => (r as { station?: number | null }).station === station)
+    dictRecords(name).filter((r) => (r as { station?: number | null }).station === station)
   return [
     { station, depot: null, yard: null },
     ...at('Depot').map((r) => ({ station: null, depot: r.id, yard: null })),

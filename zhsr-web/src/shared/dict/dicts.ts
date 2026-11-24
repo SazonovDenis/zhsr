@@ -50,7 +50,7 @@ export const dictDefs = {
   WagonModel: { translate: 'none' },
   // station — станция депо
   Depot: { translate: 'multilang', offline: true },
-  // hub — узловая станция (со своим депо): с неё может начинаться и на ней заканчиваться маршрут
+  // hub — узловая станция (со своим депо)
   Station: { translate: 'none', offline: true },
   // station — станция парка отстоя
   Yard: { translate: 'none', offline: true },

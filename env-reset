@@ -2,16 +2,19 @@
 # Пересоздать окружение разработки с нуля: поднять сервисы (env-start), очистить хранилище файлов
 # и создать бакет (prepare/storage-reset), пересоздать БД (prepare/db-reset). Остановите zhsr-app перед запуском:
 # он держит соединения с БД.
+# Фото каталогов данных кладутся в хранилище (prepare/files-img).
 #
-#   ./env-reset          - без демо-данных
-#   ./env-reset --demo   - с демо-данными (передаётся в prepare/db-reset) и фото демо-заявок (prepare/files-demo)
+#   ./env-reset              - с данными db-data/default
+#   ./env-reset --<каталог>  - ещё и с данными db-data/<каталог>: --demo, --kazrail
 set -euo pipefail
 cd "$(dirname "$0")"
+
+# каталоги данных проверяются до очистки хранилища
+for a in "$@"; do
+  if [[ $a != --?* || ! -d db-data/${a#--} ]]; then echo "нет каталога данных db-data/${a#--} (параметр $a)" >&2; exit 1; fi
+done
 
 ./env-start
 prepare/storage-reset
 prepare/db-reset "$@"
-# демо-данные: и файлы фото демо-заявок в хранилище
-for a in "$@"; do
-  if [ "$a" = --demo ]; then prepare/files-demo; fi
-done
+prepare/files-img "$@"

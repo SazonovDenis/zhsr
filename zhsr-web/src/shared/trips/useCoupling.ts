@@ -148,7 +148,7 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
         routeStation: stop.value,
         comment: comment.value,
         // отмеченные — в порядке списка: так они и встанут в поезд подряд
-        wagons: wagons.value.filter((w) => selected.value.includes(w.number)).map((w) => w.number),
+        wagons: wagons.value.filter((w) => selected.value.includes(w.number)).map((w) => w.wagon),
         time: isoDateTime(new Date(time.value!)),
         seq: attach && seq.value <= riding.value.length ? seq.value : null,
         responsibleUsrs: responsibleUsrs(responsible.value),
@@ -172,13 +172,13 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
    */
   async function submitEach(usrsOf: (number: string) => number[]): Promise<boolean> {
     if (!stop.value) return false
-    const list = wagons.value.filter((w) => selected.value.includes(w.number)).map((w) => w.number)
-    const groups = new Map<string, { usrs: number[]; wagons: string[] }>()
-    for (const n of list) {
-      const usrs = [...usrsOf(n)].sort((a, b) => a - b)
+    const list = wagons.value.filter((w) => selected.value.includes(w.number))
+    const groups = new Map<string, { usrs: number[]; wagons: number[] }>()
+    for (const w of list) {
+      const usrs = [...usrsOf(w.number)].sort((a, b) => a - b)
       const key = usrs.join(',')
       if (!groups.has(key)) groups.set(key, { usrs, wagons: [] })
-      groups.get(key)!.wagons.push(n)
+      groups.get(key)!.wagons.push(w.wagon)
     }
     error.value = null
     running.value = true

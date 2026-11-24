@@ -1,5 +1,12 @@
 <template>
-  <div>{{ row.roles.map((id) => dictManager.getValue('Role', id)).join(', ') }}</div>
+  <div>
+    {{
+      row.roles
+        .map((id) => dictManager.getValue('Role', id))
+        .sort(compareText)
+        .join(', ')
+    }}
+  </div>
   <div v-if="row.categoryType !== null" class="zs-sub">
     {{ dictManager.getValue('ConductorCategory', row.categoryType) }}
   </div>
@@ -8,6 +15,7 @@
 <script setup lang="ts">
 import type { StaffRow } from '@/api/staff'
 import type { CellProps } from '@/shared/components/table/types'
+import { compareText } from '@/shared/format'
 import { dictManager } from '@/shared/dict/DictManager'
 
 /** Роли сотрудника, под ними серым — категория проводника. */

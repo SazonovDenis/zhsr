@@ -61,7 +61,7 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
     @Override
     protected List<DbRec> loadBlock(List<Long> ids) throws Exception {
         List<DbRec> trips = db.loadList("trip", Map.of("id", ids));
-        List<Long> trains = trips.stream().map(t -> t.getLong("train", null)).filter(Objects::nonNull).distinct()
+        List<Long> trains = trips.stream().map(t -> t.getLong("train")).filter(Objects::nonNull).distinct()
                 .toList();
         Map<Long, List<DbRec>> stations = routeService.stations(UtDb.<Long>uniqueValues(trips, "route"));
 
@@ -75,7 +75,7 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
         Map<Long, OffsetDateTime> moments = new HashMap<>();
         List<Long> tripTrains = new ArrayList<>();
         for (DbRec t : trips) {
-            Long train = t.getLong("train", null);
+            Long train = t.getLong("train");
             if (train == null) {
                 continue;
             }
@@ -188,12 +188,12 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
                 members.putIfAbsent(r.getLong("usr"), m);
             }
 
-            Long train = t.getLong("train", null);
+            Long train = t.getLong("train");
             List<String> pending = new ArrayList<>();
             if (train != null && departure != null && !inTrip(t)) {
                 OffsetDateTime planned = t.getDateTimeTZ("planned_dt");
                 for (DbRec c : waiting.getOrDefault(train, List.of())) {
-                    Long changeTrip = c.getLong("trip", null);
+                    Long changeTrip = c.getLong("trip");
                     boolean atDeparture = changeTrip != null && changeTrip == id
                             && c.getLong("route_station").longValue() == departure.getLong("id");
                     boolean before = changeTrip == null && !c.getDateTimeTZ("dt").isAfter(planned);
@@ -222,7 +222,7 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
                         .filter(dt -> dt.isBefore(planned))
                         .max(Comparator.naturalOrder()).orElse(null);
                 for (DbRec c : trainFacts.getOrDefault(train, List.of())) {
-                    Long changeTrip = c.getLong("trip", null);
+                    Long changeTrip = c.getLong("trip");
                     OffsetDateTime dt = c.getDateTimeTZ("dt");
                     boolean outside = changeTrip == null && (prev == null || dt.isAfter(prev));
                     boolean own = changeTrip != null && changeTrip == id;
@@ -234,7 +234,7 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
             rec.put("done", done);
             rec.put("riding", composition.size());
             rec.put("away", composition.stream()
-                    .filter(w -> w.getLocationType() != placeType || place == null || w.getPlace() != place)
+                    .filter(w -> !Objects.equals(w.getLocationType(), placeType) || place == null || !place.equals(w.getPlace()))
                     .map(TripCrew.Wagon::getNumber)
                     .toList());
             rec.put("lnp", members.values().stream().anyMatch(m -> m.getCrewDutyType() == CrewDuty.LNP));
@@ -346,7 +346,7 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
                 from trip_crew
                 join usr on usr.id = trip_crew.usr
                 where trip_crew.trip = any(:trips) and trip_crew.dend is null
-                order by usr.full_name, trip_crew.usr, trip_crew.id
+                order by usr.full_name, usr.login
                 """;
     }
 
@@ -359,9 +359,10 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
                 from wagon_responsible
                 join wagon_responsible_usr on wagon_responsible_usr.wagon_responsible = wagon_responsible.id
                 join wagon on wagon.id = wagon_responsible.wagon
+                join usr on usr.id = wagon_responsible_usr.usr
                 join trip on trip.id = any(:trips)
                 where %s
-                order by wagon.number, wagon_responsible_usr.usr
+                order by wagon.number, usr.full_name, usr.login
                 """.formatted(TripLayerSql.WHERE);
     }
 

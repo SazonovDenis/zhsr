@@ -1,8 +1,6 @@
-# Два образа (buildx --target):
-#   zhsr-database      - миграции БД (Liquibase) и пересоздание БД с данными db-data/default. Без команды - только
-#                        миграции; reset - пересоздать БД (prepare/db-reset). См. run.
-#   zhsr-database-demo - то же и демо-данные db-data/demo: reset --demo - ещё демо-данные и фото демо-заявок.
-FROM eclipse-temurin:22-jre-noble AS zhsr-database
+# Миграции БД (Liquibase) и пересоздание БД. Без команды - только миграции; reset - пересоздать БД (prepare/db-reset).
+# См. run. Данных в образе нет: каталог db-data подключает app-reset.
+FROM eclipse-temurin:22-jre-noble
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -24,7 +22,3 @@ ENV DB_MIGRATE="java -Xmx256m -jar /app/zhsr-database-0.0.1.jar"
 
 ENTRYPOINT ["/app/run"]
 CMD ["migrate"]
-
-# демо-данные - только в этом образе
-FROM zhsr-database AS zhsr-database-demo
-COPY ./tmp/demo /app/db-data/demo

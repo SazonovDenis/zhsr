@@ -1,7 +1,7 @@
 # Ключи частей приложения для install/build-app, install/build-app-docker, install/build-app-docker-push и
 # install/remote-update (подключается через «.»): app, database, web - и только они. Без ключей - все части.
 #   app      - сервер: образ zhsr-app
-#   database - миграции БД: образы zhsr-database и zhsr-database-demo (демо-данные)
+#   database - миграции БД: образ zhsr-database
 #   web      - фронт и nginx: образ zhsr-nginx
 
 ALL_KEYS="database app web"

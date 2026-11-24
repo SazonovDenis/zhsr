@@ -54,6 +54,7 @@ import { useRouter } from 'vue-router'
 import type { TrainFilter, TrainRow } from '@/api/trains'
 import { deleteTrain, fetchTrains } from '@/api/trains'
 import { t } from '@/boot/i18n'
+import { ActiveState } from '@/shared/constants/ActiveState'
 import { provideBusy } from '@/shared/busy'
 import type { ChoiceItem } from '@/shared/components/choice/choice'
 import CbButton from '@/shared/components/choice/CbButton.vue'
@@ -87,11 +88,11 @@ const router = useRouter()
 const createReason = computed(() => roleReason([RoleType.WAGON_PLANNER], 'Создаёт планировщик вагонов'))
 
 const states: ChoiceItem[] = [
-  { id: 'active', text: 'Действует' },
-  { id: 'closed', text: 'Расформирован' },
+  { id: ActiveState.ACTIVE, text: 'Действует' },
+  { id: ActiveState.CLOSED, text: 'Расформирован' },
 ]
 
-const filter = reactive<TrainFilter>({ states: ['active'], search: '' })
+const filter = reactive<TrainFilter>({ states: [ActiveState.ACTIVE], search: '' })
 
 const rows = shallowRef<TrainRow[]>([])
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок (справочник станций, список)

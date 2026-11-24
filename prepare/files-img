@@ -1,0 +1,27 @@
+#!/bin/bash
+# Положить фото каталогов данных в хранилище файлов (S3, контейнер zhsr-s3): db-data/<каталог>/img/*.jpg - с ключом
+# <каталог>/img/<файл>, на него ссылаются storage_key в tsv. Каталог без фото пропускается. Файлы копируются в
+# контейнер и кладутся клиентом mc из образа хранилища (внутри контейнера адрес хранилища - localhost:9000); тип файла
+# mc берёт по расширению. Бакет S3_BUCKET должен уже быть (prepare/storage-reset).
+# Параметры - в .env; нет .env - копируется из .env.sample.
+#
+#   prepare/files-img --<каталог> ...   - ключи те же, что у prepare/db-reset; default - всегда
+# Обычно вызывается из env-reset.
+set -euo pipefail
+# пути данных и .env - от корня проекта
+cd "$(dirname "$0")/.."
+
+[ -f .env ] || { cp .env.sample .env; echo '.env создан из .env.sample'; }
+set -a; . ./.env; set +a
+
+for a in --default "$@"; do
+  img=${a#--}/img
+  compgen -G "db-data/$img/*.jpg" >/dev/null || continue
+  echo "--- хранилище файлов: фото -> $S3_BUCKET/$img"
+  docker exec zhsr-s3 rm -rf /tmp/data-img
+  docker cp "db-data/$img" zhsr-s3:/tmp/data-img
+  # вывод mc (таблица объёма и скорости) не нужен: ошибки mc идут в stderr
+  docker exec -e "MC_HOST_zhsr=http://$S3_ACCESS_KEY:$S3_SECRET_KEY@localhost:9000" zhsr-s3 \
+    sh -c "mc cp --quiet /tmp/data-img/*.jpg 'zhsr/$S3_BUCKET/$img/' >/dev/null && rm -rf /tmp/data-img"
+  echo "--- готово: файлов в хранилище: $(compgen -G "db-data/$img/*.jpg" | wc -l)"
+done

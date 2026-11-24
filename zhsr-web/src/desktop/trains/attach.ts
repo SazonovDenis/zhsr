@@ -38,15 +38,15 @@ export interface ChangeChoice {
   comment: string
 }
 
-/** Выбор окна «Прицепить вагоны»: номера вагонов и как прицепить. */
+/** Выбор окна «Прицепить вагоны»: id вагонов и как прицепить. */
 export interface AttachChoice extends ChangeChoice {
-  numbers: string[]
+  wagons: number[]
 }
 
 /** Тело запроса прицепки или отцепки из выбора окна. */
-export function changeBody(numbers: string[], choice: ChangeChoice): TrainChangeBody {
+export function changeBody(wagons: number[], choice: ChangeChoice): TrainChangeBody {
   return {
-    wagons: numbers,
+    wagons,
     fact: choice.fact,
     time: choice.time,
     station: choice.station,

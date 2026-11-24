@@ -59,7 +59,7 @@ final class EquipSql {
             where.add("equip_list.wagon = :wagon", "wagon", filter.wagon());
         }
         if (filter.query() != null && !filter.query().isBlank()) {
-            where.add("wagon.number like :query", "query", "%" + filter.query().trim() + "%");
+            where.add("strpos(wagon.number, :query) > 0", "query", filter.query().trim());
         }
         if (filter.from() != null) {
             where.add("equip_list.created_dt >= :from", "from", filter.from());
@@ -86,6 +86,7 @@ final class EquipSql {
             any.add("equip_list.wagon in " + TripWagonSql.wagonsOf("myTrip"));
             any.add("equip_list.trip = :myTrip");
             where.param("myTrip", scope.trip());
+            TripWagonSql.PARAMS.forEach(where::param);
         }
         where.add("(" + String.join(" or ", any) + ")");
     }

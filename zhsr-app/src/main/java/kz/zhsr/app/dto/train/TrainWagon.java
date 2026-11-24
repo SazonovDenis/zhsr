@@ -21,9 +21,9 @@ public class TrainWagon {
     private long wagonType;
     /** модель вагона; null - не задана */
     private Long modelType;
-    private long locationType;
-    /** место расположения по виду: станция, депо, парк отстоя или рейс */
-    private long place;
+    private Long locationType;
+    /** место расположения по виду: станция, депо, парк отстоя или рейс; null - не задано */
+    private Long place;
     /** станция расположения: сама станция, станция депо или парка отстоя; у вагона в рейсе - null */
     private Long station;
     /** рейс, в котором вагон сейчас; null - вагон не в рейсе */

@@ -1,0 +1,36 @@
+id	equip_list_template	parent_item	text_ru	text_kk	text_en	unit	sort_order	disabled
+1	1		Мягкий съёмный инвентарь	Жұмсақ алынбалы мүкәммал	Soft removable inventory		1	false
+2	1	1	Постель			шт	1	false
+3	1	1	Матрац	Матрац	Mattress	шт	2	false
+4	1	1	Подушка	Жастық	Pillow	шт	3	false
+5	1	1	Одеяло	Көрпе	Blanket	шт	4	false
+6	1	1	Чехол матрасный	Матрац тысы	Mattress cover	шт	5	false
+7	1	1	Наперник	Жастық тысы	Pillow ticking	шт	6	false
+8	1	1	Ковровая дорожка	Кілем жолақ	Carpet runner	шт	7	false
+9	1	1	Коврик купейный	Купе кілемшесі	Compartment mat	шт	8	false
+10	1		Съёмное оборудование	Алынбалы жабдық	Removable equipment		2	false
+11	1	10	Логотип на вагон	Вагон логотипі	Wagon logo	шт	1	false
+12	1	10	Маршрутная доска	Маршрут тақтасы	Route board	шт	2	false
+13	1	10	Держатель для туалетной бумаги	Дәретхана қағазын ұстағыш	Toilet paper holder	шт	3	false
+14	1	10	Диспенсер для жидкого мыла	Сұйық сабын диспенсері	Liquid soap dispenser	шт	4	false
+15	1	10	Огнетушитель	Өрт сөндіргіш	Fire extinguisher	шт	5	false
+16	1		Съёмный инвентарь	Алынбалы мүкәммал	Removable inventory		3	false
+17	1	16	Вешалка - плечики	Киім ілгіш	Coat hanger	шт	1	false
+18	1	16	Ершик с бочком	Ыдысы бар щетка	Toilet brush with holder	шт	2	false
+19	1		Посуда	Ыдыс-аяқ	Tableware		4	false
+20	1	19	Чайник для кипятка	Қайнаған су шәйнегі	Hot water kettle	шт	1	false
+21	1	19	Чайник для заварки	Шай демдейтін шәйнек	Teapot	шт	2	false
+22	1	19	Стакан с подстаканником	Стақан ұстағышы бар стақан	Glass with holder	шт	3	false
+23	1	19	Ложка чайная	Шай қасық	Teaspoon	шт	4	false
+24	1		Сигнальное оборудование	Сигналдық жабдық	Signalling equipment		5	false
+25	1	24	Фонарь ручной сигнальный двухцветный	Қос түсті қол сигнал шамы	Two-colour hand signal lamp	шт	1	false
+26	1	24	Флажки	Жалаушалар	Signal flags	комп	2	false
+27	1	24	Петарда	Петарда	Detonator	шт	3	false
+28	1		Медицинские принадлежности	Медициналық керек-жарақтар	Medical supplies		6	false
+29	1	28	Аптечка аварийная	Апаттық дәрі қобдишасы	Emergency first-aid kit	шт	1	false
+30	1	28	Аптечка текущая	Ағымдағы дәрі қобдишасы	Everyday first-aid kit	шт	2	false
+31	1	28	Противопедикулезная укладка	Педикулезге қарсы жиынтық	Anti-lice kit	шт	3	false
+32	1	28	Укладка Ф-30	Ф-30 жиынтығы	F-30 kit	шт	4	false
+33	1	28	Термометр комнатный	Бөлме термометрі	Room thermometer	шт	5	false
+34	1	28	Устройство для проведения искусственного дыхания	Жасанды тыныс алдыру құрылғысы	Artificial respiration device	шт	6	false
+35	1	28	Носилки медицинские	Медициналық зембіл	Medical stretcher	шт	7	false

@@ -48,9 +48,11 @@ final class StaffSql {
             where.add("usr.disabled = false");
         }
         if (filter.search() != null && !filter.search().isBlank()) {
-            where.add("(usr.full_name ilike :search or usr.login ilike :search or usr.phone ilike :search)",
-                    "search", "%" + filter.search().trim()
-                    .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%");
+            where.add("""
+                    (strpos(lower(usr.full_name), lower(:search)) > 0
+                     or strpos(lower(usr.login), lower(:search)) > 0
+                     or strpos(lower(usr.phone), lower(:search)) > 0)""",
+                    "search", filter.search().trim());
         }
         if (filter.station() != null) {
             where.add("depot.station = :station", "station", filter.station());
@@ -74,7 +76,7 @@ final class StaffSql {
                 left join depot on depot.id = usr_depot.depot
                 left join station on station.id = depot.station
                 left join usr_category on usr_category.usr = usr.id and usr_category.dend is null
-                """, sort.orderBy(SORT, "usr.full_name, usr.id"));
+                """, sort.orderBy(SORT, "usr.full_name, usr.login"));
     }
 
     /**

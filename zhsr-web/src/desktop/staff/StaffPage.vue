@@ -80,6 +80,7 @@ import type { TripOption } from '@/api/trips'
 import { fetchTripOptions } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import AdminUserDialog from '@/admin/users/AdminUserDialog.vue'
+import { ActiveState } from '@/shared/constants/ActiveState'
 import { provideBusy } from '@/shared/busy'
 import CbList from '@/shared/components/choice/CbList.vue'
 import { openDialog } from '@/shared/components/dialog/openDialog'
@@ -216,7 +217,7 @@ const tripLoad = useLoad(async () => {
 const trains = shallowRef<TrainRow[]>([])
 const trainChoices = computed(() => trains.value.map((tr) => ({ id: tr.id, text: tr.name })))
 const trainLoad = useLoad(async () => {
-  trains.value = await fetchTrains({ states: ['active'], search: '' })
+  trains.value = await fetchTrains({ states: [ActiveState.ACTIVE], search: '' })
 })
 
 // цепочка загрузок — сразу в setup: спиннер виден с первой отрисовки; она же — повтор по клику на ошибку в таблице

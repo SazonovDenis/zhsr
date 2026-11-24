@@ -42,7 +42,7 @@
     <template v-if="change && step === 1">
       <ResponsibleBoard
         v-model="responsibles"
-        :wagons="[{ number: change.wagon.number, wagonType: wagonType }]"
+        :wagons="[{ wagon: change.wagon.id, number: change.wagon.number, wagonType: wagonType }]"
         :station="change.station"
         :trip="Number(id)"
       />

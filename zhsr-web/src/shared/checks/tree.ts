@@ -1,8 +1,11 @@
+import { compareText } from '@/shared/format'
+
 /** Пункт шаблона в дереве: id, раздел-родитель, порядок показа. */
 export interface TreeItem {
   id: number
   parentItem: number | null
   sortOrder: number
+  textRu: string
 }
 
 /** Пункт в порядке показа дерева и его глубина: 0 — верхний уровень. */
@@ -12,7 +15,7 @@ export interface TreeRow<T> {
 }
 
 /**
- * Пункты шаблона в порядке показа дерева: раздел, за ним его пункты (по sortOrder, затем id), вглубь. Пункт, раздел
+ * Пункты шаблона в порядке показа дерева: раздел, за ним его пункты (по sortOrder, затем по названию), вглубь. Пункт, раздел
  * которого не пришёл, показывается на верхнем уровне.
  */
 export function treeRows<T extends TreeItem>(items: T[]): TreeRow<T>[] {
@@ -24,7 +27,8 @@ export function treeRows<T extends TreeItem>(items: T[]): TreeRow<T>[] {
     list.push(item)
     children.set(parent, list)
   }
-  for (const list of children.values()) list.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+  for (const list of children.values())
+    list.sort((a, b) => a.sortOrder - b.sortOrder || compareText(a.textRu, b.textRu))
   const res: TreeRow<T>[] = []
   const walk = (parent: number | null, depth: number) => {
     for (const item of children.get(parent) ?? []) {

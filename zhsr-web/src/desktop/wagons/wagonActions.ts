@@ -54,6 +54,7 @@ export function wagonTransfers(w: WagonRow): WagonTransfer[] {
   return TRANSFER_TARGETS.map((b) => {
     const blocked = (reason: string) => ({ ...b, query: null, reason })
     if (rights) return blocked(rights)
+    if (w.locationType === null) return blocked(t('Расположение вагона не задано'))
     if (!from) return blocked(t('Вагон в рейсе'))
     if (!station) return blocked(t('У депо или парка отстоя вагона не задана станция'))
     // куда — другие расположения этого вида на станции вагона

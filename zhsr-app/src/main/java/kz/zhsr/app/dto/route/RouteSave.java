@@ -25,9 +25,9 @@ public record RouteSave(
         Integer routeKind,
         LocalDate dbeg,
         LocalDate dend,
-        Integer conductorHours,
-        Integer lnpHours,
-        Integer pemHours,
+        Double conductorHours,
+        Double lnpHours,
+        Double pemHours,
         List<RoutePoint> points
 ) {
     public RouteSave {

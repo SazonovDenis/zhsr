@@ -44,6 +44,8 @@ public class TransferRow {
     @Getter
     @Setter
     public static class Wagon {
+        /** вагон (wagon.id) */
+        private long wagon;
         private String number;
         private boolean withProperty;
         /** запись факта ответственных, открытая актом (transfer_act_wagon.wagon_responsible); null - не назначены */

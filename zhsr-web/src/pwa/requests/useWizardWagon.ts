@@ -106,7 +106,7 @@ export function useWizardWagon(user: () => CurrentUser | null) {
   // «Другой вагон»: поиск по цифрам после паузы в вводе; всё, кроме цифр, отбрасывается
   let timer: ReturnType<typeof setTimeout> | undefined
   watch(query, (text) => {
-    const digits = text.replace(/\D/g, '')
+    const digits = text.replace(/[^\d/]/g, '')
     if (digits !== text) {
       query.value = digits
       return

@@ -1,6 +1,7 @@
 package kz.zhsr.app.service.dict;
 
 import kz.kis.kiscore.model.*;
+import kz.kis.kiscore.utils.UtCnv;
 import kz.kis.kiscore.utils.UtDb;
 import kz.kis.kisdbtools.repository.*;
 import kz.zhsr.app.auth.*;
@@ -48,14 +49,14 @@ public class DictService {
             "Depot", new Def("depot", r -> {
                 Map<String, Object> res = rec(r, "text", multiText(r.getString("name_ru"), r.getString("name_kk"),
                         r.getString("name_en")));
-                res.put("station", r.getLong("station", null));
+                res.put("station", r.getLong("station"));
                 return res;
             }),
-            // hub - узловая станция (при ней есть депо): его добавляет records по списку депо
+            // hub - узловая станция (RouteNetwork.hubs): его добавляет records
             "Station", new Def("station", r -> rec(r, "text", r.getString("name"))),
             "Yard", new Def("yard", r -> {
                 Map<String, Object> res = rec(r, "text", r.getString("name"));
-                res.put("station", r.getLong("station", null));
+                res.put("station", r.getLong("station"));
                 return res;
             }),
             "FaultGroup", new Def("fault_group_type", r -> {
@@ -65,7 +66,7 @@ public class DictService {
             }),
             "FaultType", new Def("fault_type", r -> {
                 Map<String, Object> res = rec(r, "text", multiText(r.getString("name"), null, null));
-                res.put("faultGroupType", r.getLong("fault_group_type", null));
+                res.put("faultGroupType", r.getLong("fault_group_type"));
                 res.put("severityType", r.getLong("severity_type"));
                 res.put("service", r.getLong("service"));
                 res.put("disabled", r.getBoolean("disabled"));
@@ -76,11 +77,14 @@ public class DictService {
     private final Db db;
     private final CurrentUserService currentUserService;
     private final SimpMessagingTemplate messaging;
+    private final RouteNetwork network;
 
-    public DictService(Db db, CurrentUserService currentUserService, SimpMessagingTemplate messaging) {
+    public DictService(Db db, CurrentUserService currentUserService, SimpMessagingTemplate messaging,
+                       RouteNetwork network) {
         this.db = db;
         this.currentUserService = currentUserService;
         this.messaging = messaging;
+        this.network = network;
     }
 
     /**
@@ -150,11 +154,10 @@ public class DictService {
     }
 
     /**
-     * Записи справочника для фронта. У станции - признак hub: при ней есть депо, с неё может начинаться и на ней
-     * заканчиваться маршрут.
+     * Записи справочника для фронта. У станции - признак hub: узловая ({@link RouteNetwork#hubs}).
      */
     private List<Map<String, Object>> records(String name, Def def, List<DbRec> rows) throws Exception {
-        Set<Long> hubs = name.equals("Station") ? UtDb.uniqueValues(db.loadList("depot", null), "station") : Set.of();
+        Set<Long> hubs = name.equals("Station") ? network.hubs() : Set.of();
         // неисправность в избранном: порядок показа среди частых (fault_type_favorite.sort_order)
         Map<Long, Object> favorites = name.equals("FaultType")
                 ? UtDb.flatLong(db.loadList("fault_type_favorite", null), "fault_type", "sort_order")
@@ -184,7 +187,7 @@ public class DictService {
     private static Map<String, Object> rec(DbRec r, String textField, Object text) {
         Map<String, Object> res = new HashMap<>();
         res.put("id", r.getLong("id"));
-        res.put("code", r.getString("code"));
+        res.put("code", UtCnv.toString(r.get("code")));
         res.put(textField, text);
         return res;
     }

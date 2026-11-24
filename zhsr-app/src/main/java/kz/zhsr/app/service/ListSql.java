@@ -41,13 +41,13 @@ final class ListSql {
         SqlWhere where = new SqlWhere();
         where.visible(
                 access.byDepot() ? (access.depot() == null ? "true" : "wagon.depot = :visDepot") : null,
-                access.allTripWagons() ? "wagon.id in " + TRIP_WAGONS : null,
+                access.allTripWagons() ? "wagon.id in " + TripWagonSql.wagonsOf("visTrip") : null,
                 access.wagons().isEmpty() ? null : "wagon.id = any(:visWagons)",
                 access);
-        if (filter.numbers() != null && !filter.numbers().isEmpty()) {
-            // список Db передаёт массивом чисел (BIGINT): номера приводятся к строкам
-            where.add("wagon.number = any(cast(:numbers as varchar[]))", "numbers", filter.numbers());
+        if (access.allTripWagons()) {
+            TripWagonSql.PARAMS.forEach(where::param);
         }
+        where.any("wagon.id", "ids", filter.ids());
         if (filter.number() != null && !filter.number().isBlank()) {
             where.add("strpos(wagon.number, :number) > 0", "number", filter.number().trim());
         }
@@ -70,22 +70,16 @@ final class ListSql {
                        coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard, wagon_info.trip) as place,
                        wagon_info.trip, wagon_info.dbeg_location, wagon_info.wagon_status_type,
                        wagon_info.dbeg_status, wagon_info.wagon_responsible,
-                       wagon_info.run_km, wagon.maker, wagon.build_year, wagon.dbeg, wagon.dend
+                       wagon_info.run_km, wagon.initial_run_km, wagon.maker, wagon.build_year, wagon.dbeg, wagon.dend
                 from wagon
                 join wagon_info on wagon_info.wagon = wagon.id
-                """, sort.orderBy(WAGON_SORT, "wagon.number, wagon.id") + (limit == null ? "" : "\nlimit " + limit));
+                """, sort.orderBy(WAGON_SORT, "wagon.number") + (limit == null ? "" : "\nlimit " + limit));
     }
-
-    /**
-     * Вагоны поезда рейса: до отправления - в ожидаемом составе, после - по факту; не отцеплены до отправления рейса.
-     * Параметр visTrip.
-     */
-    private static final String TRIP_WAGONS = TripWagonSql.wagonsOf("visTrip");
 
     /**
      * Вагоны поездов рейсов в статусе «план» и «выполняется» - второй проход списка вагонов: от рейсов (их немного,
      * индекс ix_trip_active), а не от вагонов. Вагон поезда рейса - {@link TripWagonSql#WHERE}. Параметры planned,
-     * inProgress - состояния рейса.
+     * inProgress - состояния рейса и {@link TripWagonSql#PARAMS}.
      */
     static String activeTripWagons() {
         return """
@@ -186,7 +180,8 @@ final class ListSql {
         }
         if (filter.from() != null) {
             // рейс, идущий в периоде, виден и если отправился раньше from
-            where.add("(trip.trip_status_type = " + TripStatus.IN_PROGRESS
+            where.param("inProgress", TripStatus.IN_PROGRESS);
+            where.add("(trip.trip_status_type = :inProgress"
                     + " or trip.planned_dt + make_interval(mins => " + RouteSql.DURATION + ") >= :from)", "from", filter.from());
         }
         if (filter.to() != null) {
@@ -233,7 +228,7 @@ final class ListSql {
                 select route.id, route.train_number, route.name, route.route_kind, route.transport_type, route.dbeg,
                        route.dend, %s as duration, route.conductor_hours, route.lnp_hours, route.pem_hours
                 from route
-                """.formatted(RouteSql.DURATION), sort.orderBy(ROUTE_SORT, "route.train_number, route.id"));
+                """.formatted(RouteSql.DURATION), sort.orderBy(ROUTE_SORT, "route.train_number"));
     }
 
     /**

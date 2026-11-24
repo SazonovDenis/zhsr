@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,7 +21,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
- * Вагон: ввод (Ф-ВАГ-01), ручная смена состояния и расположения (Ф-ВАГ-02, Ф-ВАГ-03), журнал (Ф-ВАГ-05), кого можно назначить ответственным; список вагонов - в {@link ListController}.
+ * Вагон: ввод (Ф-ВАГ-01), исправление данных (Ф-ВАГ-08), ручная смена состояния и расположения (Ф-ВАГ-02, Ф-ВАГ-03), журнал (Ф-ВАГ-05), кого можно назначить ответственным; список вагонов - в {@link ListController}.
  */
 @RestController
 public class WagonController {
@@ -65,6 +66,12 @@ public class WagonController {
         return wagonEntryService.create(body);
     }
 
+    /** Исправить данные вагона (Ф-ВАГ-08): администратор. */
+    @PutMapping("/wagons/{id}")
+    public WagonRow update(@PathVariable long id, @RequestBody WagonEntryService.WagonBody body) throws Exception {
+        return wagonEntryService.update(id, body);
+    }
+
     /**
      * Кого можно назначить ответственным за вагон: сотрудники депо станции station, бригада рейса trip и бригады
      * рейсов поезда вагонов wagons; без station у рейса - сотрудники депо станции прибытия.
@@ -72,7 +79,7 @@ public class WagonController {
     @GetMapping("/wagons/responsibles")
     public List<ResponsibleCandidate> responsibles(@RequestParam(required = false) Long station,
                                                    @RequestParam(required = false) Long trip,
-                                                   @RequestParam(required = false) List<String> wagons)
+                                                   @RequestParam(required = false) List<Long> wagons)
             throws Exception {
         return responsibleService.candidates(station, trip, wagons);
     }

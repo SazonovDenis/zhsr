@@ -1,9 +1,11 @@
 package kz.zhsr.app.controller;
 
+import kz.zhsr.app.dto.route.LegStation;
 import kz.zhsr.app.dto.route.NextStation;
 import kz.zhsr.app.dto.route.RecalcStops;
 import kz.zhsr.app.dto.route.Route;
 import kz.zhsr.app.dto.route.RouteDraft;
+import kz.zhsr.app.dto.route.RouteLeg;
 import kz.zhsr.app.dto.route.RouteSave;
 import kz.zhsr.app.dto.route.RouteStop;
 import kz.zhsr.app.service.RouteService;
@@ -57,6 +59,10 @@ public class RouteController {
         return routeService.recalc(body);
     }
 
+    @PostMapping("/routes/legs")
+    public List<List<LegStation>> legs(@RequestBody List<RouteLeg> legs) throws Exception {
+        return routeService.legs(legs);
+    }
 
     /** Удалить, если на запись никто не ссылается: иначе 409 с причиной. */
     @DeleteMapping("/routes/{id}")

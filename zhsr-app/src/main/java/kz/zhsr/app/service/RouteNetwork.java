@@ -26,9 +26,8 @@ public class RouteNetwork {
      * Сеть на момент загрузки.
      *
      * @param edges станция - соседние станции и длина перегона до них, км
-     * @param hubs  узловые станции
      */
-    public record Graph(Map<Long, Map<Long, Integer>> edges, Set<Long> hubs) {
+    public record Graph(Map<Long, Map<Long, Integer>> edges) {
 
         /**
          * Длина перегона между соседними станциями; null - перегона нет.
@@ -109,14 +108,21 @@ public class RouteNetwork {
             edges.computeIfAbsent(a, k -> new HashMap<>()).merge(b, km, Math::min);
             edges.computeIfAbsent(b, k -> new HashMap<>()).merge(a, km, Math::min);
         }
-        Set<Long> hubs = new HashSet<>();
+        return new Graph(edges);
+    }
+
+    /**
+     * Узловые станции: станции, на которых есть депо.
+     */
+    public Set<Long> hubs() throws Exception {
+        Set<Long> res = new HashSet<>();
         for (DbRec d : db.loadList("depot", Map.of())) {
-            Long station = d.getLong("station", null);
+            Long station = d.getLong("station");
             if (station != null) {
-                hubs.add(station);
+                res.add(station);
             }
         }
-        return new Graph(edges, hubs);
+        return res;
     }
 
 }

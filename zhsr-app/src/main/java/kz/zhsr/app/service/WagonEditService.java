@@ -1,6 +1,7 @@
 package kz.zhsr.app.service;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtCnv;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
@@ -114,7 +115,7 @@ public class WagonEditService {
         if (db.loadSqlRec(WagonSql.pendingTransfer(), Map.of("wagon", id, "pending", ActStatus.PENDING)) != null) {
             throw ApiException.conflict("Вагон ждёт приёма по акту передачи - сначала примите или отмените акт");
         }
-        Long station = "station".equals(column) ? body.place() : place.getLong("station", null);
+        Long station = "station".equals(column) ? body.place() : place.getLong("station");
         responsibleService.check(body.responsibleUsrs(), station, null);
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -151,7 +152,7 @@ public class WagonEditService {
         if (db.loadSqlRec(WagonSql.pendingTransfer(), Map.of("wagon", id, "pending", ActStatus.PENDING)) != null) {
             throw ApiException.conflict("Вагон ждёт приёма по акту передачи - ответственного выбирают в акте");
         }
-        responsibleService.check(body.responsibleUsrs(), station, null, List.of(wagon.getString("number")));
+        responsibleService.check(body.responsibleUsrs(), station, null, List.of(id));
 
         OffsetDateTime now = OffsetDateTime.now();
         WagonJournal.Responsibles responsibles = wagonJournal.assign(id, now, body.responsibleUsrs());
@@ -167,15 +168,15 @@ public class WagonEditService {
         if (info == null) {
             return null;
         }
-        long type = info.getLong("location_type");
+        long type = UtCnv.toLong(info.get("location_type"));
         if (type == LocationType.STATION) {
-            return info.getLong("station", null);
+            return info.getLong("station");
         }
         if (type == LocationType.DEPOT) {
-            return db.loadRec("depot", info.getLong("depot")).getLong("station", null);
+            return db.loadRec("depot", info.getLong("depot")).getLong("station");
         }
         if (type == LocationType.YARD) {
-            return db.loadRec("yard", info.getLong("yard")).getLong("station", null);
+            return db.loadRec("yard", info.getLong("yard")).getLong("station");
         }
         return null;
     }
@@ -206,7 +207,7 @@ public class WagonEditService {
     /** Вагон в рейсе меняется только отметками рейса и актами отцепки и прицепки. */
     private void requireNotInTrip(long wagon) throws Exception {
         DbRec info = db.loadRec("wagon_info", Map.of("wagon", wagon));
-        if (info != null && info.getLong("location_type") == LocationType.TRIP) {
+        if (info != null && UtCnv.toLong(info.get("location_type")) == LocationType.TRIP) {
             throw ApiException.conflict("Вагон в рейсе - меняется отметками рейса и актами отцепки и прицепки");
         }
     }

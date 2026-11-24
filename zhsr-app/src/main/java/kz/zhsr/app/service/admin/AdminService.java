@@ -157,8 +157,7 @@ public class AdminService {
         }
         return db.loadList(refTable, params).stream()
                 .map(r -> new AdminOption(r.getLong("id"), r.getString(textColumn)))
-                .sorted(Comparator.comparing(AdminOption::getText, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(AdminOption::getId))
+                .sorted(Comparator.comparing(AdminOption::getText, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
     }
 
@@ -272,6 +271,10 @@ public class AdminService {
         if (dict != null) {
             dictService.changed(dict);
         }
+        // признак узловой станции (hub) в справочнике станций зависит от депо
+        if (table.name().equals("depot")) {
+            dictService.changed("Station");
+        }
     }
 
     /**
@@ -293,9 +296,11 @@ public class AdminService {
     private static String sortColumn(AdminTable table, String sort) {
         if (sort == null || sort.isBlank()) {
             // по умолчанию - порядок показа, если он есть у таблицы
-            return hasSortOrder(table)
-                    ? AdminTables.SORT_ORDER
-                    : table.columns().get(0).name();
+            if (hasSortOrder(table)) {
+                return AdminTables.SORT_ORDER;
+            }
+            AdminColumn first = table.columns().get(0);
+            return AdminTables.REF.equals(first.type()) ? AdminSql.refSort(table, first) : first.name();
         }
         for (AdminColumn c : table.columns()) {
             if (c.name().equals(sort) && c.listed()) {

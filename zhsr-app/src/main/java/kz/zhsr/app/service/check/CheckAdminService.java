@@ -286,9 +286,8 @@ public class CheckAdminService {
 
     static List<CheckDictValueRow> sortedValues(List<CheckDictValueRow> values) {
         List<CheckDictValueRow> res = new ArrayList<>(values);
-        res.sort(Comparator.comparingLong(CheckDictValueRow::getCheckDict)
-                           .thenComparingInt(CheckDictValueRow::getSortOrder)
-                           .thenComparingLong(CheckDictValueRow::getId));
+        res.sort(Comparator.comparingInt(CheckDictValueRow::getSortOrder)
+                           .thenComparing(CheckDictValueRow::getTextRu));
         return res;
     }
 
@@ -300,7 +299,7 @@ public class CheckAdminService {
 
     static <T extends CheckItemRow> List<T> sortedItems(List<T> items) {
         List<T> res = new ArrayList<>(items);
-        res.sort(Comparator.comparingInt(CheckItemRow::getSortOrder).thenComparingLong(CheckItemRow::getId));
+        res.sort(Comparator.comparingInt(CheckItemRow::getSortOrder).thenComparing(CheckItemRow::getTextRu));
         return res;
     }
 
@@ -376,7 +375,7 @@ public class CheckAdminService {
             if (p == null || p.getLong("check_list_template") != template || p.get("value_kind") != null) {
                 throw ApiException.badRequest("Раздел - пункт без значения из этого же шаблона");
             }
-            parent = p.getLong("parent_item", null);
+            parent = p.getLong("parent_item");
         }
         Map<String, Object> columns = Columns.of(body);
         AdminTexts.normalize(columns);
@@ -419,7 +418,7 @@ public class CheckAdminService {
         }
         List<Long> values = body.checkDictValues() == null ? List.of() : body.checkDictValues();
         if (!values.isEmpty()) {
-            Long dict = item.getLong("check_dict", null);
+            Long dict = item.getLong("check_dict");
             List<DbRec> recs = db.loadList("check_dict_value", Map.of("id", values));
             if (dict == null || recs.size() != Set.copyOf(values).size()
                 || recs.stream().anyMatch(r -> !dict.equals(r.getLong("check_dict")))) {
@@ -471,7 +470,7 @@ public class CheckAdminService {
                 db.loadList("check_list_item_norm_value", Map.of("check_list_item_norm", ids)), "check_list_item_norm");
         for (CheckNormRow norm : norms) {
             norm.setCheckDictValues(values.getOrDefault(norm.getId(), List.of()).stream()
-                                          .map(r -> r.getLong("check_dict_value")).sorted().toList());
+                                          .map(r -> r.getLong("check_dict_value")).toList());
         }
         return norms;
     }

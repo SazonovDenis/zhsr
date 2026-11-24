@@ -5,6 +5,7 @@ import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.ActStatus;
+import kz.zhsr.app.constants.ActiveState;
 import kz.zhsr.app.constants.TrainWagonKind;
 import kz.zhsr.app.constants.TripStatus;
 import kz.zhsr.app.dto.common.ListSort;
@@ -48,11 +49,6 @@ import java.util.stream.Collectors;
 @Service
 public class ListService {
 
-    /**
-     * Состояние маршрута для фильтра: active - действует (dend пуст или не раньше сегодняшнего дня), closed - завершён.
-     */
-    public static final Set<String> ROUTE_STATES = Set.of("active", "closed");
-
     private final Db db;
     private final CurrentUserService currentUserService;
     private final Visibility visibility;
@@ -82,7 +78,7 @@ public class ListService {
     }
 
     /**
-     * Вагон по точному номеру, как строка списка вагонов (GET /wagons/by-number/{number}): видимость по роли - как у
+     * Вагон по точному номеру, как строка списка вагонов (GET /wagons/by-number?number=): видимость по роли - как у
      * списка.
      *
      * @throws ApiException 404 - вагона нет; 403 - вагон не виден сотруднику
@@ -121,7 +117,7 @@ public class ListService {
             WagonPlace place = new WagonPlace();
             place.setLocationType(rec.getLong("location_type"));
             place.setPlace(rec.getLong("place"));
-            Long trip = rec.getLong("trip", null);
+            Long trip = rec.getLong("trip");
             place.setTrip(trip == null ? null : new TripRef(trip));
             byId.get(rec.getLong("wagon")).setLocationAt(place);
         }
@@ -143,8 +139,10 @@ public class ListService {
         for (WagonRow row : rows) {
             byId.put(row.getId(), row);
         }
-        List<DbRec> trips = db.loadSql(ListSql.activeTripWagons(),
-                Map.of("planned", TripStatus.PLANNED, "inProgress", TripStatus.IN_PROGRESS));
+        Map<String, Object> params = new HashMap<>(TripWagonSql.PARAMS);
+        params.put("planned", TripStatus.PLANNED);
+        params.put("inProgress", TripStatus.IN_PROGRESS);
+        List<DbRec> trips = db.loadSql(ListSql.activeTripWagons(), params);
         for (DbRec rec : trips) {
             WagonRow row = byId.get(rec.getLong("wagon"));
             if (row != null) {
@@ -167,9 +165,9 @@ public class ListService {
                 WagonPendingTransfer act = new WagonPendingTransfer();
                 act.setId(rec.getLong("id"));
                 act.setNumber(rec.getString("number"));
-                act.setToStation(rec.getLong("to_station", null));
-                act.setToDepot(rec.getLong("to_depot", null));
-                act.setToYard(rec.getLong("to_yard", null));
+                act.setToStation(rec.getLong("to_station"));
+                act.setToDepot(rec.getLong("to_depot"));
+                act.setToYard(rec.getLong("to_yard"));
                 row.setPendingTransfer(act);
             }
         }
@@ -298,14 +296,10 @@ public class ListService {
             throws Exception {
         Visibility.Access access = visibility.access(currentUserService.get(), filter.depot());
 
-        List<String> states = filter.states() == null ? List.of() : filter.states();
-        for (String state : states) {
-            if (!ROUTE_STATES.contains(state)) {
-                throw ApiException.badRequest("Неизвестное состояние маршрута: " + state);
-            }
-        }
+        List<Integer> states = filter.states() == null ? List.of() : filter.states();
         // выбраны оба состояния или ни одного - фильтра нет
-        Boolean active = states.contains("active") == states.contains("closed") ? null : states.contains("active");
+        Boolean active = states.contains(ActiveState.ACTIVE) == states.contains(ActiveState.CLOSED) ? null
+                : states.contains(ActiveState.ACTIVE);
 
         SqlQuery q = ListSql.routes(filter, active, access, sort);
         List<T> routes = db.loadSql(q.sql(), q.params(), clazz);

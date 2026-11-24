@@ -44,9 +44,9 @@ public class ResponsibleService {
      *
      * @param station станция: сотрудники её депо; null - у рейса станция прибытия, иначе без них
      * @param trip    рейс: его бригада; null - без неё
-     * @param wagons  номера вагонов: бригады рейсов поезда вагонов; пусто - без них
+     * @param wagons  id вагонов: бригады рейсов поезда вагонов; пусто - без них
      */
-    public List<ResponsibleCandidate> candidates(Long station, Long trip, List<String> wagons) throws Exception {
+    public List<ResponsibleCandidate> candidates(Long station, Long trip, List<Long> wagons) throws Exception {
         currentUserService.get();
         if (station == null && trip != null) {
             DbRec arrival = db.loadSqlRec(WagonSql.tripArrivalStation(), Map.of("trip", trip));
@@ -95,10 +95,10 @@ public class ResponsibleService {
      * Проверить выбранных ответственных за вагоны передачи: все среди тех, кого можно назначить.
      *
      * @param usrs   ответственные; пусто или null - не назначены, проверять нечего
-     * @param wagons номера вагонов
+     * @param wagons id вагонов
      * @throws ApiException 400 - сотрудника нельзя назначить
      */
-    public void check(List<Long> usrs, Long station, Long trip, List<String> wagons) throws Exception {
+    public void check(List<Long> usrs, Long station, Long trip, List<Long> wagons) throws Exception {
         if (usrs == null || usrs.isEmpty()) {
             return;
         }
@@ -112,12 +112,12 @@ public class ResponsibleService {
     /**
      * Рейсы поездов вагонов: у каждого поезда - последний закончившийся, выполняющийся и ближайший запланированный.
      */
-    private List<Long> trainTrips(List<String> numbers) throws Exception {
-        if (numbers == null || numbers.isEmpty()) {
+    private List<Long> trainTrips(List<Long> wagons) throws Exception {
+        if (wagons == null || wagons.isEmpty()) {
             return List.of();
         }
         List<Long> res = new ArrayList<>();
-        for (DbRec train : db.loadSql(WagonSql.currentTrainsOf(), Map.of("numbers", numbers,
+        for (DbRec train : db.loadSql(WagonSql.currentTrainsOf(), Map.of("wagons", wagons,
                 "fact", TrainWagonKind.FACT))) {
             List<DbRec> trips = db.loadList("trip", Map.of("train", train.getLong("train"), "trip_status_type",
                     List.of(TripStatus.PLANNED, TripStatus.IN_PROGRESS, TripStatus.DONE)));

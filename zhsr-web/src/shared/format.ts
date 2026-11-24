@@ -1,4 +1,4 @@
-import { t } from '@/boot/i18n'
+import { i18n, t } from '@/boot/i18n'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -34,6 +34,36 @@ export function isoDateTime(d: Date): string {
 export function dayStart(day: string, addDays = 0): string {
   const [y, m, d] = day.split('-').map(Number)
   return isoDateTime(new Date(y!, m! - 1, d! + addDays))
+}
+
+/** Округлить часы до двух знаков после запятой. */
+export function roundHours(hours: number): number {
+  return Math.round(hours * 100) / 100
+}
+
+/** Часы числом, не больше двух знаков после запятой: «2,5»; null — прочерк. */
+export function formatHours(hours: number | null): string {
+  if (hours === null) return '—'
+  return new Intl.NumberFormat(i18n.global.locale.value, { maximumFractionDigits: 2 }).format(hours)
+}
+
+/** Дробные часы — часы и минуты: 2.5 → «2:30». */
+export function formatHoursMinutes(hours: number): string {
+  const minutes = Math.round(hours * 60)
+  return `${Math.floor(minutes / 60)}:${pad(minutes % 60)}`
+}
+
+/** Сравнить тексты для сортировки по языку интерфейса; числа внутри текста — по величине. */
+export function compareText(a: string, b: string): number {
+  return collator(i18n.global.locale.value).compare(a, b)
+}
+
+const collators = new Map<string, Intl.Collator>()
+
+function collator(locale: string): Intl.Collator {
+  let res = collators.get(locale)
+  if (!res) collators.set(locale, (res = new Intl.Collator(locale, { numeric: true })))
+  return res
 }
 
 /** Целое число с разбивкой на тысячи пробелом: 1234567 → «1 234 567». */

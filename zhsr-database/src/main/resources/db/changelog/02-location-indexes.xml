@@ -276,9 +276,9 @@
                                  referencedTableName="wagon_status_type" referencedColumnNames="id"/>
     </changeSet>
 
-    <!-- у вагона ровно одно расположение -->
+    <!-- у вагона одно расположение или расположение не задано -->
     <changeSet id="02-location-indexes-ck_wagon_info_location" author="zhsr">
-        <sql>alter table wagon_info add constraint ck_wagon_info_location check (num_nonnulls(station, depot, yard, trip) = 1)</sql>
+        <sql>alter table wagon_info add constraint ck_wagon_info_location check (num_nonnulls(station, depot, yard, trip) = num_nonnulls(location_type) and num_nonnulls(dbeg_location) = num_nonnulls(location_type))</sql>
     </changeSet>
 
     <changeSet id="02-location-indexes-fk_wagon_info_location_type" author="zhsr">
@@ -288,7 +288,7 @@
 
     <!-- заполнена ссылка, заданная видом расположения; id из location_type.tsv: 1 - станция, 2 - депо, 3 - рейс, 4 - парк отстоя -->
     <changeSet id="02-location-indexes-ck_wagon_info_location_type" author="zhsr">
-        <sql>alter table wagon_info add constraint ck_wagon_info_location_type check ((location_type = 1 and station is not null) or (location_type = 2 and depot is not null) or (location_type = 3 and trip is not null) or (location_type = 4 and yard is not null))</sql>
+        <sql>alter table wagon_info add constraint ck_wagon_info_location_type check (location_type is null or (location_type = 1 and station is not null) or (location_type = 2 and depot is not null) or (location_type = 3 and trip is not null) or (location_type = 4 and yard is not null))</sql>
     </changeSet>
 
     <changeSet id="02-location-indexes-ix_wagon_info_station" author="zhsr">

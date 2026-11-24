@@ -3,14 +3,14 @@
 #   1. удалить БД DB_NAME и создать пустую с владельцем DB_USER (пользователь создаётся, если его нет);
 #   2. накатить структуру и системные справочники (zhsr-database, db/dict) - миграции Liquibase (zhsr-database);
 #   3. загрузить начальные данные db-data/default: станции, перегоны, типы и модели вагонов, пользователь admin;
-#   4. с ключом --demo - ещё и демо-данные db-data/demo;
-#   5. записать новый идентификатор БД (db_info): zhsr-<TENANT_NAME>-<8 случайных hex-символов>.
+#   4. с ключом --<каталог> - ещё и данные db-data/<каталог>.
+# Перед данными записывается новый идентификатор БД (db_info): zhsr-<TENANT_NAME>-<8 случайных hex-символов>.
 # Файлы данных загружаются по порядку имён: <nn>-<таблица>.tsv - в таблицу, *.sql - выполняются. Столбцы tsv, которых
 # нет в таблице (description - пояснение к строке), не загружаются. Все данные - одной транзакцией.
 # Параметры подключения - в .env; нет .env - копируется из .env.sample.
 #
-#   prepare/db-reset           - без демо-данных
-#   prepare/db-reset --demo    - с демо-данными
+#   prepare/db-reset              - только db-data/default
+#   prepare/db-reset --<каталог>  - ещё и db-data/<каталог>: --demo, --kazrail
 # Обычно вызывается из env-reset вместе с очисткой хранилища файлов (prepare/storage-reset). На сервере - из образа
 # zhsr-database (install/base/app-reset): там миграции - DB_MIGRATE (java -jar), а не Gradle.
 set -euo pipefail
@@ -18,11 +18,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 dirs=(db-data/default)
-# БД с демо-данными: признак db_info.demo - страница входа показывает быстрый вход демо-пользователями
-demo=false
 for a in "$@"; do
   case $a in
-    --demo) dirs+=(db-data/demo); demo=true ;;
+    --?*)
+      # ключ - каталог относительно db-data
+      dir=db-data/${a#--}
+      [ -d "$dir" ] || { echo "нет каталога данных $dir (параметр $a)" >&2; exit 1; }
+      dirs+=("$dir")
+      ;;
     *) echo "неизвестный параметр: $a" >&2; exit 1 ;;
   esac
 done
@@ -81,13 +84,19 @@ copy_cmd() {
 
 echo "--- данные: ${dirs[*]}"
 # порядок файлов - побайтовый, не по локали: локаль при сравнении не учитывает точку и подчёркивание, и
-# 33-x_photo.tsv встал бы раньше 33-x.tsv; LC_ALL перекрывает LC_COLLATE - снимается
-unset LC_ALL
-LC_COLLATE=C
+# 33-x_photo.tsv встал бы раньше 33-x.tsv; локаль C - только на время получения списка файлов каталога $1 в files
+list_files() {
+  local LC_ALL=C
+  files=("$1"/*)
+}
 {
   echo 'begin;'
+  # до данных: каталог данных может поменять строку db_info (признак demo)
+  echo "insert into db_info (db_guid, demo) values ('$db_guid', false);"
+  echo "\\echo 'идентификатор БД: $db_guid'"
   for dir in "${dirs[@]}"; do
-    for f in "$dir"/*; do
+    list_files "$dir"
+    for f in "${files[@]}"; do
       name=$(basename "$f")
       case $name in
         *.tsv)
@@ -113,8 +122,6 @@ where table_schema = current_schema()
 \o
 \echo 'счётчики id: обновлены'
 SQL
-  echo "insert into db_info (db_guid, demo) values ('$db_guid', $demo);"
-  echo "\\echo 'идентификатор БД: $db_guid'"
   echo 'commit;'
 } | app
 

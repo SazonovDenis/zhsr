@@ -66,7 +66,7 @@
           <!-- ответственные за вагоны акта ("кому") назначаются сразу, при оформлении: сотрудники депо станции и бригады
                рейсов поезда вагонов -->
           <FormField label="Ответственные за вагоны">
-            <ResponsiblePicker v-model="responsible" :station="station" :wagons="selected" :disabled="!station" />
+            <ResponsiblePicker v-model="responsible" :station="station" :wagons="selectedIds" :disabled="!station" />
           </FormField>
           <div v-if="toCode" class="transfer__mode q-py-sm q-px-md" :class="{ 'transfer__mode--none': !mode }">
             {{ modeText }}
@@ -115,6 +115,7 @@ import DataTable from '@/shared/components/table/DataTable.vue'
 import type { Column } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
 import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
+import { compareText } from '@/shared/format'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -168,6 +169,8 @@ const chosen = ref<Record<string, boolean>>(
   Object.fromEntries((query.wagons ? String(query.wagons).split(',') : []).map((n) => [n, false])),
 )
 const selected = computed(() => Object.keys(chosen.value))
+// id отмеченных вагонов: из адреса вагоны приходят номерами
+const selectedIds = computed(() => wagons.value.filter((w) => w.number in chosen.value).map((w) => w.id))
 provide(TRANSFER_CHOICE, {
   chosen,
   set(number, withProperty) {
@@ -191,7 +194,10 @@ const stations = computed(() => {
   const ids = new Set(
     [...dictManager.getList('Depot'), ...dictManager.getList('Yard')].map((r) => (r as { station?: number }).station),
   )
-  return [...ids].filter((id): id is number => !!id).map((id) => ({ id, text: dictManager.getValue('Station', id) }))
+  return [...ids]
+    .filter((id): id is number => !!id)
+    .map((id) => ({ id, text: dictManager.getValue('Station', id) }))
+    .sort((a, b) => compareText(a.text, b.text))
 })
 
 // откуда — любое расположение станции; куда — другое расположение, со станции на станцию не передаётся
@@ -387,7 +393,10 @@ async function save() {
       workType: work.value!,
       transferredByUsr: giver.value,
       transferredDt: time.value!,
-      wagons: selected.value.map((number) => ({ number, withProperty: chosen.value[number]! })),
+      wagons: selected.value.map((number) => ({
+        wagon: wagons.value.find((w) => w.number === number)!.id,
+        withProperty: chosen.value[number]!,
+      })),
       responsibleUsrs: responsibleUsrs(responsible.value),
     })
     Notify.create({

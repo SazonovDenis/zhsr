@@ -10,7 +10,7 @@ import java.util.List;
  *
  * @param depot         id депо приписки вагона
  * @param number        часть номера вагона
- * @param numbers       номера вагонов целиком: только эти вагоны (например, состав поезда); пусто - без отбора
+ * @param ids           id вагонов: только эти вагоны (например, состав поезда); пусто - без отбора
  * @param station       id станции: вагон на этой станции, в депо или в парке отстоя при ней
  * @param trip          id рейса, в составе которого вагон
  * @param locationKinds id вида расположения вагона (location_type)
@@ -18,7 +18,7 @@ import java.util.List;
  * @param at            момент (например, отправление рейса): дополнительно к текущим - расположение и состояние на
  *                      этот момент по журналам; null - не нужны
  */
-public record WagonFilter(Long depot, String number, List<String> numbers, Long station, Long trip,
+public record WagonFilter(Long depot, String number, List<Long> ids, Long station, Long trip,
                           List<Long> locationKinds, List<Long> states,
                           @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime at) {
 }

@@ -5,7 +5,7 @@ set -e
 # Перед этим - ./build-app с теми же ключами и один раз docker login. Многоархитектурный образ собирает и публикует
 # buildx за один шаг. Ключи - install/images.sh; без ключей - все образы.
 #   ./build-app-docker-push app        - сервер (zhsr-app)
-#   ./build-app-docker-push database   - миграции (zhsr-database) и демо-данные (zhsr-database-demo)
+#   ./build-app-docker-push database   - миграции (zhsr-database)
 #   ./build-app-docker-push web        - фронт и nginx (zhsr-nginx)
 
 # все пути - от корня проекта
@@ -25,13 +25,6 @@ for key in $KEYS; do
     echo "=== $image"
     install/docker-images/prepare-context "$image"
     dir="install/docker-images/$image"
-    if [ "$image" = zhsr-database ]; then
-        # два образа из одного Dockerfile: миграции и они же с демо-данными
-        push --target zhsr-database -t sazonovden/zhsr-database:latest "$dir"
-        echo "=== zhsr-database-demo"
-        push --target zhsr-database-demo -t sazonovden/zhsr-database-demo:latest "$dir"
-    else
-        push -t "sazonovden/$image:latest" "$dir"
-    fi
+    push -t "sazonovden/$image:latest" "$dir"
     rm -rf "$dir/tmp"
 done

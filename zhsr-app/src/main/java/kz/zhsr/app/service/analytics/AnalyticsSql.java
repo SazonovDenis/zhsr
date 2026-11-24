@@ -33,7 +33,8 @@ final class AnalyticsSql {
     /**
      * Вагоны в эксплуатации на момент at: wagon, depot, last_check_dt, last_equip_dt, last_trip_dt. Рейс вагона - отправленный рейс
      * поезда, в котором вагон числился по факту между отправлением и прибытием (прибытия нет - по момент at).
-     * Параметры: fact - слой «факт» участия, at - момент; позднее него ничего не учитывается.
+     * Параметры: fact - слой «факт» участия, at - момент; позднее него ничего не учитывается,
+     * day - дата момента at.
      */
     static String lastChecks() {
         return """
@@ -51,8 +52,8 @@ final class AnalyticsSql {
                           and (train_wagon.dend is null or train_wagon.dend > trip.departed_dt)) as last_trip_dt
                 from wagon_info
                 join wagon on wagon.id = wagon_info.wagon
-                where (wagon.dbeg is null or wagon.dbeg <= cast(:at as date))
-                  and (wagon.dend is null or wagon.dend >= cast(:at as date))
+                where (wagon.dbeg is null or wagon.dbeg <= :day)
+                  and (wagon.dend is null or wagon.dend >= :day)
                 order by wagon.number""";
     }
 

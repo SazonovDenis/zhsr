@@ -52,17 +52,6 @@ services:
     volumes:
       - ./.env:/app/.env:ro
 
-  # Пересоздание БД с демо-данными - только по команде ./app-reset --demo, с остальными не запускается
-  zhsr-database-demo:
-    image: sazonovden/zhsr-database-demo:latest
-    profiles: [ "demo" ]
-    mem_limit: 384m
-    depends_on:
-      zhsr-db:
-        condition: service_healthy
-    volumes:
-      - ./.env:/app/.env:ro
-
   zhsr-app:
     image: sazonovden/zhsr-app:latest
     container_name: zhsr-app

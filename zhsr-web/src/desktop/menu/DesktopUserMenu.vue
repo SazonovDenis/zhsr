@@ -66,6 +66,7 @@ import type { MessageLanguages } from '@/boot/i18n'
 import { i18n, t } from '@/boot/i18n'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import SvgIcon from '@/shared/icons/SvgIcon.vue'
+import { compareText } from '@/shared/format'
 import { dictManager } from '@/shared/dict/DictManager'
 import { LOCALES, setLocale } from '@/shared/locale'
 import { isOnline } from '@/shared/network'
@@ -81,7 +82,12 @@ import { menuState, USER_MENU_GROUP } from './menuState'
 const props = defineProps<{ user: CurrentUser; collapsed: boolean }>()
 
 // роли совмещаются: все роли пользователя через запятую
-const roles = computed(() => props.user.roles.map((r) => dictManager.getValue('Role', r)).join(', '))
+const roles = computed(() =>
+  props.user.roles
+    .map((r) => dictManager.getValue('Role', r))
+    .sort(compareText)
+    .join(', '),
+)
 
 const router = useRouter()
 

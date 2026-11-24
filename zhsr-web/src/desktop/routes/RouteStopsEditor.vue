@@ -117,19 +117,18 @@
       </template>
     </div>
 
-    <q-btn
-      v-if="stops.length === 0 && !readonly"
-      unelevated
-      outline
-      no-caps
-      color="ok"
-      icon="add"
-      class="zs-soft-border self-start"
-      :label="t('Начальная станция')"
-      @click="insert(-1)"
-    />
-
-    <div v-if="problem" class="stops-editor__problem q-pl-lg">{{ problem }}</div>
+    <div v-for="warning in hubWarnings" :key="warning.keypath" class="stops-editor__warning q-px-md q-py-sm">
+      <i18n-t :keypath="warning.keypath" tag="span" scope="global">
+        <template #station>
+          <b>{{ dictManager.getValue('Station', warning.station) }}</b>
+        </template>
+      </i18n-t>
+    </div>
+    <!-- пояснения — одним блоком: что не так с маршрутом и правило выбора станции -->
+    <div class="stops-editor__notes q-pl-lg">
+      <div v-if="problem">{{ problem }}</div>
+      <div>{{ t('Следующая станция — любая, достижимая по маршруту от предыдущей.') }}</div>
+    </div>
   </div>
 </template>
 
@@ -144,6 +143,7 @@ import CbList from '@/shared/components/choice/CbList.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import TimeInput from '@/shared/components/form/TimeInput.vue'
 import { dictManager } from '@/shared/dict/DictManager'
+import { compareText } from '@/shared/format'
 import { useLoad } from '@/shared/loadable'
 import { formatDuration, formatTime, stopOf } from './duration'
 
@@ -151,7 +151,7 @@ import { formatDuration, formatTime, stopOf } from './duration'
  * Редактор «Остановки по порядку». Правит список остановок в памяти (v-model); сохраняет маршрут владелец.
  *
  * - Станция остановки выбирается в CbList из станций, на которые можно перейти от предыдущей остановки (для
- *   первой — из узловых). Список загружается при открытии; в строке — станции следования по пути («через …») и
+ *   первой — из всех станций маршрутной сети). Список загружается при открытии; в строке — станции следования по пути («через …») и
  *   расстояние от предыдущей остановки.
  * - Время остановки — минуты от полуночи дня отправления с начальной станции (1440 и больше — следующие сутки).
  *   У начальной станции вводится отправление, у промежуточных — прибытие, стоянка и отправление, у конечной —
@@ -160,11 +160,12 @@ import { formatDuration, formatTime, stopOf } from './duration'
  * - Времена связаны: прибытие сдвигает отправление (стоянка прежняя), стоянка — отправление, отправление — прибытие
  *   (стоянка прежняя); следующие остановки сдвигаются на ту же разницу. «В пути» — время в пути от отправления с
  *   начальной станции; у конечной станции расстояние и время в пути — итог маршрута, жирным.
+ * - У маршрута без остановок владелец передаёт одну пустую остановку: начальная станция выбирается сразу.
  * - «+» вставляет пустую остановку после этой, ✕ удаляет остановку.
  * - После выбора станции и удаления остановки расстояния и времена пересчитываются (recalcStops): время в пути от
  *   предыдущей остановки по умолчанию (по расстоянию) — там, где сменилась станция или предыдущая остановка.
- * - Под списком — что не так с маршрутом: начальная и конечная станции должны быть узловыми, время по остановкам не
- *   должно убывать.
+ * - Под списком — предупреждения о неузловых начальной и конечной станциях (сохранить маршрут можно) и что не так с
+ *   маршрутом: время по остановкам не должно убывать.
  */
 const stops = defineModel<RouteStop[]>({ required: true })
 
@@ -179,13 +180,23 @@ function isHub(station: number): boolean {
   return dictManager.getRec('Station', station)?.hub === true
 }
 
+/** Предупреждения: начальная и конечная станции не узловые; сохранению маршрута не мешают. */
+const hubWarnings = computed(() => {
+  const last = stops.value.length - 1
+  return [
+    { keypath: 'Начальная станция {station} не является узловой — не имеет депо.', station: stops.value[0]?.station },
+    {
+      keypath: 'Конечная станция {station} не является узловой — не имеет депо.',
+      // единственная остановка — начальная
+      station: last > 0 ? stops.value[last]?.station : undefined,
+    },
+  ].flatMap(({ keypath, station }) => (station && !isHub(station) ? [{ keypath, station }] : []))
+})
+
 const problem = computed(() => {
   const filled = stops.value.filter((s) => s.station)
   if (filled.length < stops.value.length) return t('Выберите станцию в каждой остановке.')
   if (filled.length < 2) return t('В маршруте должно быть не меньше двух остановок.')
-  if (!isHub(filled[0]!.station) || !isHub(filled[filled.length - 1]!.station)) {
-    return t('Начальная и конечная станции должны быть узловыми.')
-  }
   if (decreasing.value) return t('Время по остановкам не должно убывать.')
   return ''
 })
@@ -238,8 +249,12 @@ function valuesFor(index: number): ChoiceItem[] {
 // станции для открытого списка; ошибка загрузки — в самом выпадающем списке вместо вариантов
 const optionsLoad = useLoad(async () => {
   options.value = []
-  const next = await fetchNextStations(previousOf(openRow.value))
-  options.value = next.map((n) => stationItem(n.station, n.km, n.distance, n.via))
+  const previous = previousOf(openRow.value)
+  const next = await fetchNextStations(previous)
+  const items = next.map((n) => stationItem(n.station, n.km, n.distance, n.via))
+  // следующие станции сервер отдаёт по близости к предыдущей; начальные — по названию
+  if (!previous) items.sort((a, b) => compareText(a.text ?? '', b.text ?? ''))
+  options.value = items
 })
 
 function loadOptions(index: number) {
@@ -431,8 +446,18 @@ function remove(index: number) {
   font-variant-numeric: tabular-nums;
 }
 
-.stops-editor__problem {
+.stops-editor__warning {
+  border-radius: 0.3rem;
+  background: $zs-warning-bg;
+  color: $zs-text;
+  font-size: 0.8rem;
+}
+
+// пояснения не влияют на ширину таблицы: переносятся по её ширине
+.stops-editor__notes {
+  contain: inline-size;
   color: $zs-text-muted;
   font-size: 0.8rem;
+  line-height: 1.45;
 }
 </style>

@@ -1,6 +1,7 @@
 package kz.zhsr.app.service;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtCnv;
 import kz.kis.kiscore.utils.UtDb;
 import kz.kis.kisdbtools.ref.RefResolver;
 import kz.kis.kisdbtools.repository.Db;
@@ -8,6 +9,7 @@ import kz.kis.kisdbtools.repository.DbRecMapper;
 import kz.zhsr.app.auth.CurrentUser;
 import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.CrewDuty;
+import kz.zhsr.app.constants.ActiveState;
 import kz.zhsr.app.constants.LocationType;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.constants.TrainWagonChangeType;
@@ -98,7 +100,7 @@ public class TrainService {
      * @param comment         основания, примечания; может быть пусто
      * @param responsibleUsrs ответственные за вагоны - у факта в рейсе в статусе «выполняется»; пусто - не назначены
      */
-    public record ChangeBody(List<String> wagons, boolean fact, OffsetDateTime time, Long station,
+    public record ChangeBody(List<Long> wagons, boolean fact, OffsetDateTime time, Long station,
                              Long routeStation, Integer seq, String comment, List<Long> responsibleUsrs) {
     }
 
@@ -171,7 +173,7 @@ public class TrainService {
      */
     public List<TrainOption> options(TrainFilter filter) throws Exception {
         currentUserService.get();
-        List<TrainOption> res = rows(new TrainFilter(List.of("active"), filter.search(), null, null, null),
+        List<TrainOption> res = rows(new TrainFilter(List.of(ActiveState.ACTIVE), filter.search(), null, null, null),
                 TrainOption.class);
         if (res.isEmpty() || filter.from() == null || filter.to() == null) {
             return res;
@@ -288,7 +290,7 @@ public class TrainService {
             TripCrew.Wagon w = info.get(e.getKey());
             w.setSeq(e.getValue().getInt("seq"));
             w.setRiding(status == TripStatus.IN_PROGRESS
-                    ? w.getLocationType() == LocationType.TRIP && w.getTrip() != null
+                    ? Objects.equals(w.getLocationType(), LocationType.TRIP) && w.getTrip() != null
                     && w.getTrip().getId() == trip.getId()
                     : atMoment.contains(e.getKey()));
             w.setChanges(changes.stream().filter(c -> c.getWagon().getId() == e.getKey()).toList());
@@ -406,7 +408,7 @@ public class TrainService {
             throws Exception {
         List<DbRec> recs = new ArrayList<>();
         for (DbRec c : waiting(train)) {
-            Long changeTrip = c.getLong("trip", null);
+            Long changeTrip = c.getLong("trip");
             boolean atDeparture = changeTrip != null && changeTrip == trip
                     && c.getLong("route_station").longValue() == departureRouteStation;
             boolean before = changeTrip == null && !c.getDateTimeTZ("dt").isAfter(departure);
@@ -421,15 +423,8 @@ public class TrainService {
      * Занятость вагонов в поездах с времени from (GET /trains/busy): ожидаемый состав поездов (в нём и вагоны поезда
      * по факту), который не закончился к from; у каждого - рейс поезда в это время.
      */
-    public List<WagonBusy> busy(List<String> numbers, OffsetDateTime from) throws Exception {
+    public List<WagonBusy> busy(List<Long> wagons, OffsetDateTime from) throws Exception {
         currentUserService.get();
-        List<Long> wagons = new ArrayList<>();
-        for (String number : numbers == null ? List.<String>of() : numbers) {
-            DbRec w = db.loadRec("wagon", Map.of("number", number));
-            if (w != null) {
-                wagons.add(w.getLong("id"));
-            }
-        }
         return busyOf(wagons, from == null ? OffsetDateTime.now() : from);
     }
 
@@ -523,7 +518,7 @@ public class TrainService {
         reopen(id);
         Place place = placeFor(id, body);
         requireRight(me, place, body.fact());
-        List<String> numbers = numbers(body);
+        List<Long> wagons = wagons(body);
         OffsetDateTime time = time(body, place);
         if (place.trip() == null && place.station() == 0) {
             throw ApiException.badRequest("Укажите станцию прицепки");
@@ -534,8 +529,8 @@ public class TrainService {
         try {
             int kind = body.fact() ? TrainWagonKind.FACT : TrainWagonKind.PLAN;
             int seq = position(id, kind, time, body.seq());
-            for (int i = 0; i < numbers.size(); i++) {
-                DbRec wagon = requireWagon(numbers.get(i));
+            for (int i = 0; i < wagons.size(); i++) {
+                DbRec wagon = requireWagon(wagons.get(i));
                 if (body.fact()) {
                     insertFact(id, wagon, TrainWagonChangeType.ATTACH, time, seq + i, place, null, body.comment(),
                             body.responsibleUsrs(), me);
@@ -570,15 +565,15 @@ public class TrainService {
         requireActive(id);
         Place place = placeFor(id, body);
         requireRight(me, place, body.fact());
-        List<String> numbers = numbers(body);
+        List<Long> wagons = wagons(body);
         OffsetDateTime time = time(body, place);
         if (body.fact() && place.inProgress()) {
             responsibleService.check(body.responsibleUsrs(), place.station(), place.trip().getLong("id"));
         }
         try {
-            for (String number : numbers) {
-                DbRec wagon = requireWagon(number);
-                long wagonId = wagon.getLong("id");
+            for (long wagonId : wagons) {
+                DbRec wagon = requireWagon(wagonId);
+                String number = wagon.getString("number");
                 if (body.fact()) {
                     Place p = place.trip() == null ? stationOf(wagon) : place;
                     insertFact(id, wagon, TrainWagonChangeType.DETACH, time, null, p, null, body.comment(),
@@ -630,7 +625,7 @@ public class TrainService {
         }
         long train = plan.getLong("train");
         requireActive(train);
-        Place place = place(train, plan.getLong("trip", null), plan.getLong("route_station", null),
+        Place place = place(train, plan.getLong("trip"), plan.getLong("route_station"),
                 plan.getLong("station"));
         if (!canMark(me, place)) {
             throw ApiException.forbidden(place.trip() == null
@@ -684,9 +679,9 @@ public class TrainService {
         DbRec change = requireChange(changeId);
         long train = change.getLong("train");
         Map<Long, DbRec> tripsById = new HashMap<>();
-        Long tripId = change.getLong("trip", null);
+        Long tripId = change.getLong("trip");
         Place old = tripId == null ? new Place(null, false, null, change.getLong("station"), -1, 0, null)
-                : placeOf(tripId, change.getLong("route_station", null), tripsById);
+                : placeOf(tripId, change.getLong("route_station"), tripsById);
         String comment = body.comment() == null || body.comment().isBlank() ? null : body.comment().trim();
         if (change.getInt("kind") == TrainWagonKind.FACT) {
             if (!canUndo(me, old)) {
@@ -776,7 +771,7 @@ public class TrainService {
             throw ApiException.conflict("Отменяется только ожидающий план прицепки или отцепки");
         }
         long train = plan.getLong("train");
-        Place place = place(train, plan.getLong("trip", null), plan.getLong("route_station", null),
+        Place place = place(train, plan.getLong("trip"), plan.getLong("route_station"),
                 plan.getLong("station"));
         if (!canCancelPlan(me, place)) {
             throw ApiException.forbidden("План отменяет планировщик вагонов или начальник поезда рейса");
@@ -813,7 +808,7 @@ public class TrainService {
             throw ApiException.conflict("Возвращается только отменённый план прицепки или отцепки");
         }
         long train = plan.getLong("train");
-        Place place = place(train, plan.getLong("trip", null), plan.getLong("route_station", null),
+        Place place = place(train, plan.getLong("trip"), plan.getLong("route_station"),
                 plan.getLong("station"));
         if (!canCancelPlan(me, place)) {
             throw ApiException.forbidden("План возвращает планировщик вагонов или начальник поезда рейса");
@@ -875,8 +870,8 @@ public class TrainService {
         }
         long train = change.getLong("train");
         long wagon = change.getLong("wagon");
-        Long trip = change.getLong("trip", null);
-        Place place = place(train, trip, change.getLong("route_station", null), change.getLong("station"));
+        Long trip = change.getLong("trip");
+        Place place = place(train, trip, change.getLong("route_station"), change.getLong("station"));
         if (!canUndo(me, place)) {
             throw ApiException.forbidden(trip == null
                     ? "Прицепку и отцепку вне рейса отменяет планировщик вагонов"
@@ -919,7 +914,7 @@ public class TrainService {
             if (opened != null) {
                 wagonJournal.undo(opened);
             }
-            Long plan = change.getLong("plan", null);
+            Long plan = change.getLong("plan");
             if (plan != null) {
                 db.updateRec("train_wagon_change", Map.of("id", plan, "plan_status", TrainWagonPlanStatus.WAITING));
             }
@@ -975,7 +970,7 @@ public class TrainService {
         if (plan == null) {
             DbRec waiting = db.loadRec("train_wagon_change", Map.of("train", train, "wagon", wagonId, "kind",
                     TrainWagonKind.PLAN, "plan_status", TrainWagonPlanStatus.WAITING, "change_type", type));
-            Long planTrip = waiting == null ? null : waiting.getLong("trip", null);
+            Long planTrip = waiting == null ? null : waiting.getLong("trip");
             boolean sameTrip = planTrip != null && place.trip() != null
                     && planTrip.longValue() == place.trip().getLong("id");
             if (waiting != null && (sameTrip || !waiting.getDateTimeTZ("dt").isAfter(time))) {
@@ -992,8 +987,8 @@ public class TrainService {
                         responsibles));
             } else {
                 DbRec info = db.loadRec("wagon_info", Map.of("wagon", wagonId));
-                Long infoTrip = info.getLong("trip", null);
-                if (info.getLong("location_type") != LocationType.TRIP || infoTrip == null || infoTrip != trip) {
+                Long infoTrip = info.getLong("trip");
+                if (UtCnv.toLong(info.get("location_type")) != LocationType.TRIP || infoTrip == null || infoTrip != trip) {
                     throw ApiException.conflict("Вагон " + number + " не едет в поезде рейса");
                 }
                 putOpened(values, wagonJournal.move(wagonId, time, LocationType.STATION, place.station(), null,
@@ -1116,7 +1111,7 @@ public class TrainService {
         if (trip == null) {
             throw ApiException.notFound("Рейс не найден");
         }
-        Long tripTrain = trip.getLong("train", null);
+        Long tripTrain = trip.getLong("train");
         if (tripTrain == null || tripTrain != train) {
             throw ApiException.badRequest("Поезд не назначен на этот рейс");
         }
@@ -1152,7 +1147,7 @@ public class TrainService {
     /** Место отцепки вне рейса: станция расположения вагона. */
     private Place stationOf(DbRec wagon) throws Exception {
         DbRec rec = db.loadSqlRec(stationSql(), Map.of("wagon", wagon.getLong("id")));
-        Long station = rec == null ? null : rec.getLong("station", null);
+        Long station = rec == null ? null : rec.getLong("station");
         if (station == null) {
             throw ApiException.conflict("Вагон " + wagon.getString("number") + " в рейсе: отцепка оформляется в рейсе");
         }
@@ -1216,8 +1211,8 @@ public class TrainService {
         DbRec info = db.loadRec("wagon_info", Map.of("wagon", wagon.getLong("id")));
         String number = wagon.getString("number");
         if (place.inProgress()) {
-            Long station = info.getLong("station", null);
-            if (info.getLong("location_type") != LocationType.STATION || station == null
+            Long station = info.getLong("station");
+            if (UtCnv.toLong(info.get("location_type")) != LocationType.STATION || station == null
                     || station != place.station()) {
                 throw ApiException.conflict("Вагон " + number + " должен стоять на станции прицепки; вагон в депо или "
                         + "парке отстоя сначала передаётся на станцию");
@@ -1231,7 +1226,7 @@ public class TrainService {
             throw ApiException.badRequest("Укажите станцию");
         }
         DbRec at = db.loadSqlRec(stationSql(), Map.of("wagon", wagon.getLong("id")));
-        Long station = at == null ? null : at.getLong("station", null);
+        Long station = at == null ? null : at.getLong("station");
         if (station == null || station != place.station()) {
             throw ApiException.conflict("Вагон " + number + " не на станции прицепки: его можно прицепить только планом");
         }
@@ -1338,19 +1333,19 @@ public class TrainService {
 
     /** Записи журналов вагона, открытые фактом; не открывал - null. */
     private static WagonJournal.Opened opened(DbRec change) {
-        Long location = change.getLong("wagon_location", null);
-        Long status = change.getLong("wagon_status", null);
+        Long location = change.getLong("wagon_location");
+        Long status = change.getLong("wagon_status");
         return location == null || status == null ? null
                 : new WagonJournal.Opened(location, status, new WagonJournal.Responsibles(
-                        change.getLong("wagon_responsible", null), change.getLong("closed_wagon_responsible", null)));
+                        change.getLong("wagon_responsible"), change.getLong("closed_wagon_responsible")));
     }
 
-    private static List<String> numbers(ChangeBody body) {
-        List<String> numbers = body.wagons() == null ? List.of() : new ArrayList<>(new LinkedHashSet<>(body.wagons()));
-        if (numbers.isEmpty()) {
+    private static List<Long> wagons(ChangeBody body) {
+        List<Long> wagons = body.wagons() == null ? List.of() : new ArrayList<>(new LinkedHashSet<>(body.wagons()));
+        if (wagons.isEmpty()) {
             throw ApiException.badRequest("Отметьте вагоны");
         }
-        return numbers;
+        return wagons;
     }
 
     // --- права
@@ -1424,9 +1419,9 @@ public class TrainService {
         if (change == null || change.getInt("kind") != TrainWagonKind.FACT) {
             return false;
         }
-        Long trip = change.getLong("trip", null);
+        Long trip = change.getLong("trip");
         Place place = trip == null ? new Place(null, false, null, change.getLong("station"), -1, 0, null)
-                : placeOf(trip, change.getLong("route_station", null), new HashMap<>());
+                : placeOf(trip, change.getLong("route_station"), new HashMap<>());
         return canUndo(me, place);
     }
 
@@ -1479,7 +1474,7 @@ public class TrainService {
             boolean waiting = c.getKind() == TrainWagonKind.PLAN && c.getPlanStatus() != null
                     && c.getPlanStatus() == TrainWagonPlanStatus.WAITING;
             c.setOverdue(waiting && c.getDt().isBefore(now));
-            Long trip = rec.getLong("trip", null);
+            Long trip = rec.getLong("trip");
             Place place = trip == null ? new Place(null, false, null, c.getStation(), -1, 0, null)
                     : placeOf(trip, c.getRouteStation(), tripsById);
             c.setCanMark(waiting && canMark(me, place));
@@ -1541,9 +1536,9 @@ public class TrainService {
 
     private <T extends TrainRow> List<T> rows(TrainFilter filter, Class<T> clazz) throws Exception {
         SqlWhere where = new SqlWhere();
-        List<String> states = filter.states() == null ? List.of() : filter.states();
-        if (states.contains("active") != states.contains("closed")) {
-            where.add(states.contains("active") ? "train.dend is null" : "train.dend is not null");
+        List<Integer> states = filter.states() == null ? List.of() : filter.states();
+        if (states.contains(ActiveState.ACTIVE) != states.contains(ActiveState.CLOSED)) {
+            where.add(states.contains(ActiveState.ACTIVE) ? "train.dend is null" : "train.dend is not null");
         }
         String search = filter.search() == null ? "" : filter.search().trim();
         if (!search.isEmpty()) {
@@ -1551,7 +1546,7 @@ public class TrainService {
                     + "))", "search", search);
             where.param("fact", TrainWagonKind.FACT);
         }
-        SqlQuery q = where.query(TrainSql.trains(), "order by train.name, train.id");
+        SqlQuery q = where.query(TrainSql.trains(), "order by train.name, train.dbeg");
         List<T> res = db.loadSql(q.sql(), q.params(), clazz);
         fill(res);
         return res;
@@ -1582,12 +1577,12 @@ public class TrainService {
                 ref.setId(w.getLong("wagon"));
                 ref.setNumber(w.getString("number"));
                 ref.setWagonType(w.getLong("wagon_type"));
-                ref.setModelType(w.getLong("model_type", null));
+                ref.setModelType(w.getLong("model_type"));
                 refs.add(ref);
-                locationType = w.getLong("location_type", null);
-                place = w.getLong("place", null);
+                locationType = w.getLong("location_type");
+                place = w.getLong("place");
                 places.add(locationType + ":" + place);
-                Long station = w.getLong("station", null);
+                Long station = w.getLong("station");
                 if (station == null) {
                     away = true;
                 } else {
@@ -1692,10 +1687,10 @@ public class TrainService {
         return change;
     }
 
-    private DbRec requireWagon(String number) throws Exception {
-        DbRec wagon = db.loadRec("wagon", Map.of("number", number));
+    private DbRec requireWagon(long id) throws Exception {
+        DbRec wagon = db.loadRec("wagon", id);
         if (wagon == null) {
-            throw ApiException.badRequest("Вагон " + number + " не найден");
+            throw ApiException.badRequest("Вагон не найден");
         }
         return wagon;
     }

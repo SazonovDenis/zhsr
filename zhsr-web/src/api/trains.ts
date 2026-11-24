@@ -86,9 +86,9 @@ export interface TrainWagon {
   /** модель вагона — id справочника WagonModel; null — не задана */
   modelType: number | null
   /** вид расположения — id справочника LocationKind (константы LocationType) */
-  locationType: number
+  locationType: number | null
   /** место расположения по виду: станция, депо, парк отстоя или рейс */
-  place: number
+  place: number | null
   /** станция расположения: сама станция, станция депо или парка отстоя; у вагона в рейсе — null */
   station: number | null
   /** рейс, в котором вагон сейчас; null — вагон не в рейсе */
@@ -192,8 +192,8 @@ export interface WagonBusy {
 }
 
 export interface TrainFilter {
-  /** active — действующие, closed — расформированные; пусто — все */
-  states: string[]
+  /** состояния — константы ActiveState; пусто — все */
+  states: number[]
   /** часть обозначения поезда или номера вагона; пусто — без поиска */
   search: string
 }
@@ -207,7 +207,8 @@ export interface TrainFilter {
  * «выполняется», пусто — не назначены.
  */
 export interface TrainChangeBody {
-  wagons: string[]
+  /** вагоны — id */
+  wagons: number[]
   fact: boolean
   time: string | null
   station: number | null
@@ -299,7 +300,7 @@ export async function undoChange(id: number): Promise<TrainCard> {
 }
 
 /** Занятость вагонов в поездах с времени from (ISO; null — сейчас). */
-export async function fetchWagonBusy(wagons: string[], from: string | null): Promise<WagonBusy[]> {
+export async function fetchWagonBusy(wagons: number[], from: string | null): Promise<WagonBusy[]> {
   if (wagons.length === 0) return []
   return (await http.get<WagonBusy[]>('/trains/busy', { params: { wagons, from } })).data
 }

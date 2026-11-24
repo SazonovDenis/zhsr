@@ -67,14 +67,14 @@ final class AdminSql {
         if (search == null || search.isBlank()) {
             return "";
         }
-        params.put("search", "%" + search.trim().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%");
+        params.put("search", search.trim());
         List<String> any = new ArrayList<>();
         for (AdminColumn c : table.columns()) {
             if (AdminTables.TEXT.equals(c.type())) {
-                any.add(c.name() + " ilike :search");
+                any.add("strpos(lower(" + c.name() + "), lower(:search)) > 0");
             } else if (AdminTables.REF.equals(c.type())) {
-                any.add(c.name() + " in (select id from " + c.ref() + " where "
-                        + AdminTables.textColumn(c.ref()) + " ilike :search)");
+                any.add(c.name() + " in (select id from " + c.ref() + " where strpos(lower("
+                        + AdminTables.textColumn(c.ref()) + "), lower(:search)) > 0)");
             }
         }
         return any.isEmpty() ? "where false\n" : "where (" + String.join(" or ", any) + ")\n";

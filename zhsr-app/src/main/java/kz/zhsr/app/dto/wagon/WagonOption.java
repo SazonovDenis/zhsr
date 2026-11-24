@@ -15,10 +15,10 @@ public class WagonOption {
     private String number;
     /** тип вагона (wagon_type) */
     private long wagonType;
-    /** вид расположения (location_type) */
-    private long locationType;
-    /** место расположения по виду: станция (station), депо (depot), парк отстоя (yard) или рейс (trip) */
-    private long place;
+    /** вид расположения (location_type); null - расположение не задано */
+    private Long locationType;
+    /** место расположения по виду: станция (station), депо (depot), парк отстоя (yard) или рейс (trip); null - не задано */
+    private Long place;
     /** рейс, в составе которого вагон; null - вагон не в рейсе */
     private TripRef trip;
 }

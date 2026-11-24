@@ -42,7 +42,7 @@ export interface Transfer {
   receivedDt: string | null
   rejectReason: string | null
   /** вагоны; usrs — ответственные, назначенные актом, пусто — не назначены */
-  wagons: { number: string; withProperty: boolean; usrs: UserRef[] }[]
+  wagons: { wagon: number; number: string; withProperty: boolean; usrs: UserRef[] }[]
   /** текущий сотрудник может принять вагоны или отказать */
   canReceive: boolean
   /** текущий сотрудник может отменить акт (Ф-АКТ-06) */
@@ -69,7 +69,8 @@ export interface TransferDraft {
   transferredByUsr: number | null
   /** время акта: значение DatePicker, время браузера без пояса */
   transferredDt: string
-  wagons: { number: string; withProperty: boolean }[]
+  /** вагоны — id */
+  wagons: { wagon: number; withProperty: boolean }[]
   /** ответственные за вагоны акта; пусто — не назначены */
   responsibleUsrs: number[]
 }

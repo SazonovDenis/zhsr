@@ -77,6 +77,7 @@ import { numText } from '@/shared/checks/texts'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
+import { compareText } from '@/shared/format'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
@@ -94,6 +95,11 @@ const busy = provideBusy()
 const norms = shallowRef<EquipNorm[]>([])
 const error = ref<ShownError | null>(null)
 
+// норматив для всех типов вагона — первым, остальные — по типу вагона
+function normType(n: EquipNorm): string {
+  return n.wagonType === null ? '' : dictManager.getValue('WagonType', n.wagonType)
+}
+
 async function load() {
   const item = props.item
   norms.value = []
@@ -101,7 +107,9 @@ async function load() {
   if (!item || item.unit === null) return
   try {
     const [list] = await busy.run(Promise.all([fetchEquipNorms(item.id), dictManager.prepareDict('WagonType')]))
-    if (props.item?.id === item.id) norms.value = list
+    if (props.item?.id === item.id) {
+      norms.value = [...list].sort((a, b) => compareText(normType(a), normType(b)))
+    }
   } catch (e) {
     error.value = shownError(e)
   }

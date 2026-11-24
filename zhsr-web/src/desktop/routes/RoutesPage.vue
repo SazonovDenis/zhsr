@@ -59,6 +59,7 @@ import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import { dictChoices } from '@/shared/dict/dictChoices'
+import { ActiveState } from '@/shared/constants/ActiveState'
 import { provideBusy } from '@/shared/busy'
 import { dictManager } from '@/shared/dict/DictManager'
 import { RoleType } from '@/shared/constants/systemDicts'
@@ -81,11 +82,11 @@ const router = useRouter()
 const createReason = computed(() => roleReason([RoleType.WAGON_PLANNER], 'Создаёт планировщик вагонов'))
 
 const states: ChoiceItem[] = [
-  { id: 'active', text: 'Действует' },
-  { id: 'closed', text: 'Завершён' },
+  { id: ActiveState.ACTIVE, text: 'Действует' },
+  { id: ActiveState.CLOSED, text: 'Завершён' },
 ]
 
-const filter = reactive<RouteFilter>({ kinds: [], states: ['active'] })
+const filter = reactive<RouteFilter>({ kinds: [], states: [ActiveState.ACTIVE] })
 
 const rows = shallowRef<RouteRow[]>([])
 // общее ожидание страницы: спиннер на таблице — на всю цепочку загрузок (справочники, фильтры, список)

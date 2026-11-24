@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -31,12 +32,12 @@ public class CouplingService {
      * @param changeType     вид: константы TrainWagonChangeType
      * @param routeStation   промежуточная остановка маршрута (route_station)
      * @param comment        основания, примечания (приказ, причина); может быть пусто
-     * @param wagons         номера вагонов
+     * @param wagons         id вагонов
      * @param time           фактическое время, ISO с часовым поясом; null - сейчас
      * @param seq            прицепка: позиция первого вагона в поезде, с 1; null - в конец
      * @param responsibleUsrs ответственные за вагоны; пусто - не назначены
      */
-    public record CouplingBody(int changeType, long routeStation, String comment, List<String> wagons,
+    public record CouplingBody(int changeType, long routeStation, String comment, List<Long> wagons,
                                OffsetDateTime time, Integer seq, List<Long> responsibleUsrs) {
     }
 
@@ -65,6 +66,7 @@ public class CouplingService {
                     .filter(TripCrew.Wagon::isRiding)
                     .map(w -> {
                         CouplingWagon c = new CouplingWagon();
+                        c.setWagon(w.getWagon());
                         c.setNumber(w.getNumber());
                         c.setSeq(w.getSeq());
                         c.setWagonType(w.getWagonType());
@@ -83,11 +85,11 @@ public class CouplingService {
         }
         List<DbRec> recs = db.loadSql(TripSql.attachCandidates(), Map.of("station", station));
         List<CouplingWagon> res = DbRecMapper.toList(recs, CouplingWagon.class);
-        Map<String, WagonBusy> busy = trainService.busy(res.stream().map(CouplingWagon::getNumber).toList(),
+        Map<String, WagonBusy> busy = trainService.busy(res.stream().map(CouplingWagon::getWagon).toList(),
                 OffsetDateTime.now()).stream().collect(Collectors.toMap(WagonBusy::getNumber, b -> b, (a, b) -> a));
         for (CouplingWagon w : res) {
             w.setBusy(busy.get(w.getNumber()));
-            w.setAvailable(w.getLocationType() == LocationType.STATION && w.getBusy() == null);
+            w.setAvailable(Objects.equals(w.getLocationType(), LocationType.STATION) && w.getBusy() == null);
         }
         refResolver.resolve(res);
         return res;
@@ -101,7 +103,7 @@ public class CouplingService {
     @Transactional
     public TripCrew couple(long id, CouplingBody body) throws Exception {
         DbRec trip = tripService.requireTrip(id);
-        Long train = trip.getLong("train", null);
+        Long train = trip.getLong("train");
         if (train == null) {
             throw ApiException.conflict("Поезд рейса не назначен");
         }

@@ -117,7 +117,11 @@ import { useKeptSelection } from '../frame/keptSelection'
 /** Список вагонов: фильтры и таблица. */
 
 // «Номер» и «Тип» — постоянной ширины, не тянутся; общие колонки (wagonsColumns) других таблиц не меняются
-const columns = wagonsColumns.map((c) => (c.field === 'wagonType' ? { ...c, width: '10rem' } : c))
+const COLUMN_WIDTH: Record<string, string> = { number: '10ch', wagonType: '10rem' }
+const columns = wagonsColumns.map((c) => {
+  const width = COLUMN_WIDTH[c.field]
+  return width ? { ...c, width } : c
+})
 
 const router = useRouter()
 
@@ -148,6 +152,12 @@ const rowMenu: RowMenuItem<WagonRow>[] = [
     run: openJournal,
   },
   ...transferItems,
+  {
+    label: 'Исправить данные вагона',
+    separator: true,
+    disabled: () => roleReason([], 'Данные вагона исправляет администратор'),
+    run: (w: WagonRow) => void editWagon(w),
+  },
   // удалить можно вагон, на который ничего не ссылается: иначе причина от сервера в окне
   {
     label: 'Удалить',
@@ -221,6 +231,14 @@ watch([filter, sort], load, { deep: true })
 // новый вагон введён — список загружается заново, вагон становится выбранным
 async function addWagon() {
   const wagon = await openDialog<WagonRow>(WagonNewDialog)
+  if (!wagon) return
+  await load()
+  selectedId.value = wagon.id
+}
+
+// данные вагона исправлены (Ф-ВАГ-08) — список загружается заново, вагон становится выбранным
+async function editWagon(w: WagonRow) {
+  const wagon = await openDialog<WagonRow>(WagonNewDialog, { wagon: w })
   if (!wagon) return
   await load()
   selectedId.value = wagon.id

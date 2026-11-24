@@ -141,12 +141,9 @@
             <column name="wagon" type="bigint">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
-            <column name="dbeg_location" type="timestamptz">
-                <constraints nullable="false"/>
-            </column>
-            <column name="location_type" type="bigint">
-                <constraints nullable="false"/>
-            </column>
+            <!-- расположение; все поля пусты - расположение не задано -->
+            <column name="dbeg_location" type="timestamptz"/>
+            <column name="location_type" type="bigint"/>
             <column name="station" type="bigint"/>
             <column name="depot" type="bigint"/>
             <column name="yard" type="bigint"/>

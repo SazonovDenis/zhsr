@@ -21,8 +21,8 @@ public class Route {
     private LocalDate dbeg;
     /** null - маршрут действует */
     private LocalDate dend;
-    private Integer conductorHours;
-    private Integer lnpHours;
-    private Integer pemHours;
+    private Double conductorHours;
+    private Double lnpHours;
+    private Double pemHours;
     private List<RoutePoint> points = List.of();
 }

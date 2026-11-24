@@ -37,8 +37,7 @@ final class GeoSql {
                      and (trip.arrived_dt is null or train_wagon.dbeg < trip.arrived_dt)
                 join wagon_geo_location on wagon_geo_location.wagon = train_wagon.wagon
                      and wagon_geo_location.dt >= greatest(trip.departed_dt, train_wagon.dbeg)
-                     and wagon_geo_location.dt <= least(coalesce(trip.arrived_dt, :to),
-                                                        coalesce(train_wagon.dend, :to), :to)
+                     and wagon_geo_location.dt <= least(trip.arrived_dt, train_wagon.dend, :to)
                 where trip.id = any(:trips)
                 order by trip.id, wagon_geo_location.wagon, wagon_geo_location.dt""";
     }
@@ -134,6 +133,6 @@ final class GeoSql {
                 select id, train_number, name
                 from route
                 where (dbeg <= :to and (dend is null or dend >= :from)) or id = any(:routes)
-                order by id""";
+                order by train_number""";
     }
 }

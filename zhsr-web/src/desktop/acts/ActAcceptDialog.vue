@@ -5,7 +5,7 @@
       <ResponsiblePicker
         v-model="responsible"
         :station="act.station"
-        :wagons="act.wagons.map((w) => w.number)"
+        :wagons="act.wagons.map((w) => w.wagon)"
         :current="current"
       />
     </FormField>

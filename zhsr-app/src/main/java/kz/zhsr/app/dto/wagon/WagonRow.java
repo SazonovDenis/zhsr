@@ -34,6 +34,8 @@ public class WagonRow extends WagonOption {
     private OffsetDateTime dbegResponsible;
     /** общий пробег, км (wagon_info.run_km) */
     private int runKm;
+    /** пробег на момент ввода, км (wagon.initial_run_km) */
+    private int initialRunKm;
     /** изготовитель; null - не указан */
     private String maker;
     /** год постройки; null - не указан */

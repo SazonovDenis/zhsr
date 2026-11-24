@@ -659,7 +659,7 @@ public class RequestService {
      */
     private Long wagonTrip(long wagon) throws Exception {
         DbRec info = db.loadRec("wagon_info", Map.of("wagon", wagon));
-        return info != null && info.getLong("location_type") == LocationType.TRIP ? info.getLong("trip", null) : null;
+        return info != null && info.getLong("location_type") == LocationType.TRIP ? info.getLong("trip") : null;
     }
 
     /**
@@ -699,7 +699,7 @@ public class RequestService {
     private String nextNumber(OffsetDateTime now) throws Exception {
         db.loadSqlRec(RequestSql.lockNumbers(), Map.of("key", NUMBER_LOCK));
         String prefix = String.format("%s-%02d-", COMPANY_CODE, now.getYear() % 100);
-        DbRec max = db.loadSqlRec(RequestSql.maxNumber(), Map.of("prefix", prefix + "%"));
+        DbRec max = db.loadSqlRec(RequestSql.maxNumber(), Map.of("prefix", prefix));
         String last = max == null ? null : max.getString("max_number");
         int next = last == null ? 1 : Integer.parseInt(last.substring(prefix.length())) + 1;
         return prefix + String.format("%05d", next);

@@ -49,7 +49,7 @@
         v-model="responsible"
         :station="change.station"
         :trip="change.trip?.id ?? null"
-        :wagons="[change.wagon.number]"
+        :wagons="[change.wagon.id]"
       />
     </FormField>
   </FormDialog>

@@ -13,7 +13,7 @@ final class CurrentUserSql {
     }
 
     /**
-     * Роли сотрудника (id, service) по id роли. Параметр: usr.
+     * Роли сотрудника (id, service) по названию роли. Параметр: usr.
      */
     static String roles() {
         return """
@@ -21,7 +21,7 @@ final class CurrentUserSql {
                 from usr_role
                 join role_type on role_type.id = usr_role.role_type
                 where usr_role.usr = :usr
-                order by role_type.id
+                order by role_type.text
                 """;
     }
 
@@ -55,7 +55,7 @@ final class CurrentUserSql {
                 join trip on trip.id = trip_crew.trip
                 join route on route.id = trip.route
                 where trip_crew.usr = :usr and trip.trip_status_type = :status
-                order by %1$s, trip_crew.id
+                order by %1$s, route.train_number
                 limit 1
                 """.formatted(order, RouteSql.DURATION);
     }

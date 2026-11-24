@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -416,8 +417,8 @@ public class TripResponsibleService {
         return crew.getWagons().stream()
                 .filter(TripCrew.Wagon::isRiding)
                 .filter(w -> plan || (status == TripStatus.IN_PROGRESS
-                        ? w.getLocationType() == LocationType.TRIP && w.getTrip() != null && w.getTrip().getId() == trip
-                        : w.getLocationType() != LocationType.TRIP))
+                        ? Objects.equals(w.getLocationType(), LocationType.TRIP) && w.getTrip() != null && w.getTrip().getId() == trip
+                        : !Objects.equals(w.getLocationType(), LocationType.TRIP)))
                 .sorted(Comparator.comparingInt(TripCrew.Wagon::getSeq))
                 .toList();
     }

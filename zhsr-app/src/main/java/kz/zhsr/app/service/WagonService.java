@@ -165,7 +165,7 @@ public class WagonService {
         Map<Long, List<DbRec>> violations = UtDb.collectGroupBy_records(db.loadList(table + "_value",
                 Map.of(table, docs.stream().map(d -> d.getLong("id")).toList(), "violation", true)), table);
         for (DbRec doc : docs) {
-            Basis basis = new Basis(type, doc.getLong("id"), null, doc.getLong("trip", null),
+            Basis basis = new Basis(type, doc.getLong("id"), null, doc.getLong("trip"),
                     doc.getLong("created_by_usr"), null, false);
             DbRec time = new DbRec();
             time.put("dbeg", doc.get("created_dt"));
@@ -299,7 +299,7 @@ public class WagonService {
         WagonPlace place = new WagonPlace();
         place.setLocationType(rec.getLong("location_type"));
         place.setPlace(rec.getLong("place"));
-        Long trip = rec.getLong("trip", null);
+        Long trip = rec.getLong("trip");
         place.setTrip(trip == null ? null : new TripRef(trip));
         return place;
     }
@@ -318,33 +318,33 @@ public class WagonService {
                     ? WagonJournalRow.BASIS_DETACH
                     : WagonJournalRow.BASIS_ATTACH;
             boolean canCancel = trainService.canUndo(me, rec.getLong("id"));
-            Basis basis = new Basis(type, rec.getLong("id"), null, rec.getLong("trip", null),
-                    rec.getLong("usr", null), rec.get("comment") == null ? null : rec.getString("comment"),
+            Basis basis = new Basis(type, rec.getLong("id"), null, rec.getLong("trip"),
+                    rec.getLong("usr"), rec.get("comment") == null ? null : rec.getString("comment"),
                     canCancel);
-            put(locationBasis, rec.getLong("wagon_location", null), basis);
-            put(statusBasis, rec.getLong("wagon_status", null), basis);
-            put(responsibleBasis, rec.getLong("wagon_responsible", null), basis);
-            put(closedBasis, rec.getLong("closed_wagon_responsible", null), basis);
+            put(locationBasis, rec.getLong("wagon_location"), basis);
+            put(statusBasis, rec.getLong("wagon_status"), basis);
+            put(responsibleBasis, rec.getLong("wagon_responsible"), basis);
+            put(closedBasis, rec.getLong("closed_wagon_responsible"), basis);
         }
         for (DbRec rec : db.loadSql(WagonSql.transferActs(), params)) {
             // приём (расположение) провёл принявший, назначение ответственного при оформлении - сдавший
             boolean canCancel = ActCancelService.canCancelTransfer(me, rec.getLong("act_status_type"),
-                    rec.getLong("transferred_by_usr"), rec.getLong("received_by_usr", null));
+                    rec.getLong("transferred_by_usr"), rec.getLong("received_by_usr"));
             Basis received = new Basis(WagonJournalRow.BASIS_TRANSFER, rec.getLong("id"), rec.getString("number"),
-                    null, rec.getLong("received_by_usr", null), null, canCancel);
+                    null, rec.getLong("received_by_usr"), null, canCancel);
             Basis transferred = new Basis(WagonJournalRow.BASIS_TRANSFER, rec.getLong("id"), rec.getString("number"),
-                    null, rec.getLong("transferred_by_usr", null), null, canCancel);
-            put(locationBasis, rec.getLong("wagon_location", null), received);
-            put(responsibleBasis, rec.getLong("wagon_responsible", null), transferred);
-            put(closedBasis, rec.getLong("closed_wagon_responsible", null), transferred);
+                    null, rec.getLong("transferred_by_usr"), null, canCancel);
+            put(locationBasis, rec.getLong("wagon_location"), received);
+            put(responsibleBasis, rec.getLong("wagon_responsible"), transferred);
+            put(closedBasis, rec.getLong("closed_wagon_responsible"), transferred);
         }
         for (DbRec rec : db.loadSql(WagonSql.edits(), params)) {
             Basis basis = new Basis(WagonJournalRow.BASIS_MANUAL, rec.getLong("id"), null, null,
                     rec.getLong("created_by_usr"), rec.get("comment") == null ? null : rec.getString("comment"), false);
-            put(locationBasis, rec.getLong("wagon_location", null), basis);
-            put(statusBasis, rec.getLong("wagon_status", null), basis);
-            put(responsibleBasis, rec.getLong("wagon_responsible", null), basis);
-            put(closedBasis, rec.getLong("closed_wagon_responsible", null), basis);
+            put(locationBasis, rec.getLong("wagon_location"), basis);
+            put(statusBasis, rec.getLong("wagon_status"), basis);
+            put(responsibleBasis, rec.getLong("wagon_responsible"), basis);
+            put(closedBasis, rec.getLong("closed_wagon_responsible"), basis);
         }
         markBases(locations, statuses, responsibles, locationBasis, statusBasis, responsibleBasis);
     }
@@ -357,7 +357,7 @@ public class WagonService {
     private void markBases(List<DbRec> locations, List<DbRec> statuses, List<DbRec> responsibles,
                            Map<Long, Basis> locationBasis, Map<Long, Basis> statusBasis,
                            Map<Long, Basis> responsibleBasis) throws Exception {
-        List<Long> tripIds = locations.stream().map(r -> r.getLong("trip", null)).filter(t -> t != null)
+        List<Long> tripIds = locations.stream().map(r -> r.getLong("trip")).filter(t -> t != null)
                 .distinct().toList();
         if (tripIds.isEmpty()) {
             return;
@@ -366,7 +366,7 @@ public class WagonService {
         Map<OffsetDateTime, Basis> byTime = new HashMap<>();
         for (int i = 0; i < locations.size(); i++) {
             DbRec rec = locations.get(i);
-            Long tripId = rec.getLong("trip", null);
+            Long tripId = rec.getLong("trip");
             if (rec.getLong("location_type") != LocationType.TRIP || tripId == null) {
                 continue;
             }
@@ -374,7 +374,7 @@ public class WagonService {
             OffsetDateTime departed = trip.getDateTimeTZ("departed_dt");
             if (departed != null && departed.isEqual(rec.getDateTimeTZ("dbeg"))) {
                 Basis departure = new Basis(WagonJournalRow.BASIS_DEPARTURE, tripId, null, tripId,
-                        trip.getLong("departed_by_usr", null), null, false);
+                        trip.getLong("departed_by_usr"), null, false);
                 locationBasis.putIfAbsent(rec.getLong("id"), departure);
                 byTime.put(departed.toInstant().atOffset(ZoneOffset.UTC), departure);
             }
@@ -382,7 +382,7 @@ public class WagonService {
             if (arrived != null && i + 1 < locations.size()
                     && arrived.isEqual(locations.get(i + 1).getDateTimeTZ("dbeg"))) {
                 Basis arrival = new Basis(WagonJournalRow.BASIS_ARRIVAL, tripId, null, tripId,
-                        trip.getLong("arrived_by_usr", null), null, false);
+                        trip.getLong("arrived_by_usr"), null, false);
                 locationBasis.putIfAbsent(locations.get(i + 1).getLong("id"), arrival);
                 byTime.put(arrived.toInstant().atOffset(ZoneOffset.UTC), arrival);
             }

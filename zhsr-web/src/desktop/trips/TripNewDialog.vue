@@ -83,6 +83,7 @@ import { createTrip, fetchTripCrew, updateTrip } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import type { ShownError } from '@/shared/errors'
 import { formError, shownError } from '@/shared/errors'
+import { ActiveState } from '@/shared/constants/ActiveState'
 import { provideBusy } from '@/shared/busy'
 import CbList from '@/shared/components/choice/CbList.vue'
 import { openDialog } from '@/shared/components/dialog/openDialog'
@@ -149,7 +150,7 @@ const error = ref<ShownError | null>(null)
 // загрузка формы — сразу в setup и в счёт ожидания диалога: спиннер в подвале с первой отрисовки
 void busy.run(async () => {
   try {
-    const active = await fetchRouteOptions({ kinds: [], states: ['active'] })
+    const active = await fetchRouteOptions({ kinds: [], states: [ActiveState.ACTIVE] })
     // выбранный маршрут — исправляемого рейса или только что созданный — может не действовать сегодня: он тоже в
     // списке, иначе поле было бы пустым
     const own = draft.route

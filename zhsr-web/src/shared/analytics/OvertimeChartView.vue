@@ -46,7 +46,7 @@
           <span
             v-if="detailed"
             class="overtime__total"
-            :title="t('{hours} ч при нормативе {norm} ч', { hours: row.total, norm: normTotal })"
+            :title="t('{hours} ч при нормативе {norm} ч', { hours: formatHours(row.total), norm: normTotal })"
           >
             <i class="overtime__bar" :style="{ width: pos(row.total) }" />
             <i class="overtime__axis" />
@@ -68,6 +68,7 @@ import { computed, ref } from 'vue'
 
 import { CREW_DUTY_LNP, fetchOvertime } from '@/api/analytics'
 import { i18n, t } from '@/boot/i18n'
+import { formatHours } from '@/shared/format'
 import { dictManager } from '@/shared/dict/DictManager'
 import ChartView from './ChartView.vue'
 import DepotChoice from './DepotChoice.vue'
@@ -178,7 +179,7 @@ function cellTitle(row: Row, i: number, h: number): string {
   )
   let text =
     `${row.name}${row.lnp ? ' (' + t('ЛНП') + ')' : ''}\n` +
-    t('{month}: {hours} ч при норме {norm} ч', { month, hours: h, norm: data.value!.norm })
+    t('{month}: {hours} ч при норме {norm} ч', { month, hours: formatHours(h), norm: data.value!.norm })
   if (i === FULL) text += '\n' + t('месяц не закончен')
   return text
 }

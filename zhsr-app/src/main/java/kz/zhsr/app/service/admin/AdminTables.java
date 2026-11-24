@@ -78,7 +78,7 @@ public final class AdminTables {
 
     static {
         add(new AdminTable("depot", "Депо", List.of(
-                text("code", "Код", true, 20),
+                text("code", "Код", false, 20),
                 text("name_ru", "Название на русском", true, 255),
                 text("name_kk", "Название на казахском", false, 255),
                 text("name_en", "Название на английском", false, 255),

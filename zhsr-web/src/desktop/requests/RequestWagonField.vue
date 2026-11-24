@@ -230,7 +230,7 @@ let timer: ReturnType<typeof setTimeout> | undefined
 function onSearch(text: string) {
   searchText.value = text
   if (mode.value !== 'other') return
-  const digits = text.replace(/\D/g, '')
+  const digits = text.replace(/[^\d/]/g, '')
   if (digits === query) return
   query = digits
   clearTimeout(timer)

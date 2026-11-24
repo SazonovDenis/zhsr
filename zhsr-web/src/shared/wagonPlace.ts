@@ -12,7 +12,7 @@ import { tripRefText } from '@/shared/trips/tripRefText'
  * @param ref  место — id справочника по виду расположения; у рейса не нужен
  * @param trip рейс для показа: «002 • Алматы — Астана»
  */
-export function placeText(kind: number, ref: number | null, trip: string | null = null): string {
+export function placeText(kind: number | null, ref: number | null, trip: string | null = null): string {
   switch (kind) {
     case LocationType.STATION:
       return dictManager.getValue('Station', ref)

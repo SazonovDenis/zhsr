@@ -36,6 +36,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -156,8 +157,9 @@ public class CheckService {
                     Map.of("check_list_value", values.stream().map(CheckListValueRow::getId).toList())),
                     "check_list_value");
             for (CheckListValueRow v : values) {
-                v.setPhotos(photos.getOrDefault(v.getId(), List.of()).stream().map(r -> r.getLong("id")).sorted()
-                                  .toList());
+                v.setPhotos(photos.getOrDefault(v.getId(), List.of()).stream()
+                                  .sorted(Comparator.comparing((DbRec r) -> r.getDateTimeTZ("created_dt")))
+                                  .map(r -> r.getLong("id")).toList());
             }
         }
         res.setValues(values);
@@ -265,7 +267,7 @@ public class CheckService {
         }
         CheckTemplateRow tpl = db.loadRec("check_list_template", own.getLong("check_list_template"),
                 CheckTemplateRow.class);
-        Long wagon = own.getLong("wagon", null);
+        Long wagon = own.getLong("wagon");
         Long wagonType = wagon == null ? null : db.loadRec("wagon", wagon, true).getLong("wagon_type");
         db.updateRec("check_list", Map.of("id", id, "completed_dt", now));
 
@@ -304,7 +306,7 @@ public class CheckService {
             List<RequestService.StoredPhoto> stored = keepPhotos(valueId, v == null ? null : v.photos());
             stored.addAll(savePhotos(id, valueId, photos.getOrDefault(item.getId(), List.of()), user.id(), now, now));
             boolean violation = Boolean.TRUE.equals(rec.get("violation"));
-            Long request = old == null ? null : old.getLong("repair_request", null);
+            Long request = old == null ? null : old.getLong("repair_request");
             if (request != null) {
                 if (violation) {
                     requestService.updateSystem(request, requestText(tpl, item, v), stored, author);
@@ -315,7 +317,7 @@ public class CheckService {
                     db.updateRec("check_list_value", clear);
                 }
             } else if (violation && item.getFaultType() != null && tpl.getCheckObject() == CheckObject.WAGON) {
-                long created = requestService.createSystem(wagon, own.getLong("trip", null), item.getFaultType(),
+                long created = requestService.createSystem(wagon, own.getLong("trip"), item.getFaultType(),
                         requestText(tpl, item, v), author, now, stored);
                 db.updateRec("check_list_value", Map.of("id", valueId, "repair_request", created));
             }
@@ -418,7 +420,7 @@ public class CheckService {
      */
     private Long wagonTrip(long wagon) throws Exception {
         DbRec info = db.loadRec("wagon_info", Map.of("wagon", wagon));
-        return info != null && info.getLong("location_type") == LocationType.TRIP ? info.getLong("trip", null) : null;
+        return info != null && info.getLong("location_type") == LocationType.TRIP ? info.getLong("trip") : null;
     }
 
     /**

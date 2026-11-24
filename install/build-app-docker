@@ -13,11 +13,6 @@ for key in $KEYS; do
     echo "=== $image"
     install/docker-images/prepare-context "$image"
     dir="install/docker-images/$image"
-    if [ "$image" = zhsr-database ]; then
-        docker build --target zhsr-database -t sazonovden/zhsr-database:latest "$dir"
-        docker build --target zhsr-database-demo -t sazonovden/zhsr-database-demo:latest "$dir"
-    else
-        docker build -t "sazonovden/$image:latest" "$dir"
-    fi
+    docker build -t "sazonovden/$image:latest" "$dir"
     rm -rf "$dir/tmp"
 done

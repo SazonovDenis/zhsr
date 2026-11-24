@@ -83,7 +83,7 @@ interface PickRow extends WagonRow {
  * @prop groups рейсы поезда с остановками (loadStopGroups)
  * @prop at     плановое время по умолчанию, ISO
  * @prop trip   рейс, предложенный для плана первым; null — вне рейса
- * @prop wagon  номер вагона, отмеченного при открытии; null — ни одного
+ * @prop wagon  id вагона, отмеченного при открытии; null — ни одного
  * @prop plan   открыть сразу планом
  * @prop submit отцепить по выбору окна: поезд после отцепки; ошибку окно показывает у себя и не закрывается
  */
@@ -93,7 +93,7 @@ const props = withDefaults(
     groups: StopGroup[]
     at: string
     trip?: number | null
-    wagon?: string | null
+    wagon?: number | null
     plan?: boolean
     submit: (choice: AttachChoice) => Promise<TrainCard>
   }>(),
@@ -110,7 +110,7 @@ const error = ref<ShownError | null>(null)
 const loadError = ref<ShownError | null>(null)
 const running = ref(false)
 // отмеченные вагоны — по номеру
-const picked = ref(new Set<string>(props.wagon ? [props.wagon] : []))
+const picked = ref(new Set<number>(props.wagon ? [props.wagon] : []))
 
 const mode = computed(() => fields.value?.state.mode ?? (props.plan ? 'plan' : 'fact'))
 /** Момент отцепки: от него — ожидаемый состав и расположение на момент. */
@@ -123,10 +123,10 @@ async function load() {
   loadError.value = null
   try {
     await busy.run(async () => {
-      const numbers = props.card.trainWagons.map((w) => w.number)
-      const list = numbers.length
+      const ids = props.card.trainWagons.map((w) => w.wagon)
+      const list = ids.length
         ? await fetchWagons(
-            { number: '', numbers, station: null, trip: null, locationKinds: [], states: [], at: moment.value },
+            { number: '', ids, station: null, trip: null, locationKinds: [], states: [], at: moment.value },
             null,
           )
         : []
@@ -144,27 +144,27 @@ const rows = computed<PickRow[]>(() => {
   return list.map((m) => {
     // вагона нет в ответе (не виден по роли) — поля вагона поезда, без расположения на момент
     const row = wagonRows.value.get(m.wagon.number) ?? ({ ...m.wagon, locationAt: null } as unknown as WagonRow)
-    return { ...row, key: m.wagon.wagon, seq: m.state.seq }
+    return { ...row, id: m.wagon.wagon, key: m.wagon.wagon, seq: m.state.seq }
   })
 })
 
 // вагон, которого нет в составе на новое время или в новом виде, снимается
 watch(rows, (list) => {
-  const numbers = new Set(list.map((r) => r.number))
-  picked.value = new Set([...picked.value].filter((n) => numbers.has(n)))
+  const ids = new Set(list.map((r) => r.id))
+  picked.value = new Set([...picked.value].filter((id) => ids.has(id)))
 })
 
-function toggle(r: Pick<PickRow, 'number'>) {
+function toggle(r: Pick<PickRow, 'id'>) {
   const next = new Set(picked.value)
-  if (next.has(r.number)) next.delete(r.number)
-  else next.add(r.number)
+  if (next.has(r.id)) next.delete(r.id)
+  else next.add(r.id)
   picked.value = next
   // отметка вагона — ввод: убирает ошибку диалога
   error.value = null
 }
 
 provide(WAGON_PICK, {
-  isPicked: (w: WagonRow) => picked.value.has(w.number),
+  isPicked: (w: WagonRow) => picked.value.has(w.id),
   toggle,
   fit: () => ({ block: '', warn: '' }),
 })
@@ -192,7 +192,7 @@ async function save() {
   error.value = null
   running.value = true
   try {
-    emit('done', await props.submit({ ...choice, numbers: [...picked.value] }))
+    emit('done', await props.submit({ ...choice, wagons: [...picked.value] }))
   } catch (e) {
     error.value = shownError(e)
   } finally {

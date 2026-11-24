@@ -10,12 +10,14 @@ import lombok.Setter;
 @Getter
 @Setter
 public class CouplingWagon {
+    /** вагон (wagon.id) */
+    private long wagon;
     private String number;
     /** отцепка: позиция вагона в поезде; прицепка - null */
     private Integer seq;
     private long wagonType;
-    private long locationType;
-    private long place;
+    private Long locationType;
+    private Long place;
     private long wagonStatusType;
     /** занятость вагона в другом поезде; null - вагон свободен */
     private WagonBusy busy;

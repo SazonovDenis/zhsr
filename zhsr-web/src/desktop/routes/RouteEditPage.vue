@@ -13,12 +13,15 @@
           :points="previewPoints"
           :selected="selectedStation"
           :show-passing="!chainCollapsed"
+          expandable
           class="route-edit__map"
           :class="{ 'route-edit__map--wide': !chainCollapsed }"
           @station="selectedStation = $event.station"
+          @expand="chainCollapsed = !chainCollapsed"
         />
         <div class="route-edit__stops">
           <RouteStops v-model:collapsed="chainCollapsed" :points="previewPoints" layout="horizontal" />
+          <ErrorBox v-if="legsLoad.error" :error="legsLoad.error" :retry="legsLoad.retry" class="q-mt-sm" />
         </div>
       </div>
 
@@ -27,13 +30,6 @@
           <div class="route-edit__section-title">{{ t('Остановки по порядку') }}</div>
           <div class="route-edit__card route-edit__stops-card q-pa-md">
             <RouteStopsEditor v-model="stops" :readonly="readonly" />
-          </div>
-          <div class="route-edit__note">
-            {{
-              t(
-                'Начальная и конечная станции — узловые (со своим депо). Следующая станция — любая, достижимая по маршруту от предыдущей.',
-              )
-            }}
           </div>
         </div>
 
@@ -84,20 +80,24 @@
               </FormField>
             </FormSection>
 
-            <FormSection title="Нормы часов" divided columns="repeat(3, 6rem)">
-              <FormField label="Проводник, ч">
-                <span v-if="readonly" class="route-edit__value">{{ form.hc || '—' }}</span>
-                <TextInput v-else v-model="form.hc" inputmode="numeric" />
+            <FormSection title="Нормы часов" divided columns="repeat(3, 9rem)">
+              <FormField label="Проводник, час:мин">
+                <span v-if="readonly" class="route-edit__value">{{ normText(form.hc) }}</span>
+                <HoursInput v-else v-model="form.hc" width="4rem" />
               </FormField>
-              <FormField label="ЛНП, ч">
-                <span v-if="readonly" class="route-edit__value">{{ form.hl || '—' }}</span>
-                <TextInput v-else v-model="form.hl" inputmode="numeric" />
+              <FormField label="ЛНП, час:мин">
+                <span v-if="readonly" class="route-edit__value">{{ normText(form.hl) }}</span>
+                <HoursInput v-else v-model="form.hl" width="4rem" />
               </FormField>
-              <FormField label="ПЭМ, ч">
-                <span v-if="readonly" class="route-edit__value">{{ form.hp || '—' }}</span>
-                <TextInput v-else v-model="form.hp" inputmode="numeric" />
+              <FormField label="ПЭМ, час:мин">
+                <span v-if="readonly" class="route-edit__value">{{ normText(form.hp) }}</span>
+                <HoursInput v-else v-model="form.hp" width="4rem" />
               </FormField>
             </FormSection>
+
+            <div v-if="!readonly" class="route-edit__note">
+              {{ t('Можно вводить доли часа, напр. «2,5» будет означать «2 часа 30 мин».') }}
+            </div>
 
             <ErrorBox v-if="error" :error="error" class="route-edit__error q-py-sm q-px-md" />
           </div>
@@ -125,12 +125,11 @@
 </template>
 
 <script setup lang="ts">
-import { Notify } from 'quasar'
-import { computed, reactive, ref, shallowRef } from 'vue'
+import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import type { Route, RoutePoint, RouteStop } from '@/api/routes'
-import { fetchRoute, saveRoute } from '@/api/routes'
+import type { LegStation, Route, RouteLeg, RoutePoint, RouteStop } from '@/api/routes'
+import { fetchLegs, fetchRoute, saveRoute } from '@/api/routes'
 import { t } from '@/boot/i18n'
 import ErrorBox from '@/shared/components/ErrorBox.vue'
 import type { ShownError } from '@/shared/errors'
@@ -138,15 +137,18 @@ import { formError, shownError } from '@/shared/errors'
 import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import FormField from '@/shared/components/form/FormField.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
+import HoursInput from '@/shared/components/form/HoursInput.vue'
 import FormSection from '@/shared/components/form/FormSection.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import { dictChoices } from '@/shared/dict/dictChoices'
 import { RouteKind } from '@/shared/constants/RouteKind'
+import { formatHoursMinutes } from '@/shared/format'
 import { provideBusy } from '@/shared/busy'
 import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import RouteMap from '@/shared/components/map/RouteMap.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { RoleType } from '@/shared/constants/systemDicts'
+import { useLoad } from '@/shared/loadable'
 import { roleReason } from '@/shared/roleReason'
 import { loadCurrentUser } from '@/shared/user'
 import DesktopFrame from '../frame/DesktopFrame.vue'
@@ -187,9 +189,9 @@ const form = reactive({
   kind: RouteKind.REGULAR,
   since: '',
   until: '',
-  hc: '',
-  hl: '',
-  hp: '',
+  hc: null as number | null,
+  hl: null as number | null,
+  hp: null as number | null,
 })
 const saving = ref(false)
 // станции следования в цепочке сверху свёрнуты; развёрнуты — карта крупнее и показывает их
@@ -201,18 +203,26 @@ const error = ref<ShownError | null>(null)
 
 const title = computed(() => (route.value ? t('Маршрут № {train}', { train: route.value.trainNumber }) : t('Маршрут')))
 
+// станции следования новых пар остановок, по legKey
+const legs = shallowRef(new Map<string, LegStation[]>())
+
+function legKey(leg: RouteLeg): string {
+  return `${leg.from}-${leg.to}`
+}
+
 /**
  * Остановки для показа сверху и на карте. Станции следования берутся из маршрута до правки: между соседними
  * остановками — станции самого короткого куска маршрута между ними, от последнего появления предыдущей станции до
  * первого появления следующей; петли станций следования в этом куске вырезаются. Удалили остановку — она и станции
  * следования вокруг неё становятся станциями следования между её соседями; соседи — одна станция (маршрут
  * схлопнулся в редакторе) — вся петля между ними пропадает. Для пар остановок, которых в маршруте до правки не было
- * (новая станция), станции следования построит сервер при сохранении.
+ * (новая станция), станции следования прокладывает сервер (legs); ещё не загруженные пары — missing.
  */
-const previewPoints = computed<RoutePoint[]>(() => {
+const preview = computed(() => {
   const original = route.value?.points ?? []
   const filled = stops.value.filter((s) => s.station)
   const result: RoutePoint[] = []
+  const missing: RouteLeg[] = []
   // место в маршруте до правки, с которого ищется следующая пара остановок: пары идут по порядку
   let cursor = 0
   filled.forEach((stop, i) => {
@@ -223,6 +233,17 @@ const previewPoints = computed<RoutePoint[]>(() => {
       if (found) {
         passing = found.passing
         cursor = found.end
+      } else {
+        const leg = { from: prev.station, to: stop.station }
+        const stations = legs.value.get(legKey(leg))
+        if (!stations) missing.push(leg)
+        passing = (stations ?? []).map((s) => ({
+          station: s.station,
+          km: prev.km + s.km,
+          haveStop: false,
+          arrivalMin: null,
+          departureMin: null,
+        }))
       }
     }
     const last = i === filled.length - 1
@@ -233,8 +254,27 @@ const previewPoints = computed<RoutePoint[]>(() => {
       departureMin: last ? null : stop.departureMin,
     })
   })
-  return result
+  return { points: result, missing }
 })
+const previewPoints = computed(() => preview.value.points)
+
+// остановки сменились, пока шла загрузка, — загрузка повторяется для новых пар
+const legsLoad = useLoad(async () => {
+  while (preview.value.missing.length > 0) {
+    const missing = preview.value.missing
+    const loaded = await fetchLegs(missing)
+    const next = new Map(legs.value)
+    missing.forEach((leg, i) => next.set(legKey(leg), loaded[i] ?? []))
+    legs.value = next
+  }
+})
+
+watch(
+  () => preview.value.missing.map(legKey).join(),
+  (missing) => {
+    if (missing) void legsLoad.run()
+  },
+)
 
 /**
  * Время станции следования между остановками from и to — по расстоянию между отправлением с from и прибытием на to,
@@ -306,15 +346,19 @@ function toStops(points: RoutePoint[]): RouteStop[] {
 function fill(r: Route) {
   route.value = r
   stops.value = toStops(r.points)
+  // остановок нет — сразу пустая: выбор начальной станции
+  if (stops.value.length === 0 && !readonly.value) {
+    stops.value = [{ station: 0, km: 0, arrivalMin: null, departureMin: null }]
+  }
   Object.assign(form, {
     train: r.trainNumber,
     name: r.name,
     kind: r.routeKind,
     since: r.dbeg,
     until: r.dend ?? '',
-    hc: r.conductorHours === null ? '' : String(r.conductorHours),
-    hl: r.lnpHours === null ? '' : String(r.lnpHours),
-    hp: r.pemHours === null ? '' : String(r.pemHours),
+    hc: r.conductorHours,
+    hl: r.lnpHours,
+    hp: r.pemHours,
   })
 }
 
@@ -322,22 +366,20 @@ function back() {
   void router.push({ name: 'routes' })
 }
 
-/** Норма часов: целое неотрицательное число; иначе null. */
-function hours(value: string): number | null {
-  const text = value.trim()
-  return /^\d+$/.test(text) ? Number(text) : null
+/** Норма часов при readonly: «2:30»; нормы нет — прочерк. */
+function normText(hours: number | null): string {
+  return hours === null ? '—' : formatHoursMinutes(hours)
 }
 
 async function save() {
   const r = route.value
   if (!r) return
-  const values = [form.hc, form.hl, form.hp].map(hours)
   if (!form.train || !form.name || !form.since) {
     error.value = formError(t('Заполните номер поезда, сообщение и дату ввода маршрута'))
     return
   }
-  if (values.some((v) => v === null)) {
-    error.value = formError(t('Нормы часов — целые неотрицательные числа'))
+  if (form.hc === null || form.hl === null || form.hp === null) {
+    error.value = formError(t('Заполните нормы часов'))
     return
   }
   if (stops.value.length < 2 || stops.value.some((s) => !s.station)) {
@@ -347,8 +389,7 @@ async function save() {
   error.value = null
   saving.value = true
   try {
-    const [hc, hl, hp] = values as number[]
-    const saved = await saveRoute(
+    await saveRoute(
       {
         ...r,
         trainNumber: form.train,
@@ -356,14 +397,13 @@ async function save() {
         routeKind: form.kind,
         dbeg: form.since,
         dend: form.until || null,
-        conductorHours: hc!,
-        lnpHours: hl!,
-        pemHours: hp!,
+        conductorHours: form.hc,
+        lnpHours: form.hl,
+        pemHours: form.hp,
       },
       previewPoints.value,
     )
-    fill(saved)
-    Notify.create({ message: t('Маршрут сохранён'), color: 'primary' })
+    back()
   } catch (e) {
     error.value = shownError(e)
   } finally {

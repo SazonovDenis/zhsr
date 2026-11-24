@@ -19,9 +19,9 @@ public class RouteRow extends RouteOption {
     /** дата окончания действия; null - маршрут действует */
     private LocalDate dend;
     /** норма часов за рейс для проводника */
-    private Integer conductorHours;
+    private Double conductorHours;
     /** норма часов за рейс для ЛНП */
-    private Integer lnpHours;
+    private Double lnpHours;
     /** норма часов за рейс для ПЭМ */
-    private Integer pemHours;
+    private Double pemHours;
 }

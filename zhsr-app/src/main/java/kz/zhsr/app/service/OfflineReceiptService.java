@@ -1,5 +1,6 @@
 package kz.zhsr.app.service;
 
+import kz.kis.kiscore.utils.UtCnv;
 import kz.kis.kisdbtools.repository.Db;
 import org.springframework.stereotype.Service;
 
@@ -55,7 +56,7 @@ public class OfflineReceiptService {
      * Заявка, созданная уже принятой отправкой.
      */
     public long requestOf(String guid) throws Exception {
-        return db.loadList("offline_receipt", Map.of("client_guid", guid)).get(0).getLong("repair_request");
+        return UtCnv.toLong(db.loadList("offline_receipt", Map.of("client_guid", guid)).get(0).get("repair_request"));
     }
 
 }

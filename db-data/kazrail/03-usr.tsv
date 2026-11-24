@@ -1,0 +1,101 @@
+id	login	full_name	password_hash	phone	disabled	change_password	created_dt	description
+2	kr001	Айдарбекова Карамат Шарипбаевна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Инструктор-нормировщик
+3	kr002	Азимов Нурлыбек Жанузакович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Мастер производственного участка
+4	kr003	Молдабеков Олжас Оңғарбекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Мастер производственного участка
+5	kr004	Абдибеков Дидар Томанович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Начальник пассажирского поезда
+6	kr005	Керім Данияр Секербайұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Начальник пассажирского поезда
+7	kr006	Пусурманов Мерхат Жасуланович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Начальник пассажирского поезда
+8	kr007	Сәбит Ақжол Аманкелдіұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	И.о. начальника пассажирского поезда
+9	kr008	Атымтаев Алтынбек Жанабергенович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Поездной электромеханик
+10	kr009	Дәуренов Нұрсұлтан Асылханұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Поездной электромеханик
+11	kr010	Кенжебаев Жарылғасын Жұмабайұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Поездной электромеханик 4 разряда
+12	kr011	Сагадинов Жалгасбай Жаксылыкович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Поездной электромеханик
+13	kr012	Абдеш Мұзафар Бахтиярұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+14	kr013	Абдрахманов Жанат Каппасович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+15	kr014	Абдыкадыров Ерден Сембаевич	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+16	kr015	Абенов Айбол Бузаубайұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+17	kr016	Айдос Қазыбек Айдосұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+18	kr017	Айтбайұлы Али	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+19	kr018	Алпыс Менсұлу Маратқызы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+20	kr019	Амангелді Асылан Бердібекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+21	kr020	Аманжол Ермұрат Нұрбекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+22	kr021	Амралов Нурсултан Аманбаевич	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+23	kr022	Архабаев Нұрасыл Қанатұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+24	kr023	Ахметова Макпал Айбатовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+25	kr024	Ахметшин Ернур Сартаевич	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+26	kr025	Байузаков Саулет Журынбекович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+27	kr026	Бақытжан Жомарт Маралұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+28	kr027	Бейбіт Нұрлыбек Бейбітұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+29	kr028	Бейсенбаев Қуанышбек Болатұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+30	kr029	Бейсенбай Өсер Ерланұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+31	kr030	Богатикова Елена Васильевна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+32	kr031	Булекбаев Куанышбек Кожабекович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+33	kr032	Ғалымхан Қазбек Ғалижанұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+34	kr033	Далабай Еламан Хамитбекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+35	kr034	Дауытбаев Нурлыбек Узакбаевич	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+36	kr035	Есқали Нұрай Рауанқызы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+37	kr036	Әбдіғамит Ерасыл Мұхитұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+38	kr037	Әбдікәрімов Бағдат Әбдісалықұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+39	kr038	Әдірбай Мақсат Бекмұратұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+40	kr039	Әлімов Айбек Нұрымжанұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+41	kr040	Әмірғали Әлішер Жұмагерейұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+42	kr041	Жақсыбай Абылай Бақытұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+43	kr042	Жанаберген Дамир Жаңбырбайұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+44	kr043	Жиенғали Төрежан Бауыржанұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+45	kr044	Жолдықан Алпыс Төреханұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+46	kr045	Жургумбекова Анара Суйнбековна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+47	kr046	Кабидолла Жанабек Турлибекулы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+48	kr047	Какенов Еркин Бауыржанович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+49	kr048	Капуран Айжан	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+50	kr049	Каракулов Закиржан Кенжебекович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+51	kr050	Каримов Дастан Кайратович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+52	kr051	Кенжеғара Мағжан Болатұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+53	kr052	Кожахметов Батырбек Жауынбайұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+54	kr053	Койшибаев Каиргельды Агибаевич	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона; примечание: Айсара
+55	kr054	Коспанова Айгуль Кайрламбаевна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+56	kr055	Кулымбетов Магжан Танатканович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+57	kr056	Кутмагамбетов Кенжетай Бакытович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+58	kr057	Қабидолла Айбек Тұрлыбекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+59	kr058	Қазынабек Нұрлыбек Жұмашұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+60	kr059	Қалижанов Күмісбек Санабекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+61	kr060	Қалқожа Мәди Дулатұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+62	kr061	Қапсамат Ернұр Мирамбекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+63	kr062	Қойшыбек Жандос Талғатұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+64	kr063	Қонысбек Берік Қонысбекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+65	kr064	Мажман Ерболат Қасымұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+66	kr065	Мажманов Сүндетбек Қабылбекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+67	kr066	Мейрамов Баубек Мейрамұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+68	kr067	Мираш Жансұлтан Мирашұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+69	kr068	Мұхтарқызы Айсұлу	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+70	kr069	Мырзалым Аманкелді Болатұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+71	kr070	Мырзатай Мирамбек Мырзатайұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+72	kr071	Нарымбетова Райхан Мажитовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+73	kr072	Нурлыбеков Улан Муратович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+74	kr073	Нурумбаева Есенгуль Викторовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+75	kr074	Нұрғалиев Бақытжан Абатұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+76	kr075	Нұрмұхамед Әлішер Мырзатайұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+77	kr076	Озатқазыев Саят Озатқазыұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+78	kr077	Омарова Гульнара Ермакановна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+79	kr078	Орынтөлеп Абзал Жомартұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+80	kr079	Оспанов Мейрамбек Дуйсенбекович	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+81	kr080	Рахметов Галымжан Кабылтаевич	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+82	kr081	Сағидуллаева Аружан Нұрлыбекқызы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+83	kr082	Сақан Батырлан Мирамұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+84	kr083	Сақан Ұлан Мирамұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+85	kr084	Сахауов Кылышбек Сабидуллаевич	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+86	kr085	Текебаева Гульзада Амангельдиновна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+87	kr086	Темешов Ерасыл Бекболұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+88	kr087	Теміржан Аманжол Мейрамұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+89	kr088	Тәджіғали Ақниет Ерланұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+90	kr089	Төлеубай Ораәлі Төлеубайұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+91	kr090	Тұрғанбек Айтмұхаммед Кенжалыұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+92	kr091	Тыным Диас Ғалиұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+93	kr092	Уәли Айдын Жоламанұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+94	kr093	Үмітқали Бекзат Мақсұтбекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+95	kr094	Хамзанов Диас Бақытбекұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+96	kr095	Хибатова Багила Шакировна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона; примечание: Айсара
+97	kr096	Хусаин Нұржан Қайыржанұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+98	kr097	Шайхин Саян Әжмұханұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+99	kr098	Шакирова Асель Канагатовна	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+100	kr099	Шәріпбай Сабыржан Асқарұлы	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона
+101	kr100	Эгамбердиев Ерлон Нишанбаевич	$2a$10$Z/2bww6g1oQO3wdhq7qJqum98Y7z.mykoA3l8Ww0ASNW5iNbrzXM.		false	true	2026-02-25 00:00:00+05:00	Проводник пассажирского вагона

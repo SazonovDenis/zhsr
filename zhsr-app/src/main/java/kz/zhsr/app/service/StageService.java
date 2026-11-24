@@ -148,7 +148,7 @@ public class StageService {
     private List<StationPoint> stationPoints(Collection<Long> stations) throws Exception {
         Map<Long, Long> pointOf = new HashMap<>();
         for (DbRec station : db.loadList("station", Map.of("id", stations))) {
-            Long point = station.getLong("stage_point", null);
+            Long point = station.getLong("stage_point");
             if (point != null) {
                 pointOf.put(station.getLong("id"), point);
             }

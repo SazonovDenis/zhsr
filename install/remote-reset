@@ -3,14 +3,37 @@ set -e
 
 # Пересоздать на сервере хранилище и БД с нуля и запустить приложение, с машины разработчика. Все данные на сервере
 # пропадают.
-#   ./remote-reset          - без демо-данных
-#   ./remote-reset --demo   - с демо-данными и фото демо-заявок
+#   ./remote-reset              - с данными db-data/default
+#   ./remote-reset --<каталог>  - ещё и с данными db-data/<каталог>: --demo, --kazrail
+# Данные копируются на сервер по ssh при каждом запуске: *.tsv и *.sql каталогов и фото img/*.jpg; прежняя копия на
+# сервере стирается.
 
 # все пути - от корня проекта
 cd "$(dirname "$0")/.."
 . install/remote.sh
 
+# каталоги данных проверяются до изменений на сервере
+DIRS=default
+for a in "$@"; do
+    dir=${a#--}
+    case $dir in
+      "$a"|""|*[!a-z0-9_-]*) echo "неизвестный параметр: $a" >&2; exit 1 ;;
+    esac
+    [ -d "db-data/$dir" ] || { echo "нет каталога данных db-data/$dir (параметр $a)" >&2; exit 1; }
+    DIRS="$DIRS $dir"
+done
+
 sync_base
+
+echo "--- данные -> сервер: $DIRS"
+(
+    cd db-data
+    for dir in $DIRS; do
+        find "$dir" -maxdepth 1 -type f \( -name '*.tsv' -o -name '*.sql' \)
+        [ ! -d "$dir/img" ] || find "$dir/img" -maxdepth 1 -type f -name '*.jpg'
+    done | tar -czf - -T -
+) | $SSH "cd '$DEPLOY_DIR' && rm -rf db-data && mkdir db-data && tar -C db-data -xzf -"
+
 $SSH "cd '$DEPLOY_DIR' && docker compose pull && ./app-reset $*"
 
 echo "Готово"

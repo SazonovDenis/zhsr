@@ -86,8 +86,8 @@ final class TripSql {
                 from trip_crew
                 join usr on usr.id = trip_crew.usr
                 where trip_crew.trip = :trip
-                  and (trip_crew.dend is null or trip_crew.dend = cast(:arrived as timestamptz))
-                order by usr.full_name, trip_crew.usr, trip_crew.id
+                  and (trip_crew.dend is null or trip_crew.dend = :arrived)
+                order by usr.full_name, usr.login
                 """.formatted(SENIOR);
     }
 
@@ -109,7 +109,7 @@ final class TripSql {
                                    join depot on depot.id = usr_depot.depot
                                    where usr_depot.usr = usr.id and usr_depot.dend is null
                                      and depot.station = :station))
-                order by usr.full_name, usr.id
+                order by usr.full_name, usr.login
                 """.formatted(SENIOR);
     }
 
@@ -122,7 +122,7 @@ final class TripSql {
                 from usr
                 join usr_role on usr_role.usr = usr.id
                 where usr_role.role_type = :role and not usr.disabled
-                order by usr.full_name, usr.id
+                order by usr.full_name, usr.login
                 """;
     }
 
@@ -147,7 +147,7 @@ final class TripSql {
      */
     static String attachCandidates() {
         return """
-                select wagon.id, wagon.number, wagon.wagon_type, wagon_info.location_type,
+                select wagon_info.wagon, wagon.number, wagon.wagon_type, wagon_info.location_type,
                        coalesce(wagon_info.station, wagon_info.depot, wagon_info.yard) as place,
                        wagon_info.wagon_status_type
                 from wagon

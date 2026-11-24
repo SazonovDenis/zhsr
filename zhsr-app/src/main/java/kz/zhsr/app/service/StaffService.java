@@ -211,7 +211,7 @@ public class StaffService {
             params.put("departure", WagonResponsibleTripPoint.DEPARTURE);
             for (DbRec r : db.loadSql(StaffSql.planWagons(), params)) {
                 DbRec trip = plan.get(r.getLong("usr"));
-                if (trip != null && trip.getLong("trip") == r.getLong("trip")) {
+                if (trip != null && Objects.equals(trip.getLong("trip"), r.getLong("trip"))) {
                     planWagons.computeIfAbsent(r.getLong("usr"), k -> new ArrayList<>())
                             .add(new WagonRef(r.getLong("wagon")));
                 }
@@ -221,7 +221,6 @@ public class StaffService {
         for (StaffRow row : rows) {
             long usr = row.getId();
             List<Long> userRoles = roles.getOrDefault(usr, new ArrayList<>());
-            userRoles.sort(null);
             row.setRoles(userRoles);
             DbRec f = fact.get(usr);
             if (f != null) {

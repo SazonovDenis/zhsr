@@ -9,10 +9,12 @@ import kz.zhsr.app.auth.CurrentUserService;
 import kz.zhsr.app.constants.RoleType;
 import kz.zhsr.app.constants.RouteKind;
 import kz.zhsr.app.constants.TransportType;
+import kz.zhsr.app.dto.route.LegStation;
 import kz.zhsr.app.dto.route.NextStation;
 import kz.zhsr.app.dto.route.RecalcStops;
 import kz.zhsr.app.dto.route.Route;
 import kz.zhsr.app.dto.route.RouteDraft;
+import kz.zhsr.app.dto.route.RouteLeg;
 import kz.zhsr.app.dto.route.RoutePoint;
 import kz.zhsr.app.dto.route.RouteSave;
 import kz.zhsr.app.dto.route.RouteStop;
@@ -43,6 +45,11 @@ public class RouteService {
      * Средняя скорость для времени в пути по умолчанию, км/ч (как в макете zhsr-web).
      */
     public static final int DEFAULT_SPEED_KMH = 70;
+
+    /**
+     * Наибольшая норма часов: колонки route.*_hours - numeric(6,2).
+     */
+    private static final double MAX_HOURS = 9999.99;
 
     private final Db db;
     private final CurrentUserService currentUserService;
@@ -143,9 +150,9 @@ public class RouteService {
             throw ApiException.badRequest("Укажите вид маршрута и дату ввода");
         }
         checkKind(body.routeKind());
-        for (Integer h : new Integer[]{body.conductorHours(), body.lnpHours(), body.pemHours()}) {
-            if (h != null && h < 0) {
-                throw ApiException.badRequest("Нормы часов - целые неотрицательные числа");
+        for (Double h : new Double[]{body.conductorHours(), body.lnpHours(), body.pemHours()}) {
+            if (h != null && (h < 0 || h > MAX_HOURS)) {
+                throw ApiException.badRequest("Нормы часов - неотрицательные числа не больше " + MAX_HOURS);
             }
         }
         List<RoutePoint> points = buildPath(body.points());
@@ -185,13 +192,13 @@ public class RouteService {
 
     /**
      * Станции, на которые можно перейти от остановки from: все достижимые по маршрутной сети, по числу перегонов от
-     * from, затем по расстоянию; время в пути по умолчанию - по средней скорости. Без from - узловые станции: с них
-     * начинается маршрут.
+     * from, затем по расстоянию; время в пути по умолчанию - по средней скорости. Без from - все станции
+     * маршрутной сети без порядка: маршрут начинается с любой.
      */
     public List<NextStation> nextStations(Long station, Integer km) throws Exception {
         RouteNetwork.Graph graph = network.load();
         if (station == null) {
-            return graph.hubs().stream().sorted().map(h -> new NextStation(h, 0, 0, List.of(), 0)).toList();
+            return graph.edges().keySet().stream().map(h -> new NextStation(h, 0, 0, List.of(), 0)).toList();
         }
         int base = km == null ? 0 : km;
         return graph.paths(station).entrySet().stream()
@@ -244,6 +251,24 @@ public class RouteService {
     }
 
     /**
+     * Станции следования кратчайшего пути для каждой пары соседних остановок, в порядке legs; между станциями
+     * перегон - пустой список. Редактор показывает их до сохранения маршрута.
+     *
+     * @throws ApiException 400 - станции пары не связаны маршрутной сетью
+     */
+    public List<List<LegStation>> legs(List<RouteLeg> legs) throws Exception {
+        RouteNetwork.Graph graph = network.load();
+        List<List<LegStation>> res = new ArrayList<>(legs.size());
+        for (RouteLeg leg : legs) {
+            Map<Long, RouteNetwork.Path> paths = graph.paths(leg.from());
+            res.add(way(paths, leg.to()).via().stream()
+                    .map(station -> new LegStation(station, paths.get(station).km()))
+                    .toList());
+        }
+        return res;
+    }
+
+    /**
      * Стоянка остановки, мин: отправление минус прибытие; без одного из них - 0.
      */
     private static int dwell(RouteStop stop) {
@@ -288,7 +313,7 @@ public class RouteService {
     /**
      * Путь маршрута по точкам редактора: между соседними точками без перегона - станции следования кратчайшего пути;
      * километраж - по перегонам; время станций следования - по расстоянию между соседними остановками. Проверки
-     * Ф-МАР-01: не меньше двух остановок, начальная и конечная - остановки на узловых станциях, одна станция дважды
+     * Ф-МАР-01: не меньше двух остановок, начальная и конечная - остановки, одна станция дважды
      * подряд - нельзя; время остановок задано и не убывает.
      *
      * @throws ApiException 400 - путь не проходит проверки
@@ -301,9 +326,8 @@ public class RouteService {
         RoutePoint first = input.get(0);
         RoutePoint last = input.get(input.size() - 1);
         RouteNetwork.Graph graph = network.load();
-        if (!first.isHaveStop() || !last.isHaveStop() || !graph.hubs().contains(first.getStation())
-                || !graph.hubs().contains(last.getStation())) {
-            throw ApiException.badRequest("Начальная и конечная станции маршрута - только узловые");
+        if (!first.isHaveStop() || !last.isHaveStop()) {
+            throw ApiException.badRequest("Начальная и конечная станции маршрута должны быть остановками");
         }
 
         // точки с проложенными путями; время станций следования - после, по расстоянию
@@ -401,11 +425,20 @@ public class RouteService {
      * @throws ApiException 400 - станции не связаны маршрутной сетью
      */
     private static int distance(RouteNetwork.Graph graph, long from, long to) {
-        RouteNetwork.Path way = graph.paths(from).get(to);
+        return way(graph.paths(from), to).km();
+    }
+
+    /**
+     * Путь до станции to.
+     *
+     * @throws ApiException 400 - станции не связаны маршрутной сетью
+     */
+    private static RouteNetwork.Path way(Map<Long, RouteNetwork.Path> paths, long to) {
+        RouteNetwork.Path way = paths.get(to);
         if (way == null) {
             throw ApiException.badRequest("Станции маршрута не связаны маршрутной сетью");
         }
-        return way.km();
+        return way;
     }
 
     private static int defaultRunDuration(int km) {

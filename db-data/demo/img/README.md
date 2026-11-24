@@ -1,6 +1,6 @@
 # Фото к демо-заявкам
 
-Фото с Wikimedia Commons, уменьшены до 1280 точек по длинной стороне. prepare/files-demo кладёт их в
+Фото с Wikimedia Commons, уменьшены до 1280 точек по длинной стороне. prepare/files-img кладёт их в
 хранилище файлов с ключом `demo/img/<файл>`; ссылки на них - db-data/demo/22-repair_request_photo.tsv.
 
 | Файл | Источник | Автор | Лицензия |

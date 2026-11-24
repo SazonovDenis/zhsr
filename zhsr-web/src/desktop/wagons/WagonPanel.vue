@@ -14,7 +14,9 @@
       <span>{{ t('Расположение') }}</span>
       <span>
         {{ wagonPlace(wagon) }}
-        <span class="zs-sub wagon-panel__since">{{ sinceText(wagon.dbegLocation, nowMinute) }}</span>
+        <span v-if="wagon.dbegLocation" class="zs-sub wagon-panel__since">{{
+          sinceText(wagon.dbegLocation, nowMinute)
+        }}</span>
       </span>
       <span>{{ t('Состояние') }}</span>
       <span>
@@ -161,7 +163,7 @@ async function changeResponsible() {
   if (!w) return
   await pickResponsibles({
     station: wagonStation(w),
-    wagons: [w.number],
+    wagons: [w.id],
     current: w.responsibleUsrs,
     save: async (usrs) => emit('changed', await changeWagonResponsible(w.id, usrs)),
   })

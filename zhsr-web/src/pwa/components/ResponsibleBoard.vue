@@ -110,14 +110,14 @@ import PickSheet from './PickSheet.vue'
  * сотрудники депо станции station, бригада рейса trip и бригады рейсов поезда вагонов. v-model — ответственные по
  * номеру вагона; вагона нет или пусто — ответственный не назначен.
  *
- * @prop wagons  вагоны, за которые выбирают: номер и тип
+ * @prop wagons  вагоны, за которые выбирают: id, номер и тип
  * @prop station станция, сотрудники депо которой могут быть ответственными
  * @prop trip    рейс: его бригада может быть ответственной
  * @prop fill    список занимает оставшуюся высоту страницы (PwaPage с fill) и прокручивается; иначе — по содержимому
  */
 const props = withDefaults(
   defineProps<{
-    wagons: { number: string; wagonType: number }[]
+    wagons: { wagon: number; number: string; wagonType: number }[]
     station: number | null
     trip?: number | null
     fill?: boolean
@@ -132,11 +132,11 @@ const candidatesLoad = useLoad(async () => {
   candidates.value = await fetchResponsibles(
     props.station,
     props.trip,
-    props.wagons.map((w) => w.number),
+    props.wagons.map((w) => w.wagon),
   )
 })
 watch(
-  () => [props.station, props.trip, props.wagons.map((w) => w.number).join(',')],
+  () => [props.station, props.trip, props.wagons.map((w) => w.wagon).join(',')],
   () => void candidatesLoad.run(),
   { immediate: true },
 )
