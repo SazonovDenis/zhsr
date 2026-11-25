@@ -41,8 +41,10 @@
           v-for="tile in tiles"
           :key="tile.key"
           class="work-time__tile"
+          :class="{ 'work-time__tile--link': clickable }"
           :style="{ ...place(tile.rect), '--service': colorOf(tile.service) }"
           :title="tile.title"
+          @click="openRequests(tile)"
         >
           <div class="work-time__fill">
             <template v-if="tile.labelled">
@@ -58,6 +60,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import type { WorkTimeRow } from '@/api/analytics'
 import { fetchWorkTime } from '@/api/analytics'
@@ -82,7 +85,8 @@ import { useChart } from './useChart'
  * площадь — число выполненных заявок или их суммарное время выполнения.
  *
  * detailed = false — ячейка дашборда: время выполнения за месяц, все депо, подписи крупных прямоугольников
- * с многоточием. detailed = true — окно раскрытой диаграммы: период, депо, показатель, в подписях и время, и количество. Закономерность с цифрами — по всем депо —
+ * с многоточием. detailed = true — окно раскрытой диаграммы: период, депо, показатель, в подписях и время, и количество;
+ * на десктопе клик по прямоугольнику открывает список заявок с теми же заявками: период, депо, служба, неисправности, статусы «выполнена» и «закрыта». Закономерность с цифрами — по всем депо —
  * уходит владельцу событием find.
  */
 const props = defineProps<{ detailed: boolean }>()
@@ -130,6 +134,8 @@ interface Group extends Sums {
 interface Tile extends Sums {
   key: string
   service: number
+  /** неисправности прямоугольника; у «Прочих» — несколько */
+  faultTypes: number[]
   name: string
   title: string
   rect: TreemapRect
@@ -274,9 +280,10 @@ const tiles = computed<Tile[]>(() =>
       grouped(s.items, (r) => r.faultType),
       rect,
     )
-    const tileOf = (id: number | string, name: string, sums: Sums, place: TreemapRect): Tile => ({
-      key: `${s.id}-${id}`,
+    const tileOf = (faultTypes: number[], name: string, sums: Sums, place: TreemapRect): Tile => ({
+      key: `${s.id}-${faultTypes.join('-')}`,
       service: s.id,
+      faultTypes,
       name,
       title: title(`${serviceName}: ${name}`, sums),
       requests: sums.requests,
@@ -284,13 +291,32 @@ const tiles = computed<Tile[]>(() =>
       rect: place,
       labelled: fits(place),
     })
-    const res = shown.map((f, k) => tileOf(f.id, dictManager.getValue('FaultType', f.id), f, rects[k]!))
+    const res = shown.map((f, k) => tileOf([f.id], dictManager.getValue('FaultType', f.id), f, rects[k]!))
     if (others.length) {
-      res.push(tileOf('others', t('Прочие'), sumOf(others.flatMap((f) => f.items)), rects[shown.length]!))
+      const ids = others.map((f) => f.id)
+      res.push(tileOf(ids, t('Прочие'), sumOf(others.flatMap((f) => f.items)), rects[shown.length]!))
     }
     return res
   }),
 )
+
+// из раскрытой диаграммы на десктопе прямоугольник открывает список заявок; на телефоне таких фильтров в списке нет
+const router = useRouter()
+const clickable = computed(() => props.detailed && !isMobile.value)
+
+function openRequests(tile: Tile) {
+  if (!clickable.value) return
+  void router.push({
+    name: 'requests',
+    query: {
+      service: String(tile.service),
+      faults: tile.faultTypes.join(','),
+      from: fromDay.value!,
+      to: toDay.value!,
+      depot: depot.value === ALL_DEPOTS ? undefined : String(depot.value),
+    },
+  })
+}
 
 function colorOf(service: number): string {
   return COLORS[service] ?? '#62666d'
@@ -455,6 +481,10 @@ void load()
 
 .work-time__fill:not(:empty) {
   padding: 0.2rem 0.4rem;
+}
+
+.work-time__tile--link {
+  cursor: pointer;
 }
 
 .work-time__tile:hover .work-time__fill {

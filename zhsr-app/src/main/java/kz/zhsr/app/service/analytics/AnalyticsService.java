@@ -226,8 +226,8 @@ public class AnalyticsService {
     }
 
     /**
-     * Время выполнения заявок (GET /analytics/work-time): заявки всех служб, поданные за период [from, to) и
-     * выполненные, по службе, неисправности и депо исполнителя. Время выполнения - от последнего взятия в работу перед
+     * Время выполнения заявок (GET /analytics/work-time): заявки всех служб, поданные за период [from, to),
+     * выполненные и до сих пор выполненные (сейчас «выполнена» или «закрыта»), по службе, неисправности и депо исполнителя. Время выполнения - от последнего взятия в работу перед
      * первым выполнением до первого выполнения; заявка, выполненная без взятия в работу, не учитывается. Депо -
      * текущее депо исполнителя в момент первого выполнения. Пустой список - выполненных заявок нет.
      *
@@ -239,7 +239,7 @@ public class AnalyticsService {
         }
         Map<Long, List<DbRec>> requests = UtDb.collectGroupBy_records(db.loadSql(AnalyticsSql.workTime(),
                 Map.of("from", from, "to", to, "inProgress", RequestStatus.IN_PROGRESS,
-                        "done", RequestStatus.DONE)), "repair_request");
+                        "done", RequestStatus.DONE, "closed", RequestStatus.CLOSED)), "repair_request");
         Map<Long, Long> depots = loadCurrentDepots();
 
         Map<String, WorkTimeRow> rows = new LinkedHashMap<>();

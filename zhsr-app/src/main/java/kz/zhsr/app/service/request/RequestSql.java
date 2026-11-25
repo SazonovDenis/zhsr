@@ -1,6 +1,7 @@
 package kz.zhsr.app.service.request;
 
 import kz.zhsr.app.constants.LocationType;
+import kz.zhsr.app.constants.RequestStatus;
 import kz.zhsr.app.dto.common.ListSort;
 import kz.zhsr.app.dto.request.RequestFilter;
 import kz.zhsr.app.service.SqlQuery;
@@ -105,6 +106,28 @@ final class RequestSql {
             + "\n or repair_request.created_by_usr = :me)";
 
     /**
+     * Время первого выполнения заявки; null - заявка не выполнялась. Параметр: done - статус RequestStatus.
+     */
+    private static final String FIRST_DONE = """
+            (select min(done_status.dbeg) from repair_request_status done_status
+             where done_status.repair_request = repair_request.id
+               and done_status.request_status_type = :done)""";
+
+    /**
+     * Депо исполнителя, как на диаграмме «Заявки»: текущее депо того, кто был исполнителем в момент первого
+     * выполнения. Параметры: depot и параметры {@link #FIRST_DONE}.
+     */
+    private static final String DONE_DEPOT = """
+            exists (select 1 from repair_request_executor
+                    join usr_depot on usr_depot.usr = repair_request_executor.executor_usr and usr_depot.dend is null
+                    where repair_request_executor.repair_request = repair_request.id
+                      and usr_depot.depot = :depot
+                      and repair_request_executor.dbeg <= """ + FIRST_DONE + """
+
+                      and (repair_request_executor.dend is null
+                           or repair_request_executor.dend > """ + FIRST_DONE + "))";
+
+    /**
      * Строка заявки: поля заявки, текущие статус, служба и исполнитель (repair_request_info), где вагон сейчас и
      * число фото. Где вагон: place - станция, депо или парк отстоя; wagon_station - станция места (станция,
      * станция депо или парка отстоя); wagon_trip - рейс, если вагон в рейсе. Параметр tripLocation -
@@ -165,6 +188,11 @@ final class RequestSql {
             where.any("repair_request.severity_type", "severities", filter.severities());
         }
         where.any("repair_request_info.service", "services", filter.services());
+        where.any("repair_request.fault_type", "faultTypes", filter.faultTypes());
+        if (filter.depot() != null) {
+            where.add(DONE_DEPOT, "depot", filter.depot());
+            where.param("done", RequestStatus.DONE);
+        }
         if (filter.trip() != null) {
             where.add("repair_request.trip = :trip", "trip", filter.trip());
         }
@@ -194,6 +222,13 @@ final class RequestSql {
      */
     static String visible() {
         return "select repair_request.id\n" + FROM + "where repair_request.id = :id and " + VISIBLE + "\n";
+    }
+
+    /**
+     * Видна ли заявка сотруднику ({@link #SEEN}): строка есть - видна. Параметры: id, me и параметры {@link #SEEN}.
+     */
+    static String seen() {
+        return "select repair_request.id\n" + FROM + "where repair_request.id = :id and " + SEEN + "\n";
     }
 
     /**

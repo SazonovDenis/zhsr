@@ -147,6 +147,10 @@ export interface RequestFilter {
   severities: number[]
   /** службы — id справочника Service */
   services: number[]
+  /** неисправности — id справочника FaultType */
+  faultTypes: number[]
+  /** текущее депо исполнителя первого выполнения — id справочника Depot; null — без отбора */
+  depot: number | null
   /** рейс — id рейса */
   trip: number | null
   /** вагон — id вагона */
@@ -165,6 +169,8 @@ export function requestFilter(scope: RequestScope, patch: Partial<RequestFilter>
     statuses: [],
     severities: [],
     services: [],
+    faultTypes: [],
+    depot: null,
     trip: null,
     wagon: null,
     from: null,

@@ -10,12 +10,14 @@ import java.util.List;
  *
  * @param scope      mine - поданные сотрудником; todo - ждут его действия лично (назначены ему, в работе у него,
  *                   ждут его приёма); all - видные ему: по службе для исполнения, ждут его действия или поданы
- *                   им, администратору - все; пусто - все заявки (поиск)
+ *                   им, администратору - все; пусто - все заявки
  * @param closed     true - только в конечном статусе, false - только открытые, null - все
  * @param query      поиск по номеру заявки, номеру вагона и названию неисправности
  * @param statuses   статусы (request_status_type)
  * @param severities критичность (severity_type)
  * @param services   службы (service)
+ * @param faultTypes неисправности (fault_type)
+ * @param depot      текущее депо того, кто был исполнителем в момент первого выполнения (id); null - без ограничения
  * @param trip       рейс заявки
  * @param wagon      вагон заявки (id)
  * @param from       время подачи - с этой даты включительно; null - без ограничения
@@ -28,6 +30,8 @@ public record RequestFilter(
         List<Long> statuses,
         List<Long> severities,
         List<Long> services,
+        List<Long> faultTypes,
+        Long depot,
         Long trip,
         Long wagon,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

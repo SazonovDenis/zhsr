@@ -16,36 +16,50 @@
         @keydown.down.prevent="dataTable?.focus()"
         @keydown.esc="searchEsc($event, filter.query, () => (filter.query = ''))"
       />
-      <!-- поиск отменяет список и фильтры, кроме периода: они скрыты и не применяются, но не очищаются -->
-      <span v-if="searching" class="requests__search-note">
-        {{ t('При поиске список и фильтры, кроме периода, не применяются.') }}
+      <!-- список: можно снять — тогда «все»; при фильтре по вагону недоступен -->
+      <CbSegment v-model="list" single :values="listChoices" />
+      <span v-if="wagonFilter" class="requests__chip q-py-xs q-pl-sm q-pr-xs">
+        {{ t('Вагон № {number}', { number: wagonFilter.number }) }}
+        <button type="button" class="requests__chip-clear q-pa-none" :title="t('Снять фильтр')" @click="clearWagon">
+          ✕
+        </button>
       </span>
-      <template v-else>
-        <!-- список: можно снять — тогда «все»; при фильтре по вагону недоступен -->
-        <CbSegment v-model="list" single :values="listChoices" />
-        <span v-if="wagonFilter" class="requests__wagon q-py-xs q-pl-sm q-pr-xs">
-          {{ t('Вагон № {number}', { number: wagonFilter.number }) }}
-          <button type="button" class="requests__wagon-clear q-pa-none" :title="t('Снять фильтр')" @click="clearWagon">
-            ✕
-          </button>
-        </span>
-      </template>
-      <!-- период доступен всегда, и при поиске -->
+      <!-- неисправности и депо исполнителя — переход из диаграммы «Заявки» -->
+      <span v-if="filter.faultTypes.length" class="requests__chip q-py-xs q-pl-sm q-pr-xs" :title="faultTitle">
+        {{ faultText }}
+        <button
+          type="button"
+          class="requests__chip-clear q-pa-none"
+          :title="t('Снять фильтр')"
+          @click="filter.faultTypes = []"
+        >
+          ✕
+        </button>
+      </span>
+      <span v-if="filter.depot !== null" class="requests__chip q-py-xs q-pl-sm q-pr-xs">
+        {{ t('Депо исполнителя: {name}', { name: dictManager.getValue('Depot', filter.depot) }) }}
+        <button
+          type="button"
+          class="requests__chip-clear q-pa-none"
+          :title="t('Снять фильтр')"
+          @click="filter.depot = null"
+        >
+          ✕
+        </button>
+      </span>
       <PeriodPicker v-model:start-date="filter.from" v-model:end-date="filter.to" label="Период:" clearable />
     </FilterBar>
 
     <FilterBar>
-      <template v-if="!searching">
-        <CbButton
-          v-model="filter.statuses"
-          label="Статус"
-          :values="statusChoices"
-          :hidden="[RequestStatus.CLOSED]"
-          :max-button-count="6"
-        />
-        <CbButton v-model="filter.severities" label="Критичность" :values="severityChoices" :max-button-count="4" />
-        <CbList v-model="filter.services" placeholder="Служба" :values="serviceChoices" style="width: 10rem" />
-      </template>
+      <CbButton
+        v-model="filter.statuses"
+        label="Статус"
+        :values="statusChoices"
+        :hidden="[RequestStatus.CLOSED]"
+        :max-button-count="6"
+      />
+      <CbButton v-model="filter.severities" label="Критичность" :values="severityChoices" :max-button-count="4" />
+      <CbButton v-model="filter.services" label="Служба" :values="serviceChoices" />
       <template #right>{{ t('{n} заявок', rows.length) }}</template>
     </FilterBar>
 
@@ -79,7 +93,6 @@ import { fetchRequestCounts, fetchRequests, requestFilter } from '@/api/requests
 import { t } from '@/boot/i18n'
 import { bus } from '@/shared/bus'
 import CbButton from '@/shared/components/choice/CbButton.vue'
-import CbList from '@/shared/components/choice/CbList.vue'
 import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import type { ChoiceItem } from '@/shared/components/choice/choice'
 import { openDialog } from '@/shared/components/dialog/openDialog'
@@ -114,7 +127,7 @@ import { useKeptSelection } from '../frame/keptSelection'
 
 /**
  * Список заявок на ремонт (Ф-ЗАЯ-06): «созданные мной», «мне на исполнение», «все»; фильтры по периоду подачи, статусу, критичности,
- * службе, поиск по номеру, вагону и неисправности. Справа — карточка выбранной заявки с действиями.
+ * службе, поиск по номеру, вагону и неисправности (складывается с остальными фильтрами). Справа — карточка выбранной заявки с действиями.
  */
 
 const dataTable = useTemplateRef<{ focus: () => void }>('dataTable')
@@ -168,6 +181,25 @@ function applyRouteQuery() {
     void router.replace({ name: 'requests' })
     return
   }
+  // переход из диаграммы «Заявки» (?service=id&faults=id,id&from=дата&to=дата&depot=id): те же заявки, что в
+  // прямоугольнике диаграммы; остальные фильтры и выбор списка сброшены
+  const { service, faults, from, to, depot } = route.query
+  if (typeof faults === 'string' && typeof from === 'string' && typeof to === 'string') {
+    const patch = {
+      services: [Number(service)],
+      faultTypes: faults.split(',').map(Number),
+      from,
+      to,
+      statuses: [RequestStatus.DONE, RequestStatus.CLOSED],
+      depot: Number(depot) || null,
+    }
+    Object.assign(filter, requestFilter('all', patch))
+    list.value = null
+    wagonFilter.value = null
+    selectedId.value = null
+    void router.replace({ name: 'requests' })
+    return
+  }
   const id = Number(route.query.wagon)
   const number = route.query.number
   if (!id || typeof number !== 'string') return
@@ -180,8 +212,14 @@ function applyRouteQuery() {
 function clearWagon() {
   wagonFilter.value = null
 }
-// поиск: список и фильтры скрыты, сервер их не применяет (Ф-ЗАЯ-06)
-const searching = computed(() => filter.query.trim() !== '')
+// несколько неисправностей — прямоугольник «Прочие» диаграммы: в отметке их число, названия — в подсказке
+const faultNames = computed(() => filter.faultTypes.map((id) => dictManager.getValue('FaultType', id)))
+const faultText = computed(() =>
+  faultNames.value.length === 1
+    ? t('Неисправность: {name}', { name: faultNames.value[0]! })
+    : t('Неисправностей: {n}', { n: faultNames.value.length }),
+)
+const faultTitle = computed(() => faultNames.value.join('\n'))
 
 const rows = shallowRef<RepairRequest[]>([])
 const counts = shallowRef<RequestCounts>({ requestStatusType: {}, severityType: {} })
@@ -236,7 +274,7 @@ async function loadCounts() {
 }
 
 applyRouteQuery()
-watch(() => [route.query.wagon, route.query.request], applyRouteQuery)
+watch(() => [route.query.wagon, route.query.request, route.query.faults], applyRouteQuery)
 
 // фильтр или сортировка изменились — данные загружаются заново
 watch([filter, sort], load, { deep: true })
@@ -312,7 +350,7 @@ async function init() {
 
 async function loadDicts() {
   try {
-    await busy.run(dictManager.prepareDicts('FaultType', 'WagonType'))
+    await busy.run(dictManager.prepareDicts('FaultType', 'WagonType', 'Depot'))
   } catch (e) {
     loadError.value = shownError(e)
   }
@@ -321,7 +359,7 @@ void init()
 </script>
 
 <style scoped lang="scss">
-.requests__wagon {
+.requests__chip {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -331,16 +369,11 @@ void init()
   font-size: 0.8rem;
 }
 
-.requests__wagon-clear {
+.requests__chip-clear {
   border: 0;
   background: none;
   color: $zs-text-muted;
   font: inherit;
   cursor: pointer;
-}
-
-.requests__search-note {
-  color: $zs-text-muted;
-  font-size: 0.8rem;
 }
 </style>

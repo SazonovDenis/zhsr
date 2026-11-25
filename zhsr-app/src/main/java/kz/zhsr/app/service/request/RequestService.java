@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -98,9 +99,19 @@ public class RequestService {
 
     /**
      * Список заявок по фильтру (Ф-ЗАЯ-06). По умолчанию - сначала новые.
+     *
+     * @throws ApiException 403 - по фильтру пусто, а в поиске - номер заявки, которая сотруднику не видна
      */
     public List<RequestRow> list(RequestFilter filter, ListSort sort) throws Exception {
         List<RequestRow> res = load(filter, true, sort);
+        if (res.isEmpty() && filter.query() != null && !filter.query().isBlank()) {
+            // искали по номеру чужой заявки: пустой список выглядел бы так, будто заявка пропала
+            DbRec found = db.loadRec("repair_request",
+                    Map.of("number", filter.query().trim().toUpperCase(Locale.ROOT)));
+            if (found != null) {
+                requireSeen(found.getLong("id"), found.getString("number"));
+            }
+        }
         refResolver.resolve(res);
         return res;
     }
@@ -110,7 +121,8 @@ public class RequestService {
      * на исполнение» без других отборов.
      */
     public int todoCount() throws Exception {
-        RequestFilter filter = new RequestFilter("todo", null, null, null, null, null, null, null, null, null);
+        RequestFilter filter = new RequestFilter("todo", null, null, null, null, null, null, null, null, null, null,
+                null);
         return load(filter, true, new ListSort(null, false)).size();
     }
 
@@ -130,9 +142,18 @@ public class RequestService {
     /**
      * Карточка заявки: поля и плоские списки журналов, примечаний и фото.
      *
-     * @throws ApiException 404 - заявки нет
+     * @throws ApiException 404 - заявки нет; 403 - заявка сотруднику не видна
      */
     public RequestDetail detail(long id) throws Exception {
+        requireSeen(id, row(id).getNumber());
+        return card(id);
+    }
+
+    /**
+     * Карточка без проверки видимости - ответ на изменение заявки: после действия (отклонить, снять себя) заявка
+     * может перестать быть видна сотруднику, а изменение уже выполнено.
+     */
+    private RequestDetail card(long id) throws Exception {
         RequestDetail row = row(id, RequestDetail.class);
 
         Map<String, Object> params = Map.of("id", id);
@@ -385,7 +406,7 @@ public class RequestService {
             body = new RequestActionBody(null, null, null);
         }
         if (!offlineReceipt.accept(body.clientGuid())) {
-            return detail(id);
+            return card(id);
         }
         CurrentUser user = currentUserService.get();
         RequestRow row = row(id);
@@ -406,7 +427,7 @@ public class RequestService {
         if (!text.isEmpty()) {
             insertNote(id, text, user.id(), at, now);
         }
-        return detail(id);
+        return card(id);
     }
 
     /**
@@ -418,7 +439,7 @@ public class RequestService {
     @Transactional
     public RequestDetail assign(long id, RequestExecutorBody body) throws Exception {
         if (!offlineReceipt.accept(body.clientGuid())) {
-            return detail(id);
+            return card(id);
         }
         Long executor = body.executor();
         CurrentUser user = currentUserService.get();
@@ -427,7 +448,7 @@ public class RequestService {
         rights.checkAssign(user, row);
         Long current = row.getExecutorUsr() == null ? null : row.getExecutorUsr().getId();
         if (Objects.equals(current, executor)) {
-            return detail(id);
+            return card(id);
         }
         long status = row.getRequestStatusType();
         if (executor != null) {
@@ -442,7 +463,7 @@ public class RequestService {
             throw ApiException.badRequest("Снять исполнителя можно только с невыполненной заявки");
         }
         move(row, status, executor, user.id(), clientTime(body.clientDt(), OffsetDateTime.now()));
-        return detail(id);
+        return card(id);
     }
 
     /**
@@ -456,7 +477,7 @@ public class RequestService {
     public RequestDetail addNote(long id, String text, OffsetDateTime clientDt, String clientGuid,
                                  List<MultipartFile> photos) throws Exception {
         if (!offlineReceipt.accept(clientGuid)) {
-            return detail(id);
+            return card(id);
         }
         CurrentUser user = currentUserService.get();
         row(id);
@@ -471,7 +492,7 @@ public class RequestService {
             insertNote(id, note, user.id(), at, now);
         }
         savePhotos(id, photos, user.id(), at, now);
-        return detail(id);
+        return card(id);
     }
 
     /**
@@ -510,7 +531,7 @@ public class RequestService {
             throw ApiException.badRequest("Напишите примечание");
         }
         db.updateRec("repair_request_note", Map.of("id", noteId, "note", value));
-        return detail(note.getLong("repair_request"));
+        return card(note.getLong("repair_request"));
     }
 
     /**
@@ -533,7 +554,7 @@ public class RequestService {
         if (key.startsWith(PHOTO_PREFIX)) {
             storage.remove(key);
         }
-        return detail(photo.getLong("repair_request"));
+        return card(photo.getLong("repair_request"));
     }
 
     // --- внутреннее
@@ -560,12 +581,6 @@ public class RequestService {
 
     private List<RequestRow> load(RequestFilter filter, boolean byStatus, ListSort sort) throws Exception {
         CurrentUser user = currentUserService.get();
-        // поиск по номеру, вагону и неисправности отменяет список и фильтры, кроме периода: ищется среди всех заявок
-        // (Ф-ЗАЯ-06)
-        if (filter.query() != null && !filter.query().isBlank()) {
-            filter = new RequestFilter(null, null, filter.query(), null, null, null, null, null, filter.from(),
-                    filter.to());
-        }
         SqlQuery q = RequestSql.list(filter, user.id(), visibility(user), List.copyOf(RequestRights.FINAL_STATUSES),
                 byStatus, sort);
         return db.loadSql(q.sql(), q.params(), RequestRow.class);
@@ -601,6 +616,21 @@ public class RequestService {
         Map<String, Object> params = visibility(user);
         params.put("id", id);
         return db.loadSqlRec(RequestSql.visible(), params) != null;
+    }
+
+    /**
+     * Заявка видна сотруднику - то же правило, что у списка «все» (RequestSql, SEEN).
+     *
+     * @throws ApiException 403 - не видна: сообщение говорит, что заявка есть, но доступа к ней нет
+     */
+    private void requireSeen(long id, String number) throws Exception {
+        CurrentUser user = currentUserService.get();
+        Map<String, Object> params = visibility(user);
+        params.put("id", id);
+        params.put("me", user.id());
+        if (db.loadSqlRec(RequestSql.seen(), params) == null) {
+            throw ApiException.forbidden("Заявка " + number + " есть, но у вас нет к ней доступа");
+        }
     }
 
     /**

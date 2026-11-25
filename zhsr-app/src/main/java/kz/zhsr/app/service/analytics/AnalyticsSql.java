@@ -101,7 +101,8 @@ final class AnalyticsSql {
     /**
      * Взятия в работу и выполнения заявок всех служб по порядку: repair_request, service, fault_type, dbeg,
      * request_status_type, executor_usr - исполнитель заявки в момент dbeg; null - исполнителя не было. Параметры: from
-     * и to - период [from, to) по repair_request.created_dt, inProgress и done - статусы RequestStatus.
+     * и to - период [from, to) по repair_request.created_dt, inProgress, done и closed - статусы RequestStatus. Берутся
+     * только заявки, которые сейчас в статусе done или closed.
      */
     static String workTime() {
         return """
@@ -117,6 +118,7 @@ final class AnalyticsSql {
                           or repair_request_executor.dend > repair_request_status.dbeg)
                 where repair_request.created_dt >= :from
                   and repair_request.created_dt < :to
+                  and repair_request_info.request_status_type in (:done, :closed)
                   and repair_request_status.request_status_type in (:inProgress, :done)
                 order by repair_request_status.repair_request, repair_request_status.dbeg, repair_request_status.id""";
     }
