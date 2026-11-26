@@ -2,8 +2,19 @@
   <!-- две строки, поля строк друг под другом не выравниваются: 1 — вид и рейс; 2 — станция, позиция, время, основания -->
   <div class="change-where">
     <div class="change-where__row">
-      <FormField :label="w.attach ? 'Прицепка' : 'Отцепка'">
-        <CbSegment v-model="w.state.mode" single required :values="w.modes" />
+      <FormField :label="trainWagonSeq ? 'Смена порядка' : w.attach ? 'Прицепка' : 'Отцепка'">
+        <CbSegment v-model="w.state.mode" single required :values="modes" />
+      </FormField>
+      <!-- исправление факта: его рейс -->
+      <FormField v-if="fact?.trip" label="В рейсе">
+        <CbList
+          :model-value="fact.trip.id"
+          single
+          disabled
+          no-clear
+          :values="[{ id: fact.trip.id, text: tripRefDatedText(fact.trip) }]"
+          style="width: 36rem"
+        />
       </FormField>
       <!-- рейсы поезда в статусе «план» — богатым видом, как фильтр «Рейс» списка вагонов; пусто — вне рейса -->
       <FormField v-if="w.state.mode === 'plan'" label="В рейсе">
@@ -25,7 +36,18 @@
 
     <div class="change-where__row">
       <!-- факт в рейсе — остановка маршрута в пути; план в рейсе — остановка рейса; время стоянки в списке справа -->
-      <FormField v-if="stopList" label="Станция">
+      <FormField v-if="fact" label="Станция">
+        <CbList
+          :model-value="fact.station"
+          single
+          disabled
+          no-clear
+          :values="dictChoices('Station')"
+          :source="dictSource('Station')"
+          style="width: 14rem"
+        />
+      </FormField>
+      <FormField v-else-if="stopList" label="Станция">
         <CbList v-model="stopModel" single no-clear :values="stopList" style="width: 18rem">
           <template #option="{ item }"><StopOption :item="item" /></template>
         </CbList>
@@ -55,10 +77,10 @@
       </FormField>
       <!-- позиция — по составу на момент прицепки: текущему по факту или ожидаемому по плану -->
       <FormField v-if="w.attach" label="Позиция в поезде">
-        <CbList v-model="w.state.seq" single no-clear :values="w.seqChoices" style="width: 14rem" />
+        <CbList v-model="seqModel" single no-clear :disabled="!!fact" :values="seqChoices" style="width: 14rem" />
       </FormField>
-      <FormField v-if="w.state.mode === 'fact'" :label="w.attach ? 'Время прицепки' : 'Время отцепки'">
-        <DatePicker v-model="w.state.factTime" with-time :date-text="w.attach ? 'Время прицепки' : 'Время отцепки'" />
+      <FormField v-if="w.state.mode === 'fact'" :label="factLabel">
+        <DatePicker v-model="factTimeModel" with-time :disabled="!!fact" :date-text="factLabel" />
       </FormField>
       <FormField v-else :label="planLabel">
         <DatePicker v-model="w.state.planTime" with-time :date-text="planLabel" />
@@ -71,9 +93,11 @@
 </template>
 
 <script setup lang="ts">
+import { date } from 'quasar'
 import { computed } from 'vue'
 
-import type { TrainCard } from '@/api/trains'
+import type { TrainCard, TrainChange } from '@/api/trains'
+import { t } from '@/boot/i18n'
 import type { ChoiceItem, ChoiceModel } from '@/shared/components/choice/choice'
 import CbList from '@/shared/components/choice/CbList.vue'
 import CbOption from '@/shared/components/choice/CbOption.vue'
@@ -82,6 +106,7 @@ import FormField from '@/shared/components/form/FormField.vue'
 import NoteInput from '@/shared/components/form/NoteInput.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
 import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
+import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import { tripOptionOf } from '../trips/tripOptionItem'
 import TripOptionView from '../trips/TripOptionView.vue'
 import type { StopGroup } from './attach'
@@ -90,7 +115,8 @@ import { useChangeWhere } from './changeWhere'
 import StopOption from './StopOption.vue'
 
 /**
- * Поля «как, где и куда» окон прицепки и отцепки (useChangeWhere) — только наши контролы, двумя строками без
+ * Поля «как, где и куда» окон прицепки, отцепки и смены порядка (trainWagonSeq: свои подписи, остальное — как у
+ * отцепки) (useChangeWhere) — только наши контролы, двумя строками без
  * выравнивания между ними: в первой — вид (обязательный выбор «Планом» / «Фактом») и у плана рейс, во второй — станция,
  * у прицепки позиция, время («Плановое время прицепки/отцепки» у плана) и основания. У плана —
  * «В рейсе» (рейсы поезда в статусе «план» богатым видом, пусто — вне рейса), станция (в рейсе — из остановок рейса,
@@ -98,7 +124,8 @@ import StopOption from './StopOption.vue'
  * прицепки — позиция в поезде; основания и примечания — полем той же ширины, что соседние. Под полями подписей нет:
  * проверки — в build(), окно показывает их ошибкой диалога. Окно читает выбор через ref: build() — выбор или текст
  * ошибки, targetStation и moment — станция и момент. initial — исправление плана: поля заполнены его значениями.
- * Справочник Station готовит окно.
+ * Справочник Station готовит окно. fact — исправление факта: поля показывают значения этой записи и недоступны, кроме
+ * оснований.
  */
 const props = withDefaults(
   defineProps<{
@@ -111,14 +138,40 @@ const props = withDefaults(
     trip?: number | null
     plan?: boolean
     initial?: ChangeInitial | null
+    trainWagonSeq?: boolean
+    fact?: TrainChange | null
   }>(),
-  { factAllowed: true, attach: false, trip: null, plan: false, initial: null },
+  { factAllowed: true, attach: false, trip: null, plan: false, initial: null, trainWagonSeq: false, fact: null },
 )
 
 const w = useChangeWhere(props)
 defineExpose(w)
 
-const planLabel = computed(() => (w.attach ? 'Плановое время прицепки' : 'Плановое время отцепки'))
+const modes = computed<ChoiceItem[]>(() => (props.fact ? w.modes.map((m) => ({ ...m, disabled: true })) : w.modes))
+// у факта позиция и время — из записи, а не из состояния выбора
+const seqChoices = computed<ChoiceItem[]>(() => {
+  if (!props.fact) return w.seqChoices
+  const seq = props.fact.seq
+  return [{ id: seq ?? Number.MAX_SAFE_INTEGER, text: seq === null ? t('в конец') : String(seq) }]
+})
+const seqModel = computed<ChoiceModel>({
+  get: () => (props.fact ? (props.fact.seq ?? Number.MAX_SAFE_INTEGER) : w.state.seq),
+  set: (v) => (w.state.seq = v as number),
+})
+const factTimeModel = computed<string | null>({
+  get: () => (props.fact ? date.formatDate(props.fact.dt, 'YYYY-MM-DDTHH:mm') : w.state.factTime),
+  set: (v) => (w.state.factTime = v as string),
+})
+const factLabel = computed(() =>
+  props.trainWagonSeq ? 'Время смены порядка' : w.attach ? 'Время прицепки' : 'Время отцепки',
+)
+const planLabel = computed(() =>
+  props.trainWagonSeq
+    ? 'Плановое время смены порядка'
+    : w.attach
+      ? 'Плановое время прицепки'
+      : 'Плановое время отцепки',
+)
 
 /** Список станций рейса: факт в рейсе — остановки в пути, план в рейсе — остановки рейса; иначе null. */
 const stopList = computed<ChoiceItem[] | null>(() => {

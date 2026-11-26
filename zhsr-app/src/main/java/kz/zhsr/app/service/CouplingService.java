@@ -85,8 +85,8 @@ public class CouplingService {
         }
         List<DbRec> recs = db.loadSql(TripSql.attachCandidates(), Map.of("station", station));
         List<CouplingWagon> res = DbRecMapper.toList(recs, CouplingWagon.class);
-        Map<String, WagonBusy> busy = trainService.busy(res.stream().map(CouplingWagon::getWagon).toList(),
-                OffsetDateTime.now()).stream().collect(Collectors.toMap(WagonBusy::getNumber, b -> b, (a, b) -> a));
+        Map<String, WagonBusy> busy = trainService.factBusy(res.stream().map(CouplingWagon::getWagon).toList())
+                .stream().collect(Collectors.toMap(WagonBusy::getNumber, b -> b, (a, b) -> a));
         for (CouplingWagon w : res) {
             w.setBusy(busy.get(w.getNumber()));
             w.setAvailable(Objects.equals(w.getLocationType(), LocationType.STATION) && w.getBusy() == null);

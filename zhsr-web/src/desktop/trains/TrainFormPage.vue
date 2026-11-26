@@ -11,6 +11,17 @@
           class="zs-soft-border"
           :disable="!!detachReason || actions.running.value"
           :title="detachReason || undefined"
+          :label="t('Сменить порядок')"
+          @click="actions.seq"
+        />
+        <q-btn
+          unelevated
+          outline
+          no-caps
+          color="primary"
+          class="zs-soft-border"
+          :disable="!!detachReason || actions.running.value"
+          :title="detachReason || undefined"
           :label="t('Отцепить вагоны')"
           @click="actions.detach()"
         />
@@ -65,15 +76,17 @@
         </div>
         <TrainMomentView
           :card="card"
-          :change-id="selected"
+          :selected="selected"
           :future="side === 'future' || !!tripMoment"
           :couple-reason="detachReason"
-          :trip="nowSelected ? null : tripMoment"
+          :trip="tripMoment"
+          :now="nowSelected"
           :mark="selectedMark"
           class="train-form__view"
           @detach="(w, fact, plan, at) => void actions.detach(w, fact, plan, at)"
           @select="onSelect"
           @pick-trip="pickTrip"
+          @crew-changed="loadTrip"
         />
       </div>
     </div>
@@ -86,7 +99,11 @@
         :closable="false"
         :edit-reason="card && !card.canEdit ? t('Поезд меняет планировщик вагонов') : ''"
         @edit="rename"
-      />
+      >
+        <template #bottom>
+          <TrainMap v-if="card" :card="card" :view="mapView" :plan="mapPlan" />
+        </template>
+      </TrainPanel>
     </template>
   </DesktopFrame>
 </template>
@@ -110,11 +127,15 @@ import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { isoDateTime } from '@/shared/format'
 import type { JournalMark } from '@/shared/trains/trainJournal'
+import { changeKey, isFact, isWaiting, planMoment } from '@/shared/trains/trainJournal'
+import { crewNorm } from '@/shared/trips/crewNorm'
 import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import { pastTrips } from './pastTrips'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import type { JournalSide } from './journalSide'
 import TrainJournalList from './TrainJournalList.vue'
+import TrainMap from './TrainMap.vue'
+import type { TrainMapView } from './trainMapView'
 import TrainMomentView from './TrainMomentView.vue'
 import TrainNameDialog from './TrainNameDialog.vue'
 import TrainPanel from './TrainPanel.vue'
@@ -125,7 +146,7 @@ import { useTrainActions } from './useTrainActions'
  * Состав поезда (Ф-ПОЕ-02) по технике «журнал и состояние»: в середине — состав на момент (по умолчанию — сейчас, по
  * факту); слева — журнал прицепок и отцепок (виден всегда): прошлое —
  * факты, настоящее — текущее состояние и ожидающие планы. Выбор записи журнала показывает состав на её время: у факта — по факту, у плана —
- * ожидаемый. Прицепка и отцепка нескольких вагонов — кнопками в шапке, отцепка вагона — меню вагона, отметка и отмена
+ * ожидаемый. Смена порядка вагонов, прицепка и отцепка нескольких вагонов — кнопками в шапке, отцепка вагона — меню вагона, отметка и отмена
  * плана, удаление ошибочного факта — меню записи журнала. Справа — панель поезда с кнопкой «Редактировать»
  * (обозначение). Над составом — выбор рейса поезда (Ф-РЕЙ-02, адрес ?trip=): состав на отправление рейса (до
  * отправления — ожидаемый, у вагона не на станции отправления — «Оформить передачу»), журнал — записи рейса и записи
@@ -141,16 +162,16 @@ const floating = ref(false)
 
 const card = shallowRef<TrainCard | null>(null)
 const error = ref<ShownError | null>(null)
-// выбранная запись журнала — момент состава; null — сейчас
-const selected = ref<number | null>(null)
+// выбранная запись журнала (changeKey) — момент состава; null — сейчас
+const selected = ref<string | null>(null)
 // выбранная отметка рейса в журнале — момент состава; выбор записи её снимает, и наоборот
 const selectedMark = shallowRef<JournalMark | null>(null)
 
 // выбран рейс и строка «Текущее состояние»: справа — текущий состав
 const nowSelected = ref(false)
 
-function onSelect(id: number | null) {
-  selected.value = id
+function onSelect(key: string | null) {
+  selected.value = key
   selectedMark.value = null
   nowSelected.value = false
 }
@@ -219,6 +240,8 @@ const tripMoment = computed<TripMoment | null>(() => {
     at: c.trip.departedDt ?? c.trip.plannedDt,
     fact: c.trip.departedDt !== null,
     departureStation: c.trip.departureStation,
+    problems: c.problems,
+    norm: crewNorm(c).wagons,
   }
 })
 
@@ -228,7 +251,7 @@ const tripMoment = computed<TripMoment | null>(() => {
  * плановое); нет предыдущего или следующего — без границы с этой стороны. Факт, который отработал план, попадает в
  * период по времени плана. Рейс не выбран — null.
  */
-const tripChanges = computed<Set<number> | null>(() => {
+const tripChanges = computed<Set<string> | null>(() => {
   const c = card.value
   const id = tripMoment.value?.id
   if (!c || id === undefined) return null
@@ -246,8 +269,28 @@ const tripChanges = computed<Set<number> | null>(() => {
         const at = new Date(x.planDt ?? x.dt).getTime()
         return i >= 0 && at >= from && at < to
       })
-      .map((x) => x.id),
+      .map(changeKey),
   )
+})
+
+/** Выбранная запись журнала. */
+const selectedChange = computed(() => card.value?.changes.find((c) => changeKey(c) === selected.value) ?? null)
+
+/** На карте ожидаемое по плану — когда и состав ожидаемый по плану. */
+const mapPlan = computed(() => {
+  if (selectedChange.value) return isWaiting(selectedChange.value)
+  if (selectedMark.value) return !selectedMark.value.fact
+  return !nowSelected.value && !!tripMoment.value && !tripMoment.value.fact
+})
+
+/** Что показывает карта — то же, что состав: отметка рейса, запись журнала, выбранный рейс или «сейчас». */
+const mapView = computed<TrainMapView>(() => {
+  const mark = selectedMark.value
+  if (mark) return { kind: 'trip', trip: mark.trip.id, end: mark.kind === 'arrival', at: mark.dt }
+  const c = selectedChange.value
+  if (c) return { kind: 'change', change: c, at: isFact(c) ? c.dt : planMoment(card.value!, c) }
+  const trip = tripMoment.value
+  return trip && !nowSelected.value ? { kind: 'trip', trip: trip.id, end: false, at: trip.at } : { kind: 'now' }
 })
 
 /** Варианты рейса: рейсы поезда в статусе «план» и «выполняется»; выбранный другой рейс — тоже. */
@@ -297,7 +340,8 @@ async function changed(next: TrainCard | null) {
     card.value = next
     await loadTrip()
   } else await load()
-  if (selected.value !== null && !card.value?.changes.some((c) => c.id === selected.value)) selected.value = null
+  if (selected.value !== null && !card.value?.changes.some((c) => changeKey(c) === selected.value))
+    selected.value = null
 }
 
 const actions = useTrainActions({

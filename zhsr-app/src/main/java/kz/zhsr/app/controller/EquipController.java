@@ -8,6 +8,7 @@ import kz.zhsr.app.dto.equip.EquipListDetail;
 import kz.zhsr.app.dto.equip.EquipListDraft;
 import kz.zhsr.app.dto.equip.EquipListFilter;
 import kz.zhsr.app.dto.equip.EquipListRow;
+import kz.zhsr.app.dto.equip.EquipListShortage;
 import kz.zhsr.app.dto.equip.EquipNormBody;
 import kz.zhsr.app.dto.equip.EquipNormRow;
 import kz.zhsr.app.dto.equip.EquipTemplateBody;
@@ -66,6 +67,11 @@ public class EquipController {
     @GetMapping("/equip-lists")
     public List<EquipListRow> list(EquipListFilter filter, ListSort sort) throws Exception {
         return equipService.list(filter, sort);
+    }
+
+    @GetMapping("/equip-lists/shortages")
+    public List<EquipListShortage> shortages(@RequestParam List<Long> wagons) throws Exception {
+        return equipService.shortages(wagons);
     }
 
     /** Последняя опись вагона без ограничения видимости; описей нет - пустой ответ. */

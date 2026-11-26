@@ -97,6 +97,7 @@ import { openDialog } from '@/shared/components/dialog/openDialog'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import { dictChoices, dictSource } from '@/shared/dict/dictChoices'
+import { dictManager } from '@/shared/dict/DictManager'
 import { provideBusy } from '@/shared/busy'
 import { loadCurrentUser } from '@/shared/user'
 import RouteSelect from '../routes/RouteSelect.vue'
@@ -127,18 +128,35 @@ const filter = reactive<TripFilter & { wagon: string }>({
   wagon: '',
 })
 
+/** Рейс из перехода, который надо выбрать после загрузки списка; null — нет. */
+let tripToSelect: number | null = null
+
 /**
  * Переход «Рейсы вагона» с панели вагона (?wagon=номер): рейсы вагона в состояниях «план» и «выполняется» за всё
  * время — период сброшен, остальные фильтры тоже.
  */
 function applyRouteQuery() {
+  // переход с карты «Текущие рейсы» (?route=id&state=id&from=дата&to=дата&trip=id): рейсы маршрута в состоянии и за
+  // период кликнутого рейса, остальные фильтры сброшены; рейс выбирается, когда список загружен. Переход открывает
+  // страницу заново: правило «период в прошлом меняет состояния» (watch ниже) к фильтрам перехода не применяется —
+  // у рейса в пути период кончается сегодня, а состояние остаётся «выполняется»
+  const routeId = Number(route.query.route)
+  const trip = Number(route.query.trip)
+  const state = Number(route.query.state)
+  const { from, to } = route.query
+  if (routeId && state && trip && typeof from === 'string' && typeof to === 'string') {
+    Object.assign(filter, { route: routeId, station: null, from, to, states: [state], wagon: '' })
+    tripToSelect = trip
+    void router.replace({ name: 'trips' })
+    return
+  }
   const wagon = route.query.wagon
   if (typeof wagon !== 'string' || !wagon) return
   Object.assign(filter, { route: null, station: null, from: null, to: null, states: [...FUTURE_STATES], wagon })
   void router.replace({ name: 'trips' })
 }
 applyRouteQuery()
-watch(() => route.query.wagon, applyRouteQuery)
+watch(() => [route.query.wagon, route.query.trip], applyRouteQuery)
 
 // варианты периода зависят от выбранных состояний
 const presets = computed(() => sidePresets(statesSide(filter.states)))
@@ -200,7 +218,8 @@ usePageSearchEsc(
 )
 // правая панель: рядом со списком на широком окне, поверх него — на узком
 const panel = useSidePanel(selectedId)
-const sort = ref<TableSort | null>(null)
+// по умолчанию — по плановому отправлению
+const sort = ref<TableSort | null>({ field: 'plannedDt', desc: false })
 const selected = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null)
 
 // ошибка загрузки показывается на месте строк таблицы
@@ -209,7 +228,19 @@ const loadError = ref<ShownError | null>(null)
 async function load() {
   loadError.value = null
   try {
-    rows.value = await busy.run(fetchTrips(filter, sort.value))
+    // справочники — для подсказок неготовности вагонов в колонке «Готовность»
+    const [list] = await busy.run(
+      Promise.all([
+        fetchTrips(filter, sort.value),
+        dictManager.prepareDicts('Station', 'Depot', 'Yard', 'LocationKind'),
+      ]),
+    )
+    rows.value = list
+    // выбор — после строк: таблица прокручивается к выбранной, когда та уже в списке
+    if (tripToSelect !== null) {
+      selectedId.value = list.some((row) => row.id === tripToSelect) ? tripToSelect : null
+      tripToSelect = null
+    }
   } catch (e) {
     rows.value = []
     loadError.value = shownError(e)

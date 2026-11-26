@@ -44,7 +44,7 @@
           :class="{ 'work-time__tile--link': clickable }"
           :style="{ ...place(tile.rect), '--service': colorOf(tile.service) }"
           :title="tile.title"
-          @click="openRequests(tile)"
+          @click="openRequests($event, tile)"
         >
           <div class="work-time__fill">
             <template v-if="tile.labelled">
@@ -85,9 +85,10 @@ import { useChart } from './useChart'
  * площадь — число выполненных заявок или их суммарное время выполнения.
  *
  * detailed = false — ячейка дашборда: время выполнения за месяц, все депо, подписи крупных прямоугольников
- * с многоточием. detailed = true — окно раскрытой диаграммы: период, депо, показатель, в подписях и время, и количество;
- * на десктопе клик по прямоугольнику открывает список заявок с теми же заявками: период, депо, служба, неисправности, статусы «выполнена» и «закрыта». Закономерность с цифрами — по всем депо —
- * уходит владельцу событием find.
+ * с многоточием. detailed = true — окно раскрытой диаграммы: период, депо, показатель, в подписях и время, и
+ * количество. На десктопе в обоих видах клик по прямоугольнику открывает список заявок с теми же заявками: период, депо,
+ * служба, неисправности, статусы «выполнена» и «закрыта». Закономерность с цифрами — по всем депо — уходит владельцу
+ * событием find.
  */
 const props = defineProps<{ detailed: boolean }>()
 const emit = defineEmits<{ find: [text: string] }>()
@@ -300,12 +301,15 @@ const tiles = computed<Tile[]>(() =>
   }),
 )
 
-// из раскрытой диаграммы на десктопе прямоугольник открывает список заявок; на телефоне таких фильтров в списке нет
+// на десктопе прямоугольник открывает список заявок — и в миниатюре, и в раскрытой диаграмме; на телефоне таких
+// фильтров в списке нет
 const router = useRouter()
-const clickable = computed(() => props.detailed && !isMobile.value)
+const clickable = computed(() => !isMobile.value)
 
-function openRequests(tile: Tile) {
+function openRequests(event: MouseEvent, tile: Tile) {
   if (!clickable.value) return
+  // миниатюра: клик не доходит до ячейки дашборда, которая открыла бы раскрытую диаграмму
+  event.stopPropagation()
   void router.push({
     name: 'requests',
     query: {

@@ -8,25 +8,32 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
- * Прицепка или отцепка вагона - запись журнала train_wagon_change: план или факт.
+ * Запись журнала поезда, план или факт: прицепка или отцепка вагона (train_wagon_change) или смена порядка вагонов
+ * (train_wagon_seq). Что за запись, говорит code; запись определяют code и id; plan и fact - записи той же таблицы.
  */
 @Getter
 @Setter
 public class TrainChange {
     private long id;
+    /** таблица записи: константы TrainJournalCode - вычисляемое */
+    private String code;
     private TrainRef train;
+    /** вагон прицепки или отцепки; у смены порядка null */
     private WagonRef wagon;
+    /** смена порядка: новый порядок вагонов по позициям - вычисляемое; у прицепки и отцепки пусто */
+    private List<TrainWagonSeqItem> trainWagonSeqItem = List.of();
     /** слой: константы TrainWagonKind */
     private int kind;
     /** статус плана: константы TrainWagonPlanStatus; у факта null */
     private Integer planStatus;
-    /** вид: константы TrainWagonChangeType */
-    private int changeType;
+    /** вид: константы TrainWagonChangeType; у смены порядка null */
+    private Integer changeType;
     /** время: у плана плановое, у факта фактическое */
     private OffsetDateTime dt;
-    /** позиция, на которую прицепляют вагон; у отцепки null */
+    /** позиция, на которую прицепляют вагон; у отцепки и смены порядка null */
     private Integer seq;
     private long station;
     /** рейс прицепки или отцепки; null - вне рейса */

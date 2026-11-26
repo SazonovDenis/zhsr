@@ -31,6 +31,21 @@ export const PRESETS: PeriodPreset[] = [
   untilToday('yStart', 'С начала года', new Date(today.getFullYear(), 0, 1)),
 ]
 
+// неделя с понедельника: дней от сегодня до понедельника прошлой недели и до её воскресенья
+const weekDay = today.getDay() || 7
+
+/** Кнопки и готовые периоды «Текущих рейсов»: после «Месяц» — ещё «Вчера» и «Прошлая неделя». */
+export const GEO_PERIODS = ['d1', 'd7', 'm1', 'yesterday', 'prevWeek', 'prevMonth']
+export const GEO_PRESETS: PeriodPreset[] = PRESETS.flatMap((preset) =>
+  preset.value === 'm1'
+    ? [
+        preset,
+        { value: 'yesterday', label: 'Вчера', from: -1, to: -1 },
+        { value: 'prevWeek', label: 'Прошлая неделя', from: -(weekDay + 6), to: -weekDay },
+      ]
+    : [preset],
+)
+
 /** Период по умолчанию — неделя по сегодня: ISO-даты «2026-10-30». */
 export function weekDates(): { from: string; to: string } {
   return presetDates(PRESETS.find((p) => p.value === 'd7')!)

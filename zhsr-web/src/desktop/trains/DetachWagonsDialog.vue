@@ -10,6 +10,9 @@
     :error="error"
     @ok="save"
   >
+    <template v-if="problemRows.length > 0" #warnings>
+      <WagonProblemList :rows="problemRows" strip />
+    </template>
     <ChangeWhereFields
       ref="fields"
       :card="card"
@@ -38,6 +41,8 @@
         class="detach-wagons__table"
         @row-click="toggle($event as PickRow)"
       />
+      <!-- отмеченные вагоны: что будет мешать их планам, если отцепить -->
+      <ErrorBox v-if="problemsError" :error="problemsError" />
     </div>
   </FormDialog>
 </template>
@@ -50,13 +55,17 @@ import type { WagonRow } from '@/api/wagons'
 import { fetchWagons } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
 import FormDialog from '@/shared/components/dialog/FormDialog.vue'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import { defineColumns } from '@/shared/components/table/types'
 import type { ShownError } from '@/shared/errors'
 import { formError, shownError } from '@/shared/errors'
+import { TrainWagonChangeType } from '@/shared/constants/TrainWagonChange'
 import { currentComposition, expectedAt } from '@/shared/trains/trainJournal'
+import { useWagonProblems } from '@/shared/trains/useWagonProblems'
+import WagonProblemList from '@/shared/trains/WagonProblemList.vue'
 import CellTripWagonPick from '../trips/cells/CellTripWagonPick.vue'
 import { WAGON_PICK } from '../trips/wagonPick'
 import CellWagonLocation from '../wagons/cells/CellWagonLocation.vue'
@@ -163,6 +172,17 @@ function toggle(r: Pick<PickRow, 'id'>) {
   // отметка вагона — ввод: убирает ошибку диалога
   error.value = null
 }
+
+const { rows: problemRows, error: problemsError } = useWagonProblems(() => ({
+  train: props.card.id,
+  wagons: [...picked.value],
+  changeType: TrainWagonChangeType.DETACH,
+  fact: mode.value === 'fact',
+  time: moment.value,
+  station: fields.value?.targetStation ?? null,
+  routeStation: fields.value?.routeStation ?? null,
+  plan: null,
+}))
 
 provide(WAGON_PICK, {
   isPicked: (w: WagonRow) => picked.value.has(w.id),

@@ -17,4 +17,6 @@ public class GeoRoute {
     private String name;
     /** точки линии по порядку: долгота, широта, километр от начала линии */
     private List<double[]> points = List.of();
+    /** остановки по порядку */
+    private List<GeoStop> stops = List.of();
 }

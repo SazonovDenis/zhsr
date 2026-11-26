@@ -1,20 +1,22 @@
 import { ref } from 'vue'
 
 import type { TrainCard, TrainChange, TrainWagon } from '@/api/trains'
-import { attachWagons, cancelChangePlan, detachWagons } from '@/api/trains'
+import { attachWagons, cancelChangePlan, detachWagons, editTrainChange, seqWagons } from '@/api/trains'
 import { openDialog } from '@/shared/components/dialog/openDialog'
-import { isAttach, isWaiting } from '@/shared/trains/trainJournal'
+import { isSeq, isWaiting } from '@/shared/trains/trainJournal'
 import type { AttachChoice } from './attach'
 import { changeBody, loadStopGroups } from './attach'
 import AttachWagonsDialog from './AttachWagonsDialog.vue'
 import ChangeEditDialog from './ChangeEditDialog.vue'
 import ChangeUndoDialog from './ChangeUndoDialog.vue'
+import { confirmCancelByWarnings } from './confirmByWarnings'
 import DetachWagonsDialog from './DetachWagonsDialog.vue'
 import MarkChangeDialog from './MarkChangeDialog.vue'
+import TrainWagonSeqDialog from './TrainWagonSeqDialog.vue'
 
 /**
  * Действия над составом поезда — одни и те же на экране поезда и на экране прицепки и отцепки в рейсе: прицепить,
- * отцепить вагоны (из меню вагона — с этим вагоном), отметить план, отменить план, исправить запись журнала, удалить
+ * отцепить вагоны (из меню вагона — с этим вагоном), сменить порядок вагонов, отметить план, отменить план, исправить запись журнала, удалить
  * ошибочный факт. Окна открываются здесь; запрос прицепки и отцепки выполняет окно: ошибка остаётся в окне. Проверки и
  * права — на сервере.
  *
@@ -99,15 +101,39 @@ export function useTrainActions(o: {
     if (done) await o.changed(done)
   }
 
+  /** Сменить порядок вагонов: окно с составом, местом и временем. */
+  async function seq() {
+    let card: TrainCard
+    let groups
+    try {
+      card = await o.card()
+      groups = await loadStopGroups(card)
+    } catch (e) {
+      o.failed(e)
+      return
+    }
+    const done = await openDialog<TrainCard>(TrainWagonSeqDialog, {
+      card,
+      groups,
+      at: o.at(),
+      trip: o.trip(),
+      submit: (choice: AttachChoice) => seqWagons(card.id, changeBody(choice.wagons, choice)),
+    })
+    if (done) await o.changed(done)
+  }
+
   /** Отметить исполнение плана. */
   async function mark(c: TrainChange) {
     const done = await openDialog<TrainCard>(MarkChangeDialog, { change: c, inProgress: o.inProgress(c) })
     if (done) await o.changed(done)
   }
 
-  /** Отменить план — сразу, без окна. */
-  function cancel(c: TrainChange) {
-    void run(() => cancelChangePlan(c.id))
+  /** Отменить план: без предупреждений — сразу, без окна; с предупреждениями — после подтверждения. */
+  async function cancel(c: TrainChange) {
+    running.value = true
+    const ok = await confirmCancelByWarnings(c)
+    running.value = false
+    if (ok) await run(() => cancelChangePlan(c))
   }
 
   /** Исправить запись журнала: план — целиком, факт — основания. */
@@ -121,20 +147,24 @@ export function useTrainActions(o: {
       o.failed(e)
       return
     }
-    const done = await openDialog<TrainCard>(ChangeEditDialog, { card, change: c, groups })
+    const done =
+      isSeq(c) && isWaiting(c)
+        ? await openDialog<TrainCard>(TrainWagonSeqDialog, {
+            card,
+            groups,
+            at: c.dt,
+            change: c,
+            submit: (choice: AttachChoice) => editTrainChange(c, changeBody(choice.wagons, choice)),
+          })
+        : await openDialog<TrainCard>(ChangeEditDialog, { card, change: c, groups })
     if (done) await o.changed(done)
   }
 
   /** Удалить ошибочный факт — с подтверждением. */
   async function undo(c: TrainChange) {
-    const done = await openDialog<true>(ChangeUndoDialog, {
-      changeId: c.id,
-      attach: isAttach(c),
-      number: c.wagon.number,
-      marked: c.plan !== null,
-    })
+    const done = await openDialog<true>(ChangeUndoDialog, { change: c })
     if (done) await o.changed(null)
   }
 
-  return { running, attach, detach, mark, cancel, undo, edit }
+  return { running, attach, detach, seq, mark, cancel, undo, edit }
 }

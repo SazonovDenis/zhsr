@@ -14,7 +14,9 @@
     <span class="zs-mono">{{ row.number }}</span>
   </div>
   <div v-if="!fit.busy && fit.block" class="cell-attach-pick__block">{{ fit.block }}</div>
-  <div v-else-if="fit.warn" class="cell-attach-pick__warn">{{ fit.warn }}</div>
+  <template v-else>
+    <div v-for="(note, i) in fit.notes" :key="i" class="cell-attach-pick__warn"><PhraseView :phrase="note" /></div>
+  </template>
 </template>
 
 <script setup lang="ts">
@@ -22,6 +24,7 @@ import { computed, inject } from 'vue'
 
 import type { WagonRow } from '@/api/wagons'
 import type { CellProps } from '@/shared/components/table/types'
+import PhraseView from '@/shared/trains/PhraseView.vue'
 import { ATTACH_PICK } from '../attachPick'
 
 /**
@@ -56,5 +59,10 @@ const fit = computed(() => pick.fit(props.row))
   color: $zs-text-muted;
   font-size: 0.7rem;
   font-style: italic;
+
+  // фраза без номера вагона начинается с заглавной буквы
+  &::first-letter {
+    text-transform: uppercase;
+  }
 }
 </style>

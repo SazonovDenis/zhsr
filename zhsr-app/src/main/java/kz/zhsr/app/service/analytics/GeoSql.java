@@ -1,5 +1,7 @@
 package kz.zhsr.app.service.analytics;
 
+import kz.zhsr.app.service.RouteSql;
+
 /**
  * SQL {@link GeoService}. Параметры запросов - в описании каждого метода.
  */
@@ -8,123 +10,56 @@ final class GeoSql {
     private GeoSql() {
     }
 
+    /** Поля рейса карты: id, route, train, trip_status_type, planned_dt, departed_dt, arrived_dt, arrival. */
+    private static final String TRIP_FIELDS = """
+            select trip.id, trip.route, trip.train, trip.trip_status_type, trip.planned_dt, trip.departed_dt,
+                   trip.arrived_dt, trip.planned_dt + make_interval(mins => %s) as arrival
+            from trip
+            join route on route.id = trip.route
+            """.formatted(RouteSql.DURATION);
+
     /**
-     * Отправленные рейсы с поездом, которые шли в период: id, route, train, planned_dt, departed_dt, arrived_dt - по
-     * отправлению. Параметры: from, to - период; usr - сотрудник бригады (только при own).
+     * Рейсы с поездом, которые шли в период, и неотправленные с плановым отправлением в периоде - по отправлению.
+     * Параметры: from, to - период; planned - состояние «план».
      */
-    static String trips(boolean own) {
-        return """
-                select trip.id, trip.route, trip.train, trip.planned_dt, trip.departed_dt, trip.arrived_dt
-                from trip
-                where trip.departed_dt < :to
-                  and (trip.arrived_dt is null or trip.arrived_dt > :from)
-                  and trip.train is not null"""
-                + (own ? " and trip.id in (select trip_crew.trip from trip_crew where trip_crew.usr = :usr)" : "")
-                + " order by trip.departed_dt, trip.id";
+    static String periodTrips() {
+        return TRIP_FIELDS + """
+                where trip.train is not null
+                  and (trip.departed_dt < :to and (trip.arrived_dt is null or trip.arrived_dt > :from)
+                       or trip.departed_dt is null and trip.trip_status_type = :planned
+                          and trip.planned_dt >= :from and trip.planned_dt < :to)
+                order by coalesce(trip.departed_dt, trip.planned_dt), trip.id""";
+    }
+
+    /** Рейсы поездов по отправлению. Параметры: trains - поезда, states - состояния рейсов. */
+    static String trainTrips() {
+        return TRIP_FIELDS + """
+                where trip.train = any(:trains) and trip.trip_status_type = any(:states)
+                order by coalesce(trip.departed_dt, trip.planned_dt), trip.id""";
     }
 
     /**
-     * Положения вагонов рейсов, пока вагон в поезде рейса: trip, wagon, dt, x, y - по рейсу, вагону и времени.
-     * Параметры: trips - рейсы, fact - слой «факт» участия, to - конец периода.
+     * Положения поездов рейсов от отправления до прибытия: trip, dt, x, y - по рейсу и времени. Параметры: trips -
+     * отправленные рейсы, to - конец периода.
      */
-    static String tripWagonPoints() {
+    static String tripPoints() {
         return """
-                select trip.id as trip, wagon_geo_location.wagon, wagon_geo_location.dt, wagon_geo_location.x,
-                       wagon_geo_location.y
+                select trip.id as trip, train_geo_location.dt, train_geo_location.x, train_geo_location.y
                 from trip
-                join train_wagon on train_wagon.train = trip.train and train_wagon.kind = :fact
-                     and (train_wagon.dend is null or train_wagon.dend > trip.departed_dt)
-                     and (trip.arrived_dt is null or train_wagon.dbeg < trip.arrived_dt)
-                join wagon_geo_location on wagon_geo_location.wagon = train_wagon.wagon
-                     and wagon_geo_location.dt >= greatest(trip.departed_dt, train_wagon.dbeg)
-                     and wagon_geo_location.dt <= least(trip.arrived_dt, train_wagon.dend, :to)
+                join train_geo_location on train_geo_location.train = trip.train
+                     and train_geo_location.dt >= trip.departed_dt
+                     and train_geo_location.dt <= least(trip.arrived_dt, :to)
                 where trip.id = any(:trips)
-                order by trip.id, wagon_geo_location.wagon, wagon_geo_location.dt""";
+                order by trip.id, train_geo_location.dt""";
     }
 
-    /** Положения вагонов за период: wagon, dt, x, y - по вагону и времени. Параметры: from, to - период. */
-    static String wagonPoints() {
+    /** Маршруты по id. Параметр routes. */
+    static String routesById() {
         return """
-                select wagon, dt, x, y
-                from wagon_geo_location
-                where dt >= :from and dt < :to
-                order by wagon, dt""";
-    }
-
-    /** Последнее положение каждого вагона до периода: wagon, dt, x, y. Параметр from - начало периода. */
-    static String lastWagonPoints() {
-        return """
-                select distinct on (wagon) wagon, dt, x, y
-                from wagon_geo_location
-                where dt < :from
-                order by wagon, dt desc""";
-    }
-
-    /**
-     * Когда вагоны были в рейсах: trip, wagon, dbeg, dend - от отправления или прицепки до прибытия или отцепки; dend
-     * null - вагон в рейсе. Параметры: from, to - период, fact - слой «факт» участия.
-     */
-    static String wagonTrips() {
-        return """
-                select trip.id as trip, train_wagon.wagon, greatest(trip.departed_dt, train_wagon.dbeg) as dbeg,
-                       least(trip.arrived_dt, train_wagon.dend) as dend
-                from trip
-                join train_wagon on train_wagon.train = trip.train and train_wagon.kind = :fact
-                     and (train_wagon.dend is null or train_wagon.dend > trip.departed_dt)
-                     and (trip.arrived_dt is null or train_wagon.dbeg < trip.arrived_dt)
-                where trip.departed_dt < :to
-                  and (trip.arrived_dt is null or trip.arrived_dt > :from)""";
-    }
-
-    /**
-     * Дежурства проводников в рейсах: trip, usr, dbeg, dend; dend null - на дежурстве. Параметры: from, to - период,
-     * conductor - обязанность CrewDuty.
-     */
-    static String usrTrips() {
-        return """
-                select trip, usr, dbeg, dend
-                from trip_crew
-                where crew_duty_type = :conductor
-                  and dbeg < :to
-                  and (dend is null or dend > :from)""";
-    }
-
-    /** Положения проводников за период: usr, dt, x, y - по сотруднику и времени. Параметры: from, to, conductor. */
-    static String usrPoints() {
-        return """
-                select usr, dt, x, y
-                from usr_geo_location
-                where dt >= :from and dt < :to
-                  and usr in (select trip_crew.usr from trip_crew where trip_crew.crew_duty_type = :conductor)
-                order by usr, dt""";
-    }
-
-    /** Последнее положение каждого проводника до периода: usr, dt, x, y. Параметры: from, conductor. */
-    static String lastUsrPoints() {
-        return """
-                select distinct on (usr) usr, dt, x, y
-                from usr_geo_location
-                where dt < :from
-                  and usr in (select trip_crew.usr from trip_crew where trip_crew.crew_duty_type = :conductor)
-                order by usr, dt desc""";
-    }
-
-    /**
-     * Положения проводников рейсов от отправления до прибытия рейса: trip, usr, dt, x, y - по рейсу, сотруднику и
-     * времени. Параметры: trips - рейсы, conductor - обязанность CrewDuty, from, to - период.
-     */
-    static String tripUsrPoints() {
-        return """
-                select trip.id as trip, usr_geo_location.usr, usr_geo_location.dt, usr_geo_location.x,
-                       usr_geo_location.y
-                from trip
-                join trip_crew on trip_crew.trip = trip.id and trip_crew.crew_duty_type = :conductor
-                join usr_geo_location on usr_geo_location.usr = trip_crew.usr
-                     and usr_geo_location.dt >= trip.departed_dt
-                     and (trip.arrived_dt is null or usr_geo_location.dt <= trip.arrived_dt)
-                where trip.id = any(:trips)
-                  and usr_geo_location.dt >= :from and usr_geo_location.dt < :to
-                order by trip.id, usr_geo_location.usr, usr_geo_location.dt""";
+                select id, train_number, name
+                from route
+                where id = any(:routes)
+                order by train_number""";
     }
 
     /** Маршруты, действующие в периоде, и маршруты рейсов. Параметры: from, to - даты, routes - маршруты рейсов. */

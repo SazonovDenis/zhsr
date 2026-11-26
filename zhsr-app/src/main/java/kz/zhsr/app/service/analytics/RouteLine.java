@@ -2,6 +2,7 @@ package kz.zhsr.app.service.analytics;
 
 import kz.kis.kiscore.model.DbRec;
 import kz.kis.kiscore.utils.UtCnv;
+import kz.zhsr.app.dto.analytics.GeoStop;
 import kz.zhsr.app.dto.route.MapPoint;
 import kz.zhsr.app.dto.route.StageLine;
 import kz.zhsr.app.dto.route.StageLines;
@@ -24,6 +25,7 @@ final class RouteLine {
     private static final double STATION_KM = 0.5;
 
     private final List<double[]> points = new ArrayList<>();
+    private final List<DbRec> stations;
     private final double[] stationKm;
     private final double[] arrival;
     private final double[] departure;
@@ -33,6 +35,7 @@ final class RouteLine {
      * @param stations станции маршрута по порядку (route_station), не меньше одной
      */
     RouteLine(StageLines lines, List<DbRec> stations) {
+        this.stations = stations;
         int count = stations.size();
         stationKm = new double[count];
         arrival = new double[count];
@@ -82,6 +85,19 @@ final class RouteLine {
     /** Точки линии: долгота, широта, километр. */
     List<double[]> points() {
         return points;
+    }
+
+    /** Остановки маршрута по порядку: километр и расписание. */
+    List<GeoStop> stops() {
+        List<GeoStop> res = new ArrayList<>();
+        for (int i = 0; i < stationKm.length; i++) {
+            // километры округляются, как у точек линии: у конечных остановок они равны концам линии
+            res.add(new GeoStop(stations.get(i).getLong("id"), stations.get(i).getLong("station"),
+                    Boolean.TRUE.equals(stations.get(i).get("have_stop")),
+                    Math.round(stationKm[i] * 100) / 100.0, arrival[i],
+                    departure[i]));
+        }
+        return res;
     }
 
     double length() {

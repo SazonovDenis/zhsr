@@ -2,13 +2,13 @@
   <div class="cell-plans">
     <div
       v-for="c in row.plans"
-      :key="c.id"
+      :key="changeKey(c)"
       class="cell-plans__item"
-      :class="{ 'cell-plans__item--selected': c.id === row.selectedPlan }"
+      :class="{ 'cell-plans__item--selected': changeKey(c) === row.selectedPlan }"
       role="button"
       tabindex="0"
-      @click.stop="plans.select(c.id)"
-      @keydown.enter.prevent="plans.select(c.id)"
+      @click.stop="plans.select(changeKey(c))"
+      @keydown.enter.prevent="plans.select(changeKey(c))"
     >
       <span class="cell-plans__time">{{ formatDateTime(c.dt) }}</span>
       <span class="cell-plans__what"><ChangeTitle :change="c" /></span>
@@ -36,6 +36,7 @@ import type { CellProps } from '@/shared/components/table/types'
 import { dictManager } from '@/shared/dict/DictManager'
 import { formatDateTime } from '@/shared/format'
 import ChangeTitle from '@/shared/trains/ChangeTitle.vue'
+import { changeKey } from '@/shared/trains/trainJournal'
 import { MOMENT_PLANS } from '../tripMoment'
 
 /**
@@ -43,7 +44,7 @@ import { MOMENT_PLANS } from '../tripMoment'
  * «Отцепка вагона 12345», «Станция: …», «Рейс: 655/656 от 22.12 12:45» (номер — мягкой ссылкой, выбирает рейс),
  * просрочка, основания. Клик по плану выбирает его запись журнала. Справочник Station готовит страница.
  */
-defineProps<CellProps<TrainWagon & { plans: TrainChange[]; selectedPlan: number | null }>>()
+defineProps<CellProps<TrainWagon & { plans: TrainChange[]; selectedPlan: string | null }>>()
 
 const plans = inject(MOMENT_PLANS)!
 </script>

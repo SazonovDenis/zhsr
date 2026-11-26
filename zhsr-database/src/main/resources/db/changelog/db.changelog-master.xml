@@ -50,4 +50,8 @@
 
     <include file="db/changelog/07-transfer-act-work-type.xml"/>
 
+    <include file="db/changelog/08-train-wagon-seq.xml"/>
+
+    <include file="db/changelog/09-train-geo-location.xml"/>
+
 </databaseChangeLog>

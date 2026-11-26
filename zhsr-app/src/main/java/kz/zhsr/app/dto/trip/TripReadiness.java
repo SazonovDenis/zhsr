@@ -1,6 +1,7 @@
 package kz.zhsr.app.dto.trip;
 
 import kz.kis.kisdbtools.ref.Ref;
+import kz.zhsr.app.dto.train.WagonProblem;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -25,12 +26,20 @@ public class TripReadiness extends Ref {
     private int riding;
     /** номера едущих вагонов не на станции отправления (в пути - не в этом рейсе) */
     private List<String> away = List.of();
+    /** неготовность вагонов рейса: едущих на отправлении (в пути - сейчас) и прицепляемых планом на остановках */
+    private List<WagonProblem> problems = List.of();
     /** назначен ЛНП */
     private boolean lnp;
     /** назначен ПЭМ */
     private boolean pem;
     /** номера пассажирских вагонов, у которых не выполнена норма проводников */
     private List<String> normNotOk = List.of();
+
+    /** сколько позиций описей экипировки в недостаче: по последней описи каждого едущего вагона по каждому шаблону */
+    private int equipShortage;
+
+    /** номера едущих вагонов, у которых опись экипировки не проводилась ни разу */
+    private List<String> equipNoList = List.of();
 
     public TripReadiness() {
     }

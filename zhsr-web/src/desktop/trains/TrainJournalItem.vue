@@ -10,7 +10,9 @@
   >
     <!-- строка «сейчас»: как запись, время идёт само, выделена только жирным -->
     <template v-if="!change">
-      <span class="journal-item__time journal-item__now">{{ wrap(formatDateTime(new Date(nowMinute).toISOString())) }}</span>
+      <span class="journal-item__time journal-item__now">{{
+        wrap(formatDateTime(new Date(nowMinute).toISOString()))
+      }}</span>
       <span class="journal-item__now">{{ t('Текущее состояние') }}</span>
     </template>
     <template v-else>

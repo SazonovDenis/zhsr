@@ -210,7 +210,7 @@ function applyRouteQuery() {
 }
 applyRouteQuery()
 
-/** Переход из диаграммы: номер вагона в поиске и период (?query=номер&from=дата&to=дата). */
+/** Переход из диаграммы и из состава поезда: номер вагона в поиске и период (?query=номер&from=дата&to=дата). */
 function applySearchQuery() {
   const { query, from, to } = route.query
   if (typeof query !== 'string' || typeof from !== 'string' || typeof to !== 'string') return

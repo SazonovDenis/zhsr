@@ -1,6 +1,6 @@
 <template>
   <!-- Единый корень — без него группа кнопок и «...» попадают в DOM родителя как независимые узлы -->
-  <div class="date-picker">
+  <div class="date-picker" :class="{ 'date-picker--disabled': disabled }">
     <span v-if="label" class="date-picker__label q-my-none q-mr-sm q-ml-md">{{ t(label) }}</span>
 
     <!-- дата — первой: всегда видна и вводится вручную: дд.мм.гггг (с временем — дд.мм.гггг чч:мм).
@@ -11,6 +11,7 @@
       :class="{ 'date-picker__input--time': withTime }"
       :placeholder="placeholder"
       inputmode="numeric"
+      :disabled="disabled"
       @focus="startTyping"
       @input="onTypedInput"
       @blur="commitTyped"
@@ -30,6 +31,7 @@
         :class="option.value === shortModel ? 'bg-selected text-selected' : 'date-picker__btn'"
         :label="option.label"
         :tabindex="-1"
+        :disable="disabled"
         @click="onShortClick(option.value)"
       />
     </div>
@@ -40,6 +42,7 @@
       icon="more_horiz"
       class="date-picker__more q-ml-auto q-py-none q-px-sm"
       :tabindex="-1"
+      :disable="disabled"
       @click="open"
     />
 
@@ -145,6 +148,7 @@ import { QUICK_DATE_LABELS, quickDateValue } from './quickDates'
  * - Дата всегда видна в рамке в поле ввода и вводится вручную: дд.мм.гггг (с временем — дд.мм.гггг чч:мм). Можно
  *   печатать и с разделителями, и одни цифры — разделители встают сами. Полностью набранная дата применяется сразу,
  *   неполная — по Enter или при уходе из поля; ошибка в дате — поле возвращается к прежнему значению.
+ * - disabled — поле недоступно: показано бледным, ввод и окно выбора закрыты.
  * - quick — быстрые варианты (см. quickDates.ts); их набор задаёт место применения. Первые shortCount вариантов
  *   стоят кнопками в рамке и применяются сразу. Выбранная кнопка подсвечена: вариант выводится из самой даты.
  * - С временем быстрый вариант меняет только дату, время сохраняется.
@@ -161,6 +165,7 @@ const props = withDefaults(
     /** подпись в шапке календаря — на русском */
     dateText?: string
     withTime?: boolean
+    disabled?: boolean
     nullable?: boolean
     /** повторный клик по выбранной кнопке короткого ряда очищает значение */
     clearable?: boolean
@@ -176,6 +181,7 @@ const props = withDefaults(
     label: '',
     dateText: 'Дата',
     withTime: false,
+    disabled: false,
     nullable: true,
     clearable: false,
     applyImmediately: false,
@@ -605,6 +611,10 @@ function apply() {
   :deep(.date-picker__btn) {
     color: $zs-text;
   }
+}
+
+.date-picker--disabled {
+  opacity: 0.45;
 }
 
 // фокус в поле даты — рамка подсвечивается, как у остальных полей

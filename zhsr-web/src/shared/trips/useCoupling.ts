@@ -1,6 +1,7 @@
 import { date } from 'quasar'
 import { computed, ref, shallowRef } from 'vue'
 
+import type { WagonProblemQuery } from '@/api/trains'
 import type { CouplingWagon, TripCrew } from '@/api/trips'
 import { coupleWagons, fetchCouplingWagons, fetchTripCrew } from '@/api/trips'
 import { t } from '@/boot/i18n'
@@ -12,6 +13,9 @@ import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { shownError } from '@/shared/errors'
 import { isoDateTime } from '@/shared/format'
+import { useWagonProblems } from '@/shared/trains/useWagonProblems'
+import { phraseText } from '@/shared/trains/phrase'
+import { planProblemPhrase } from '@/shared/trains/wagonProblemText'
 import { tripRefDatedText } from '@/shared/trips/tripRefText'
 import { currentUser, loadCurrentUser } from '@/shared/user'
 import { placeText } from '@/shared/wagonPlace'
@@ -26,7 +30,8 @@ export const SEQ_END = Number.MAX_SAFE_INTEGER
  * промежуточные остановки, позиция прицепки, основания и примечания (приказ, причина), ответственные за вагоны,
  * список вагонов и оформление. Остановка по умолчанию — станция пользователя, если она среди промежуточных остановок.
  * Прицепка ставит вагоны подряд с выбранной позиции, вагоны с неё сдвигаются назад; отцепка сдвигает вагоны за
- * отцепленным вперёд. Ответственные выбираются обязательно: сотрудники или «не назначен». Проверки — на сервере.
+ * отцепленным вперёд. Ответственные выбираются обязательно: сотрудники или «не назначен». Проверки — на сервере: вагоны
+ * списка отмечаются любые. До сохранения — предупреждения, что будет мешать планам вагонов (problemRows, notesOf, warnText).
  */
 export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
   const type = attach ? TrainWagonChangeType.ATTACH : TrainWagonChangeType.DETACH
@@ -77,6 +82,42 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
           ? placeText(w.locationType, w.place)
           : `${placeText(w.locationType, w.place)} • ${t('сначала передача на станцию')}`
 
+  /** Запрос предупреждений о прицепке или отцепке вагонов (id); остановка не выбрана — запрашивать нечего. */
+  function problemQuery(ids: number[]): WagonProblemQuery | null {
+    const train = crew.value?.trip.train
+    if (!train || !stop.value || !station.value) return null
+    const at = new Date(time.value ?? '')
+    return {
+      train: train.id,
+      wagons: ids,
+      changeType: type,
+      fact: true,
+      time: Number.isNaN(at.getTime()) ? null : isoDateTime(at),
+      station: station.value,
+      routeStation: stop.value,
+      plan: null,
+    }
+  }
+
+  // что будет мешать планам, если сохранить: отмеченные вагоны, а у прицепки — ещё каждый вагон списка
+  const picked = useWagonProblems(() =>
+    problemQuery(wagons.value.filter((w) => selected.value.includes(w.number)).map((w) => w.wagon)),
+  )
+  const listed = useWagonProblems(() => (attach ? problemQuery(wagons.value.map((w) => w.wagon)) : null))
+
+  /** Предупреждения вагона списка прицепки фразами без номера. */
+  const notesOf = (w: CouplingWagon) =>
+    listed.rows.value.flatMap((row) =>
+      row.problems.filter((p) => p.wagon.id === w.wagon).map((p) => planProblemPhrase(row, p)),
+    )
+
+  /** То же одной строкой простого текста, каждая фраза — с заглавной буквы; нет — пусто. */
+  const warnText = (w: CouplingWagon) =>
+    notesOf(w)
+      .map((note) => phraseText(note))
+      .map((text) => text.charAt(0).toUpperCase() + text.slice(1))
+      .join(' ')
+
   async function loadWagons() {
     selected.value = []
     wagons.value = attach && !station.value ? [] : await fetchCouplingWagons(tripId, type, station.value)
@@ -116,13 +157,7 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
 
   const chosen = computed(() => wagons.value.filter((w) => selected.value.includes(w.number)))
   const canSubmit = computed(
-    () =>
-      !!stop.value &&
-      !!time.value &&
-      responsible.value !== null &&
-      chosen.value.length > 0 &&
-      chosen.value.every((w) => w.available) &&
-      !running.value,
+    () => !!stop.value && !!time.value && responsible.value !== null && chosen.value.length > 0 && !running.value,
   )
 
   /** Вагон стоит в депо или парке отстоя: прицепить нельзя, можно вернуть на станцию актом приёма-передачи. */
@@ -218,6 +253,10 @@ export function useCoupling(tripId: number, attach: boolean, busy: Busy) {
     responsible,
     error,
     running,
+    problemRows: picked.rows,
+    problemsError: computed(() => picked.error.value ?? listed.error.value),
+    notesOf,
+    warnText,
     stops,
     whereText,
     load,

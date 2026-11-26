@@ -46,8 +46,6 @@ import { t } from '@/boot/i18n'
 import type { ChoiceItem } from '@/shared/components/choice/choice'
 import CbSegment from '@/shared/components/choice/CbSegment.vue'
 import { openDialog } from '@/shared/components/dialog/openDialog'
-import type { UserPickRow } from '@/shared/components/dialog/UserPickDialog.vue'
-import UserPickDialog from '@/shared/components/dialog/UserPickDialog.vue'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import CellEdit from '@/shared/components/table/CellEdit.vue'
 import { defineColumns } from '@/shared/components/table/types'
@@ -57,16 +55,17 @@ import { notifyError } from '@/shared/errors'
 import { formatDateTime } from '@/shared/format'
 import type { ResponsiblesDraft } from '@/shared/trips/tripResponsibles'
 import { isMe, userName } from '@/shared/user'
-import { candidateDuty, responsibleDuty, responsiblePlace } from '@/shared/wagons/responsible'
+import { candidateDuty } from '@/shared/wagons/responsible'
 import CellRespPerson from './CellRespPerson.vue'
 import CellRespWagon from './CellRespWagon.vue'
 import CellRespWagons from './CellRespWagons.vue'
+import { pickWagonUsers } from './pickWagonUsers'
 import TripWagonsDialog from './TripWagonsDialog.vue'
 
 /**
  * Ответственные за вагоны рейса (Ф-РЕЙ-08) в диалоге «Ответственные за вагоны» — две связанные таблицы рядом.
  * Слева «По вагонам» — вагоны поезда и их ответственные, клик по строке — окно выбора сотрудника с выбором нескольких
- * (UserPickDialog, multiple; при сотрудниках станции — с переключателем «Поездная бригада» / «Сотрудники станции»).
+ * (pickWagonUsers; при сотрудниках станции — с переключателем «Поездная бригада» / «Сотрудники станции»).
  * Справа «По сотрудникам» — «Поездная бригада» (при сотрудниках станции — переключатель «Поездная бригада» /
  * «Сотрудники станции») — сотрудники и их вагоны, клик по строке — окно выбора вагонов (TripWagonsDialog); у
  * проводника с двумя несоседними вагонами — предупреждение «назначен на несоседние вагоны». Обе таблицы
@@ -83,8 +82,6 @@ const modes: ChoiceItem[] = [
   { id: 'conductors', text: 'Поездная бригада' },
   { id: 'station', text: 'Сотрудники станции' },
 ]
-// члены бригады рейса; остальные кандидаты — сотрудники станции
-const crewIds = computed(() => new Set(props.data.candidates.filter((c) => c.crewDutyType !== null).map((c) => c.id)))
 
 const usrsOf = (wagon: number) => draft.value[wagon] ?? []
 const currentOf = (wagon: number) => props.data.wagons.find((w) => w.wagon.id === wagon)?.usrs.map((u) => u.id) ?? []
@@ -212,31 +209,15 @@ async function loadWagonList(): Promise<WagonRow[]> {
 /** Сотрудники вагона — в окне выбора сотрудника с выбором нескольких; меняет только черновик. */
 async function pickUsers(line: WagonLine) {
   if (props.readonly) return
-  await openDialog<{ usrs: number[] }>(UserPickDialog, {
-    multiple: true,
-    title: t('Ответственные за вагон {n}', { n: line.number }),
-    // переключатель «Поездная бригада» / «Сотрудники станции» — всегда: нет сотрудников станции — список пуст
-    groups: [
-      { id: 'conductors', text: 'Поездная бригада', filter: (r: UserPickRow) => crewIds.value.has(r.id) },
-      { id: 'station', text: 'Сотрудники станции', filter: (r: UserPickRow) => !crewIds.value.has(r.id) },
-    ],
-    okText: 'Выбрать',
-    current: usrsOf(line.id).map((id) => ({ id, name: nameOf(id) })),
-    load: () =>
-      Promise.resolve(
-        props.data.candidates.map((c) => ({
-          id: c.id,
-          name: c.name,
-          me: isMe(c),
-          duty: responsibleDuty(c),
-          place: responsiblePlace(c),
-        })),
-      ),
-    save: (usrs: number[]) => {
+  await pickWagonUsers(
+    props.data,
+    line.number,
+    usrsOf(line.id).map((id) => ({ id, name: nameOf(id) })),
+    (usrs) => {
       draft.value = { ...draft.value, [line.id]: usrs }
       return Promise.resolve()
     },
-  })
+  )
 }
 
 /** Вагоны сотрудника — в окне выбора вагонов по вагонам поезда; меняет только черновик. */

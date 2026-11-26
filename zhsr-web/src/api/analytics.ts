@@ -1,4 +1,6 @@
 import { http } from './http'
+import type { TripRef } from './wagons'
+import type { StationPoint } from './stages'
 import type { UserRef, WagonRef } from './requests'
 import type { TrainRef } from './trains'
 
@@ -120,6 +122,22 @@ export async function fetchWorkTime(from: string, to: string): Promise<WorkTimeR
   return (await http.get<WorkTimeRow[]>('/analytics/work-time', { params: { from, to } })).data
 }
 
+/** Остановка маршрута на карте. */
+export interface GeoStop {
+  /** остановка (route_station.id) */
+  id: number
+  /** станция — id справочника Station */
+  station: number
+  /** поезд здесь останавливается; false — станция следования */
+  haveStop: boolean
+  /** километр линии маршрута */
+  km: number
+  /** прибытие по расписанию, минуты от отправления с начальной станции */
+  arrivalMin: number
+  /** отправление по расписанию, там же */
+  departureMin: number
+}
+
 /** Маршрут на карте. */
 export interface GeoRoute {
   id: number
@@ -127,18 +145,53 @@ export interface GeoRoute {
   name: string
   /** точки линии по порядку: долгота, широта, километр от начала линии */
   points: [number, number, number][]
+  /** остановки по порядку */
+  stops: GeoStop[]
 }
 
-/** Рейс на карте. */
+/** Прицепка или отцепка вагона в цикле рейса. */
+export interface GeoChange {
+  /** train_wagon_change.id */
+  id: number
+  wagon: WagonRef
+  /** слой — константы TrainWagonKind */
+  kind: number
+  /** вид — константы TrainWagonChangeType */
+  changeType: number
+  /** время записи, ISO */
+  dt: string
+  /** с какого времени запись действует: у ожидающего плана — не раньше последнего факта поезда */
+  moment: string
+  /** плановое время; null — факт без плана */
+  planDt: string | null
+  /** станция — id справочника Station */
+  station: number
+}
+
+/**
+ * Рейс на карте. Цикл рейса — рейс с подготовкой: записи прицепок и отцепок рейса и записи вне рейса после прибытия
+ * предыдущего рейса поезда; записи после прибытия последнего рейса поезда — его же.
+ */
 export interface GeoTrip {
   id: number
   /** маршрут — id из GeoChart.routes */
   route: number
   train: TrainRef
+  /** состояние — константы TripStatus */
+  tripStatusType: number
   plannedDt: string
-  departedDt: string
-  /** null — рейс в пути */
+  /** null — рейс не отправлен */
+  departedDt: string | null
+  /** null — рейс не прибыл */
   arrivedDt: string | null
+  /** плановое прибытие */
+  arrival: string
+  /** начало цикла — прибытие предыдущего рейса поезда; null — предыдущего рейса нет */
+  cycleStart: string | null
+  /** записи цикла: факты и ожидающие планы, по времени */
+  changes: GeoChange[]
+  /** проводники рейса */
+  conductors: UserRef[]
   /**
    * ход поезда по порядку: минуты от начала периода, километр линии маршрута, отклонение от расписания в минутах
    * (больше нуля — отставание); пусто — координат нет
@@ -146,41 +199,63 @@ export interface GeoTrip {
   track: [number, number, number][]
 }
 
-/** Положения на карте вне рейсов: общее вагона и проводника. */
-export interface GeoPlaces {
-  /**
-   * точки по времени вне рейсов и последняя точка каждого рейса: минуты от начала периода (меньше нуля — до периода),
-   * долгота, широта; не пуст
-   */
-  points: [number, number, number][]
-  /** рейсы периода: минуты начала и конца; конец null — рейс идёт */
-  trips: [number, number | null][]
-  /** до какой минуты показывается; null — в последней точке бессрочно */
-  until: number | null
+/** Участие вагона в поезде. */
+export interface GeoState {
+  train: number
+  wagon: number
+  /** слой — константы TrainWagonKind */
+  kind: number
+  dbeg: string
+  dend: string | null
 }
 
-/** Положения вагона на карте. */
-export interface GeoWagon extends GeoPlaces {
-  wagon: WagonRef
+/** Расположение вагона за период. */
+export interface GeoLocation {
+  wagon: number
+  dbeg: string
+  dend: string | null
+  /** станция расположения: сама станция, станция депо или парка отстоя; у вагона в рейсе — null */
+  station: number | null
+  /** депо, в котором вагон; null — не в депо */
+  depot: number | null
+  /** парк отстоя, в котором вагон; null — не в парке отстоя */
+  yard: number | null
+  /** рейс, в котором вагон; null — вне рейса */
+  trip: TripRef | null
 }
 
-/** Положения проводника на карте. */
-export interface GeoUsr extends GeoPlaces {
-  usr: UserRef
+/** Период ответственных за вагон: факт или ожидающий план. */
+export interface GeoResponsible {
+  wagon: number
+  /** слой — константы WagonResponsibleKind */
+  kind: number
+  dbeg: string
+  dend: string | null
+  /** плановое время начала; null — факт вне стадии рейса */
+  planDt: string | null
+  /** проводники рейсов из состава ответственных — id; у плана может быть пусто */
+  usrs: number[]
 }
 
-/** Диаграмма «Текущие рейсы». Время точек — минуты от from. */
+/** Данные карт «Текущие рейсы» и поезда. Время точек хода — минуты от from. */
 export interface GeoChart {
   from: string
   routes: GeoRoute[]
+  /** по отправлению, и неотправленные */
   trips: GeoTrip[]
-  /** без points — пустой список */
-  wagons: GeoWagon[]
-  /** без points — пустой список */
-  usrs: GeoUsr[]
+  states: GeoState[]
+  locations: GeoLocation[]
+  responsibles: GeoResponsible[]
+  /** точки станций */
+  stations: StationPoint[]
 }
 
-/** Ход рейсов и положения вагонов и проводников за период [from, to); points — с положениями вагонов и проводников. */
-export async function fetchGeoChart(from: string, to: string, points: boolean): Promise<GeoChart> {
-  return (await http.get<GeoChart>('/analytics/geo', { params: { from, to, points } })).data
+/** Карта поезда: его рейсы с формирования по текущее время и неотправленные. */
+export async function fetchTrainGeoChart(train: number): Promise<GeoChart> {
+  return (await http.get<GeoChart>(`/trains/${train}/geo`)).data
+}
+
+/** «Текущие рейсы» за период [from, to); details — с данными циклов рейсов. */
+export async function fetchGeoChart(from: string, to: string, details: boolean): Promise<GeoChart> {
+  return (await http.get<GeoChart>('/analytics/geo', { params: { from, to, points: details } })).data
 }

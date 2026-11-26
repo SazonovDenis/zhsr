@@ -1,8 +1,15 @@
 /**
- * Журнал прицепок и отцепок и участие вагона в поезде: значения train_wagon_change.change_type, kind и plan_status,
+ * Журнал поезда и участие вагона в поезде: код записи журнала (имя таблицы, как TrainJournalCode.java); значения train_wagon_change.change_type, kind и plan_status,
  * train_wagon.kind. Таблиц справочника нет: константы — как TrainWagonChangeType.java, TrainWagonKind.java и
  * TrainWagonPlanStatus.java на сервере.
  */
+export const TrainJournalCode = {
+  /** Прицепка или отцепка вагона */
+  TRAIN_WAGON_CHANGE: 'train_wagon_change',
+  /** Смена порядка вагонов */
+  TRAIN_WAGON_SEQ: 'train_wagon_seq',
+} as const
+
 export const TrainWagonChangeType = {
   /** Прицепка: вагон входит в поезд — на станции или в пути */
   ATTACH: 1,

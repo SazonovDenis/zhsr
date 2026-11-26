@@ -38,7 +38,11 @@
       </div>
 
       <!-- рейсы — тем же блоком, что у вагона; от атрибутов — чертой во всю ширину панели -->
-      <section v-if="trips.length > 0" class="train-panel__trips q-pt-md q-px-lg">
+      <section
+        v-if="trips.length > 0"
+        class="train-panel__trips q-pt-md q-px-lg"
+        :class="{ 'train-panel__trips--shrink': formPage }"
+      >
         <TripLinks :trips="trips" :title="pastTrips ? 'Прошлые рейсы' : 'Текущий и будущие рейсы'" />
       </section>
 
@@ -53,6 +57,11 @@
         <!-- вагонов нет — без таблицы, одной надписью -->
         <DataTable v-if="train.wagons.length > 0" :columns="wagonColumns" :rows="train.wagons" row-key="id" />
         <div v-else class="train-panel__empty">{{ t('Вагонов нет') }}</div>
+      </section>
+
+      <!-- низ панели экрана состава (карта поезда) -->
+      <section v-if="$slots.bottom" class="train-panel__bottom q-pt-md q-px-lg q-pb-md">
+        <slot name="bottom" />
       </section>
     </template>
   </SidePanel>
@@ -80,7 +89,7 @@ import { trainPlaceText } from './trainPlace'
  * прицепок и отцепок; под атрибутами — кнопка «Редактировать» (обозначение поезда, событие edit; editReason — почему
  * недоступна); ниже — рейсы поезда ссылками на состав поезда с рейсом и вагоны списком по порядку. На списке поездов —
  * блок «Вагоны» с кнопкой «Состав поезда»; на экране состава поезда (formPage) блока «Вагоны» нет (состав — в середине
- * экрана). Справочники Station, Depot, Yard, LocationKind, WagonType, WagonModel, TripState готовит страница.
+ * экрана), а внизу — слот bottom. Справочники Station, Depot, Yard, LocationKind, WagonType, WagonModel, TripState готовит страница.
  */
 const props = withDefaults(
   defineProps<{
@@ -116,6 +125,20 @@ const wagonColumns = (wagonsColumns as unknown as Column<TrainRowWagon>[])
 .train-panel__trips {
   flex: none;
   margin: 0 -1.5rem;
+  border-top: 0.0625rem solid $zs-border;
+
+  // над картой: длинный список рейсов прокручивается, а не вытесняет её
+  &--shrink {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+.train-panel__bottom {
+  display: flex;
+  flex: 1 0 20rem;
+  flex-direction: column;
+  margin: 0 -1.5rem -1rem;
   border-top: 0.0625rem solid $zs-border;
 }
 

@@ -1,7 +1,7 @@
 <template>
   <!-- Единый корень — без него группа кнопок и кнопка «...» попадают в DOM родителя как два независимых узла, и любой
        внешний flex/grid растягивает и позиционирует их порознь -->
-  <div class="period-picker q-pa-none">
+  <div class="period-picker q-pa-none" :class="{ 'period-picker--touch': isMobile }">
     <span v-if="label" class="period-picker__label q-my-none q-mr-sm q-ml-md">{{ t(label) }}</span>
 
     <!-- поля ввода нет — ряд как переключатель: одна остановка Tab, внутри стрелки, пробел и Backspace
@@ -180,6 +180,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { HistoryDialog } from '@/shared/components/dialog/dialogHistory'
 import { dialogHistory } from '@/shared/components/dialog/dialogHistory'
 import { vRovingButtons } from '@/shared/composables/rovingButtons'
+import { isMobile } from '@/shared/device'
 
 import { i18n, t } from '@/boot/i18n'
 import type { PeriodPreset } from './period'
@@ -774,18 +775,25 @@ function formatDateHeader(dateStr: string | null): string {
 // Короткий ряд — в общей рамке-пилюле, как CbSegment: подпись, готовые периоды и «...»
 // Кнопки периодов и «...» — во всю внутреннюю высоту рамки, со скруглением рамки: выбранная кнопка вписывается в
 // рамку ровно, без зазоров. Внутренний радиус кнопки — радиус рамки минус её толщина
+// Высота ряда — как у кнопок CbButton, а не полей (--zs-control-height)
 .period-picker {
+  --period-picker-height: 1.9rem;
   --period-picker-border: 0.0625rem;
-  --period-picker-radius: calc(var(--zs-control-height) / 2);
+  --period-picker-radius: calc(var(--period-picker-height) / 2);
 
   display: inline-flex;
   flex-wrap: nowrap;
   align-items: stretch;
   gap: 0.1rem;
-  height: var(--zs-control-height);
+  height: var(--period-picker-height);
   border: var(--period-picker-border) solid $zs-border-input;
   border-radius: var(--period-picker-radius);
   background: #fff;
+}
+
+// телефон: под палец, как CbButton
+.period-picker--touch {
+  --period-picker-height: 2.8rem;
 }
 
 .period-picker__label {

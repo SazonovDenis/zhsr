@@ -1,7 +1,7 @@
 package kz.zhsr.app.service;
 
 /**
- * SQL поезда, журнала прицепок и отцепок (train_wagon_change) и участия вагонов в поезде (train_wagon):
+ * SQL поезда, журнала поезда (train_wagon_change, train_wagon_seq) и участия вагонов в поезде (train_wagon):
  * {@link TrainService}, {@link TrainJournal}.
  */
 final class TrainSql {
@@ -13,6 +13,21 @@ final class TrainSql {
                      (select yard.station from yard where yard.id = wagon_info.yard))""";
 
     private TrainSql() {
+    }
+
+    /**
+     * Станция расположения вагона на время по журналу расположения: station - сама станция, станция депо или парка отстоя;
+     * в рейсе - null. Записи на это время нет - строки нет. Параметры wagon, time.
+     */
+    static String wagonStationAt() {
+        return """
+                select coalesce(wagon_location.station,
+                                (select depot.station from depot where depot.id = wagon_location.depot),
+                                (select yard.station from yard where yard.id = wagon_location.yard)) as station
+                from wagon_location
+                where wagon_location.wagon = :wagon and wagon_location.dbeg <= :time
+                  and (wagon_location.dend is null or wagon_location.dend > :time)
+                """;
     }
 
     /**
@@ -111,24 +126,14 @@ final class TrainSql {
                 """;
     }
 
-    /** Записи Факта журнала поезда со временем не раньше time, по времени и id. Параметры train, fact, time. */
-    static String factsFrom() {
-        return """
-                select train_wagon_change.id, train_wagon_change.wagon, train_wagon_change.change_type,
-                       train_wagon_change.seq, train_wagon_change.dt
-                from train_wagon_change
-                where train_wagon_change.train = :train and train_wagon_change.kind = :fact
-                  and train_wagon_change.dt >= :time
-                order by train_wagon_change.dt, train_wagon_change.id
-                """;
-    }
-
     /** Время последней записи Факта журнала поезда. Параметры train, fact. */
     static String lastTrainFact() {
         return """
-                select max(train_wagon_change.dt) as dt
-                from train_wagon_change
-                where train_wagon_change.train = :train and train_wagon_change.kind = :fact
+                select greatest(
+                           (select max(train_wagon_change.dt) from train_wagon_change
+                            where train_wagon_change.train = :train and train_wagon_change.kind = :fact),
+                           (select max(train_wagon_seq.dt) from train_wagon_seq
+                            where train_wagon_seq.train = :train and train_wagon_seq.kind = :fact)) as dt
                 """;
     }
 
@@ -156,7 +161,7 @@ final class TrainSql {
                 """;
     }
 
-    /** Число ожидающих записей Плана по поездам. Параметры trains, plan, waiting. */
+    /** Число ожидающих записей Плана по поездам: до двух строк на поезд. Параметры trains, plan, waiting. */
     static String waitingCounts() {
         return """
                 select train_wagon_change.train, count(*) as cnt
@@ -164,6 +169,12 @@ final class TrainSql {
                 where train_wagon_change.train = any(:trains) and train_wagon_change.kind = :plan
                   and train_wagon_change.plan_status = :waiting
                 group by train_wagon_change.train
+                union all
+                select train_wagon_seq.train, count(*) as cnt
+                from train_wagon_seq
+                where train_wagon_seq.train = any(:trains) and train_wagon_seq.kind = :plan
+                  and train_wagon_seq.plan_status = :waiting
+                group by train_wagon_seq.train
                 """;
     }
 

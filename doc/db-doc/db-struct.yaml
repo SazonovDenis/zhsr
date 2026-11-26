@@ -148,8 +148,8 @@ tables:
     columns:
       id: {type: bigint, required: true}
       code: {type: varchar(20)}
-      name: {type: varchar(255), required: true}
       station: {type: bigint, references: station}
+      name: {type: varchar(255), required: true}
 
   dict_version:
     primary_key: [name]
@@ -442,6 +442,15 @@ tables:
       dbeg: {type: timestamptz, required: true}
       dend: {type: timestamptz}
 
+  train_geo_location:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      train: {type: bigint, required: true, references: train}
+      dt: {type: timestamptz, required: true}
+      x: {type: 'numeric(9,6)', required: true}
+      y: {type: 'numeric(9,6)', required: true}
+
   train_wagon:
     primary_key: [id]
     columns:
@@ -475,6 +484,29 @@ tables:
       wagon_responsible: {type: bigint, references: wagon_responsible}
       closed_wagon_responsible: {type: bigint, references: wagon_responsible}
 
+  train_wagon_seq:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      train: {type: bigint, required: true, references: train}
+      kind: {type: integer, required: true}
+      plan_status: {type: integer}
+      dt: {type: timestamptz, required: true}
+      station: {type: bigint, required: true, references: station}
+      trip: {type: bigint, references: trip}
+      route_station: {type: bigint, references: route_station}
+      plan: {type: bigint, references: train_wagon_seq}
+      usr: {type: bigint, required: true, references: usr}
+      comment: {type: text}
+
+  train_wagon_seq_item:
+    primary_key: [id]
+    columns:
+      id: {type: bigint, required: true}
+      train_wagon_seq: {type: bigint, required: true, references: train_wagon_seq}
+      wagon: {type: bigint, required: true, references: wagon}
+      seq: {type: integer, required: true}
+
   transfer_act:
     primary_key: [id]
     columns:
@@ -486,7 +518,7 @@ tables:
       to_station: {type: bigint, references: station}
       to_depot: {type: bigint, references: depot}
       to_yard: {type: bigint, references: yard}
-      work_type: {type: bigint, required: true, references: work_type}
+      work_type: {type: bigint, references: work_type}
       act_status_type: {type: bigint, required: true, references: act_status_type}
       transferred_by_usr: {type: bigint, required: true, references: usr}
       transferred_dt: {type: timestamptz, required: true}

@@ -3,7 +3,7 @@ import { TripResponsibleLayer } from '@/shared/constants/TripResponsibleLayer'
 import { dayStart, isoDateTime } from '@/shared/format'
 import { http } from './http'
 import type { UserRef } from './requests'
-import type { TrainChange, TrainRef, TrainWagon, WagonBusy } from './trains'
+import type { TrainChange, TrainRef, TrainWagon, WagonBusy, WagonProblem } from './trains'
 import type { TripRef } from './wagons'
 import type { ResponsibleCandidate } from '@/shared/wagons/responsible'
 
@@ -24,12 +24,18 @@ export interface TripReadiness {
   riding: number
   /** номера едущих вагонов не на станции отправления */
   away: string[]
+  /** неготовность вагонов рейса: едущих на отправлении (в пути — сейчас) и прицепляемых планом на остановках */
+  problems: WagonProblem[]
   /** назначен ЛНП */
   lnp: boolean
   /** назначен ПЭМ */
   pem: boolean
   /** номера пассажирских вагонов, у которых не выполнена норма проводников */
   normNotOk: string[]
+  /** номера едущих вагонов, у которых опись экипировки не проводилась */
+  equipNoList: string[]
+  /** сколько позиций описей экипировки в недостаче */
+  equipShortage: number
 }
 
 /** Строка таблицы рейсов: вариант выбора рейса и поля таблицы. */
@@ -197,6 +203,8 @@ export interface CouplingWagon {
 
 /** Рейс, вагоны поезда рейса по порядку, бригада и прицепки и отцепки рейса. */
 export interface TripCrew {
+  /** неготовность вагонов рейса — тот же расчёт, что в готовности рейса; у выполненного и отменённого рейса пусто */
+  problems: WagonProblem[]
   trip: {
     id: number
     /** маршрут — id маршрута */

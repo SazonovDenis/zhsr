@@ -26,8 +26,8 @@
     <!-- прибытие: плановые прицепки и отцепки рейса отмечаются или отменяются до завершения рейса -->
     <div v-if="!depart && !fix && planned.length > 0" class="trip-mark__plans q-mt-md">
       <div class="trip-mark__title">{{ t('Не отмечены прицепки и отцепки рейса') }}</div>
-      <div v-for="c in planned" :key="c.id" class="trip-mark__plan">
-        <span class="zs-mono">{{ c.wagon.number }}</span>
+      <div v-for="c in planned" :key="changeKey(c)" class="trip-mark__plan">
+        <span class="zs-mono">{{ changeNumbers(c) }}</span>
         <ChangeLine :change="c" @mark="markPlan" @cancel="cancelPlan" />
       </div>
     </div>
@@ -40,6 +40,7 @@ import { computed, ref, shallowRef } from 'vue'
 
 import type { TrainCard, TrainChange } from '@/api/trains'
 import { cancelChangePlan } from '@/api/trains'
+import { confirmCancelByWarnings } from '../trains/confirmByWarnings'
 import type { TripCrew, TripResponsibles } from '@/api/trips'
 import {
   cancelArrival,
@@ -59,7 +60,7 @@ import FormField from '@/shared/components/form/FormField.vue'
 import SoftLink from '@/shared/components/form/SoftLink.vue'
 import FormSection from '@/shared/components/form/FormSection.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
-import { isWaiting } from '@/shared/trains/trainJournal'
+import { changeKey, changeNumbers, isWaiting } from '@/shared/trains/trainJournal'
 import type { ShownError } from '@/shared/errors'
 import { formError, shownError } from '@/shared/errors'
 import { isoDateTime } from '@/shared/format'
@@ -126,8 +127,9 @@ async function markPlan(change: TrainChange) {
 
 async function cancelPlan(change: TrainChange) {
   error.value = null
+  if (!(await confirmCancelByWarnings(change))) return
   try {
-    await cancelChangePlan(change.id)
+    await cancelChangePlan(change)
     await loadChanges()
   } catch (e) {
     error.value = shownError(e)

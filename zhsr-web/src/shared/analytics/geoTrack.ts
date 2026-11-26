@@ -1,7 +1,15 @@
-import type { GeoPlaces, GeoRoute, GeoTrip } from '@/api/analytics'
+import type { GeoRoute, GeoTrip } from '@/api/analytics'
 
 /** Точка во времени: минуты от начала периода и два значения — долгота и широта либо километр и отклонение. */
 export type TimedPoint = [number, number, number]
+
+/** Поезд в заданном месте карты. */
+export interface ExpectedTrain {
+  /** широта и долгота */
+  at: [number, number]
+  /** направление хода, градусы; null — поезд не в пути */
+  bearing: number | null
+}
 
 /** Отставание и опережение, минут, при которых цвет линии предельный. */
 export const LATE_LIMIT = 60
@@ -66,13 +74,19 @@ export function valueAt(points: TimedPoint[], minute: number): [number, number] 
   return [a[1], a[2]]
 }
 
-/** Место вне рейсов на момент: широта, долгота и минута последней точки; null — в рейсе или места нет. */
-export function placeAt(places: GeoPlaces, minute: number): { at: [number, number]; last: number } | null {
-  if (places.until !== null && minute > places.until) return null
-  if (places.trips.some(([from, to]) => from <= minute && (to === null || minute < to))) return null
-  const value = valueAt(places.points, minute)
-  if (!value) return null
-  return { at: [value[1], value[0]], last: places.points[lastIndex(places.points, minute)]![0] }
+/** Километр маршрута по расписанию через minute минут после отправления с начальной станции. */
+export function scheduleKm(route: GeoRoute, minute: number): number {
+  let previous = route.stops[0]
+  if (!previous || minute <= previous.departureMin) return previous?.km ?? 0
+  for (const stop of route.stops.slice(1)) {
+    if (minute < stop.arrivalMin) {
+      const part = (minute - previous.departureMin) / (stop.arrivalMin - previous.departureMin)
+      return previous.km + (stop.km - previous.km) * part
+    }
+    if (minute <= stop.departureMin) return stop.km
+    previous = stop
+  }
+  return previous.km
 }
 
 /** Место линии маршрута по километру: широта и долгота. */

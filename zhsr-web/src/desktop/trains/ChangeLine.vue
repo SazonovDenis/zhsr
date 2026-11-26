@@ -1,9 +1,6 @@
 <template>
   <span class="change-line">
-    <!-- вид — цветом вида, место и время — обычным цветом -->
-    <span :class="{ 'change-line__overdue': change.overdue }"
-      ><ChangeKindWord :attach="isAttach(change)" :text="kind" />{{ text }}</span
-    >
+    <span :class="{ 'change-line__overdue': change.overdue }">{{ kind }}{{ text }}</span>
     <span v-if="deviation" class="change-line__muted">{{ deviation }}</span>
     <q-btn
       v-for="a in actions"
@@ -29,13 +26,12 @@ import type { TrainChange } from '@/api/trains'
 import { t } from '@/boot/i18n'
 import { dictManager } from '@/shared/dict/DictManager'
 import { formatDateTime } from '@/shared/format'
-import ChangeKindWord from '@/shared/trains/ChangeKindWord.vue'
-import { changeActions, deviationText, isAttach, isWaiting } from '@/shared/trains/trainJournal'
+import { changeActions, deviationText, isAttach, isSeq, isWaiting } from '@/shared/trains/trainJournal'
 
 /**
- * Прицепка или отцепка вагона одной строкой с действиями (слово вида — зелёным или красным, остальное — обычным
- * цветом): план — «прицепка по плану: Астана, 30.10 11:00, на 7» с
- * «Отметить» и «Отменить план»; факт — «прицеплен: Астана, 28.10 06:00» с отклонением от плана и «Удалить факт».
+ * Прицепка или отцепка вагона одной строкой с действиями: план — «прицепка по плану: Астана, 30.10 11:00, на 7» с
+ * «Отметить выполнение» и «Отменить план»; факт — «прицеплен: Астана, 28.10 06:00» с отклонением от плана и «Удалить факт».
+ * Смена порядка — «смена порядка по плану» и «порядок вагонов изменён».
  * Кнопки видны всегда; недоступные — неактивны, причина во всплывающей подсказке. Справочник Station готовит страница.
  *
  * @prop change     запись журнала
@@ -53,6 +49,7 @@ const deviation = computed(() => deviationText(props.change))
 
 /** Слово вида: план — «прицепка по плану», факт — «прицеплен». */
 const kind = computed(() => {
+  if (isSeq(props.change)) return waiting.value ? t('смена порядка по плану') : t('порядок вагонов изменён')
   const attach = isAttach(props.change)
   if (waiting.value) return attach ? t('прицепка по плану') : t('отцепка по плану')
   return attach ? t('прицеплен') : t('отцеплен')

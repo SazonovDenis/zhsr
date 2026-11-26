@@ -1,28 +1,33 @@
 package kz.zhsr.app.service.ref;
 
 import kz.kis.kiscore.model.DbRec;
+import kz.kis.kiscore.utils.UtCnv;
 import kz.kis.kiscore.utils.UtDb;
 import kz.kis.kisdbtools.ref.RefLoader;
 import kz.kis.kisdbtools.repository.Db;
 import kz.zhsr.app.constants.ConductorCategory;
 import kz.zhsr.app.constants.CrewDuty;
 import kz.zhsr.app.constants.LocationType;
+import kz.zhsr.app.constants.TrainWagonChangeType;
 import kz.zhsr.app.constants.TrainWagonKind;
 import kz.zhsr.app.constants.TrainWagonPlanStatus;
 import kz.zhsr.app.constants.TripStatus;
 import kz.zhsr.app.dto.ref.UserRef;
+import kz.zhsr.app.dto.train.WagonProblem;
 import kz.zhsr.app.dto.trip.TripCrew;
 import kz.zhsr.app.dto.trip.TripReadiness;
 import kz.zhsr.app.service.RouteService;
 import kz.zhsr.app.service.TripLayerSql;
 import kz.zhsr.app.service.TripNorm;
 import kz.zhsr.app.service.TripService;
+import kz.zhsr.app.service.WagonProblems;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +37,7 @@ import java.util.stream.Collectors;
 
 /**
  * Готовность рейсов к отправлению (Ф-РЕЙ-02): поезд назначен и ожидающие планы до отправления отмечены, вагоны на
- * станции отправления, ЛНП и ПЭМ назначены, норма проводников выполнена. У рейса в статусе «Выполняется» - те же
+ * станции отправления, ЛНП и ПЭМ назначены, норма проводников выполнена, недостачи экипировки нет, опись проведена. У рейса в статусе «Выполняется» - те же
  * пункты по текущему состоянию: состав - текущий по факту, вагоны должны быть в рейсе, планов до отправления нет.
  * Выполненное до отправления - прицепки и отцепки фактом (и отмеченные планы, и факты без плана): вне рейса после
  * планового отправления предыдущего рейса поезда и самого рейса - не позже отправления.
@@ -47,10 +52,12 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
 
     private final Db db;
     private final RouteService routeService;
+    private final WagonProblems wagonProblems;
 
-    TripReadinessLoader(Db db, RouteService routeService) {
+    TripReadinessLoader(Db db, RouteService routeService, WagonProblems wagonProblems) {
         this.db = db;
         this.routeService = routeService;
+        this.wagonProblems = wagonProblems;
     }
 
     @Override
@@ -69,7 +76,7 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
         Map<Long, OffsetDateTime> lastFact = new HashMap<>();
         if (!trains.isEmpty()) {
             for (DbRec r : db.loadSql(lastFacts(), Map.of("trains", trains, "fact", TrainWagonKind.FACT))) {
-                lastFact.put(r.getLong("train"), r.getDateTimeTZ("dt"));
+                lastFact.merge(r.getLong("train"), r.getDateTimeTZ("dt"), (a, b) -> a.isAfter(b) ? a : b);
             }
         }
         Map<Long, OffsetDateTime> moments = new HashMap<>();
@@ -133,6 +140,23 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
             }
         }
 
+        // недостача по последним описям едущих вагонов: вагон -> позиции шаблонов
+        Map<Long, Set<Long>> shortages = new HashMap<>();
+        if (!wagonIds.isEmpty()) {
+            for (DbRec r : db.loadSql(equipShortages(), Map.of("wagons", wagonIds))) {
+                shortages.computeIfAbsent(r.getLong("wagon"), k -> new HashSet<>())
+                        .add(r.getLong("equip_list_template_item"));
+            }
+        }
+
+        // вагоны, у которых описей не было вовсе
+        Set<Long> listed = new HashSet<>();
+        if (!wagonIds.isEmpty()) {
+            for (DbRec r : db.loadSql(listedWagons(), Map.of("wagons", wagonIds))) {
+                listed.add(r.getLong("wagon"));
+            }
+        }
+
         // факты поездов и рейсы поездов: выполненное до отправления рейса - факты вне рейса после планового
         // отправления предыдущего рейса поезда и факты самого рейса до его отправления
         Map<Long, List<DbRec>> trainFacts = Map.of();
@@ -148,6 +172,8 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
         Map<String, Object> params = TripLayerSql.params();
         params.put("trips", ids);
         Map<Long, List<DbRec>> responsibles = UtDb.collectGroupBy_records(db.loadSql(crewWagons(), params), "id");
+
+        Map<Long, List<WagonProblem>> problems = problems(trips, stations, moments, riding, trains);
 
         List<DbRec> res = new ArrayList<>();
         for (DbRec t : trips) {
@@ -197,7 +223,7 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
                     boolean atDeparture = changeTrip != null && changeTrip == id
                             && c.getLong("route_station").longValue() == departure.getLong("id");
                     boolean before = changeTrip == null && !c.getDateTimeTZ("dt").isAfter(planned);
-                    if (atDeparture || before) {
+                    if ((atDeparture || before) && !pending.contains(c.getString("number"))) {
                         pending.add(c.getString("number"));
                     }
                 }
@@ -226,19 +252,28 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
                     OffsetDateTime dt = c.getDateTimeTZ("dt");
                     boolean outside = changeTrip == null && (prev == null || dt.isAfter(prev));
                     boolean own = changeTrip != null && changeTrip == id;
-                    if ((outside || own) && !dt.isAfter(until)) {
+                    if ((outside || own) && !dt.isAfter(until) && !done.contains(c.getString("number"))) {
                         done.add(c.getString("number"));
                     }
                 }
             }
             rec.put("done", done);
             rec.put("riding", composition.size());
+            rec.put("problems", problems.getOrDefault(id, List.of()));
             rec.put("away", composition.stream()
                     .filter(w -> !Objects.equals(w.getLocationType(), placeType) || place == null || !place.equals(w.getPlace()))
                     .map(TripCrew.Wagon::getNumber)
                     .toList());
             rec.put("lnp", members.values().stream().anyMatch(m -> m.getCrewDutyType() == CrewDuty.LNP));
             rec.put("pem", members.values().stream().anyMatch(m -> m.getCrewDutyType() == CrewDuty.PEM));
+            // позиции с недостачей: по каждому шаблону - в последней описи каждого едущего вагона
+            Set<Long> shortItems = new HashSet<>();
+            for (Long wagon : ridingIds) {
+                shortItems.addAll(shortages.getOrDefault(wagon, Set.of()));
+            }
+            rec.put("equip_shortage", shortItems.size());
+            rec.put("equip_no_list", composition.stream().filter(w -> !listed.contains(w.getWagon()))
+                    .map(TripCrew.Wagon::getNumber).toList());
             rec.put("norm_not_ok", TripNorm.notOk(composition, new ArrayList<>(members.values())));
             res.add(rec);
         }
@@ -253,22 +288,88 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
         ref.setDone((List<String>) rec.get("done"));
         ref.setRiding(rec.getInt("riding"));
         ref.setAway((List<String>) rec.get("away"));
+        ref.setProblems((List<WagonProblem>) rec.get("problems"));
         ref.setLnp(rec.getBoolean("lnp"));
         ref.setPem(rec.getBoolean("pem"));
+        ref.setEquipNoList((List<String>) rec.get("equip_no_list"));
+        ref.setEquipShortage(rec.getInt("equip_shortage"));
         ref.setNormNotOk((List<String>) rec.get("norm_not_ok"));
+    }
+
+    /**
+     * Неготовность вагонов рейсов. Вагон нужен от отправления (у выполняющегося рейса - с этого момента) до прибытия по
+     * расписанию: едущий на отправлении - на станции отправления (в пути расположение не проверяется), прицепляемый
+     * планом на остановке - с планового времени прицепки на станции остановки.
+     */
+    private Map<Long, List<WagonProblem>> problems(List<DbRec> trips, Map<Long, List<DbRec>> stations,
+                                                   Map<Long, OffsetDateTime> moments,
+                                                   Map<Long, List<DbRec>> riding, List<Long> trains)
+            throws Exception {
+        Map<Long, List<DbRec>> attaches = trains.isEmpty() ? Map.of() : UtDb.collectGroupBy_records(
+                db.loadList("train_wagon_change", Map.of("train", trains, "kind", TrainWagonKind.PLAN,
+                        "plan_status", TrainWagonPlanStatus.WAITING, "change_type", TrainWagonChangeType.ATTACH)),
+                "train");
+        OffsetDateTime now = OffsetDateTime.now();
+        List<WagonProblems.Need> needs = new ArrayList<>();
+        List<Long> needTrips = new ArrayList<>();
+        for (DbRec t : trips) {
+            long id = t.getLong("id");
+            Long train = t.getLong("train");
+            List<DbRec> route = stations.getOrDefault(t.getLong("route"), List.of());
+            List<DbRec> points = route.stream().filter(rs -> rs.getBoolean("have_stop")).toList();
+            if (train == null || points.isEmpty()) {
+                continue;
+            }
+            boolean inTrip = inTrip(t);
+            OffsetDateTime from = inTrip ? now : moments.get(id);
+            DbRec first = points.get(0);
+            DbRec last = points.get(points.size() - 1);
+            int minutes = (int) (UtCnv.toLong(last.get("arrival_min")) - UtCnv.toLong(first.get("departure_min")));
+            OffsetDateTime arrival = t.getDateTimeTZ("planned_dt").plusMinutes(minutes);
+            OffsetDateTime to = arrival.isAfter(from) ? arrival : from.plusMinutes(1);
+            Long departure = inTrip ? null : first.getLong("station");
+            for (DbRec r : riding.getOrDefault(id, List.of())) {
+                needs.add(new WagonProblems.Need(r.getLong("wagon"), train, departure, from, to));
+                needTrips.add(id);
+            }
+            for (DbRec c : attaches.getOrDefault(train, List.of())) {
+                Long changeTrip = c.getLong("trip");
+                if (changeTrip == null || changeTrip != id
+                        || (!inTrip && c.getLong("route_station").longValue() == first.getLong("id"))) {
+                    continue;
+                }
+                OffsetDateTime dt = c.getDateTimeTZ("dt");
+                needs.add(new WagonProblems.Need(c.getLong("wagon"), train, c.getLong("station"), dt,
+                        to.isAfter(dt) ? to : dt.plusMinutes(1)));
+                needTrips.add(id);
+            }
+        }
+        Map<Long, List<WagonProblem>> res = new HashMap<>();
+        List<List<WagonProblem>> found = wagonProblems.find(needs);
+        for (int i = 0; i < needs.size(); i++) {
+            if (!found.get(i).isEmpty()) {
+                res.computeIfAbsent(needTrips.get(i), k -> new ArrayList<>()).addAll(found.get(i));
+            }
+        }
+        return res;
     }
 
     private static boolean inTrip(DbRec trip) {
         return trip.getLong("trip_status_type") == TripStatus.IN_PROGRESS;
     }
 
-    /** Последний Факт журнала поездов. Параметры trains, fact. */
+    /** Последний Факт журнала поездов: до двух строк на поезд. Параметры trains, fact. */
     private static String lastFacts() {
         return """
                 select train_wagon_change.train, max(train_wagon_change.dt) as dt
                 from train_wagon_change
                 where train_wagon_change.train = any(:trains) and train_wagon_change.kind = :fact
                 group by train_wagon_change.train
+                union all
+                select train_wagon_seq.train, max(train_wagon_seq.dt) as dt
+                from train_wagon_seq
+                where train_wagon_seq.train = any(:trains) and train_wagon_seq.kind = :fact
+                group by train_wagon_seq.train
                 """;
     }
 
@@ -303,7 +404,36 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
                 """;
     }
 
-    /** Ожидающие планы поездов с номером вагона. Параметры trains, kind, waiting. */
+    /**
+     * Позиции с недостачей (фактическое количество меньше требуемого) в последней описи вагона по каждому шаблону:
+     * вагон и позиция. Параметр wagons.
+     */
+    private static String equipShortages() {
+        return """
+                select equip_list.wagon, equip_list_value.equip_list_template_item
+                from equip_list_value
+                join equip_list on equip_list.id = equip_list_value.equip_list
+                where equip_list.wagon = any(:wagons)
+                  and equip_list_value.quantity_required is not null
+                  and equip_list_value.quantity_actual < equip_list_value.quantity_required
+                  and equip_list.id = (select last.id from equip_list as last
+                                       where last.wagon = equip_list.wagon
+                                         and last.equip_list_template = equip_list.equip_list_template
+                                       order by last.completed_dt desc, last.id desc
+                                       limit 1)
+                """;
+    }
+
+    /** Вагоны, у которых есть хотя бы одна опись экипировки. Параметр wagons. */
+    private static String listedWagons() {
+        return """
+                select distinct equip_list.wagon
+                from equip_list
+                where equip_list.wagon = any(:wagons)
+                """;
+    }
+
+    /** Ожидающие планы поездов с номером вагона; у смены порядка - все её вагоны. Параметры trains, kind, waiting. */
     private static String waitingPlans() {
         return """
                 select train_wagon_change.train, train_wagon_change.trip, train_wagon_change.route_station,
@@ -312,18 +442,32 @@ class TripReadinessLoader extends RefLoader<TripReadiness> {
                 join wagon on wagon.id = train_wagon_change.wagon
                 where train_wagon_change.train = any(:trains) and train_wagon_change.kind = :kind
                   and train_wagon_change.plan_status = :waiting
-                order by train_wagon_change.dt, train_wagon_change.id
+                union all
+                select train_wagon_seq.train, train_wagon_seq.trip, train_wagon_seq.route_station,
+                       train_wagon_seq.dt, wagon.number
+                from train_wagon_seq
+                join train_wagon_seq_item on train_wagon_seq_item.train_wagon_seq = train_wagon_seq.id
+                join wagon on wagon.id = train_wagon_seq_item.wagon
+                where train_wagon_seq.train = any(:trains) and train_wagon_seq.kind = :kind
+                  and train_wagon_seq.plan_status = :waiting
+                order by dt, number
                 """;
     }
 
-    /** Факты журнала поездов с номером вагона и рейсом. Параметры trains, fact. */
+    /** Факты журнала поездов с номером вагона и рейсом; у смены порядка - все её вагоны. Параметры trains, fact. */
     private static String trainFacts() {
         return """
                 select train_wagon_change.train, train_wagon_change.trip, train_wagon_change.dt, wagon.number
                 from train_wagon_change
                 join wagon on wagon.id = train_wagon_change.wagon
                 where train_wagon_change.train = any(:trains) and train_wagon_change.kind = :fact
-                order by train_wagon_change.dt, train_wagon_change.id
+                union all
+                select train_wagon_seq.train, train_wagon_seq.trip, train_wagon_seq.dt, wagon.number
+                from train_wagon_seq
+                join train_wagon_seq_item on train_wagon_seq_item.train_wagon_seq = train_wagon_seq.id
+                join wagon on wagon.id = train_wagon_seq_item.wagon
+                where train_wagon_seq.train = any(:trains) and train_wagon_seq.kind = :fact
+                order by dt, number
                 """;
     }
 

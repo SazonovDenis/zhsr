@@ -1,0 +1,103 @@
+<template>
+  <ul class="cell-wagon-readiness q-my-none q-pl-none">
+    <li v-for="(p, i) in problems" :key="i" class="cell-wagon-readiness__item">
+      <div class="cell-wagon-readiness__warn">{{ t(PROBLEM_TITLES[p.wagonProblemType]!) }}</div>
+      <div class="cell-wagon-readiness__detail">{{ detail(p) }}</div>
+      <div v-if="p.wagonProblemType === WagonProblemType.YARD" @click.stop>
+        <SoftLink
+          text="Оформить передачу"
+          :disabled="!!transfer.reason(row)"
+          :title="transfer.reason(row) || undefined"
+          @click="transfer.open(row)"
+        />
+      </div>
+    </li>
+    <li v-if="conductors.notOk(row)" class="cell-wagon-readiness__item">
+      <div class="cell-wagon-readiness__warn">{{ t('Проводники не по норме') }}</div>
+      <div @click.stop>
+        <SoftLink
+          text="Назначить"
+          :disabled="!!conductors.reason()"
+          :title="conductors.reason() || undefined"
+          @click="conductors.assign(row)"
+        />
+      </div>
+    </li>
+    <li v-if="lists && lists.length === 0" class="cell-wagon-readiness__item">
+      <div class="cell-wagon-readiness__warn">{{ t('Опись не проводилась') }}</div>
+    </li>
+    <li v-for="l in shortages" :key="l.id" class="cell-wagon-readiness__item">
+      <div class="cell-wagon-readiness__warn">{{ t('Недостача по {n} позициям', l.shortageCount) }}</div>
+      <div @click.stop>
+        <SoftLink text="Опись" :title="textOf(l.equipListTemplate)" @click="equip.open(l, row.number)" />
+      </div>
+    </li>
+  </ul>
+</template>
+
+<script setup lang="ts">
+import { computed, inject } from 'vue'
+
+import type { TrainWagon, WagonProblem } from '@/api/trains'
+import { t } from '@/boot/i18n'
+import { textOf } from '@/shared/checks/texts'
+import SoftLink from '@/shared/components/form/SoftLink.vue'
+import { WagonProblemType } from '@/shared/constants/WagonProblemType'
+import { dictManager } from '@/shared/dict/DictManager'
+import { wagonProblemDetail } from '@/shared/trains/wagonProblemText'
+import type { CellProps } from '@/shared/components/table/types'
+import { TRIP_CONDUCTORS, TRIP_EQUIP, TRIP_TRANSFER } from '../tripMoment'
+
+/**
+ * Готовность вагона состава к отправлению рейса. Неготовности вагона по планам (расчёт сервера, Ф-ПОЕ-03): «На другой
+ * станции», «Нужна передача на станцию» или «В другом поезде» (на каждый поезд своя запись), под названием —
+ * подробности; у «На другой станции» — только где окажется вагон. У «Нужна передача на станцию» ссылка «Оформить передачу» — акт передачи на станцию отправления
+ * (Ф-АКТ-02); нет права — ссылка неактивна, причина — в подсказке. Проводники: у вагона не выполнена норма — предупреждение и ссылка
+ * «Назначить» — окно ответственных за вагон; нет права — ссылка неактивна, причина — в подсказке. Экипировка: описей у вагона нет — «Опись не проводилась»; в последней описи
+ * по шаблону недостача — «Недостача по N позициям» и ссылка «Опись» на эту опись, шаблон — в подсказке. Пункты разделены небольшим интервалом.
+ * Всё в порядке — ячейка пустая.
+ */
+const PROBLEM_TITLES: Record<number, string> = {
+  [WagonProblemType.STATION]: 'На другой станции',
+  [WagonProblemType.YARD]: 'Нужна передача на станцию',
+  [WagonProblemType.BUSY]: 'В другом поезде',
+}
+
+const props = defineProps<CellProps<TrainWagon>>()
+
+const transfer = inject(TRIP_TRANSFER)!
+const equip = inject(TRIP_EQUIP)!
+const conductors = inject(TRIP_CONDUCTORS)!
+
+const problems = computed(() => transfer.problems(props.row))
+const lists = computed(() => equip.lists(props.row.wagon))
+const shortages = computed(() => lists.value?.filter((l) => l.shortageCount > 0) ?? [])
+
+/** Подробности под названием неготовности. Станция, где нужен вагон, — станция отправления рейса, она не пишется. */
+function detail(p: WagonProblem): string {
+  if (p.wagonProblemType !== WagonProblemType.STATION) return wagonProblemDetail(p)
+  return p.station === null
+    ? t('окажется в рейсе')
+    : t('окажется на станции {station}', { station: dictManager.getValue('Station', p.station) })
+}
+</script>
+
+<style scoped lang="scss">
+.cell-wagon-readiness {
+  list-style: none;
+}
+
+.cell-wagon-readiness__item + .cell-wagon-readiness__item {
+  margin-top: 0.3rem;
+}
+
+.cell-wagon-readiness__warn {
+  color: $zs-error-fg;
+  font-weight: 600;
+}
+
+.cell-wagon-readiness__detail {
+  color: $zs-text-muted;
+  font-size: 0.8rem;
+}
+</style>

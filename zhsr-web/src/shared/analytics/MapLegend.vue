@@ -44,7 +44,7 @@ type Corner = 'bl' | 'br' | 'tl' | 'tr'
 /** Отступы углов в rem, те же — в стилях: слева вверху — кнопки масштаба, справа внизу — подпись OSM. */
 const CORNERS: Record<Corner, { x: number; y: number }> = {
   bl: { x: 0.5, y: 0.5 },
-  tr: { x: 0.5, y: 0.5 },
+  tr: { x: 0.5, y: 2.3 },
   tl: { x: 3.5, y: 0.5 },
   br: { x: 0.5, y: 1.8 },
 }
@@ -167,8 +167,9 @@ defineExpose({ check })
     left: 0.5rem;
   }
 
+  // ниже плашки «по факту / по плану» в правом верхнем углу карты
   &--tr {
-    top: 0.5rem;
+    top: 2.3rem;
     right: 0.5rem;
   }
 

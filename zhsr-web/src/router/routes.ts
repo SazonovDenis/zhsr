@@ -164,7 +164,7 @@ const routes: RouteRecordRaw[] = [
         component: () => pwa().then((m) => m.PwaTripWagonsPage),
       },
       {
-        path: 'trip/:id/mark/:change',
+        path: 'trip/:id/mark/:code/:change',
         name: 'pwa-trip-mark',
         meta: { pair: 'trips' },
         props: true,

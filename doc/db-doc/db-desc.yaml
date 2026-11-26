@@ -11,7 +11,7 @@ diagrams:
   train:
     title: "Поезд и вагоны в нём"
     description: "Вагоны, которые ходят вместе из рейса в рейс. Журнал прицепок и отцепок (план и факт) строит участие вагонов: историю составов и ожидаемый состав."
-    tables: [ train, train_wagon, train_wagon_change, trip, wagon: { hide_references: [ "depot" ] }, wagon_run, station, route_station, wagon_location: { hide_references: [ "trip", "wagon", "station" ] }, wagon_status: { hide_references: [ "wagon" ] }, wagon_responsible: { hide_references: [ "created_by_usr", "wagon" ] } ]
+    tables: [ train, train_wagon, train_wagon_change, train_wagon_seq, train_wagon_seq_item, trip, wagon: { hide_references: [ "depot" ] }, wagon_run, station, route_station, wagon_location: { hide_references: [ "trip", "wagon", "station" ] }, wagon_status: { hide_references: [ "wagon" ] }, wagon_responsible: { hide_references: [ "created_by_usr", "wagon" ] } ]
     hide_fields: [ "station", "route_station", "wagon", "wagon_location", "wagon_status", "wagon_responsible" ]
     top: [ wagon_status, wagon_responsible, wagon_location ]
 
@@ -28,9 +28,9 @@ diagrams:
     hide_fields: [ "depot", "yard", "station" , "wagon", "trip", "location_type", "usr" ]
 
   geo_location:
-    title: "Положение вагонов и сотрудников на местности"
-    tables: [ usr_geo_location, wagon_geo_location, usr, wagon: { hide_references: [ "depot" ] } ]
-    hide_fields: [ "usr", "wagon" ]
+    title: "Положение поездов, вагонов и сотрудников на местности"
+    tables: [ train_geo_location, usr_geo_location, wagon_geo_location, train, usr, wagon: { hide_references: [ "depot" ] } ]
+    hide_fields: [ "train", "usr", "wagon" ]
 
   transfer_act:
     title: "Передача вагонов между депо, станцией и парком отстоя"
@@ -774,6 +774,56 @@ tables:
         title: "Запись ответственных, закрытая фактом"
         description: "Факт wagon_responsible; удаление факта открывает её снова; пусто - ответственных не было"
 
+  train_wagon_seq:
+    title: "Смена порядка вагонов поезда: план и факт"
+    description: |
+      Журнал по технике «журнал и состояние» (journal-state-plan-fact.md): смена порядка вагонов поезда в момент
+      времени; участие вагонов в поезде train_wagon строится по этому журналу вместе с журналом прицепок и отцепок
+      train_wagon_change. Новый порядок - строки train_wagon_seq_item. Два слоя (kind): план - запланированная смена
+      порядка со статусом, факт - произошедшая; факт по плану ссылается на план.
+    columns:
+      train:
+        title: "Поезд"
+      kind:
+        title: "Слой"
+        constants_from: kz.zhsr.app.constants.TrainWagonKind
+      plan_status:
+        title: "Статус плана"
+        description: "Только у плана"
+        constants_from: kz.zhsr.app.constants.TrainWagonPlanStatus
+      dt:
+        title: "Время"
+        description: "У плана - плановое, у факта - фактическое"
+      station:
+        title: "Станция"
+      trip:
+        title: "Рейс"
+        description: "Пусто - вне рейса"
+      route_station:
+        title: "Остановка маршрута рейса"
+        description: "Пусто - вне рейса"
+      plan:
+        title: "Отработанный план"
+        description: "Только у факта; пусто - факт без плана"
+      usr:
+        title: "Кто внёс"
+        description: "Запланировал или отметил факт"
+      comment:
+        title: "Основания, примечания"
+        description: "Приказ, причина"
+
+  train_wagon_seq_item:
+    title: "Позиция вагона в новом порядке"
+    description: "Строка нового порядка вагонов; удаляется вместе с записью журнала train_wagon_seq."
+    columns:
+      train_wagon_seq:
+        title: "Смена порядка"
+      wagon:
+        title: "Вагон"
+      seq:
+        title: "Позиция в поезде"
+        description: "С 1"
+
   wagon_run:
     title: "Пробег вагона за участок рейса"
     description: |
@@ -791,6 +841,23 @@ tables:
       km:
         title: "Пробег, км"
         description: "Разность километража route_station конца и начала участка"
+
+  train_geo_location:
+    title: "Положение поезда на местности"
+    description: |
+      Очищенные координаты поезда по времени: по ним строится ход рейса на карте. Поезд вне рейса новых строк не получает.
+    columns:
+      train:
+        title: "Поезд"
+      dt:
+        title: "Момент"
+        description: "Время, в которое вычислено положение"
+      x:
+        title: "Долгота"
+        description: "Градусы, WGS 84"
+      y:
+        title: "Широта"
+        description: "Градусы, WGS 84"
 
   usr_geo_location:
     title: "Положение сотрудника на местности"

@@ -43,6 +43,7 @@
             :plain="o.id === null"
           />
         </button>
+        <div v-if="emptyText" class="user-pick__empty q-px-sm">{{ t(emptyText) }}</div>
       </div>
     </div>
   </FormDialog>
@@ -81,6 +82,8 @@ export interface UserPickGroup {
   id: string
   text: string
   filter: (row: UserPickRow) => boolean
+  /** что написать под списком, если у load нет ни одной строки группы */
+  empty?: string | undefined
 }
 
 /**
@@ -177,6 +180,12 @@ const options = computed<(Omit<UserPickRow, 'id'> & { id: number | null })[]>(()
   return [{ id: null, name: t('Не назначен') }, ...list]
 })
 
+/** Пояснение показанной группы без сотрудников; пусто — не показывать. */
+const emptyText = computed(() => {
+  const g = props.groups.find((x) => x.id === group.value)
+  return g?.empty && !rows.value.some(g.filter) ? g.empty : ''
+})
+
 void props
   .load()
   .then((list) => (rows.value = list))
@@ -261,6 +270,11 @@ const extraActions = computed<DialogAction[]>(() => [
   // список шире полей окна (1.5rem): до края окна — 0.5rem
   margin: 0 -1rem;
   overflow-y: auto;
+}
+
+.user-pick__empty {
+  color: $zs-text-muted;
+  font-size: 0.8rem;
 }
 
 .user-pick__item {

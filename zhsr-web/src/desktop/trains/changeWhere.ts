@@ -158,6 +158,8 @@ export function useChangeWhere(o: {
     if (state.mode === 'fact') return isoDateTime(new Date(state.factTime))
     return state.planTime ? isoDateTime(new Date(state.planTime)) : o.at
   })
+  /** Остановка маршрута рейса (route_station.id) выбранного места; null — вне рейса. */
+  const routeStation = computed<number | null>(() => stop.value?.routeStation ?? null)
   /** План в рейсе: плановое время вне периода рейса. */
   const planOutside = computed(() => {
     const g = group.value
@@ -228,6 +230,7 @@ export function useChangeWhere(o: {
     stopChoices,
     seqChoices,
     targetStation,
+    routeStation,
     moment,
     build,
   })

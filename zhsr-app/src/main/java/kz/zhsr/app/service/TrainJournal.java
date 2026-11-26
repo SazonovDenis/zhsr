@@ -13,11 +13,13 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.ToLongFunction;
 
 /**
- * Участие вагонов в поезде (train_wagon) по журналу прицепок и отцепок (train_wagon_change) - техника «журнал и
- * состояние» (doc/db-doc/journal-state-plan-fact.md). Группа - вагоны поезда: прицепка на позицию сдвигает вагоны с
- * неё на 1 назад, отцепка - вагоны за отцепленным на 1 вперёд; каждый сдвиг закрывает запись участия вагона и создаёт
+ * Участие вагонов в поезде (train_wagon) по журналу поезда: прицепки и отцепки (train_wagon_change) и смены порядка
+ * вагонов (train_wagon_seq) - техника «журнал и состояние» (doc/db-doc/journal-state-plan-fact.md). Группа - вагоны
+ * поезда: прицепка на позицию сдвигает вагоны с неё на 1 назад, отцепка - вагоны за отцепленным на 1 вперёд, смена
+ * порядка переставляет вагоны ({@link #reorder}); каждое изменение позиции закрывает запись участия вагона и создаёт
  * новую.
  * <p>
  * Слой Факт - история: записи Факта журнала применяются при создании, временем не раньше последнего Факта поезда.
@@ -42,9 +44,11 @@ public class TrainJournal {
     }
 
     private final Db db;
+    private final TrainJournalStore store;
 
-    public TrainJournal(Db db) {
+    public TrainJournal(Db db, TrainJournalStore store) {
         this.db = db;
+        this.store = store;
     }
 
     // --- чтение
@@ -96,8 +100,9 @@ public class TrainJournal {
         for (DbRec r : db.loadSql(TrainSql.openStates(), Map.of("train", train, "kind", TrainWagonKind.FACT))) {
             order.add(slot(r));
         }
-        List<DbRec> events = db.loadSql(TrainSql.factsFrom(), Map.of("train", train, "fact", TrainWagonKind.FACT,
-                "time", time));
+        List<DbRec> events = store.list(Map.of("train", train, "kind", TrainWagonKind.FACT)).stream()
+                .filter(r -> !r.getDateTimeTZ("dt").isBefore(time))
+                .toList();
         play(train, TrainWagonKind.FACT, order, events, null);
     }
 
@@ -115,11 +120,10 @@ public class TrainJournal {
             order.add(s);
         }
         OffsetDateTime last = lastFact(train);
-        List<DbRec> plans = new ArrayList<>(db.loadList("train_wagon_change", Map.of("train", train,
-                "kind", TrainWagonKind.PLAN, "plan_status", TrainWagonPlanStatus.WAITING)));
+        List<DbRec> plans = new ArrayList<>(store.list(Map.of("train", train, "kind", TrainWagonKind.PLAN,
+                "plan_status", TrainWagonPlanStatus.WAITING)));
         plans.sort(Comparator.<DbRec, OffsetDateTime>comparing(e -> timeOf(e, last))
-                .thenComparing(e -> e.getDateTimeTZ("dt"))
-                .thenComparing(e -> e.getLong("id")));
+                .thenComparing(TrainJournalStore.JOURNAL_ORDER));
         play(train, TrainWagonKind.PLAN, order, plans, last);
     }
 
@@ -145,8 +149,35 @@ public class TrainJournal {
         }
     }
 
-    /** Прицепка ставит вагон на позицию (больше числа вагонов - последним), отцепка убирает; повтор не меняет. */
+    /**
+     * Переставить элементы списка в порядке wanted (id вагонов): вагоны из wanted меняются местами между собой - на
+     * позициях, которые они занимают; вагоны, которых нет в wanted, остаются на местах; вагоны wanted, которых нет в
+     * списке, пропускаются.
+     */
+    static <T> void reorder(List<T> list, ToLongFunction<T> wagon, List<Long> wanted) {
+        List<Integer> places = new ArrayList<>();
+        List<T> moved = new ArrayList<>();
+        for (int i = 0; i < list.size(); i++) {
+            if (wanted.contains(wagon.applyAsLong(list.get(i)))) {
+                places.add(i);
+                moved.add(list.get(i));
+            }
+        }
+        moved.sort(Comparator.comparingInt(item -> wanted.indexOf(wagon.applyAsLong(item))));
+        for (int i = 0; i < places.size(); i++) {
+            list.set(places.get(i), moved.get(i));
+        }
+    }
+
+    /**
+     * Прицепка ставит вагон на позицию (больше числа вагонов - последним), отцепка убирает, повтор не меняет; смена
+     * порядка переставляет вагоны.
+     */
     private static void step(List<Slot> order, DbRec event) {
+        if (TrainJournalStore.isSeq(event)) {
+            reorder(order, s -> s.wagon, TrainJournalStore.order(event));
+            return;
+        }
         long wagon = event.getLong("wagon");
         int index = -1;
         for (int j = 0; j < order.size(); j++) {

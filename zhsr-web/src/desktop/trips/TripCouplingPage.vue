@@ -73,28 +73,25 @@
           <span class="trip-coupling__muted">{{ t('Отмечено: {n}', { n: card.selected.value.length }) }}</span>
         </div>
         <div class="trip-coupling__table">
-          <label
-            v-for="w in card.wagons.value"
-            :key="w.number"
-            class="trip-coupling__row q-py-sm q-px-md"
-            :class="{ 'trip-coupling__row--off': !w.available && !card.returnable(w) }"
-          >
-            <q-checkbox
-              v-model="card.selected.value"
-              :val="w.number"
-              :disable="!w.available && !card.returnable(w)"
-              dense
-            />
+          <label v-for="w in card.wagons.value" :key="w.number" class="trip-coupling__row q-py-sm q-px-md">
+            <q-checkbox v-model="card.selected.value" :val="w.number" dense />
             <span class="trip-coupling__muted">{{ w.seq ?? '' }}</span>
             <span class="zs-mono trip-coupling__number">{{ w.number }}</span>
             <span>{{ dictManager.getValue('WagonType', w.wagonType) }}</span>
             <span class="zs-sub">{{ card.whereText(w) }}</span>
             <DictBadge :id="w.wagonStatusType" dict="WagonState" />
+            <!-- что будет мешать планам вагона, если прицепить -->
+            <span v-for="(note, i) in card.notesOf(w)" :key="i" class="trip-coupling__warn">
+              <PhraseView :phrase="note" />
+            </span>
           </label>
           <div v-if="!busy.active.value && card.wagons.value.length === 0" class="trip-coupling__muted q-pa-md">
             {{ attach && !card.station.value ? t('Выберите остановку') : t('Вагонов нет') }}
           </div>
         </div>
+        <!-- отмеченные вагоны: что будет мешать их планам -->
+        <ErrorBox v-if="card.problemsError.value" :error="card.problemsError.value" />
+        <WagonProblemList :rows="card.problemRows.value" />
       </div>
     </div>
 
@@ -120,8 +117,8 @@
           <div class="trip-coupling__divider q-mt-md" />
           <div class="trip-coupling__caption q-mb-sm">{{ t('Планы рейса') }}</div>
           <div v-if="plans.length === 0" class="trip-coupling__muted">{{ t('Ожидающих планов нет') }}</div>
-          <div v-for="c in plans" :key="c.id" class="trip-coupling__plan q-mb-sm">
-            <span class="zs-mono">{{ c.wagon.number }}</span>
+          <div v-for="c in plans" :key="changeKey(c)" class="trip-coupling__plan q-mb-sm">
+            <span class="zs-mono">{{ changeNumbers(c) }}</span>
             <ChangeLine
               :change="c"
               :facts="card.crew.value.changes"
@@ -155,7 +152,9 @@ import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { shownError } from '@/shared/errors'
-import { isWaiting } from '@/shared/trains/trainJournal'
+import { changeKey, changeNumbers, isWaiting } from '@/shared/trains/trainJournal'
+import PhraseView from '@/shared/trains/PhraseView.vue'
+import WagonProblemList from '@/shared/trains/WagonProblemList.vue'
 import { placeCode } from '@/shared/transferPlace'
 import { useCoupling } from '@/shared/trips/useCoupling'
 import ResponsiblePicker from '@/shared/wagons/ResponsiblePicker.vue'
@@ -171,7 +170,7 @@ import TripTimes from './TripTimes.vue'
  * позиция прицепки, основания и примечания, ответственные; рядом — вагоны с галочками: при отцепке — которые едут в
  * поезде, по позиции, при прицепке — станции остановки, её депо и парка отстоя. Вагон в депо или парке отстоя
  * прицепить нельзя: «Вернуть на станцию» открывает акт приёма-передачи (Ф-АКТ-02). Справа — рейс и его ожидающие
- * планы с «Отметить» и «Отменить план».
+ * планы с «Отметить выполнение» и «Отменить план».
  */
 const props = defineProps<{ id: string; kind: string }>()
 
@@ -292,10 +291,18 @@ async function submit() {
   &:first-child {
     border-top: 0;
   }
+}
 
-  &--off {
-    opacity: 0.55;
-    cursor: default;
+// предупреждения — отдельной строкой под вагоном, от колонки номера до конца
+.trip-coupling__warn {
+  grid-column: 3 / -1;
+  color: $zs-text-muted;
+  font-size: 0.7rem;
+  font-style: italic;
+
+  // фраза без номера вагона начинается с заглавной буквы
+  &::first-letter {
+    text-transform: uppercase;
   }
 }
 

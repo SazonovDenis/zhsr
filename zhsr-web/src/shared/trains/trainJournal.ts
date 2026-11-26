@@ -2,13 +2,19 @@ import type { TrainCard, TrainChange, TrainState, TrainWagon } from '@/api/train
 import type { TripRef } from '@/api/wagons'
 import { TripStatus } from '@/shared/constants/systemDicts'
 import { t } from '@/boot/i18n'
-import { TrainWagonChangeType, TrainWagonKind, TrainWagonPlanStatus } from '@/shared/constants/TrainWagonChange'
+import {
+  TrainJournalCode,
+  TrainWagonChangeType,
+  TrainWagonKind,
+  TrainWagonPlanStatus,
+} from '@/shared/constants/TrainWagonChange'
 import { dictManager } from '@/shared/dict/DictManager'
 import { formatDateTime } from '@/shared/format'
 
 /**
  * Журнал поезда и состав на момент (техника «журнал и состояние», doc/db-doc/journal-state-plan-fact.md) — общее для
- * экранов поезда, рейса и телефона. Журнал — записи train_wagon_change: факты и ожидающие планы. Состав — записи
+ * экранов поезда, рейса и телефона. Журнал — записи train_wagon_change и train_wagon_seq: факты и ожидающие планы.
+ * Состав — записи
  * train_wagon: слой «факт» — история, слой «план» — ожидаемый состав. Справочник Station готовит страница.
  */
 
@@ -16,6 +22,38 @@ export const isFact = (c: TrainChange) => c.kind === TrainWagonKind.FACT
 export const isWaiting = (c: TrainChange) =>
   c.kind === TrainWagonKind.PLAN && c.planStatus === TrainWagonPlanStatus.WAITING
 export const isAttach = (c: TrainChange) => c.changeType === TrainWagonChangeType.ATTACH
+/** Запись смены порядка вагонов. */
+export const isSeq = (c: TrainChange) => c.code === TrainJournalCode.TRAIN_WAGON_SEQ
+
+/** Ключ записи журнала на экране: id двух таблиц независимы. */
+export const changeKey = (c: Pick<TrainChange, 'code' | 'id'>) => `${c.code}:${c.id}`
+
+/** Порядок записей одного времени: смена порядка — после прицепок и отцепок (как на сервере); затем по id. */
+const sameTime = (a: TrainChange, b: TrainChange) => Number(isSeq(a)) - Number(isSeq(b)) || a.id - b.id
+
+/** Порядок записей журнала: по времени, в один момент — sameTime. */
+export const byJournal = (a: TrainChange, b: TrainChange) =>
+  new Date(a.dt).getTime() - new Date(b.dt).getTime() || sameTime(a, b)
+
+/** Вагоны записи — id: вагон прицепки или отцепки, все вагоны нового порядка. */
+export const changeWagons = (c: TrainChange): number[] =>
+  c.wagon ? [c.wagon.id] : c.trainWagonSeqItem.map((x) => x.wagon.id)
+
+/** Номера вагонов записи через запятую: вагон прицепки или отцепки, вагоны нового порядка по позициям. */
+export const changeNumbers = (c: TrainChange): string =>
+  c.wagon ? c.wagon.number : c.trainWagonSeqItem.map((x) => x.wagon.number).join(', ')
+
+/**
+ * Переставить вагоны списка в порядке wanted (как TrainJournal.reorder на сервере): вагоны из wanted меняются местами
+ * между собой на занятых ими позициях, остальные остаются на местах.
+ */
+export function reorderBy<T>(list: T[], wagon: (item: T) => number, wanted: number[]): T[] {
+  const moved = list
+    .filter((x) => wanted.includes(wagon(x)))
+    .sort((a, b) => wanted.indexOf(wagon(a)) - wanted.indexOf(wagon(b)))
+  let next = 0
+  return list.map((x) => (wanted.includes(wagon(x)) ? moved[next++]! : x))
+}
 
 /** Вагон состава на момент: запись участия и вагон с текущим расположением. */
 export interface MomentWagon {
@@ -51,18 +89,39 @@ export function compositionAt(card: TrainCard, kind: number, time: string): Mome
  * ставит вагон на свою позицию (больше числа вагонов — в конец), отцепка убирает.
  */
 export function compositionAfter(card: TrainCard, c: TrainChange): MomentWagon[] {
+  return compose(card, c, true)
+}
+
+/** Вагоны, у которых смена порядка c меняет позицию, — id. */
+export function movedBySeq(card: TrainCard, c: TrainChange): Set<number> {
+  const before = compose(card, c, false).map((m) => m.wagon.wagon)
+  return new Set(
+    compose(card, c, true)
+      .map((m) => m.wagon.wagon)
+      .filter((wagon, i) => before[i] !== wagon),
+  )
+}
+
+/** Состав на момент записи c: с самой записью (self) или перед ней. */
+function compose(card: TrainCard, c: TrainChange, self: boolean): MomentWagon[] {
   const fact = isFact(c)
   const kind = fact ? TrainWagonKind.FACT : TrainWagonKind.PLAN
   const momentOf = (x: TrainChange) => (fact ? x.dt : planMoment(card, x))
   const at = new Date(momentOf(c)).getTime()
   const journal = journalOf(card)
   const same = (fact ? journal.facts : journal.plans).filter((x) => new Date(momentOf(x)).getTime() === at)
-  const order = compositionAt(card, kind, new Date(at - 1).toISOString()).map((m) => m.wagon)
+  let order = compositionAt(card, kind, new Date(at - 1).toISOString()).map((m) => m.wagon)
   const wagons = new Map(card.trainWagons.map((w) => [w.wagon, w]))
-  for (const x of same.slice(0, same.findIndex((y) => y.id === c.id) + 1)) {
-    const index = order.findIndex((w) => w.wagon === x.wagon.id)
+  const key = changeKey(c)
+  for (const x of same.slice(0, same.findIndex((y) => changeKey(y) === key) + (self ? 1 : 0))) {
+    if (!x.wagon) {
+      order = reorderBy(order, (w) => w.wagon, changeWagons(x))
+      continue
+    }
+    const wagonId = x.wagon.id
+    const index = order.findIndex((w) => w.wagon === wagonId)
     if (isAttach(x)) {
-      const wagon = wagons.get(x.wagon.id)
+      const wagon = wagons.get(wagonId)
       if (index >= 0 || !wagon) continue
       order.splice(Math.min(Math.max(x.seq ?? order.length + 1, 1), order.length + 1) - 1, 0, wagon)
     } else if (index >= 0) {
@@ -95,8 +154,13 @@ export function currentComposition(card: TrainCard): MomentWagon[] {
     })
 }
 
-/** Вид события словами: «Прицепка» или «Отцепка». */
-export const changeKindText = (c: TrainChange) => (isAttach(c) ? t('Прицепка') : t('Отцепка'))
+/** Подпись плашки состава и карты поезда: «по факту на 24.11 19:07» или «ожидаемый по плану на 24.11 19:07». */
+export const momentBadgeText = (plan: boolean, at: string) =>
+  t(plan ? 'ожидаемый по плану на {time}' : 'по факту на {time}', { time: formatDateTime(at) })
+
+/** Вид события словами: «Прицепка», «Отцепка» или «Смена порядка». */
+export const changeKindText = (c: TrainChange) =>
+  isSeq(c) ? t('Смена порядка') : isAttach(c) ? t('Прицепка') : t('Отцепка')
 
 /**
  * Отклонение факта от отработанного плана словами: «по плану 10:00, Караганда»; без плана или без отклонения — пусто.
@@ -160,28 +224,30 @@ export function tripMarksOfTrip(card: TrainCard, trip: number): JournalMark[] {
 
 /** Журнал поезда для показа: факты по времени, затем ожидающие планы по времени. */
 export function journalOf(card: TrainCard): { facts: TrainChange[]; plans: TrainChange[] } {
-  const byTime = (a: TrainChange, b: TrainChange) => new Date(a.dt).getTime() - new Date(b.dt).getTime() || a.id - b.id
   return {
-    facts: card.changes.filter(isFact).sort(byTime),
-    plans: card.changes.filter(isWaiting).sort(byTime),
+    facts: card.changes.filter(isFact).sort(byJournal),
+    plans: card.changes.filter(isWaiting).sort(byJournal),
   }
 }
 
 /**
  * Более поздние факты того же вагона среди известных фактов facts — от последнего: пока они есть, факт c не удалить
- * (сначала удаляются они). Факты других вагонов не мешают. Факты вагона в других поездах проверяет сервер.
+ * (сначала удаляются они). Факты других вагонов и смены порядка не мешают; смене порядка не мешают никакие факты.
+ * Факты вагона в других поездах проверяет сервер.
  */
 export function laterFactsOfWagon(facts: TrainChange[], c: TrainChange): TrainChange[] {
   const at = Date.parse(c.dt)
+  const wagon = c.wagon?.id
+  if (wagon === undefined) return []
   return facts
     .filter(
       (x) =>
         isFact(x) &&
-        x.wagon.id === c.wagon.id &&
+        x.wagon?.id === wagon &&
         x.id !== c.id &&
         (Date.parse(x.dt) > at || (Date.parse(x.dt) === at && x.id > c.id)),
     )
-    .sort((a, b) => Date.parse(b.dt) - Date.parse(a.dt) || b.id - a.id)
+    .sort((a, b) => byJournal(b, a))
 }
 
 /** Действие с записью журнала: текст на русском, почему недоступно (пусто — доступно). */
@@ -193,7 +259,7 @@ export interface ChangeAction {
 
 /**
  * Действия с записью журнала — общие для экранов: у ожидающего плана «Редактировать» (если задан run.edit),
- * «Отметить» и «Отменить план», у факта «Редактировать» (основания) и «Удалить факт». Недоступное — с причиной (права на сервере: canMark, canCancel, canUndo; удалить факт нельзя, пока после него
+ * «Отметить выполнение» и «Отменить план», у факта «Редактировать» (основания) и «Удалить факт». Недоступное — с причиной (права на сервере: canMark, canCancel, canUndo; удалить факт нельзя, пока после него
  * есть факты того же вагона).
  *
  * @param facts известные факты поезда или рейса: по ним — более поздние факты того же вагона
@@ -215,7 +281,7 @@ export function changeActions(
     return [
       ...editAction('Исправляет план планировщик вагонов или ЛНП рейса'),
       {
-        label: 'Отметить',
+        label: 'Отметить выполнение',
         reason: c.canMark ? '' : t('Отмечает план планировщик вагонов, в рейсе — ЛНП рейса'),
         run: () => run.mark(c),
       },
@@ -235,7 +301,7 @@ export function changeActions(
     return [
       ...editAction('Основания факта исправляет тот, кто может удалить факт'),
       // факт, который отработал план, — отметка выполнения плана: её отменяют; факт без плана удаляют
-      { label: c.plan !== null ? 'Отменить отметку' : 'Удалить факт', reason, run: () => run.undo(c) },
+      { label: c.plan !== null ? 'Отменить отметку о выполнении' : 'Удалить факт', reason, run: () => run.undo(c) },
     ]
   }
   return []

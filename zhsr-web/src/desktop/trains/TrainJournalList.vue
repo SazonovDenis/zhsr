@@ -61,9 +61,9 @@
             v-else-if="row.change"
             :change="row.change"
             :hide-time="i > 0 && rows[i - 1]!.dt === row.dt"
-            :selected="selected === row.change.id"
+            :selected="selected === changeKey(row.change)"
             :has-menu="actionsOf(row.change).length > 0"
-            @select="emit('select', row.change.id)"
+            @select="emit('select', changeKey(row.change!))"
             @menu="openMenu($event, row.change!)"
             @trip="emit('pick-trip', $event)"
           />
@@ -92,7 +92,7 @@ import RowMenu from '@/shared/components/table/RowMenu.vue'
 import { arrowTarget } from '@/shared/composables/listArrows'
 import type { JournalMark as Mark } from '@/shared/trains/trainJournal'
 import { nowMinute } from '@/shared/since'
-import { changeActions, journalOf, tripMarksOf, tripMarksOfTrip } from '@/shared/trains/trainJournal'
+import { changeActions, changeKey, journalOf, tripMarksOf, tripMarksOfTrip } from '@/shared/trains/trainJournal'
 import type { JournalSide } from './journalSide'
 import JournalItem from './TrainJournalItem.vue'
 import JournalMark from './TrainJournalMark.vue'
@@ -101,17 +101,17 @@ import JournalMark from './TrainJournalMark.vue'
  * Журнал поезда (Ф-ПОЕ-02): над ним переключатель «Настоящее» / «Прошлое», под переключателем подпись «Журнал отцепок
  * и прицепок». Прошлое
  * — факты по времени и внизу строка «Текущее состояние»; факты — последние для вагона (у каждого вагона — его
- * последний факт) или за период: неделя, месяц, 3 месяца, год. Время, равное времени записи выше, не повторяется. Настоящее — сверху строка «Текущее состояние», под ней ожидающие планы по времени. В рамке —
+ * последняя прицепка или отцепка, ещё последняя смена порядка) или за период: неделя, месяц, 3 месяца, год. Время, равное времени записи выше, не повторяется. Настоящее — сверху строка «Текущее состояние», под ней ожидающие планы по времени. В рамке —
  * заголовки колонок «Время» и «Событие». Выбор записи — момент, на который справа показан состав: у факта — по факту,
  * у плана — ожидаемый; «Текущее состояние» — текущий состав. Смена прошлого и будущего выбирает «Текущее состояние».
  * Между записями — отметки рейсов поезда (TrainJournalMark): в прошлом — фактические отправления и прибытия, в
  * настоящем — плановые; клик по отметке — состав на её момент (событие select-mark). У записи — меню действий:
- * «Отметить» и «Отменить план» у плана, «Удалить факт» у факта; недоступные — с причиной. Номер рейса записи — мягкая
+ * «Отметить выполнение» и «Отменить план» у плана, «Удалить факт» у факта; недоступные — с причиной. Номер рейса записи — мягкая
  * ссылка: выбрать этот рейс (событие pick-trip).
  * Список прокручен к строке «Текущее состояние». Журнал поезда сервер отдаёт целиком: период отбирает факты здесь.
  *
  * @prop card     поезд
- * @prop selected выбранная запись (train_wagon_change.id); null — «Текущее состояние»
+ * @prop selected выбранная запись (changeKey); null — «Текущее состояние»
  * @prop only     показывать только эти записи (выбран рейс: записи рейса и записи вне рейса за его период); null —
  *                все
  * @prop selectedMark выбранная отметка рейса (JournalMark.key); null — не выбрана
@@ -126,9 +126,9 @@ import JournalMark from './TrainJournalMark.vue'
 const props = withDefaults(
   defineProps<{
     card: TrainCard
-    selected: number | null
+    selected: string | null
     disable?: boolean
-    only?: Set<number> | null
+    only?: Set<string> | null
     selectedMark?: string | null
     onlyTrip?: number | null
     nowSelected?: boolean
@@ -151,7 +151,7 @@ function onArrow(e: KeyboardEvent) {
 
 const side = defineModel<JournalSide>('side', { required: true })
 const emit = defineEmits<{
-  select: [id: number | null]
+  select: [key: string | null]
   'select-mark': [mark: Mark]
   'select-now': []
   'clear-trip': []
@@ -195,7 +195,10 @@ const journal = computed(() => {
   const all = journalOf(props.card)
   const only = props.only
   if (!only) return all
-  return { facts: all.facts.filter((c) => only.has(c.id)), plans: all.plans.filter((c) => only.has(c.id)) }
+  return {
+    facts: all.facts.filter((c) => only.has(changeKey(c))),
+    plans: all.plans.filter((c) => only.has(changeKey(c))),
+  }
 })
 /** Показанные записи: прошлое — факты последние или за период, настоящее — текущее состояние и ожидающие планы. */
 const shown = computed<TrainChange[]>(() => {
@@ -204,9 +207,11 @@ const shown = computed<TrainChange[]>(() => {
   if (side.value === 'future') return journal.value.plans
   const facts = journal.value.facts
   if (pastMode.value === 'last') {
-    // у каждого вагона — его последний факт; порядок по времени сохраняется
-    const last = new Map(facts.map((c) => [c.wagon.id, c.id]))
-    return facts.filter((c) => last.get(c.wagon.id) === c.id)
+    // у каждого вагона — его последняя прицепка или отцепка, ещё — последняя смена порядка; порядок по времени
+    // сохраняется
+    const owner = (c: TrainChange) => c.wagon?.id ?? 'seq'
+    const last = new Map(facts.map((c) => [owner(c), changeKey(c)]))
+    return facts.filter((c) => last.get(owner(c)) === changeKey(c))
   }
   const from = Date.now() - (PERIOD_DAYS[period.value] ?? 7) * 86_400_000
   return facts.filter((c) => new Date(c.dt).getTime() >= from)
@@ -243,7 +248,7 @@ interface JournalRow {
 const rows = computed<JournalRow[]>(() => {
   const list: JournalRow[] = [
     ...marks.value.map((m) => ({ key: `m${m.key}`, dt: m.dt, change: null, mark: m, now: false })),
-    ...shown.value.map((c) => ({ key: `c${c.id}`, dt: c.dt, change: c, mark: null, now: false })),
+    ...shown.value.map((c) => ({ key: `c${changeKey(c)}`, dt: c.dt, change: c, mark: null, now: false })),
   ]
   if (props.onlyTrip !== null) {
     const dep = marks.value.find((m) => m.kind === 'departure')

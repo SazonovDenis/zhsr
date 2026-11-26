@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
+        objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
+
+    <!-- train_wagon_seq: журнал смены порядка вагонов поезда, слои План и Факт - как train_wagon_change;
+         plan - у факта отработанный им план -->
+    <changeSet id="08-train-wagon-seq-train_wagon_seq" author="zhsr">
+        <createTable tableName="train_wagon_seq">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="train" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="kind" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="plan_status" type="integer"/>
+            <column name="dt" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="station" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="trip" type="bigint"/>
+            <column name="route_station" type="bigint"/>
+            <column name="plan" type="bigint"/>
+            <column name="usr" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="comment" type="text"/>
+        </createTable>
+    </changeSet>
+
+    <!-- train_wagon_seq_item: новый порядок вагонов - вагон и его позиция, с 1 -->
+    <changeSet id="08-train-wagon-seq-train_wagon_seq_item" author="zhsr">
+        <createTable tableName="train_wagon_seq_item">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="train_wagon_seq" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="wagon" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="seq" type="integer">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-fk_train_wagon_seq_train" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_seq" baseColumnNames="train" constraintName="fk_train_wagon_seq_train"
+                                 referencedTableName="train" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-fk_train_wagon_seq_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_seq" baseColumnNames="station" constraintName="fk_train_wagon_seq_station"
+                                 referencedTableName="station" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-fk_train_wagon_seq_trip" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_seq" baseColumnNames="trip" constraintName="fk_train_wagon_seq_trip"
+                                 referencedTableName="trip" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-fk_train_wagon_seq_route_station" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_seq" baseColumnNames="route_station" constraintName="fk_train_wagon_seq_route_station"
+                                 referencedTableName="route_station" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-fk_train_wagon_seq_usr" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_seq" baseColumnNames="usr" constraintName="fk_train_wagon_seq_usr"
+                                 referencedTableName="usr" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-fk_train_wagon_seq_plan" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_seq" baseColumnNames="plan" constraintName="fk_train_wagon_seq_plan"
+                                 referencedTableName="train_wagon_seq" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-ux_train_wagon_seq_plan" author="zhsr">
+        <sql>create unique index ux_train_wagon_seq_plan on train_wagon_seq (plan) where plan is not null</sql>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-ck_train_wagon_seq_kind" author="zhsr">
+        <sql>alter table train_wagon_seq add constraint ck_train_wagon_seq_kind check (kind in (1, 2) and (kind = 1) = (plan_status is not null) and (plan_status is null or plan_status in (1, 2, 3)) and (kind = 2 or plan is null))</sql>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-ck_train_wagon_seq_trip" author="zhsr">
+        <sql>alter table train_wagon_seq add constraint ck_train_wagon_seq_trip check ((trip is null) = (route_station is null))</sql>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-ix_train_wagon_seq_trip" author="zhsr">
+        <sql>create index ix_train_wagon_seq_trip on train_wagon_seq (trip) where trip is not null</sql>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-ix_train_wagon_seq_train" author="zhsr">
+        <sql>create index ix_train_wagon_seq_train on train_wagon_seq (train, kind, dt)</sql>
+    </changeSet>
+
+    <!-- строки порядка удаляются вместе с записью журнала -->
+    <changeSet id="08-train-wagon-seq-fk_train_wagon_seq_item_train_wagon_seq" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_seq_item" baseColumnNames="train_wagon_seq" constraintName="fk_train_wagon_seq_item_train_wagon_seq"
+                                 referencedTableName="train_wagon_seq" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-fk_train_wagon_seq_item_wagon" author="zhsr">
+        <addForeignKeyConstraint baseTableName="train_wagon_seq_item" baseColumnNames="wagon" constraintName="fk_train_wagon_seq_item_wagon"
+                                 referencedTableName="wagon" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-uq_train_wagon_seq_item_train_wagon_seq_wagon" author="zhsr">
+        <addUniqueConstraint tableName="train_wagon_seq_item" columnNames="train_wagon_seq, wagon" constraintName="uq_train_wagon_seq_item_train_wagon_seq_wagon"/>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-uq_train_wagon_seq_item_train_wagon_seq_seq" author="zhsr">
+        <addUniqueConstraint tableName="train_wagon_seq_item" columnNames="train_wagon_seq, seq" constraintName="uq_train_wagon_seq_item_train_wagon_seq_seq"/>
+    </changeSet>
+
+    <changeSet id="08-train-wagon-seq-ck_train_wagon_seq_item_seq" author="zhsr">
+        <sql>alter table train_wagon_seq_item add constraint ck_train_wagon_seq_item_seq check (seq &gt; 0)</sql>
+    </changeSet>
+
+</databaseChangeLog>

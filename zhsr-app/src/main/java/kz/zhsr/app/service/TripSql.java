@@ -20,7 +20,7 @@ final class TripSql {
 
     /**
      * Первое изменение после отметки отправления или прибытия: записи журналов вагонов, которые были в поезде в момент
-     * отметки (расположение, состояние, факт ответственных), прицепки и отцепки поезда - позже отметки; номер вагона и
+     * отметки (расположение, состояние, факт ответственных), прицепки, отцепки и смены порядка вагонов поезда - позже отметки; номер вагона и
      * время. Записи, которые открыла сама отметка, начинаются временем отметки и не попадают. Параметры: train,
      * since - время отметки, fact - слой «факт» журнала ответственных, trainFact - слой «факт» участия в поезде и
      * журнала прицепок и отцепок.
@@ -47,6 +47,13 @@ final class TripSql {
                 join wagon on wagon.id = train_wagon_change.wagon
                 where train_wagon_change.train = :train and train_wagon_change.kind = :trainFact
                   and train_wagon_change.dt > :since
+                union all
+                select wagon.number, train_wagon_seq.dt
+                from train_wagon_seq
+                join train_wagon_seq_item on train_wagon_seq_item.train_wagon_seq = train_wagon_seq.id
+                join wagon on wagon.id = train_wagon_seq_item.wagon
+                where train_wagon_seq.train = :train and train_wagon_seq.kind = :trainFact
+                  and train_wagon_seq.dt > :since
                 union all
                 select wagon.number, wagon_responsible.dbeg
                 from train_wagon

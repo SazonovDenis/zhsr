@@ -18,6 +18,7 @@ import kz.zhsr.app.dto.equip.EquipListDetail;
 import kz.zhsr.app.dto.equip.EquipListDraft;
 import kz.zhsr.app.dto.equip.EquipListFilter;
 import kz.zhsr.app.dto.equip.EquipListRow;
+import kz.zhsr.app.dto.equip.EquipListShortage;
 import kz.zhsr.app.dto.equip.EquipListValueRow;
 import kz.zhsr.app.dto.equip.EquipNormRow;
 import kz.zhsr.app.dto.equip.EquipTemplateRow;
@@ -113,6 +114,18 @@ public class EquipService {
         CurrentUser user = currentUserService.get();
         SqlQuery q = EquipSql.list(filter, user.id(), CheckRights.seesAll(user), CheckRights.scope(user), sort);
         List<EquipListRow> res = db.loadSql(q.sql(), q.params(), EquipListRow.class);
+        refResolver.resolve(res);
+        return res;
+    }
+
+    /**
+     * Последние описи вагонов по шаблонам с числом позиций в недостаче - готовность вагонов к рейсу: без ограничения
+     * видимости описей, как сама готовность. Вагона без описей в ответе нет.
+     */
+    public List<EquipListShortage> shortages(List<Long> wagons) throws Exception {
+        currentUserService.get();
+        List<EquipListShortage> res = db.loadSql(EquipSql.shortages(), Map.of("wagons", wagons),
+                EquipListShortage.class);
         refResolver.resolve(res);
         return res;
     }

@@ -48,7 +48,7 @@
            своим разделителем. Слева операция, справа кнопки; ожидающие, подтверждённые и отменённые (с кнопкой «Вернуть
            план») — все строками; без прав и связи кнопок нет -->
       <div v-if="planRows.length > 0" class="today__plans q-pt-md">
-        <div v-for="c in planRows" :key="c.id" class="today__plan q-py-xs">
+        <div v-for="c in planRows" :key="changeKey(c)" class="today__plan q-py-xs">
           <!-- три строки: операция и вагон; станция и время по плану; состояние — «не подтверждён», «просрочен»,
                «выполнено 21.12 23:00», «отменено» -->
           <div class="today__plan-text">
@@ -88,7 +88,7 @@
                 no-caps
                 color="primary"
                 :label="t('Подтвердить')"
-                @click="router.push({ name: 'pwa-trip-mark', params: { id: trip.id, change: c.id } })"
+                @click="router.push({ name: 'pwa-trip-mark', params: { id: trip.id, code: c.code, change: c.id } })"
               />
               <q-btn
                 unelevated
@@ -228,6 +228,9 @@
         <b><ChangeTitle :change="cancelling" :seq="false" /></b>
         <span>{{ planWhere(cancelling) }}</span>
         <span>{{ t('План останется в списке, его можно вернуть.') }}</span>
+        <!-- что будет мешать планам вагона после отмены -->
+        <ErrorBox v-if="cancelProblemsError" :error="cancelProblemsError" />
+        <WagonProblemList :rows="cancelProblems" title="После этого действия будут проблемы:" />
       </div>
       <template #buttons>
         <q-btn
@@ -252,6 +255,37 @@
         />
       </template>
     </BottomSheet>
+    <!-- возврат плана: лист открывается, только если есть что показать, иначе план возвращается сразу -->
+    <BottomSheet :show="restoring !== null" :title="t('Вернуть план?')" @update:show="(v) => !v && (restoring = null)">
+      <div v-if="restoring" class="today__sheet-text">
+        <b><ChangeTitle :change="restoring.change" :seq="false" /></b>
+        <span>{{ planWhere(restoring.change) }}</span>
+        <ErrorBox v-if="restoring.error" :error="restoring.error" />
+        <WagonProblemList :rows="restoring.rows" title="После этого действия будут проблемы:" />
+      </div>
+      <template #buttons>
+        <q-btn
+          unelevated
+          outline
+          no-caps
+          color="ink"
+          no-wrap
+          class="today__sheet-btn zs-pwa-btn zs-pwa-btn--lg zs-soft-border"
+          :label="t('Не возвращать')"
+          @click="restoring = null"
+        />
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          no-wrap
+          class="today__sheet-btn zs-pwa-btn zs-pwa-btn--lg"
+          :loading="markRunning"
+          :label="t('Вернуть план')"
+          @click="confirmRestore"
+        />
+      </template>
+    </BottomSheet>
     <!-- отмена выполнения или подтверждения — с подтверждением; не последний факт поезда — почему нельзя и что
          сначала отменить -->
     <BottomSheet :show="undoing !== null" :title="undoTitle" @update:show="(v) => !v && (undoing = null)">
@@ -261,15 +295,19 @@
         <template v-if="undoBlockers">
           <span class="q-mt-sm">{{ t('После этого вагон ещё прицепляли или отцепляли.') }}</span>
           <span>{{ t('Сначала отмените, начиная с последней:') }}</span>
-          <span v-for="b in undoBlockers" :key="b.id"
+          <span v-for="b in undoBlockers" :key="changeKey(b)"
             >• <ChangeTitle :change="b" :seq="false" /> — {{ planWhere(b) }}</span
           >
         </template>
         <span v-else>{{
-          isFactRow(undoing)
-            ? t('Прицепка или отцепка удаляется.')
-            : t('Отметка выполнения удаляется, план снова ожидает.')
+          !isFactRow(undoing)
+            ? t('Отметка выполнения удаляется, план снова ожидает.')
+            : isSeq(undoing)
+              ? t('Смена порядка удаляется.')
+              : t('Прицепка или отцепка удаляется.')
         }}</span>
+        <ErrorBox v-if="undoProblemsError" :error="undoProblemsError" />
+        <WagonProblemList :rows="undoProblems" title="После этого действия будут проблемы:" />
       </div>
       <template #buttons>
         <q-btn
@@ -315,8 +353,8 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import UserName from '@/shared/components/UserName.vue'
-import type { TrainChange } from '@/api/trains'
-import { cancelChangePlan, restoreChangePlan, undoChange } from '@/api/trains'
+import type { PlanProblem, TrainChange } from '@/api/trains'
+import { cancelChangePlan, fetchJournalProblems, restoreChangePlan, undoChange } from '@/api/trains'
 import type { TripRow, TripCrew } from '@/api/trips'
 import {
   cancelArrival,
@@ -330,6 +368,8 @@ import {
 } from '@/api/trips'
 import { t } from '@/boot/i18n'
 import ChangeTitle from '@/shared/trains/ChangeTitle.vue'
+import { loadProblems, useJournalProblems } from '@/shared/trains/useWagonProblems'
+import WagonProblemList from '@/shared/trains/WagonProblemList.vue'
 import { bus } from '@/shared/bus'
 import { dictManager } from '@/shared/dict/DictManager'
 import { provideBusy } from '@/shared/busy'
@@ -343,7 +383,7 @@ import { isOnline } from '@/shared/network'
 import { loadCached } from '@/shared/offline/cache'
 import { CrewDuty, LocationType, RoleType, TripStatus } from '@/shared/constants/systemDicts'
 import { TrainWagonKind, TrainWagonPlanStatus } from '@/shared/constants/TrainWagonChange'
-import { isWaiting, laterFactsOfWagon } from '@/shared/trains/trainJournal'
+import { byJournal, changeKey, isSeq, isWaiting, laterFactsOfWagon } from '@/shared/trains/trainJournal'
 import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
 import { crewNorm, normDone } from '@/shared/trips/crewNorm'
 import { delayText, markEditable, useNow } from '@/shared/trips/tripTimes'
@@ -429,15 +469,15 @@ function markBlock(depart: boolean): string {
   const c = crew.value
   if (!c) return ''
   if (!depart) {
-    const waiting = plannedChanges.value.map((x) => x.wagon.number)
+    const waiting = numbersOf(plannedChanges.value)
     return waiting.length
-      ? t('Отметьте или отмените плановые прицепки и отцепки рейса: {list}', { list: waiting.join(', ') })
+      ? t('Отметьте или отмените плановые изменения состава рейса: {list}', { list: waiting.join(', ') })
       : ''
   }
   if (!c.trip.train) return t('Поезд рейса не назначен')
   if (c.pending.length > 0) {
-    return t('Отметьте или отмените плановые прицепки и отцепки до отправления: {list}', {
-      list: c.pending.map((x) => x.wagon.number).join(', '),
+    return t('Отметьте или отмените плановые изменения состава до отправления: {list}', {
+      list: numbersOf(c.pending).join(', '),
     })
   }
   const riding = c.wagons.filter((w) => w.riding)
@@ -453,6 +493,11 @@ function markBlock(depart: boolean): string {
   }
   return ''
 }
+
+/** Номера вагонов записей без повторов. */
+const numbersOf = (list: TrainChange[]) => [
+  ...new Set(list.flatMap((c) => (c.wagon ? [c.wagon.number] : c.trainWagonSeqItem.map((x) => x.wagon.number)))),
+]
 
 /** Отметить отправление или прибытие: сначала проверки — не прошли, ошибка в карточке рейса, окно даты не открывается. */
 function openMark(depart: boolean) {
@@ -477,7 +522,7 @@ function timeBlock(): string {
   return ''
 }
 
-// плановые прицепки и отцепки рейса ЛНП: из формирования рейса
+// ожидающие планы рейса ЛНП: из формирования рейса
 const plannedChanges = computed(() => (crew.value?.changes ?? []).filter(isWaiting))
 
 // отменённые планы рейса — строками с кнопкой «Вернуть план»
@@ -492,7 +537,7 @@ const undoFact = (c: TrainChange) => (isFactRow(c) ? c.id : c.fact)
 /** Более поздние факты того же вагона в рейсе — от последнего; факта строки нет в данных — пусто. */
 function blockersOf(c: TrainChange): TrainChange[] {
   const facts = (crew.value?.changes ?? []).filter(isFactRow)
-  const fact = facts.find((x) => x.id === undoFact(c))
+  const fact = facts.find((x) => x.code === c.code && x.id === undoFact(c))
   return fact ? laterFactsOfWagon(facts, fact) : []
 }
 
@@ -506,6 +551,16 @@ const undoBlockers = computed<TrainChange[] | null>(() => {
   const list = blockersOf(c)
   return list.length > 0 ? list : null
 })
+
+// что будет мешать планам вагона после отмены плана и после удаления факта — в листах подтверждения
+const { rows: cancelProblems, error: cancelProblemsError } = useJournalProblems(() =>
+  cancelling.value ? { change: cancelling.value, action: 'cancel' } : null,
+)
+const { rows: undoProblems, error: undoProblemsError } = useJournalProblems(() => {
+  const c = undoing.value
+  const fact = c && !undoBlockers.value ? undoFact(c) : null
+  return c && fact !== null ? { change: { code: c.code, id: fact }, action: 'undo' } : null
+})
 const undoTitle = computed(() => {
   const c = undoing.value
   if (!c) return ''
@@ -516,6 +571,8 @@ const undoTitle = computed(() => {
 const cancelling = ref<TrainChange | null>(null)
 // подтверждённый план, отмену подтверждения которого подтверждают; null — лист закрыт
 const undoing = ref<TrainChange | null>(null)
+// отменённый план, возврат которого подтверждают, с предупреждениями; null — лист закрыт
+const restoring = shallowRef<{ change: TrainChange; rows: PlanProblem[]; error: ShownError | null } | null>(null)
 
 /** Есть ли у строки кнопки: подтверждённый — отменить подтверждение, отменённый — вернуть, ожидающий — отменить. */
 function planButtons(c: TrainChange): boolean {
@@ -525,7 +582,7 @@ function planButtons(c: TrainChange): boolean {
   return isCancelled(c) ? c.canRestore : c.canCancel
 }
 /** Подтверждённые планы рейса в списке: факт такого плана показан строкой плана. */
-const shownDone = computed(() => new Set((crew.value?.done ?? []).map((c) => c.id)))
+const shownDone = computed(() => new Set((crew.value?.done ?? []).map(changeKey)))
 
 /**
  * Строки: ожидающие, подтверждённые и отменённые планы рейса и выполненные прицепки и отцепки рейса — факты без
@@ -536,8 +593,10 @@ const planRows = computed(() =>
     ...plannedChanges.value,
     ...(crew.value?.done ?? []),
     ...(crew.value?.cancelled ?? []),
-    ...(crew.value?.changes ?? []).filter((c) => isFactRow(c) && (c.plan === null || !shownDone.value.has(c.plan))),
-  ].sort((a, b) => Date.parse(rowTime(a)) - Date.parse(rowTime(b)) || a.id - b.id),
+    ...(crew.value?.changes ?? []).filter(
+      (c) => isFactRow(c) && (c.plan === null || !shownDone.value.has(changeKey({ code: c.code, id: c.plan }))),
+    ),
+  ].sort((a, b) => byJournal({ ...a, dt: rowTime(a) }, { ...b, dt: rowTime(b) })),
 )
 
 /** «Караганда, 23.12, в 21:32». */
@@ -572,14 +631,14 @@ function statusClass(c: TrainChange): string {
  */
 function rowTime(c: TrainChange): string {
   if (!isDone(c) || c.fact === null) return c.dt
-  return (crew.value?.changes ?? []).find((x) => x.id === c.fact)?.dt ?? c.dt
+  return (crew.value?.changes ?? []).find((x) => x.code === c.code && x.id === c.fact)?.dt ?? c.dt
 }
 
 // отменить план — кнопкой в строке, без окна: строка остаётся отменённым планом с кнопкой «Вернуть план»
 async function cancelPlan(c: TrainChange) {
   markRunning.value = true
   try {
-    await cancelChangePlan(c.id)
+    await cancelChangePlan(c)
     await load()
   } catch (e) {
     notifyError(e)
@@ -603,7 +662,7 @@ async function confirmUndo() {
   if (!c || fact === null) return
   markRunning.value = true
   try {
-    await undoChange(fact)
+    await undoChange({ code: c.code, id: fact })
     undoing.value = null
     await load()
   } catch (e) {
@@ -613,11 +672,34 @@ async function confirmUndo() {
   }
 }
 
-// вернуть отменённый план; ошибка — всплывашкой
+// вернуть отменённый план: есть предупреждения — сначала лист с ними
 async function restorePlan(c: TrainChange) {
   markRunning.value = true
+  let rows: PlanProblem[] = []
+  let problemsError: ShownError | null = null
   try {
-    await restoreChangePlan(c.id)
+    rows = await loadProblems(() => fetchJournalProblems(c, 'restore'))
+  } catch (e) {
+    problemsError = shownError(e)
+  }
+  markRunning.value = false
+  if (rows.length > 0 || problemsError) restoring.value = { change: c, rows, error: problemsError }
+  else await doRestore(c)
+}
+
+/** Подтверждённый возврат плана: лист закрывается после возврата. */
+async function confirmRestore() {
+  const r = restoring.value
+  if (!r) return
+  await doRestore(r.change)
+  restoring.value = null
+}
+
+// ошибка возврата — всплывашкой
+async function doRestore(c: TrainChange) {
+  markRunning.value = true
+  try {
+    await restoreChangePlan(c)
     await load()
   } catch (e) {
     notifyError(e)

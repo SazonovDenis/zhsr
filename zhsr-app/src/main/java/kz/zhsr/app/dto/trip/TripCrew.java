@@ -4,6 +4,7 @@ import kz.zhsr.app.dto.ref.TrainRef;
 import kz.zhsr.app.dto.ref.UserRef;
 import kz.zhsr.app.dto.train.TrainChange;
 import kz.zhsr.app.dto.train.TrainWagon;
+import kz.zhsr.app.dto.train.WagonProblem;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -19,6 +20,9 @@ public class TripCrew {
     private Trip trip;
     /** вагоны поезда рейса на время рейса: до отправления - ожидаемый состав, после - факт; по позиции */
     private List<Wagon> wagons = List.of();
+    /** неготовность вагонов рейса - тот же расчёт, что в готовности рейса (TripReadiness); у рейса в статусе
+     * «выполнен» и «отменён» пусто */
+    private List<WagonProblem> problems = List.of();
     private List<Member> crew = List.of();
     /** прицепки и отцепки рейса: факты и ожидающие планы, по времени */
     private List<TrainChange> changes = List.of();

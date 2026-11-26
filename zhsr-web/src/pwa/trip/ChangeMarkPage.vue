@@ -1,7 +1,7 @@
 <template>
   <PwaPage :back="goBack" :title="title" :subtitle="subtitle" :fill="step === 1">
     <!-- в пути — два шага: отметка и ответственные; прогресс — у нижнего края шапки -->
-    <template v-if="inProgress" #bottom>
+    <template v-if="twoSteps" #bottom>
       <div class="mark__bars q-px-sm">
         <span v-for="i in 2" :key="i" class="mark__bar" :class="{ 'mark__bar--on': i - 1 <= step }" />
       </div>
@@ -14,10 +14,10 @@
 
       <!-- из плана — текстом, без полей: остановка, вагон, позиция, время по плану -->
       <div class="mark__attrs">
-        <span>{{ attach ? t('Остановка прицепки') : t('Остановка отцепки') }}</span>
+        <span>{{ t(stopLabel) }}</span>
         <span>{{ dictManager.getValue('Station', change.station) }}</span>
-        <span>{{ t('Вагон') }}</span>
-        <span class="zs-mono mark__number">{{ change.wagon.number }}</span>
+        <span>{{ seq ? t('Новый порядок') : t('Вагон') }}</span>
+        <span class="zs-mono mark__number">{{ changeNumbers(change) }}</span>
         <template v-if="attach && change.seq !== null">
           <span>{{ t('Позиция в поезде') }}</span>
           <span>{{ change.seq }}</span>
@@ -27,19 +27,21 @@
       </div>
 
       <label class="mark__field">
-        <span class="mark__label">{{ attach ? t('Время прицепки') : t('Время отцепки') }}</span>
-        <DatePicker v-model="time" with-time :date-text="attach ? 'Время прицепки' : 'Время отцепки'" />
+        <span class="mark__label">{{ t(timeLabel) }}</span>
+        <DatePicker v-model="time" with-time :date-text="timeLabel" />
       </label>
       <label class="mark__field">
         <span class="mark__label">{{ t('Основания, примечания') }}</span>
         <NoteInput v-model="comment" />
       </label>
+      <ErrorBox v-if="problemsError" :error="problemsError" />
+      <WagonProblemList :rows="problemRows" />
       <ErrorBox v-if="error" :error="error" />
     </template>
 
     <!-- шаг 2 (в пути: прицепка и отцепка меняют журналы вагона): ответственные — видом первого шага экрана
          «Ответственные за вагоны»: бригада рейса и сотрудники станции -->
-    <template v-if="change && step === 1">
+    <template v-if="change?.wagon && step === 1">
       <ResponsibleBoard
         v-model="responsibles"
         :wagons="[{ wagon: change.wagon.id, number: change.wagon.number, wagonType: wagonType }]"
@@ -76,7 +78,9 @@ import type { ShownError } from '@/shared/errors'
 import { formError, shownError } from '@/shared/errors'
 import { formatDateTime, isoDateTime } from '@/shared/format'
 import { isOnline } from '@/shared/network'
-import { isAttach } from '@/shared/trains/trainJournal'
+import { useWagonProblems } from '@/shared/trains/useWagonProblems'
+import WagonProblemList from '@/shared/trains/WagonProblemList.vue'
+import { changeNumbers, isAttach, isSeq } from '@/shared/trains/trainJournal'
 import PwaPage from '../components/PwaPage.vue'
 import ResponsibleBoard from '../components/ResponsibleBoard.vue'
 import type { BottomBarAction } from '../components/BottomBar.vue'
@@ -89,30 +93,58 @@ import BottomBar from '../components/BottomBar.vue'
  * первого шага экрана «Ответственные за вагоны»). Нужна связь.
  *
  * @prop id     рейс
- * @prop change плановая прицепка или отцепка (train_wagon_change.id)
+ * @prop code   таблица записи плана (TrainJournalCode)
+ * @prop change план прицепки, отцепки или смены порядка вагонов (id записи таблицы code); у смены порядка вместо
+ *              вагона и позиции — новый порядок, шага ответственных нет
  */
-const props = defineProps<{ id: string; change: string }>()
+const props = defineProps<{ id: string; code: string; change: string }>()
 
 const router = useRouter()
 const busy = provideBusy()
 
 const crew = shallowRef<TripCrew | null>(null)
 const change = computed<TrainChange | null>(
-  () => crew.value?.changes.find((c) => c.id === Number(props.change)) ?? null,
+  () => crew.value?.changes.find((c) => c.code === props.code && c.id === Number(props.change)) ?? null,
 )
+const seq = computed(() => !!change.value && isSeq(change.value))
 const attach = computed(() => !!change.value && isAttach(change.value))
-const inProgress = computed(() => crew.value?.trip.tripStatusType === TripStatus.IN_PROGRESS)
+/** Два шага: прицепка и отцепка в рейсе в пути — ещё ответственные; смена порядка журналы вагона не меняет. */
+const twoSteps = computed(() => !seq.value && crew.value?.trip.tripStatusType === TripStatus.IN_PROGRESS)
 
-const title = computed(() => (attach.value ? t('Подтвердить прицепку') : t('Подтвердить отцепку')))
+const title = computed(() => t(confirmText.value))
+const confirmText = computed(() =>
+  seq.value ? 'Подтвердить смену порядка' : attach.value ? 'Подтвердить прицепку' : 'Подтвердить отцепку',
+)
+const stopLabel = computed(() =>
+  seq.value ? 'Остановка смены порядка' : attach.value ? 'Остановка прицепки' : 'Остановка отцепки',
+)
+const timeLabel = computed(() =>
+  seq.value ? 'Время смены порядка' : attach.value ? 'Время прицепки' : 'Время отцепки',
+)
 const subtitle = computed(() => (crew.value ? `${crew.value.trip.trainNumber} • ${crew.value.trip.name}` : ''))
 
 const time = ref<string | null>(date.formatDate(new Date(), 'YYYY-MM-DDTHH:mm'))
 const comment = ref('')
+// что будет мешать планам вагона, если подтвердить
+const { rows: problemRows, error: problemsError } = useWagonProblems(() => {
+  const c = change.value
+  if (!c?.wagon || !isOnline.value) return null
+  return {
+    train: c.train.id,
+    wagons: [c.wagon.id],
+    changeType: c.changeType!,
+    fact: true,
+    time: time.value ? isoDateTime(new Date(time.value)) : null,
+    station: c.station,
+    routeStation: c.routeStation,
+    plan: c.id,
+  }
+})
 // ответственные за вагон — по номеру вагона; пусто — не назначен
 const responsibles = ref<Record<string, number[]>>({})
 /** Тип вагона плана — из вагонов поезда рейса. */
 const wagonType = computed(
-  () => crew.value?.wagons.find((w) => w.number === change.value?.wagon.number)?.wagonType ?? 0,
+  () => crew.value?.wagons.find((w) => w.number === change.value?.wagon?.number)?.wagonType ?? 0,
 )
 const loadError = ref<ShownError | null>(null)
 const error = ref<ShownError | null>(null)
@@ -126,7 +158,7 @@ async function load() {
     await busy.run(async () => {
       const [data] = await Promise.all([fetchTripCrew(Number(props.id)), dictManager.prepareDicts('Station')])
       crew.value = data
-      if (!change.value) loadError.value = formError(t('План прицепки или отцепки не найден или уже отмечен'))
+      if (!change.value) loadError.value = formError(t('План не найден или уже отмечен'))
       comment.value = change.value?.comment ?? ''
     })
   } catch (e) {
@@ -140,10 +172,9 @@ function goBack() {
   else void router.push({ name: 'pwa-home' })
 }
 
-const confirmText = computed(() => (attach.value ? 'Подтвердить прицепку' : 'Подтвердить отцепку'))
 const navActions = computed<BottomBarAction[]>(() => {
   const ready = !!change.value && isOnline.value
-  if (step.value === 0 && inProgress.value) {
+  if (step.value === 0 && twoSteps.value) {
     return [
       { key: 'back', title: 'Отмена', align: 'left' },
       { key: 'next', title: 'Далее', kind: 'primary', disabled: !ready || !time.value },
@@ -186,12 +217,12 @@ async function save() {
   error.value = null
   running.value = true
   try {
-    await markChange(c.id, {
+    await markChange(c, {
       time: isoDateTime(new Date(time.value)),
       station: null,
       seq: null,
       comment: comment.value.trim(),
-      responsibleUsrs: responsibles.value[c.wagon.number] ?? [],
+      responsibleUsrs: c.wagon ? (responsibles.value[c.wagon.number] ?? []) : [],
     })
     goBack()
   } catch (e) {

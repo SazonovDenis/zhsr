@@ -130,6 +130,29 @@ final class EquipSql {
         return "delete from repair_request_photo where storage_key = :key";
     }
 
+    /**
+     * Последняя опись каждого вагона по каждому шаблону и число позиций в недостаче (фактическое количество меньше
+     * требуемого); отбор последней и недостачи - как в готовности рейса (TripReadinessLoader). Параметр wagons.
+     */
+    static String shortages() {
+        return """
+                select equip_list.id, equip_list.equip_list_template, equip_list.wagon, equip_list.created_dt,
+                       (select count(*) from equip_list_value
+                        where equip_list_value.equip_list = equip_list.id
+                          and equip_list_value.quantity_required is not null
+                          and equip_list_value.quantity_actual < equip_list_value.quantity_required) as shortage_count
+                from equip_list
+                join equip_list_template on equip_list_template.id = equip_list.equip_list_template
+                where equip_list.wagon = any(:wagons)
+                  and equip_list.id = (select last.id from equip_list as last
+                                       where last.wagon = equip_list.wagon
+                                         and last.equip_list_template = equip_list.equip_list_template
+                                       order by last.completed_dt desc, last.id desc
+                                       limit 1)
+                order by equip_list.wagon, equip_list_template.sort_order, equip_list_template.text_ru
+                """;
+    }
+
     /** Последняя опись вагона: id, по времени составления. Параметр wagon. */
     static String lastOfWagon() {
         return """

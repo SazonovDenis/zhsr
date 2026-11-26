@@ -692,7 +692,7 @@ public class TripService {
         DbRec change = changeAfter(id, trip, mark);
         if (change != null) {
             throw ApiException.conflict("После отметки " + mark.text + " были изменения («" + change.getString("number")
-                    + "»: отцепка, прицепка, передача или смена ответственных) - сначала отмените их");
+                    + "»: отцепка, прицепка, смена порядка, передача или смена ответственных) - сначала отмените их");
         }
         OffsetDateTime since = trip.getDateTimeTZ(mark.time);
         if (mark == Mark.ARRIVE) {
@@ -868,6 +868,11 @@ public class TripService {
         TripCrew res = new TripCrew();
         res.setTrip(trip);
         res.setWagons(wagons);
+        if (trip.getTripStatusType() == TripStatus.PLANNED || trip.getTripStatusType() == TripStatus.IN_PROGRESS) {
+            TripReadiness readiness = new TripReadiness(id);
+            refResolver.resolve(List.of(readiness));
+            res.setProblems(readiness.getProblems());
+        }
         res.setCrew(new ArrayList<>(members.values()));
         res.setChanges(changes);
         res.setCancelled(trainService.tripPlans(id, TrainWagonPlanStatus.CANCELLED));

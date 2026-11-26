@@ -173,6 +173,22 @@ export async function fetchLastEquipList(wagon: number): Promise<EquipListDetail
   return (await http.get<EquipListDetail | ''>('/equip-lists/last', { params: { wagon } })).data || null
 }
 
+/** Последняя опись вагона по шаблону и недостача в ней. */
+export interface EquipListShortage {
+  id: number
+  equipListTemplate: EquipTemplateRef
+  wagon: WagonRef
+  createdDt: string
+  /** сколько позиций в недостаче; 0 — недостачи нет */
+  shortageCount: number
+}
+
+/** Последние описи вагонов по шаблонам с недостачей; вагона без описей в ответе нет. */
+export async function fetchEquipShortages(wagons: number[]): Promise<EquipListShortage[]> {
+  const params = { wagons: wagons.join(',') }
+  return (await http.get<EquipListShortage[]>('/equip-lists/shortages', { params })).data
+}
+
 export async function fetchEquipList(id: number): Promise<EquipListDetail> {
   return (await http.get<EquipListDetail>(`/equip-lists/${id}`)).data
 }

@@ -3,8 +3,8 @@ import type { UserRef, WagonRef } from './requests'
 import type { TripRef } from './wagons'
 
 /**
- * API поездов: список, создание и обозначение, журнал прицепок и отцепок и участие вагонов (план и факт), прицепка и
- * отцепка, отметка и отмена плана, удаление ошибочного факта, занятость вагонов.
+ * API поездов: список, создание и обозначение, журнал поезда и участие вагонов (план и факт), прицепка, отцепка и
+ * смена порядка вагонов, отметка и отмена плана, удаление ошибочного факта, занятость вагонов.
  */
 
 /** Поезд в данных. */
@@ -14,20 +14,35 @@ export interface TrainRef {
   name: string
 }
 
-/** Прицепка или отцепка вагона — запись журнала поезда: план или факт. */
+/** Позиция вагона в новом порядке — строка train_wagon_seq_item. */
+export interface TrainWagonSeqItem {
+  wagon: WagonRef
+  /** позиция в поезде, с 1 */
+  seq: number
+}
+
+/**
+ * Запись журнала поезда, план или факт: прицепка или отцепка вагона или смена порядка вагонов. Что за запись, говорит
+ * code; запись определяют code и id; plan и fact — записи той же таблицы.
+ */
 export interface TrainChange {
+  /** таблица записи — константы TrainJournalCode */
+  code: string
   id: number
   train: TrainRef
-  wagon: WagonRef
+  /** вагон прицепки или отцепки; у смены порядка null */
+  wagon: WagonRef | null
+  /** смена порядка: новый порядок вагонов по позициям; у прицепки и отцепки пусто */
+  trainWagonSeqItem: TrainWagonSeqItem[]
   /** слой — константы TrainWagonKind */
   kind: number
   /** статус плана — константы TrainWagonPlanStatus; у факта null */
   planStatus: number | null
-  /** вид — константы TrainWagonChangeType */
-  changeType: number
+  /** вид — константы TrainWagonChangeType; у смены порядка null */
+  changeType: number | null
   /** время, ISO: у плана плановое, у факта фактическое */
   dt: string
-  /** позиция, на которую прицепляют вагон, с 1; у отцепки null */
+  /** позиция, на которую прицепляют вагон, с 1; у отцепки и смены порядка null */
   seq: number | null
   /** станция — id справочника Station */
   station: number
@@ -232,6 +247,79 @@ export interface MarkBody {
   responsibleUsrs: number[]
 }
 
+/**
+ * Неготовность вагона к прицепке или к рейсу: занятость в другом поезде (train, trip, dbeg, dend, fact; на каждый поезд
+ * своя запись) или расположение (locationType, place, station, needStation).
+ */
+export interface WagonProblem {
+  wagon: WagonRef
+  /** константы WagonProblemType */
+  wagonProblemType: number
+  /** когда нужен вагон, ISO */
+  needDt: string
+  /** где будет вагон: вид расположения (LocationType) и id по виду; null — неизвестно */
+  locationType: number | null
+  place: number | null
+  /** станция расположения; null — вагон в рейсе */
+  station: number | null
+  /** на какой станции вагон нужен */
+  needStation: number | null
+  /** другой поезд */
+  train: TrainRef | null
+  /** рейс другого поезда в это время */
+  trip: TripRef | null
+  /** с какого времени вагон в другом поезде, ISO */
+  dbeg: string | null
+  /** запланированная отцепка от другого поезда, ISO; null — не запланирована */
+  dend: string | null
+  /** прицепка к другому поезду выполнена фактом */
+  fact: boolean
+}
+
+/** Рейс или плановая прицепка вне рейса, у вагонов которых есть неготовность. */
+export interface PlanProblem {
+  /** плановое отправление рейса или плановое время прицепки, ISO */
+  dt: string
+  train: TrainRef
+  /** null — прицепка вне рейса */
+  trip: TripRef | null
+  /** плановая прицепка вне рейса; null — рейс или сохраняемая новая прицепка */
+  trainWagonChange: number | null
+  problems: WagonProblem[]
+}
+
+/**
+ * Прицепка или отцепка, которую пользователь собирается сохранить: поезд, вагоны (id), вид (TrainWagonChangeType), факт
+ * или план, время (ISO), станция (null — у отцепки: станция, на которой вагон сейчас), остановка рейса (null — вне
+ * рейса) и исправляемый или отмечаемый план (null — новая запись).
+ */
+export interface WagonProblemQuery {
+  train: number
+  wagons: number[]
+  changeType: number
+  fact: boolean
+  time: string | null
+  station: number | null
+  routeStation: number | null
+  plan: number | null
+}
+
+/** Что будет мешать планам вагонов, если сохранить прицепку или отцепку. */
+export async function fetchWagonProblems(query: WagonProblemQuery): Promise<PlanProblem[]> {
+  if (query.wagons.length === 0) return []
+  const { train, ...params } = query
+  return (await http.get<PlanProblem[]>(`/trains/${train}/wagon-problems`, { params })).data
+}
+
+/** Действие над записью журнала, перед которым нужны предупреждения: отмена плана, возврат плана, удаление факта. */
+export type JournalAction = 'cancel' | 'restore' | 'undo'
+
+/** Что будет мешать планам вагона после действия над записью журнала. */
+export async function fetchJournalProblems(c: TrainJournalId, action: JournalAction): Promise<PlanProblem[]> {
+  const url = `/train-journal/${c.code}/${c.id}/wagon-problems`
+  return (await http.get<PlanProblem[]>(url, { params: { action } })).data
+}
+
 /** Список поездов. */
 export async function fetchTrains(filter: TrainFilter): Promise<TrainRow[]> {
   return (await http.get<TrainRow[]>('/trains', { params: filter })).data
@@ -271,32 +359,45 @@ export async function detachWagons(id: number, body: TrainChangeBody): Promise<T
   return (await http.post<TrainCard>(`/trains/${id}/detach`, body)).data
 }
 
-/** Отметить исполнение плана прицепки или отцепки: факт по плану. */
-export async function markChange(id: number, body: MarkBody): Promise<TrainCard> {
-  return (await http.post<TrainCard>(`/train-changes/${id}/done`, body)).data
+/**
+ * Сменить порядок вагонов фактом или планом: body.wagons — все вагоны поезда в новом порядке; seq и responsibleUsrs не
+ * используются.
+ */
+export async function seqWagons(id: number, body: TrainChangeBody): Promise<TrainCard> {
+  return (await http.post<TrainCard>(`/trains/${id}/seq`, body)).data
 }
 
-/** Отменить план прицепки или отцепки. */
-export async function cancelChangePlan(id: number): Promise<TrainCard> {
-  return (await http.post<TrainCard>(`/train-changes/${id}/cancel`)).data
+/** Запись журнала поезда в адресе: код и id. */
+export type TrainJournalId = Pick<TrainChange, 'code' | 'id'>
+
+const journalUrl = (c: TrainJournalId) => `/train-journal/${c.code}/${c.id}`
+
+/** Отметить исполнение плана: факт по плану. */
+export async function markChange(c: TrainJournalId, body: MarkBody): Promise<TrainCard> {
+  return (await http.post<TrainCard>(`${journalUrl(c)}/done`, body)).data
 }
 
-/** Вернуть отменённый план прицепки или отцепки: снова «ожидает». */
-export async function restoreChangePlan(id: number): Promise<TrainCard> {
-  return (await http.post<TrainCard>(`/train-changes/${id}/restore`)).data
+/** Отменить план. */
+export async function cancelChangePlan(c: TrainJournalId): Promise<TrainCard> {
+  return (await http.post<TrainCard>(`${journalUrl(c)}/cancel`)).data
+}
+
+/** Вернуть отменённый план: снова «ожидает». */
+export async function restoreChangePlan(c: TrainJournalId): Promise<TrainCard> {
+  return (await http.post<TrainCard>(`${journalUrl(c)}/restore`)).data
 }
 
 /**
  * Исправить запись журнала: ожидающий план — время, место, позицию и основания (wagons и fact не используются), факт —
  * только основания (comment). Ответ — поезд после изменения.
  */
-export async function editTrainChange(id: number, body: TrainChangeBody): Promise<TrainCard> {
-  return (await http.put<TrainCard>(`/train-changes/${id}`, body)).data
+export async function editTrainChange(c: TrainJournalId, body: TrainChangeBody): Promise<TrainCard> {
+  return (await http.put<TrainCard>(journalUrl(c), body)).data
 }
 
-/** Удалить ошибочный факт прицепки или отцепки без истории. */
-export async function undoChange(id: number): Promise<TrainCard> {
-  return (await http.delete<TrainCard>(`/train-changes/${id}`)).data
+/** Удалить ошибочный факт без истории. */
+export async function undoChange(c: TrainJournalId): Promise<TrainCard> {
+  return (await http.delete<TrainCard>(journalUrl(c))).data
 }
 
 /** Занятость вагонов в поездах с времени from (ISO; null — сейчас). */

@@ -78,6 +78,10 @@
         :station="card.station.value"
         :trip="Number(id)"
       />
+
+      <!-- на всех шагах: что будет мешать планам отмеченных вагонов, если сохранить -->
+      <ErrorBox v-if="card.problemsError.value" :error="card.problemsError.value" />
+      <WagonProblemList :rows="card.problemRows.value" />
     </template>
 
     <template #bar>
@@ -101,6 +105,7 @@ import LoadSpinner from '@/shared/components/LoadSpinner.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { isOnline } from '@/shared/network'
+import WagonProblemList from '@/shared/trains/WagonProblemList.vue'
 import { useCoupling } from '@/shared/trips/useCoupling'
 import TextInput from '@/shared/components/form/TextInput.vue'
 import { LocationType } from '@/shared/constants/systemDicts'
@@ -143,8 +148,8 @@ const chosen = computed(() => card.wagons.value.filter((w) => card.selected.valu
 const query = ref('')
 
 /**
- * Строки списка — как в выборе вагона заявки: номер, тип, где вагон сейчас, плашка «Ваш вагон» / «Ваш рейс»;
- * недоступный вагон — бледный, причина — в расположении.
+ * Строки списка — как в выборе вагона заявки: номер, тип, где вагон сейчас (у вагона не на станции или в другом поезде —
+ * с пояснением), плашка «Ваш вагон» / «Ваш рейс»; у прицепки после расположения — предупреждения. Отмечаются любые.
  */
 const wagonItems = computed<WagonListItem[]>(() =>
   card.wagons.value
@@ -153,13 +158,17 @@ const wagonItems = computed<WagonListItem[]>(() =>
       key: w.number,
       number: w.number,
       type: dictManager.getValue('WagonType', w.wagonType),
-      place: !w.available
-        ? card.whereText(w)
-        : w.locationType === LocationType.TRIP
-          ? placeText(w.locationType, null, card.crew.value ? tripRefText(card.crew.value.trip) : null)
-          : placeText(w.locationType, w.place),
+      place: [
+        !w.available
+          ? card.whereText(w)
+          : w.locationType === LocationType.TRIP
+            ? placeText(w.locationType, null, card.crew.value ? tripRefText(card.crew.value.trip) : null)
+            : placeText(w.locationType, w.place),
+        card.warnText(w),
+      ]
+        .filter(Boolean)
+        .join('. '),
       badge: wagonBadge(currentUser.value, { number: w.number, trip: null } as RequestWagon, false),
-      disabled: !w.available,
     })),
 )
 
@@ -194,12 +203,7 @@ const navActions = computed<BottomBarAction[]>(() => {
       kind: 'primary',
       loading: card.running.value,
       disabled:
-        !card.stop.value ||
-        !card.time.value ||
-        chosen.value.length === 0 ||
-        !chosen.value.every((w) => w.available) ||
-        card.running.value ||
-        !isOnline.value,
+        !card.stop.value || !card.time.value || chosen.value.length === 0 || card.running.value || !isOnline.value,
     },
   ]
 })

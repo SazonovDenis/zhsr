@@ -10,6 +10,9 @@
     :error="error"
     @ok="save"
   >
+    <template v-if="pickedRows.length > 0" #warnings>
+      <WagonProblemList :rows="pickedRows" strip />
+    </template>
     <ChangeWhereFields
       ref="fields"
       :card="card"
@@ -63,6 +66,8 @@
         @sort="sort = $event"
         @row-click="toggle($event as WagonRow)"
       />
+      <!-- отмеченные вагоны (в том числе скрытые фильтром): что будет мешать их планам, если прицепить -->
+      <ErrorBox v-if="pickedError" :error="pickedError" />
     </div>
   </FormDialog>
 </template>
@@ -70,13 +75,14 @@
 <script setup lang="ts">
 import { computed, provide, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
 
-import type { TrainCard, WagonBusy } from '@/api/trains'
-import { fetchWagonBusy } from '@/api/trains'
+import type { TrainCard, WagonProblemQuery } from '@/api/trains'
+import { fetchWagonBusy, fetchWagonProblems } from '@/api/trains'
 import type { WagonFilter, WagonRow } from '@/api/wagons'
 import { fetchWagons, wagonQuery } from '@/api/wagons'
 import { t } from '@/boot/i18n'
 import { provideBusy } from '@/shared/busy'
 import CbButton from '@/shared/components/choice/CbButton.vue'
+import ErrorBox from '@/shared/components/ErrorBox.vue'
 import FormDialog from '@/shared/components/dialog/FormDialog.vue'
 import FilterBar from '@/shared/components/FilterBar.vue'
 import TextInput from '@/shared/components/form/TextInput.vue'
@@ -85,14 +91,16 @@ import { useSearchFocus } from '@/shared/composables/searchFocus'
 import { searchEsc } from '@/shared/composables/searchEsc'
 import type { TableSort } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
-import { LocationType, WagonStatus } from '@/shared/constants/systemDicts'
+import { WagonStatus } from '@/shared/constants/systemDicts'
+import { TrainWagonChangeType } from '@/shared/constants/TrainWagonChange'
 import { dictChoices } from '@/shared/dict/dictChoices'
 import { dictManager } from '@/shared/dict/DictManager'
 import type { ShownError } from '@/shared/errors'
 import { formError, shownError } from '@/shared/errors'
-import { formatDateTime } from '@/shared/format'
-import { placeStation, wagonTransferPlace } from '@/shared/transferPlace'
-import { tripRefDatedText } from '@/shared/trips/tripRefText'
+import { useWagonProblems } from '@/shared/trains/useWagonProblems'
+import type { Phrase } from '@/shared/trains/phrase'
+import { planProblemPhrase } from '@/shared/trains/wagonProblemText'
+import WagonProblemList from '@/shared/trains/WagonProblemList.vue'
 import CellWagonLocation from '../wagons/cells/CellWagonLocation.vue'
 import CellWagonLocationAt from '../wagons/cells/CellWagonLocationAt.vue'
 import CellWagonState from '../wagons/cells/CellWagonState.vue'
@@ -107,9 +115,10 @@ import ChangeWhereFields from './ChangeWhereFields.vue'
 /**
  * Диалог «Прицепить вагоны» (Ф-ПОЕ-02, Ф-РЕЙ-02) — один и тот же из состава поезда и из формирования рейса: как, где и
  * на какую позицию — по тому, где поезд и вагоны (ChangeWhereFields), и список вагонов как основной (GET /wagons):
- * вагоны станции прицепки (станция выбирается одна — в полях окна), все состояния, кроме «Отставлен». Кроме текущих расположения и состояния — они же на момент прицепки. Вагон,
- * занятый в другом поезде на это время по факту или по плану, не выбирается: вместо отметки — замок, в колонке
- * «Состояние на момент» — в каком поезде и рейсе он занят и с какого по какое время. Фактом выбирается только вагон на станции прицепки; другие вагоны — только планом.
+ * вагоны станции прицепки (станция выбирается одна — в полях окна), все состояния, кроме «Отставлен». Кроме текущих расположения и состояния — они же на момент прицепки. Вагон, который
+ * уже в этом поезде, не выбирается: вместо отметки — замок. Остальные вагоны выбираются; под номером — предупреждения:
+ * что будет мешать будущим планам вагона, если прицепить; у отмеченных вагонов они списком под таблицей. Можно ли
+ * прицепить, проверяет сервер при сохранении.
  * Поиск по номеру находит вагон на любой станции. Открывается через openDialog, результат — поезд после прицепки.
  *
  * @prop card        поезд: состав для выбора позиции
@@ -162,7 +171,10 @@ const searching = computed(() => filter.number.trim() !== '')
 const sort = ref<TableSort | null>(null)
 
 const rows = shallowRef<WagonRow[]>([])
-const busyOf = shallowRef(new Map<string, WagonBusy>())
+/** Вагоны списка, которые уже в этом поезде на момент прицепки, — по номеру. */
+const inTrain = shallowRef(new Set<string>())
+/** Предупреждения вагонов списка — по id вагона. */
+const notesOf = shallowRef(new Map<number, Phrase[]>())
 const loadError = ref<ShownError | null>(null)
 const error = ref<ShownError | null>(null)
 const running = ref(false)
@@ -178,35 +190,33 @@ const columns = defineColumns<WagonRow>([
   { field: 'wagonStatusTypeAt', title: 'Состояние на момент', cell: CellAttachStateAt },
 ])
 
-/** Занятость словами: «поезд Тулпар-1, рейс 002 … от 12.11, с 12.11 08:00 по 14.11 21:00». */
-function busyText(b: WagonBusy): string {
-  const trip = b.trip ? `, ${t('рейс {trip}', { trip: tripRefDatedText(b.trip) })}` : ''
-  const until = b.dend ? ` ${t('по {time}', { time: formatDateTime(b.dend) })}` : ''
-  return `${t('Занят: поезд {train}', { train: b.train.name })}${trip}, ${t('с {time}', { time: formatDateTime(b.dbeg) })}${until}`
-}
-
 /**
- * Подходит ли вагон: занят в поезде — нельзя (замок вместо отметки, занятость — в колонке «Состояние на момент»); факт — только вагон на станции прицепки, не в рейсе; план — вагон не на
- * станции к моменту прицепки — с предупреждением.
+ * Подходит ли вагон. Уже в этом поезде — замок вместо отметки. Остальные вагоны выбираются; под номером —
+ * предупреждения: что будет мешать планам вагона, если прицепить.
  */
 function fit(w: WagonRow): AttachFit {
-  const b = busyOf.value.get(w.number)
-  if (b) {
-    const busy = b.train.id === props.card.id ? t('Уже в поезде') : busyText(b)
-    return { block: busy, warn: '', busy }
+  if (inTrain.value.has(w.number)) {
+    const busy = t('Уже в поезде')
+    return { block: busy, warn: '', busy, notes: [] }
   }
-  const station = targetStation.value
-  if (mode.value === 'fact') {
-    const place = wagonTransferPlace(w.locationType, w.place)
-    const at = place ? placeStation(place) : null
-    if (w.locationType === LocationType.TRIP || at === null || at !== station)
-      return { block: t('Не на станции прицепки: только планом'), warn: '', busy: '' }
-    return { block: '', warn: '', busy: '' }
-  }
-  const at = w.locationAt ? wagonTransferPlace(w.locationAt.locationType, w.locationAt.place) : null
-  const atStation = at ? placeStation(at) : null
-  return { block: '', warn: atStation === station ? '' : t('Не на станции прицепки к этому времени'), busy: '' }
+  return { block: '', warn: '', busy: '', notes: notesOf.value.get(w.id) ?? [] }
 }
+
+/** Запрос предупреждений о прицепке вагонов по выбору окна. */
+function problemQuery(wagons: number[]): WagonProblemQuery {
+  return {
+    train: props.card.id,
+    wagons,
+    changeType: TrainWagonChangeType.ATTACH,
+    fact: mode.value === 'fact',
+    time: moment.value,
+    station: targetStation.value,
+    routeStation: fields.value?.routeStation ?? null,
+    plan: null,
+  }
+}
+
+const { rows: pickedRows, error: pickedError } = useWagonProblems(() => problemQuery([...picked.value]))
 
 function toggle(w: WagonRow) {
   if (fit(w).block) return
@@ -224,13 +234,22 @@ async function load() {
   loadError.value = null
   try {
     await busy.run(async () => {
-      const list = await fetchWagons(wagonQuery({ ...filter, at: moment.value, plan: mode.value === 'plan' }), sort.value)
-      const busyList = await fetchWagonBusy(
-        list.map((w) => w.id),
-        moment.value,
+      const list = await fetchWagons(
+        wagonQuery({ ...filter, at: moment.value, plan: mode.value === 'plan' }),
+        sort.value,
       )
+      const ids = list.map((w) => w.id)
+      const [busyList, problems] = await Promise.all([
+        fetchWagonBusy(ids, moment.value),
+        fetchWagonProblems(problemQuery(ids)),
+      ])
       rows.value = list
-      busyOf.value = new Map(busyList.map((b) => [b.number, b]))
+      inTrain.value = new Set(busyList.filter((b) => b.train.id === props.card.id).map((b) => b.number))
+      const byWagon = new Map<number, Phrase[]>()
+      for (const row of problems)
+        for (const p of row.problems)
+          byWagon.set(p.wagon.id, [...(byWagon.get(p.wagon.id) ?? []), planProblemPhrase(row, p)])
+      notesOf.value = byWagon
     })
   } catch (e) {
     rows.value = []
@@ -238,10 +257,10 @@ async function load() {
   }
 }
 
-watch([filter, sort, moment, mode], load, { deep: true })
+watch([filter, sort, moment, mode, targetStation, () => fields.value?.routeStation], load, { deep: true })
 
 // отмеченный вагон, который при смене вида или времени перестал подходить, снимается
-watch([mode, moment, busyOf], () => {
+watch([mode, moment, inTrain], () => {
   picked.value = new Set(
     [...picked.value].filter((id) => {
       const row = rows.value.find((w) => w.id === id)

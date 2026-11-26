@@ -59,6 +59,7 @@ import { shownError } from '@/shared/errors'
 import { dayStart } from '@/shared/format'
 import ActCancelDialog from '../acts/ActCancelDialog.vue'
 import ChangeUndoDialog from '../trains/ChangeUndoDialog.vue'
+import { TrainJournalCode, TrainWagonChangeType } from '@/shared/constants/TrainWagonChange'
 import DesktopFrame from '../frame/DesktopFrame.vue'
 import type { JournalRow } from './journalColumns'
 import { journalColumns } from './journalColumns'
@@ -143,7 +144,16 @@ async function cancelAct(row: JournalRow) {
 async function undo(row: JournalRow) {
   if (row.act === null) return
   const attach = row.basisType === JournalBasis.ATTACH
-  const done = await openDialog<true>(ChangeUndoDialog, { changeId: row.act, attach, number: props.number })
+  // plan — null: журнал вагона не отличает отметку плана от факта без плана
+  const done = await openDialog<true>(ChangeUndoDialog, {
+    change: {
+      code: TrainJournalCode.TRAIN_WAGON_CHANGE,
+      id: row.act,
+      changeType: attach ? TrainWagonChangeType.ATTACH : TrainWagonChangeType.DETACH,
+      plan: null,
+      wagon: { number: props.number },
+    },
+  })
   if (!done) return
   Notify.create({ message: t(attach ? 'Прицепка отменена' : 'Отцепка отменена'), position: 'bottom' })
   await Promise.all([load(), loadWagon()])

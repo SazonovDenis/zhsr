@@ -61,7 +61,9 @@
       <div v-for="w in warnings" :key="w.title" class="trip-new__warning">
         <div>{{ w.title }}</div>
         <ul class="q-my-none q-pl-lg">
-          <li v-for="c in w.changes" :key="c.id"><ChangeTitle :change="c" />{{ ' • ' + formatDateTime(c.dt) }}</li>
+          <li v-for="c in w.changes" :key="changeKey(c)">
+            <ChangeTitle :change="c" />{{ ' • ' + formatDateTime(c.dt) }}
+          </li>
         </ul>
       </div>
     </template>
@@ -92,7 +94,7 @@ import FormDialog from '@/shared/components/dialog/FormDialog.vue'
 import { dictManager } from '@/shared/dict/DictManager'
 import { formatDateTime, isoDateTime } from '@/shared/format'
 import ChangeTitle from '@/shared/trains/ChangeTitle.vue'
-import { isWaiting } from '@/shared/trains/trainJournal'
+import { changeKey, isWaiting } from '@/shared/trains/trainJournal'
 import { useLoad } from '@/shared/loadable'
 import FormField from '@/shared/components/form/FormField.vue'
 import DatePicker from '@/shared/components/period/DatePicker.vue'

@@ -1,11 +1,15 @@
 package kz.zhsr.app.controller;
 
+import kz.zhsr.app.dto.analytics.GeoChart;
+import kz.zhsr.app.dto.train.PlanProblem;
 import kz.zhsr.app.dto.train.TrainCard;
 import kz.zhsr.app.dto.train.TrainFilter;
 import kz.zhsr.app.dto.train.TrainOption;
 import kz.zhsr.app.dto.train.TrainRow;
 import kz.zhsr.app.dto.train.WagonBusy;
+import kz.zhsr.app.service.PlanProblemService;
 import kz.zhsr.app.service.TrainService;
+import kz.zhsr.app.service.analytics.GeoService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,15 +24,20 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
- * Поезд (Ф-ПОЕ-00, Ф-ПОЕ-01, Ф-ПОЕ-02) и прицепка и отцепка вагонов фактом и планом.
+ * Поезд (Ф-ПОЕ-00, Ф-ПОЕ-01, Ф-ПОЕ-02), прицепка и отцепка вагонов и смена порядка вагонов фактом и планом.
  */
 @RestController
 public class TrainController {
 
     private final TrainService trainService;
+    private final PlanProblemService planProblemService;
 
-    public TrainController(TrainService trainService) {
+    private final GeoService geoService;
+
+    public TrainController(TrainService trainService, PlanProblemService planProblemService, GeoService geoService) {
+        this.geoService = geoService;
         this.trainService = trainService;
+        this.planProblemService = planProblemService;
     }
 
     @GetMapping("/trains")
@@ -49,9 +58,35 @@ public class TrainController {
         return trainService.busy(wagons, from);
     }
 
+    /** Что будет мешать планам вагонов, если сохранить прицепку или отцепку. */
+    @GetMapping("/trains/{id}/wagon-problems")
+    public List<PlanProblem> wagonProblems(@PathVariable long id, TrainService.ProblemsQuery query) throws Exception {
+        return trainService.wagonProblems(id, query);
+    }
+
+    /** Что будет мешать планам вагона после отмены плана, возврата плана или удаления факта. */
+    @GetMapping("/train-journal/{code}/{id}/wagon-problems")
+    public List<PlanProblem> journalProblems(@PathVariable String code, @PathVariable long id,
+                                             @RequestParam String action) throws Exception {
+        return trainService.journalProblems(code, id, action);
+    }
+
+    /** Рейсы и плановые прицепки вне рейса с неготовностью вагонов до времени to. */
+    @GetMapping("/plan-problems")
+    public List<PlanProblem> planProblems(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                                          OffsetDateTime to) throws Exception {
+        return planProblemService.list(to);
+    }
+
     @GetMapping("/trains/{id}")
     public TrainCard card(@PathVariable long id) throws Exception {
         return trainService.card(id);
+    }
+
+    /** Данные карты поезда. */
+    @GetMapping("/trains/{id}/geo")
+    public GeoChart geo(@PathVariable long id) throws Exception {
+        return geoService.trainChart(id);
     }
 
     @PostMapping("/trains")
@@ -74,33 +109,41 @@ public class TrainController {
         return trainService.detach(id, body);
     }
 
+    /** Сменить порядок вагонов фактом или планом. */
+    @PostMapping("/trains/{id}/seq")
+    public TrainCard seq(@PathVariable long id, @RequestBody TrainService.ChangeBody body) throws Exception {
+        return trainService.seq(id, body);
+    }
+
     /** Отметить исполнение плана прицепки или отцепки: факт по плану. */
-    @PostMapping("/train-changes/{id}/done")
-    public TrainCard mark(@PathVariable long id, @RequestBody TrainService.MarkBody body) throws Exception {
-        return trainService.mark(id, body);
+    @PostMapping("/train-journal/{code}/{id}/done")
+    public TrainCard mark(@PathVariable String code, @PathVariable long id,
+                          @RequestBody TrainService.MarkBody body) throws Exception {
+        return trainService.mark(code, id, body);
     }
 
     /** Отменить план прицепки или отцепки. */
-    @PutMapping("/train-changes/{id}")
-    public TrainCard edit(@PathVariable long id, @RequestBody TrainService.ChangeBody body) throws Exception {
-        return trainService.edit(id, body);
+    @PutMapping("/train-journal/{code}/{id}")
+    public TrainCard edit(@PathVariable String code, @PathVariable long id,
+                          @RequestBody TrainService.ChangeBody body) throws Exception {
+        return trainService.edit(code, id, body);
     }
 
-    @PostMapping("/train-changes/{id}/cancel")
-    public TrainCard cancelPlan(@PathVariable long id) throws Exception {
-        return trainService.cancelPlan(id);
+    @PostMapping("/train-journal/{code}/{id}/cancel")
+    public TrainCard cancelPlan(@PathVariable String code, @PathVariable long id) throws Exception {
+        return trainService.cancelPlan(code, id);
     }
 
     /** Вернуть отменённый план прицепки или отцепки. */
-    @PostMapping("/train-changes/{id}/restore")
-    public TrainCard restorePlan(@PathVariable long id) throws Exception {
-        return trainService.restorePlan(id);
+    @PostMapping("/train-journal/{code}/{id}/restore")
+    public TrainCard restorePlan(@PathVariable String code, @PathVariable long id) throws Exception {
+        return trainService.restorePlan(code, id);
     }
 
     /** Удалить ошибочный факт прицепки или отцепки без истории. */
-    @DeleteMapping("/train-changes/{id}")
-    public TrainCard undo(@PathVariable long id) throws Exception {
-        return trainService.undo(id);
+    @DeleteMapping("/train-journal/{code}/{id}")
+    public TrainCard undo(@PathVariable String code, @PathVariable long id) throws Exception {
+        return trainService.undo(code, id);
     }
 
 
