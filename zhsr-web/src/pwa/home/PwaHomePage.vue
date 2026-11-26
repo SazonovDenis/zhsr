@@ -544,6 +544,11 @@ function blockersOf(c: TrainChange): TrainChange[] {
 /** «Отменить» доступна: после факта строки у этого вагона нет других прицепок и отцепок. */
 const undoLast = (c: TrainChange) => blockersOf(c).length === 0
 
+// план, отмену которого подтверждают; null — лист закрыт
+const cancelling = ref<TrainChange | null>(null)
+// подтверждённый план, отмену подтверждения которого подтверждают; null — лист закрыт
+const undoing = ref<TrainChange | null>(null)
+
 /** Что мешает отменить: более поздние факты того же вагона, от последнего; ничего — null, отменить можно. */
 const undoBlockers = computed<TrainChange[] | null>(() => {
   const c = undoing.value
@@ -567,10 +572,6 @@ const undoTitle = computed(() => {
   if (undoBlockers.value) return t('Отменить пока нельзя')
   return isFactRow(c) ? t('Отменить выполнение?') : t('Отменить подтверждение?')
 })
-// план, отмену которого подтверждают; null — лист закрыт
-const cancelling = ref<TrainChange | null>(null)
-// подтверждённый план, отмену подтверждения которого подтверждают; null — лист закрыт
-const undoing = ref<TrainChange | null>(null)
 // отменённый план, возврат которого подтверждают, с предупреждениями; null — лист закрыт
 const restoring = shallowRef<{ change: TrainChange; rows: PlanProblem[]; error: ShownError | null } | null>(null)
 
