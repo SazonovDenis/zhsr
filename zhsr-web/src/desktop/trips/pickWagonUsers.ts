@@ -4,20 +4,26 @@ import { t } from '@/boot/i18n'
 import { openDialog } from '@/shared/components/dialog/openDialog'
 import type { UserPickRow } from '@/shared/components/dialog/UserPickDialog.vue'
 import UserPickDialog from '@/shared/components/dialog/UserPickDialog.vue'
+import type { ResponsiblesDraft } from '@/shared/trips/tripResponsibles'
+import { candidateWagonWarning, currentDraft } from '@/shared/trips/tripResponsibles'
 import { isMe } from '@/shared/user'
-import { responsibleDuty, responsiblePlace } from '@/shared/wagons/responsible'
+import { responsibleDuty } from '@/shared/wagons/responsible'
+import { candidatePlace } from './candidatePlace'
 
 /**
  * Окно «Ответственные за вагон N» рейса: сотрудники из тех, кого можно назначить (data.candidates), с переключателем
- * «Поездная бригада» / «Сотрудники станции». current — назначенные сейчас; save — что сделать с выбором. Возвращает
- * выбор; окно закрыто без выбора — undefined.
+ * «Поездная бригада» / «Сотрудники станции». У проводника, которому этот вагон нарушит правило «один вагон или два
+ * соседних» (с учётом draft — черновика ответственных), — предупреждение жирным справа. current — назначенные
+ * сейчас; save — что сделать с выбором. Возвращает выбор; окно закрыто без выбора — undefined.
  */
 export function pickWagonUsers(
   data: TripResponsibles,
   number: string,
   current: UserRef[],
   save: (usrs: number[]) => Promise<void>,
+  draft: ResponsiblesDraft = currentDraft(data),
 ): Promise<{ usrs: number[] } | undefined> {
+  const wagon = data.wagons.find((w) => w.wagon.number === number)!.wagon.id
   // члены бригады рейса; остальные кандидаты — сотрудники станции
   const crew = new Set(data.candidates.filter((c) => c.crewDutyType !== null).map((c) => c.id))
   return openDialog<{ usrs: number[] }>(UserPickDialog, {
@@ -42,7 +48,7 @@ export function pickWagonUsers(
           name: c.name,
           me: isMe(c),
           duty: responsibleDuty(c),
-          place: responsiblePlace(c),
+          place: candidatePlace(c, candidateWagonWarning(data, draft, c.id, wagon)),
         })),
       ),
     save,

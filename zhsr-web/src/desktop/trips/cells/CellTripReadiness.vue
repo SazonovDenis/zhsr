@@ -1,14 +1,8 @@
 <template>
   <div class="cell-trip-readiness">
-    <span
-      v-for="item in items"
-      :key="item.key"
-      class="cell-trip-readiness__chip q-py-none q-px-sm"
-      :title="item.title"
-      :class="item.ok ? 'cell-trip-readiness__chip--ok' : 'cell-trip-readiness__chip--bad'"
-    >
+    <ReadinessChip v-for="item in items" :key="item.key" :ok="item.ok" :title="item.title">
       {{ item.text }}
-    </span>
+    </ReadinessChip>
   </div>
 </template>
 
@@ -17,6 +11,7 @@ import { computed } from 'vue'
 
 import type { TripRow } from '@/api/trips'
 import { t } from '@/boot/i18n'
+import ReadinessChip from '@/shared/components/ReadinessChip.vue'
 import type { CellProps } from '@/shared/components/table/types'
 import { TripStatus } from '@/shared/constants/systemDicts'
 import { WagonProblemType } from '@/shared/constants/WagonProblemType'
@@ -103,21 +98,5 @@ const items = computed<Item[]>(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-}
-
-.cell-trip-readiness__chip {
-  border-radius: 62.5rem;
-  font-size: 0.8rem;
-  line-height: 1.35;
-
-  &--ok {
-    background: #dff0e2;
-    color: #1d5e2c;
-  }
-
-  &--bad {
-    background: #f7dcd8;
-    color: $zs-error-fg;
-  }
 }
 </style>

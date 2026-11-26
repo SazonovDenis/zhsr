@@ -15,6 +15,8 @@ export interface TripMoment {
   at: string
   /** рейс отправлен: состав на отправление — по факту; иначе — ожидаемый по плану */
   fact: boolean
+  /** статус рейса — константы TripStatus */
+  tripStatusType: number
   /** станция отправления — id справочника Station; null — у маршрута нет остановок */
   departureStation: number | null
   /** неготовность вагонов рейса — расчёт сервера по планам */
@@ -25,6 +27,8 @@ export interface TripMoment {
 
 /** Неготовности вагонов рейса и передача вагона на станцию отправления — для ячейки состава (provide/inject). */
 export interface TripTransfer {
+  /** вагон на месте к отправлению: проверка расположения проведена и неготовностей нет */
+  inPlace: (w: TrainWagon) => boolean
   /** неготовности вагона */
   problems: (w: TrainWagon) => WagonProblem[]
   /** почему передачу не оформить; пусто — можно */
@@ -46,8 +50,8 @@ export const TRIP_EQUIP: InjectionKey<TripEquip> = Symbol('tripEquip')
 
 /** Норма проводников вагона состава — для ячейки готовности (provide/inject). */
 export interface TripConductors {
-  /** у пассажирского вагона не выполнена норма проводников */
-  notOk: (w: TrainWagon) => boolean
+  /** норма проводников вагона; undefined — вагон не едет в поезде рейса или рейс ещё грузится */
+  norm: (w: TrainWagon) => WagonNorm | undefined
   /** почему ответственных не назначить; пусто — можно */
   reason: () => string
   /** назначить ответственных за вагон */

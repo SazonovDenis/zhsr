@@ -385,7 +385,7 @@ import { CrewDuty, LocationType, RoleType, TripStatus } from '@/shared/constants
 import { TrainWagonKind, TrainWagonPlanStatus } from '@/shared/constants/TrainWagonChange'
 import { byJournal, changeKey, isSeq, isWaiting, laterFactsOfWagon } from '@/shared/trains/trainJournal'
 import { currentUser, hasRole, loadCurrentUser } from '@/shared/user'
-import { crewNorm, normDone } from '@/shared/trips/crewNorm'
+import { crewNorm } from '@/shared/trips/crewNorm'
 import { delayText, markEditable, useNow } from '@/shared/trips/tripTimes'
 import BottomSheet from '../components/BottomSheet.vue'
 import CalendarDialog from '../components/CalendarDialog.vue'
@@ -487,10 +487,6 @@ function markBlock(depart: boolean): string {
     .map((w) => w.number)
   if (away.length > 0) return t('Вагоны не на станции отправления: {list}', { list: away.join(', ') })
   if (!member(CrewDuty.LNP) || !member(CrewDuty.PEM)) return t('Не назначены начальник поезда и ПЭМ')
-  const n = norm.value
-  if (n && !normDone(n)) {
-    return t('Не выполнена норма проводников: {list}', { list: [...n.notOk, ...n.tailBad].join(', ') })
-  }
   return ''
 }
 

@@ -239,6 +239,7 @@ const tripMoment = computed<TripMoment | null>(() => {
     number: c.trip.trainNumber,
     at: c.trip.departedDt ?? c.trip.plannedDt,
     fact: c.trip.departedDt !== null,
+    tripStatusType: c.trip.tripStatusType,
     departureStation: c.trip.departureStation,
     problems: c.problems,
     norm: crewNorm(c).wagons,

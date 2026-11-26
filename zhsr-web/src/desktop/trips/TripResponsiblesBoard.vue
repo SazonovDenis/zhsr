@@ -49,11 +49,11 @@ import { openDialog } from '@/shared/components/dialog/openDialog'
 import DataTable from '@/shared/components/table/DataTable.vue'
 import CellEdit from '@/shared/components/table/CellEdit.vue'
 import { defineColumns } from '@/shared/components/table/types'
-import { CrewDuty } from '@/shared/constants/systemDicts'
 import { dictManager } from '@/shared/dict/DictManager'
 import { notifyError } from '@/shared/errors'
 import { formatDateTime } from '@/shared/format'
 import type { ResponsiblesDraft } from '@/shared/trips/tripResponsibles'
+import { draftConductorError, pickedWagonsError } from '@/shared/trips/tripResponsibles'
 import { isMe, userName } from '@/shared/user'
 import { candidateDuty } from '@/shared/wagons/responsible'
 import CellRespPerson from './CellRespPerson.vue'
@@ -68,7 +68,7 @@ import TripWagonsDialog from './TripWagonsDialog.vue'
  * (pickWagonUsers; при сотрудниках станции — с переключателем «Поездная бригада» / «Сотрудники станции»).
  * Справа «По сотрудникам» — «Поездная бригада» (при сотрудниках станции — переключатель «Поездная бригада» /
  * «Сотрудники станции») — сотрудники и их вагоны, клик по строке — окно выбора вагонов (TripWagonsDialog); у
- * проводника с двумя несоседними вагонами — предупреждение «назначен на несоседние вагоны». Обе таблицы
+ * проводника с двумя несоседними вагонами или больше чем с двумя — предупреждение; оно же — в окнах выбора. Обе таблицы
  * показывают один черновик (v-model, вагон — сотрудники): правка в одной сразу видна в другой; записывает вызывающий.
  * readonly — клик по строке ничего не открывает.
  */
@@ -152,15 +152,8 @@ export interface PersonLine {
   /** должность в бригаде; не в бригаде — служба («депо станции») */
   duty: string
   wagons: string
-  /** проводник назначен на два несоседних вагона */
-  notAdjacent: boolean
-}
-
-/** Проводник с двумя вагонами, которые в поезде не рядом: проводник обслуживает один вагон или два соседних. */
-function notAdjacent(c: { id: number; crewDutyType: number | null }): boolean {
-  if (c.crewDutyType !== CrewDuty.CONDUCTOR) return false
-  const pos = props.data.wagons.flatMap((w, i) => (usrsOf(w.wagon.id).includes(c.id) ? [i] : []))
-  return pos.length === 2 && pos[1]! - pos[0]! !== 1
+  /** нарушение правила «один вагон или два соседних» у проводника; пусто — нет */
+  wagonsError: string
 }
 
 const personRows = computed<PersonLine[]>(() => {
@@ -179,7 +172,7 @@ const personRows = computed<PersonLine[]>(() => {
             .filter((w) => usrsOf(w.wagon.id).includes(c.id))
             .map((w) => w.wagon.number)
             .join(', ') || '—',
-        notAdjacent: notAdjacent(c),
+        wagonsError: draftConductorError(props.data, draft.value, c.id),
       }))
   )
 })
@@ -217,6 +210,7 @@ async function pickUsers(line: WagonLine) {
       draft.value = { ...draft.value, [line.id]: usrs }
       return Promise.resolve()
     },
+    draft.value,
   )
 }
 
@@ -236,6 +230,12 @@ async function pickWagons(line: PersonLine) {
     picked: mine,
     title: t('Вагоны для {name}', { name: line.name }),
     okText: 'Выбрать',
+    check: (picked: string[]) =>
+      pickedWagonsError(
+        props.data,
+        line.id,
+        props.data.wagons.filter((w) => picked.includes(w.wagon.number)).map((w) => w.wagon.id),
+      ),
   })
   if (!numbers) return
   const next = { ...draft.value }

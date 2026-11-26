@@ -38,7 +38,7 @@ import { actionsMenu } from '@/shared/components/table/rowMenu'
 import type { RowAction } from '@/shared/components/table/rowMenu'
 import type { Column } from '@/shared/components/table/types'
 import { defineColumns } from '@/shared/components/table/types'
-import { CrewDuty, LocationType, RoleType } from '@/shared/constants/systemDicts'
+import { CrewDuty, LocationType, RoleType, TripStatus } from '@/shared/constants/systemDicts'
 import type { ShownError } from '@/shared/errors'
 import { notifyError, shownError } from '@/shared/errors'
 import { TripResponsibleLayer } from '@/shared/constants/TripResponsibleLayer'
@@ -64,6 +64,7 @@ import { currentUser, hasRole } from '@/shared/user'
 import { pickWagonUsers } from '../trips/pickWagonUsers'
 import { wagonsColumns } from '../wagons/wagonsColumns'
 import CellMomentPlans from './cells/CellMomentPlans.vue'
+import CellMomentWagon from './cells/CellMomentWagon.vue'
 import CellWagonReadiness from './cells/CellWagonReadiness.vue'
 import type { TripMoment } from './tripMoment'
 import { MOMENT_PLANS, TRIP_CONDUCTORS, TRIP_EQUIP, TRIP_TRANSFER } from './tripMoment'
@@ -84,8 +85,9 @@ interface MomentRow extends TrainWagon {
  * после неё; запись плана — ожидаемый состав после неё. Выбран рейс —
  * колонка «Готовность» каждого вагона: на другой станции, нужна передача на станцию (со ссылкой «Оформить передачу») или в другом поезде; проводники не по норме —
  * предупреждение и ссылка «Назначить»; опись экипировки не
- * проводилась — предупреждение, в ней недостача — предупреждение и ссылка «Опись». Показан строго состав на момент: вагона, которого нет в
- * поезде, в таблице нет. Колонки «Номер», «Тип», «Расположение», «Состояние» — как в списке вагонов. В режиме журнала «Настоящее» —
+ * проводилась — предупреждение, в ней недостача — предупреждение и ссылка «Опись»; выполненные пункты — зелёными
+ * плашками. Показан строго состав на момент: вагона, которого нет в
+ * поезде, в таблице нет. Колонка «Вагон» — номер, тип и модель; «Расположение» и «Состояние» — как в списке вагонов. В режиме журнала «Настоящее» —
  * ещё колонка «Запланировано» (ожидающие планы вагона после момента) и меню вагона «Отцепить вагон»; в
  * режиме «Прошлое» меню — только у текущего состава. Вагон, которого касается запись, выделен. Справочники Station,
  * Depot, Yard, LocationKind, WagonType, WagonModel готовит страница.
@@ -197,22 +199,18 @@ const rows = computed<MomentRow[]>(() =>
 /** Выделенный вагон: вагон выбранной прицепки или отцепки. */
 const highlight = computed(() => change.value?.wagon?.id ?? null)
 
-// «Номер», «Тип», «Расположение», «Состояние» — те же, что в списке вагонов; строка вагона поезда несёт их поля
+// «Расположение», «Состояние» — те же, что в списке вагонов; строка вагона поезда несёт их поля
 /**
  * Ширины колонок без зависимости от содержимого: каждая строка таблицы — своя сетка, и ширина «по содержимому»
  * (min-content) у строк разная — колонки прыгали бы от строки к строке.
  */
 const WIDTHS: Record<string, string> = {
-  wagonType: 'minmax(6rem, 0.8fr)',
   locationType: 'minmax(8rem, 1.3fr)',
-  wagonStatusType: 'minmax(7rem, 1fr)',
+  wagonStatusType: 'minmax(4.7rem, 0.7fr)',
 }
 
 const wagonColumns = (wagonsColumns as unknown as Column<MomentRow>[])
-  .filter(
-    (c) =>
-      c.field === 'number' || c.field === 'wagonType' || c.field === 'locationType' || c.field === 'wagonStatusType',
-  )
+  .filter((c) => c.field === 'locationType' || c.field === 'wagonStatusType')
   .map((c) => {
     const width = WIDTHS[c.field as string] ?? c.width
     return width === undefined ? { ...c, sortable: false } : { ...c, sortable: false, width }
@@ -222,11 +220,14 @@ const wagonColumns = (wagonsColumns as unknown as Column<MomentRow>[])
 const withReadiness = computed(() => !!props.trip)
 
 const columns = computed(() => [
-  ...defineColumns<MomentRow>([{ field: 'seq', title: '№', width: '2rem' }]),
+  ...defineColumns<MomentRow>([
+    { field: 'seq', title: '№', width: '2rem' },
+    { field: 'number', title: 'Вагон', width: 'minmax(5.5rem, 0.7fr)', cell: CellMomentWagon },
+  ]),
   ...wagonColumns,
   ...(withReadiness.value
     ? defineColumns<MomentRow>([
-        { field: 'key', title: 'Готовность', width: 'minmax(7rem, 1fr)', cell: CellWagonReadiness },
+        { field: 'key', title: 'Готовность', width: 'minmax(9rem, 1.6fr)', cell: CellWagonReadiness },
       ])
     : []),
   ...(props.future
@@ -239,6 +240,13 @@ const columns = computed(() => [
 // передачу на станцию оформляют мастер депо, приёмщик и администратор
 const router = useRouter()
 provide(TRIP_TRANSFER, {
+  // расположение проверяется только до отправления у вагонов, которые едут в поезде на отправлении; без остановок у
+  // маршрута проверки нет
+  inPlace: (w) =>
+    props.trip?.tripStatusType === TripStatus.PLANNED &&
+    props.trip.departureStation !== null &&
+    props.trip.norm.some((n) => n.number === w.number) &&
+    !props.trip.problems.some((p) => p.wagon.id === w.wagon),
   problems: (w) => props.trip?.problems.filter((p) => p.wagon.id === w.wagon) ?? [],
   reason: (w) => {
     if (![RoleType.ADMIN, RoleType.MASTER, RoleType.RECEIVER].some((r) => hasRole(currentUser.value, r)))
@@ -304,7 +312,7 @@ async function assignConductors(w: TrainWagon) {
   }
 }
 provide(TRIP_CONDUCTORS, {
-  notOk: (w) => props.trip?.norm.some((n) => n.number === w.number && !n.ok) ?? false,
+  norm: (w) => props.trip?.norm.find((n) => n.number === w.number),
   reason: () => {
     const u = currentUser.value
     const chief = u?.trip?.id === props.trip?.id && u?.trip?.crewDutyType === CrewDuty.LNP

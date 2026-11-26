@@ -49,6 +49,7 @@
       </template>
       <template #right>{{ t('Отмечено: {n}', { n: picked.size }) }}</template>
     </FilterBar>
+    <div v-if="warning" class="trip-wagons__warn">{{ warning }}</div>
 
     <DataTable
       ref="dataTable"
@@ -112,12 +113,14 @@ import { WAGON_PICK } from './wagonPick'
  * Внешний список (wagons): окно работает только с этими вагонами — без запроса, фильтров и колонок «на момент
  * отправки», поиск по номеру — среди них; выбрать можно любой, отметку можно снять со всех; picked — отмеченные при
  * открытии. Так выбирают вагоны ответственного (Ф-РЕЙ-08).
+ * check — предупреждение по отмеченным вагонам над таблицей, выбору не мешает.
  *
  * @prop tripId           рейс
  * @prop departureStation станция отправления — id справочника Station
  * @prop plannedDt        плановое отправление, ISO: момент для расположения и состояния
  * @prop wagons           внешний список вагонов; null — вагоны с сервера по фильтру
  * @prop picked           номера вагонов, отмеченных при открытии
+ * @prop check            предупреждение (переведено) по номерам отмеченных вагонов; пусто — не показывается
  */
 const props = withDefaults(
   defineProps<{
@@ -126,6 +129,7 @@ const props = withDefaults(
     plannedDt?: string | null
     wagons?: WagonRow[] | null
     picked?: string[]
+    check?: ((numbers: string[]) => string) | null
     title?: string
     okText?: string
   }>(),
@@ -135,6 +139,7 @@ const props = withDefaults(
     plannedDt: null,
     wagons: null,
     picked: () => [],
+    check: null,
     title: 'Добавить вагоны',
     okText: 'Добавить',
   },
@@ -164,6 +169,8 @@ const loadError = ref<ShownError | null>(null)
 const error = ref<ShownError | null>(null)
 // отмеченные вагоны — по номеру: отметка сохраняется при смене фильтра
 const picked = ref(new Set<string>(props.picked))
+
+const warning = computed(() => props.check?.([...picked.value]) ?? '')
 
 const allColumns = defineColumns<WagonRow>([
   { field: 'number', title: 'Номер', width: '11rem', cell: CellTripWagonPick, sortable: true },
@@ -248,6 +255,11 @@ function save() {
 </script>
 
 <style scoped lang="scss">
+.trip-wagons__warn {
+  color: $zs-error-fg;
+  font-weight: 600;
+}
+
 .trip-wagons__note {
   color: $zs-text-muted;
   font-size: 0.8rem;

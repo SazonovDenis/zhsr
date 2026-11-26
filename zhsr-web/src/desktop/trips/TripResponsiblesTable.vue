@@ -3,6 +3,7 @@
     <CbSegment v-model="mode" single required :values="modes" />
     <template #right>{{ t('Изменено вагонов: {n}', { n: changedCount }) }}</template>
   </FilterBar>
+  <div v-for="w in warnings" :key="w" class="trip-resp__warn">{{ w }}</div>
   <DataTable
     v-if="mode === 'wagons'"
     :columns="wagonColumns"
@@ -40,8 +41,16 @@ import { defineColumns } from '@/shared/components/table/types'
 import { notifyError } from '@/shared/errors'
 import { formatDateTime } from '@/shared/format'
 import type { ResponsiblesDraft } from '@/shared/trips/tripResponsibles'
+import {
+  candidateWagonWarning,
+  draftConductorError,
+  draftConductorWarnings,
+  pickedWagonsError,
+} from '@/shared/trips/tripResponsibles'
 import { isMe, userName } from '@/shared/user'
 import { responsibleDuty, responsiblePlace } from '@/shared/wagons/responsible'
+import { candidatePlace } from './candidatePlace'
+import CellRespWagons from './CellRespWagons.vue'
 import TripWagonsDialog from './TripWagonsDialog.vue'
 
 /**
@@ -49,7 +58,8 @@ import TripWagonsDialog from './TripWagonsDialog.vue'
  * поезда и их ответственные, клик по строке — окно выбора сотрудника с выбором нескольких (UserPickDialog, multiple); «По
  * бригаде» и «Сотрудники станции» — сотрудники и их вагоны, клик по строке — окно выбора вагонов (TripWagonsDialog)
  * по вагонам поезда. Ответственные работают параллельно. v-model — черновик (вагон — сотрудники): окна выбора меняют
- * только его, записывает вызывающий одним временем. readonly — клик по строке ничего не открывает.
+ * только его, записывает вызывающий одним временем. Проводники с несоседними вагонами или больше чем с двумя —
+ * предупреждения над таблицей, у сотрудника и в окнах выбора. readonly — клик по строке ничего не открывает.
  */
 const props = withDefaults(defineProps<{ data: TripResponsibles; readonly?: boolean }>(), { readonly: false })
 
@@ -68,6 +78,7 @@ const modes = computed<ChoiceItem[]>(() => [
 const usrsOf = (wagon: number) => draft.value[wagon] ?? []
 const currentOf = (wagon: number) => props.data.wagons.find((w) => w.wagon.id === wagon)?.usrs.map((u) => u.id) ?? []
 const sameSet = (a: number[], b: number[]) => a.length === b.length && a.every((x) => b.includes(x))
+const warnings = computed(() => draftConductorWarnings(props.data, draft.value))
 const changedCount = computed(
   () => props.data.wagons.filter((w) => !sameSet(usrsOf(w.wagon.id), currentOf(w.wagon.id))).length,
 )
@@ -126,6 +137,7 @@ interface PersonLine {
   name: string
   duty: string
   wagons: string
+  wagonsError: string
 }
 
 const personRows = computed<PersonLine[]>(() => {
@@ -143,6 +155,7 @@ const personRows = computed<PersonLine[]>(() => {
             .filter((w) => usrsOf(w.wagon.id).includes(c.id))
             .map((w) => w.wagon.number)
             .join(', ') || '—',
+        wagonsError: draftConductorError(props.data, draft.value, c.id),
       }))
   )
 })
@@ -150,7 +163,7 @@ const personRows = computed<PersonLine[]>(() => {
 const personColumns = defineColumns<PersonLine>([
   { field: 'name', title: 'Сотрудник' },
   { field: 'duty', title: 'Должность' },
-  { field: 'wagons', title: 'Вагоны', cellClass: 'zs-mono' },
+  { field: 'wagons', title: 'Вагоны', cellClass: 'zs-mono', cell: CellRespWagons },
 ])
 
 // вагоны поезда строками таблицы вагонов — для окна выбора вагонов; грузятся один раз
@@ -182,7 +195,7 @@ async function pickUsers(line: WagonLine) {
           name: c.name,
           me: isMe(c),
           duty: responsibleDuty(c),
-          place: responsiblePlace(c),
+          place: candidatePlace(c, candidateWagonWarning(props.data, draft.value, c.id, line.id)),
         })),
       ),
     save: (usrs: number[]) => {
@@ -208,6 +221,12 @@ async function pickWagons(line: PersonLine) {
     picked: mine,
     title: t('Вагоны для {name}', { name: line.name }),
     okText: 'Выбрать',
+    check: (picked: string[]) =>
+      pickedWagonsError(
+        props.data,
+        line.id,
+        props.data.wagons.filter((w) => picked.includes(w.wagon.number)).map((w) => w.wagon.id),
+      ),
   })
   if (!numbers) return
   const next = { ...draft.value }
@@ -222,6 +241,10 @@ async function pickWagons(line: PersonLine) {
 </script>
 
 <style scoped lang="scss">
+.trip-resp__warn {
+  color: $zs-error-fg;
+}
+
 .trip-resp__table {
   min-height: 0;
   flex: 1;

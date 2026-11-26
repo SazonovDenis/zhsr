@@ -1,11 +1,23 @@
 import type { CrewMember, TripCrew } from '@/api/trips'
+import { t } from '@/boot/i18n'
 import { CrewDuty } from '@/shared/constants/systemDicts'
+import { userName } from '@/shared/user'
 
 /**
  * Норма проводников рейса (Ф-РЕЙ-06): 2 проводника на пассажирский вагон или 3 на два соседних вагона; один проводник
  * обслуживает 1 вагон или 2 соседних; в хвостовые вагоны (первый и последний вагоны состава) — по 2 старших
- * проводника. Вагоны проводника, ставшие несоседними, в норму не засчитываются.
+ * проводника. Проводник с двумя несоседними вагонами или больше чем с двумя вагонами в норму не засчитывается.
  */
+
+/**
+ * Нарушено ли правило «проводник — один вагон или два соседних»: positions — позиции его вагонов в составе. Возвращает
+ * текст нарушения; пусто — правило выполнено.
+ */
+export function conductorWagonsError(positions: number[]): string {
+  if (positions.length > 2) return t('назначен больше чем на два вагона')
+  if (positions.length === 2 && Math.abs(positions[0]! - positions[1]!) !== 1) return t('назначен на несоседние вагоны')
+  return ''
+}
 
 export interface WagonNorm {
   number: string
@@ -18,12 +30,12 @@ export interface WagonNorm {
   tail: boolean
   /** проводники вагона по порядку назначения */
   conductors: CrewMember[]
-  /** норма вагона выполнена */
+  /** норма вагона выполнена: issues пуст */
   ok: boolean
   /** в хвостовом вагоне не хватает старших проводников */
   needSeniors: boolean
-  /** у проводника этого вагона два несоседних вагона */
-  notAdjacent: boolean
+  /** что не выполнено по норме у вагона — готовые тексты (переведены) */
+  issues: string[]
 }
 
 export interface CrewNorm {
@@ -35,7 +47,7 @@ export interface CrewNorm {
   full: boolean
   /** хвостовые вагоны без двух старших проводников */
   tailBad: string[]
-  /** пассажирские вагоны без нормы */
+  /** вагоны с невыполненной нормой */
   notOk: string[]
   /** проводники рейса без вагона */
   pool: CrewMember[]
@@ -49,8 +61,8 @@ export function crewNorm(crew: TripCrew): CrewNorm {
   const order = live.map((w) => w.number)
   const conductors = crew.crew.filter((m) => m.crewDutyType === CrewDuty.CONDUCTOR)
   const last = order.length - 1
-  const adjacent = (m: CrewMember) =>
-    m.wagons.length < 2 || Math.abs(order.indexOf(m.wagons[0]!) - order.indexOf(m.wagons[1]!)) === 1
+  const wagonsError = (m: CrewMember) => conductorWagonsError(m.wagons.map((n) => order.indexOf(n)))
+  const adjacent = (m: CrewMember) => !wagonsError(m)
   const serving = (number: string) => conductors.filter((m) => m.wagons.includes(number))
 
   const ok = new Set<string>()
@@ -79,8 +91,16 @@ export function crewNorm(crew: TripCrew): CrewNorm {
   const wagons: WagonNorm[] = live.map((w, i) => {
     const list = serving(w.number)
     const tail = w.passenger && (i === 0 || i === last)
-    const needSeniors = tail && list.filter((m) => m.senior).length < 2
-    const notAdjacent = list.some((m) => !adjacent(m))
+    const seniors = list.filter((m) => m.senior).length
+    const needSeniors = tail && seniors < 2
+    const issues: string[] = []
+    if (w.passenger && !ok.has(w.number)) {
+      issues.push(t('Не хватает проводников: нужно 2 на вагон или 3 на два соседних'))
+    }
+    if (needSeniors) issues.push(t('Хвостовой вагон: нужны 2 старших проводника, назначено {n}', { n: seniors }))
+    for (const m of list.filter((x) => !adjacent(x))) {
+      issues.push(`${userName(m.usr)}: ${wagonsError(m)} (${m.wagons.join(', ')})`)
+    }
     return {
       number: w.number,
       pos: i + 1,
@@ -88,9 +108,9 @@ export function crewNorm(crew: TripCrew): CrewNorm {
       passenger: w.passenger,
       tail,
       conductors: list,
-      ok: !w.passenger || (ok.has(w.number) && !needSeniors && !notAdjacent),
+      ok: issues.length === 0,
       needSeniors,
-      notAdjacent,
+      issues,
     }
   })
 
@@ -101,14 +121,9 @@ export function crewNorm(crew: TripCrew): CrewNorm {
     need,
     full: passenger.every((w) => ok.has(w.number)),
     tailBad: wagons.filter((w) => w.needSeniors).map((w) => w.number),
-    notOk: passenger.filter((w) => !w.ok).map((w) => w.number),
+    notOk: wagons.filter((w) => !w.ok).map((w) => w.number),
     pool: conductors.filter((m) => m.wagons.length === 0),
     chiefAndPem:
       crew.crew.some((m) => m.crewDutyType === CrewDuty.LNP) && crew.crew.some((m) => m.crewDutyType === CrewDuty.PEM),
   }
-}
-
-/** Норма выполнена полностью: все вагоны по норме, в хвостовых — старшие проводники. */
-export function normDone(norm: CrewNorm): boolean {
-  return norm.full && norm.tailBad.length === 0 && norm.notOk.length === 0
 }

@@ -43,6 +43,7 @@
             :badge="r.changed ? t('изменено') : ''"
           />
           <UserOption v-else :name="r.title" :me="isMe({ id: r.id })" :duty="dutyOf(r.id)" :place="r.sub" />
+          <span v-for="w in r.warnings" :key="w" class="resp__warn">{{ w }}</span>
         </button>
         <div v-if="rows.length === 0" class="resp__muted q-py-lg q-px-md">{{ t(emptyText) }}</div>
       </div>
@@ -63,6 +64,7 @@
           />
         </fieldset>
       </label>
+      <div v-for="w in warnings" :key="w" class="resp__warn">{{ w }}</div>
       <!-- прокручивается только итог; ФИО — каждое своей строкой, номера вагонов — колонкой -->
       <div class="resp__list resp__list--main q-pa-md">
         <template v-for="g in summary" :key="g.title">
@@ -103,11 +105,13 @@
           :duty="people.get(option.id)?.duty ?? ''"
           :place="people.get(option.id)?.place ?? ''"
         />
+        <span v-if="userWarning(option.id)" class="resp__warn">{{ userWarning(option.id) }}</span>
       </template>
     </PickSheet>
 
     <!-- выбор вагонов сотрудника — тем же списком вагонов, что на экране: подсвечено может быть несколько -->
     <BottomSheet v-model:show="wagonPickOpen" :title="pickTitle">
+      <div v-if="wagonPickWarning" class="resp__warn">{{ wagonPickWarning }}</div>
       <div class="resp__list">
         <button
           v-for="w in data?.wagons ?? []"
@@ -164,7 +168,15 @@ import { TripStatus } from '@/shared/constants/systemDicts'
 import { isoDateTime } from '@/shared/format'
 import { isOnline } from '@/shared/network'
 import type { ResponsiblesDraft } from '@/shared/trips/tripResponsibles'
-import { currentDraft, draftChanges, factTimeError } from '@/shared/trips/tripResponsibles'
+import {
+  candidateWagonWarning,
+  currentDraft,
+  draftChanges,
+  draftConductorError,
+  draftConductorWarnings,
+  factTimeError,
+  pickedWagonsError,
+} from '@/shared/trips/tripResponsibles'
 import UserOption from '@/shared/components/UserOption.vue'
 import WagonOption from '@/shared/components/WagonOption.vue'
 import { dictManager } from '@/shared/dict/DictManager'
@@ -185,7 +197,8 @@ import BottomBar from '../components/BottomBar.vue'
  * изменения (по умолчанию — сейчас; у плана — плановое отправление или прибытие, не правится) и прокручиваемый итог
  * «Назначены» и «Сняты» — строки «ФИО — вагон N»; «Назад» и «Переназначить»: факт записывается одним временем
  * изменения, план — без времени. after — «Ответственные после рейса»: план с планового
- * прибытия; без after — ответственные на рейс: до отправления план на рейс из бригады, после — факт. Нужна связь.
+ * прибытия; проводник с несоседними вагонами или больше чем с двумя — предупреждение у строки, в листах выбора и над
+ * итогом; без after — ответственные на рейс: до отправления план на рейс из бригады, после — факт. Нужна связь.
  */
 const props = defineProps<{ id: string; after?: boolean }>()
 
@@ -260,6 +273,7 @@ const rows = computed(() => {
         title: `${w.seq}. ${w.wagon.number}`,
         sub: usrs.length > 0 ? usrs.map(nameOf).join(', ') : t('не назначен'),
         changed: !sameSet(usrs, currentOf(w.wagon.id)),
+        warnings: data.value ? draftConductorWarnings(data.value, draft.value, w.wagon.id) : [],
       }
     })
   }
@@ -270,6 +284,7 @@ const rows = computed(() => {
       title: userName(c),
       sub: mine.length > 0 ? mine.map((w) => w.wagon.number).join(', ') : '—',
       changed: wagons.some((w) => usrsOf(w.wagon.id).includes(c.id) !== currentOf(w.wagon.id).includes(c.id)),
+      warnings: [data.value ? draftConductorError(data.value, draft.value, c.id) : ''].filter(Boolean),
     }
   })
 })
@@ -308,6 +323,19 @@ const pickSelected = computed<number[]>(() => {
   if (mode.value === 'wagons') return usrsOf(row)
   return (data.value?.wagons ?? []).filter((w) => usrsOf(w.wagon.id).includes(row)).map((w) => w.wagon.id)
 })
+
+/** Предупреждения черновика — над итогом второго шага. */
+const warnings = computed(() => (data.value ? draftConductorWarnings(data.value, draft.value) : []))
+/** Предупреждение в листе выбора сотрудников вагона: чем кандидату грозит этот вагон. */
+function userWarning(usr: number): string {
+  const row = pickRow.value
+  if (!data.value || row === null || mode.value !== 'wagons') return ''
+  return candidateWagonWarning(data.value, draft.value, usr, row)
+}
+/** Предупреждение в листе выбора вагонов сотрудника — по отмеченным вагонам. */
+const wagonPickWarning = computed(() =>
+  data.value && pickRow.value !== null ? pickedWagonsError(data.value, pickRow.value, wagonPicked.value) : '',
+)
 
 /** Вагон поезда рейса по id. */
 const wagonOf = (id: number) => data.value?.wagons.find((w) => w.wagon.id === id)
@@ -476,8 +504,15 @@ void load()
   overflow-y: auto;
 }
 
+.resp__warn {
+  color: $zs-error-fg;
+  font-size: 0.8rem;
+}
+
 .resp__row {
   display: flex;
+  // предупреждение — своей строкой под строкой вагона или сотрудника
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   min-height: 3.3rem;
